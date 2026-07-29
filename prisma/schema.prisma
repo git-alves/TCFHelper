@@ -75,21 +75,33 @@ model Subscription {
   id                   String              @id @default(cuid())
   userId               String
   user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeCustomerId     String              @unique
-  stripeSubscriptionId String?             @unique
+  // A customer can hold more than one subscription over time (or, in
+  // principle, concurrently), so this is the indexed lookup key, not the
+  // unique identity of the row — that's stripeSubscriptionId.
+  stripeCustomerId     String
+  stripeSubscriptionId String              @unique
   stripePriceId        String?
   status               SubscriptionStatus  @default(INCOMPLETE)
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean             @default(false)
-  // Timestamp (from the Stripe event, not our own clock) of the last webhook
-  // event applied to this row. Stripe doesn't guarantee webhook delivery
-  // order, so this guards against an older/out-of-order event clobbering
-  // newer state.
+  // Informational only — the last Stripe event's timestamp applied to this
+  // row. Writes are serialized per-subscription (see the webhook handler),
+  // so this is not used to gate whether a write is applied.
   lastStripeEventAt    DateTime?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
   @@index([userId])
+  @@index([stripeCustomerId])
+}
+
+/// Durable record of processed Stripe webhook events, keyed by Stripe's own
+/// event ID, so a redelivered event (Stripe explicitly does not guarantee
+/// exactly-once or in-order delivery) is a no-op instead of reapplied.
+model StripeEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
 }
 
 model Topic {

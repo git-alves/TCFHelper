@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import type { SubscriptionStatus } from "@/generated/prisma/client";
+import { Prisma, type SubscriptionStatus } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
 
@@ -45,59 +45,69 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
 }
 
-async function syncSubscription(event: Stripe.Event) {
-  // The webhook payload's shape depends on the API version the *endpoint*
-  // (or account default) is pinned to, which we don't control from here —
-  // it doesn't have to match the SDK's pinned apiVersion. Re-fetching
-  // through our pinned client guarantees the shape we actually coded
-  // against, instead of trusting whatever the payload happened to contain.
+export async function syncSubscription(event: Stripe.Event) {
   const subscriptionId = (event.data.object as Stripe.Subscription).id;
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-  const userId = subscription.metadata?.userId;
-  if (!userId) {
-    console.log(`No userId metadata on subscription ${subscription.id}; skipping DB sync.`);
-    return;
-  }
+  await prisma.$transaction(
+    async (tx) => {
+      // Stripe redelivers events (at-least-once, no ordering guarantee) and
+      // `event.created` is only second-granular, so neither the event ID
+      // nor a timestamp comparison is a safe way to gate a write. Instead:
+      // record the event ID first — a unique-constraint violation means
+      // we've already processed this exact event, so bail out — and then
+      // serialize everything else per-subscription with an advisory lock
+      // so concurrent deliveries for the *same* subscription can't race.
+      try {
+        await tx.stripeEvent.create({ data: { id: event.id, type: event.type } });
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          console.log(`Skipping already-processed Stripe event ${event.id}`);
+          return;
+        }
+        throw error;
+      }
 
-  const eventCreatedAt = new Date(event.created * 1000);
-  const stripeCustomerId = String(subscription.customer);
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subscriptionId})::bigint)`;
 
-  const existing = await prisma.subscription.findUnique({
-    where: { stripeCustomerId },
-    select: { lastStripeEventAt: true },
-  });
+      // The webhook payload's shape depends on the API version the
+      // *endpoint* (or account default) is pinned to, which we don't
+      // control from here — it doesn't have to match the SDK's pinned
+      // apiVersion. Re-fetching through our pinned client guarantees the
+      // shape we actually coded against. It also means whichever delivery
+      // for this subscription runs last (now serialized by the lock above)
+      // always writes Stripe's true current state, regardless of which
+      // event triggered it — so event ordering doesn't matter for
+      // correctness, only for not doing redundant work.
+      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
-  // Stripe doesn't guarantee webhook delivery order. If we've already
-  // applied a newer event for this customer, don't let a late/out-of-order
-  // one overwrite it — this also protects against a stale event for an
-  // old subscription clobbering a newer one after cancel + resubscribe.
-  if (existing?.lastStripeEventAt && existing.lastStripeEventAt >= eventCreatedAt) {
-    console.log(
-      `Skipping stale Stripe event for customer ${stripeCustomerId} (event ${event.id})`
-    );
-    return;
-  }
+      const userId = subscription.metadata?.userId;
+      if (!userId) {
+        console.log(`No userId metadata on subscription ${subscription.id}; skipping DB sync.`);
+        return;
+      }
 
-  const item = subscription.items.data[0];
-  const data = {
-    userId,
-    stripeCustomerId,
-    stripeSubscriptionId: subscription.id,
-    stripePriceId: item?.price.id,
-    status: mapStripeStatus(subscription.status),
-    currentPeriodEnd: item?.current_period_end
-      ? new Date(item.current_period_end * 1000)
-      : null,
-    cancelAtPeriodEnd: subscription.cancel_at_period_end,
-    lastStripeEventAt: eventCreatedAt,
-  };
+      const item = subscription.items.data[0];
+      const data = {
+        userId,
+        stripeCustomerId: String(subscription.customer),
+        stripeSubscriptionId: subscription.id,
+        stripePriceId: item?.price.id,
+        status: mapStripeStatus(subscription.status),
+        currentPeriodEnd: item?.current_period_end
+          ? new Date(item.current_period_end * 1000)
+          : null,
+        cancelAtPeriodEnd: subscription.cancel_at_period_end,
+        lastStripeEventAt: new Date(event.created * 1000),
+      };
 
-  await prisma.subscription.upsert({
-    where: { stripeCustomerId },
-    create: data,
-    update: data,
-  });
+      await tx.subscription.upsert({
+        where: { stripeSubscriptionId: subscription.id },
+        create: data,
+        update: data,
+      });
+    },
+    { timeout: 15000 }
+  );
 }
 
 function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {

@@ -3,11 +3,15 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { passwordSchema } from "@/lib/validation";
 
+// Deliberately not the signup-time `passwordSchema`: accounts created
+// before that check existed may have a >72-byte password that bcrypt
+// already truncated when hashing, and still authenticate correctly
+// against that hash. Rejecting them here would lock those users out even
+// though bcrypt.compare would succeed.
 const credentialsSchema = z.object({
   email: z.string().email(),
-  password: passwordSchema,
+  password: z.string().min(1),
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
