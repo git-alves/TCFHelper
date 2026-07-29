@@ -48,8 +48,13 @@ describe("authorizeCredentials", () => {
     expect(result).toBeNull();
   });
 
-  it("rejects an unknown email without needing to compare a password", async () => {
+  it("rejects an unknown email, but still runs bcrypt.compare against a dummy hash", async () => {
+    // Regression: returning early for an unknown email — skipping
+    // bcrypt.compare entirely — makes login response time a timing oracle
+    // that reveals which emails have an account. It must always compare
+    // against something.
     findUniqueMock.mockResolvedValue(null);
+    const compareSpy = vi.spyOn(bcrypt, "compare");
 
     const result = await authorizeCredentials({
       email: "nobody@example.com",
@@ -57,6 +62,7 @@ describe("authorizeCredentials", () => {
     });
 
     expect(result).toBeNull();
+    expect(compareSpy).toHaveBeenCalledTimes(1);
   });
 
   it("authenticates a legacy account whose >72-byte password bcrypt already truncated", async () => {

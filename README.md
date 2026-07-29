@@ -81,22 +81,33 @@ still around would still throw `P2002` the moment a returning customer
 starts a second subscription. So this isn't safe to roll out gradually —
 take a short webhook maintenance window instead:
 
-1. In the Stripe dashboard, disable the webhook endpoint (or otherwise
-   stop it from being reachable). Stripe queues and retries undelivered
-   events for up to 3 days, so nothing is lost.
-2. Run `npm run db:deploy` — with no handler processing events, it's safe
-   to apply both `20260729140000_add_stripe_event_and_customer_index` and
+1. **Don't disable the endpoint/destination in the Stripe dashboard** —
+   [Stripe does not queue or backfill events generated while a
+   destination is disabled](https://docs.stripe.com/workbench/event-destinations),
+   so any subscription change during that window would be lost for good.
+   Instead, make delivery transiently *fail* while leaving the
+   destination enabled: take the app offline (e.g. a maintenance page, or
+   temporarily point the deployment at nothing) so Stripe's requests
+   error or time out. Stripe treats that as a failed delivery and retries
+   with backoff for up to 3 days.
+2. Wait for in-flight requests to the old handler to drain, then run
+   `npm run db:deploy` — with nothing processing events, it's safe to
+   apply both `20260729140000_add_stripe_event_and_customer_index` and
    `20260729150000_require_subscription_id_and_drop_legacy_unique`
    together. If the second migration's preflight check fails (a row has a
    NULL `stripeSubscriptionId`), fix or remove that row, then run
    `npx prisma migrate resolve --rolled-back 20260729150000_require_subscription_id_and_drop_legacy_unique`
    before retrying `db:deploy` — Prisma records the migration as failed
    and won't reapply it until you do.
-3. Deploy the new app code.
-4. Re-enable the webhook endpoint. Stripe redelivers whatever queued
-   during the window; the `StripeEvent` dedupe and per-subscription
-   advisory lock mean those retries and out-of-order arrivals are handled
-   correctly by the new handler.
+3. Deploy the new app code, restoring a working endpoint.
+4. Stripe redelivers failed attempts automatically over its retry window,
+   and the `StripeEvent` dedupe plus per-subscription advisory lock make
+   replays and out-of-order arrivals safe. As a safety net, once the
+   retry window has passed, check the endpoint's delivery logs in the
+   Stripe dashboard for anything that exhausted its retries (an outage
+   longer than the ~3-day retry window would do it) and manually redeliver
+   each with `stripe events resend <event_id>` (Stripe CLI) or the
+   dashboard's per-event **Resend** action.
 
 If this is your first deploy (nothing is live yet), skip all of this —
 there's no existing handler to break, so just run `npm run db:deploy`
