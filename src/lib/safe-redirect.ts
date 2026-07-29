@@ -7,6 +7,12 @@
  * characters (e.g. "/\r\n//evil.example", which a naive prefix check
  * accepts but which browsers reinterpret as protocol-relative). We also
  * only ever return the parsed path/search/hash, never the raw candidate.
+ *
+ * An origin match alone isn't sufficient: an absolute candidate like
+ * "http://localhost//evil.example" resolves to our own origin but its
+ * pathname is "//evil.example" — router.push() would treat that leading
+ * "//" as protocol-relative and send the browser cross-origin again. So the
+ * reconstructed path is rejected too if it starts with "//".
  */
 const SAFE_REDIRECT_BASE = "http://localhost";
 
@@ -26,5 +32,6 @@ export function getSafeRedirectPath(
   if (url.origin !== SAFE_REDIRECT_BASE) return fallback;
 
   const path = `${url.pathname}${url.search}${url.hash}`;
-  return path || fallback;
+  if (!path || path.startsWith("//") || path.startsWith("/\\")) return fallback;
+  return path;
 }

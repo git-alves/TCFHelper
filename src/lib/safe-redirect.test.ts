@@ -42,6 +42,16 @@ describe("getSafeRedirectPath", () => {
     expect(getSafeRedirectPath("/\t/evil.example")).toBe("/dashboard");
   });
 
+  it("falls back for an absolute same-origin URL whose path is itself protocol-relative", () => {
+    // Regression: "http://localhost//evil.example" resolves to our own
+    // origin (SAFE_REDIRECT_BASE), so the origin check alone passes, but
+    // its pathname is "//evil.example" — handing that back to router.push
+    // would be reinterpreted as protocol-relative and leave the origin.
+    expect(getSafeRedirectPath("http://localhost//evil.example")).toBe("/dashboard");
+    expect(getSafeRedirectPath("http://localhost:80//evil.example")).toBe("/dashboard");
+    expect(getSafeRedirectPath("http://localhost///evil.example")).toBe("/dashboard");
+  });
+
   it("uses a custom fallback when provided", () => {
     expect(getSafeRedirectPath("//evil.example", "/login")).toBe("/login");
   });
