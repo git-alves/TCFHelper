@@ -86,10 +86,13 @@ take a short webhook maintenance window instead:
    destination is disabled](https://docs.stripe.com/workbench/event-destinations),
    so any subscription change during that window would be lost for good.
    Instead, make delivery transiently *fail* while leaving the
-   destination enabled: take the app offline (e.g. a maintenance page, or
-   temporarily point the deployment at nothing) so Stripe's requests
-   error or time out. Stripe treats that as a failed delivery and retries
-   with backoff for up to 3 days.
+   destination enabled: `/api/webhooks/stripe` specifically must return a
+   non-2xx status (`503`) or be genuinely unreachable/time out — a generic
+   maintenance page that answers `200` for everything (including the
+   webhook path) counts as a successful delivery to Stripe, and that
+   event is gone for good. In live mode, Stripe retries a failed delivery
+   with backoff for up to 3 days; test mode's retry window is much
+   shorter, so don't rely on it there.
 2. Wait for in-flight requests to the old handler to drain, then run
    `npm run db:deploy` — with nothing processing events, it's safe to
    apply both `20260729140000_add_stripe_event_and_customer_index` and
@@ -105,9 +108,10 @@ take a short webhook maintenance window instead:
    replays and out-of-order arrivals safe. As a safety net, once the
    retry window has passed, check the endpoint's delivery logs in the
    Stripe dashboard for anything that exhausted its retries (an outage
-   longer than the ~3-day retry window would do it) and manually redeliver
-   each with `stripe events resend <event_id>` (Stripe CLI) or the
-   dashboard's per-event **Resend** action.
+   longer than the live-mode ~3-day retry window would do it) and
+   manually redeliver each with
+   `stripe events resend <event_id> --webhook-endpoint=<endpoint_id>`
+   (Stripe CLI) or the dashboard's per-event **Resend** action.
 
 If this is your first deploy (nothing is live yet), skip all of this —
 there's no existing handler to break, so just run `npm run db:deploy`
