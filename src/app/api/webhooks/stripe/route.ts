@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type Stripe from "stripe";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/prisma";
-import { Prisma, type SubscriptionStatus } from "@/generated/prisma/client";
+import type { SubscriptionStatus } from "@/generated/prisma/client";
 
 export const runtime = "nodejs";
 
@@ -52,19 +52,21 @@ export async function syncSubscription(event: Stripe.Event) {
     async (tx) => {
       // Stripe redelivers events (at-least-once, no ordering guarantee) and
       // `event.created` is only second-granular, so neither the event ID
-      // nor a timestamp comparison is a safe way to gate a write. Instead:
-      // record the event ID first — a unique-constraint violation means
-      // we've already processed this exact event, so bail out — and then
-      // serialize everything else per-subscription with an advisory lock
-      // so concurrent deliveries for the *same* subscription can't race.
-      try {
-        await tx.stripeEvent.create({ data: { id: event.id, type: event.type } });
-      } catch (error) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-          console.log(`Skipping already-processed Stripe event ${event.id}`);
-          return;
-        }
-        throw error;
+      // nor a timestamp comparison is a safe way to gate a write. Instead,
+      // record the event ID first: `skipDuplicates` compiles to `ON
+      // CONFLICT DO NOTHING`, so a redelivery is a no-op insert rather than
+      // a unique-violation error. That distinction matters — Postgres
+      // aborts the entire transaction on a query error, and Prisma's
+      // interactive transactions don't take a savepoint per query, so
+      // catching that error and continuing to use `tx` afterwards would
+      // fail every subsequent statement in this transaction.
+      const { count } = await tx.stripeEvent.createMany({
+        data: [{ id: event.id, type: event.type }],
+        skipDuplicates: true,
+      });
+      if (count === 0) {
+        console.log(`Skipping already-processed Stripe event ${event.id}`);
+        return;
       }
 
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${subscriptionId})::bigint)`;

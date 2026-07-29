@@ -21,13 +21,14 @@ vi.mock("@/lib/stripe", () => ({
 }));
 
 // A minimal stand-in for Prisma's interactive $transaction: dedupes by
-// event ID the same way a unique-constraint violation would, and serializes
-// concurrent callers of $executeRaw that share a lock key exactly like a
-// Postgres advisory lock held for the lifetime of the transaction — so
-// these tests exercise the same serialization the real DB provides.
-vi.mock("@/lib/prisma", async () => {
-  const { Prisma } = await import("@/generated/prisma/client");
-
+// event ID the same way `createMany({ skipDuplicates: true })` compiling to
+// `ON CONFLICT DO NOTHING` would (a no-op insert, not a thrown error — a
+// real unique-violation would abort the whole Postgres transaction), and
+// serializes concurrent callers of $executeRaw that share a lock key
+// exactly like a Postgres advisory lock held for the lifetime of the
+// transaction — so these tests exercise the same serialization the real DB
+// provides.
+vi.mock("@/lib/prisma", () => {
   return {
     prisma: {
       async $transaction(callback: (tx: unknown) => Promise<unknown>) {
@@ -35,14 +36,13 @@ vi.mock("@/lib/prisma", async () => {
 
         const tx = {
           stripeEvent: {
-            async create({ data }: { data: { id: string; type: string } }) {
-              if (db.stripeEventIds.has(data.id)) {
-                throw new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
-                  code: "P2002",
-                  clientVersion: "test",
-                });
+            async createMany({ data }: { data: { id: string; type: string }[] }) {
+              const [{ id }] = data;
+              if (db.stripeEventIds.has(id)) {
+                return { count: 0 };
               }
-              db.stripeEventIds.add(data.id);
+              db.stripeEventIds.add(id);
+              return { count: 1 };
             },
           },
           async $executeRaw(_strings: TemplateStringsArray, ...values: unknown[]) {
@@ -100,6 +100,14 @@ function makeSubscription(overrides: { id: string; status?: string }) {
   } as unknown as Stripe.Subscription;
 }
 
+function deferred<T = void>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 function makeEvent(overrides: { id: string; created: number; subscriptionId: string }) {
   return {
     id: overrides.id,
@@ -145,15 +153,25 @@ describe("syncSubscription", () => {
 
   it("serializes concurrent, same-second events for one subscription instead of racing", async () => {
     const order: string[] = [];
+    const firstStarted = deferred();
+    const releaseFirst = deferred();
     let callCount = 0;
 
+    // Deterministic barrier instead of a wall-clock delay: the first
+    // caller to reach `retrieve` blocks until the test explicitly releases
+    // it, so we can assert the second caller hasn't started yet — proving
+    // the advisory lock serializes them — without depending on timing.
     retrieveMock.mockImplementation(async (id: string) => {
       callCount += 1;
-      const label = callCount === 1 ? "first" : "second";
-      order.push(`${label}-start`);
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      order.push(`${label}-end`);
-      return makeSubscription({ id, status: label === "first" ? "active" : "canceled" });
+      if (callCount === 1) {
+        order.push("first-start");
+        firstStarted.resolve();
+        await releaseFirst.promise;
+        order.push("first-end");
+        return makeSubscription({ id, status: "active" });
+      }
+      order.push("second-start");
+      return makeSubscription({ id, status: "canceled" });
     });
 
     // Same subscription, same second (event.created has second granularity
@@ -162,12 +180,18 @@ describe("syncSubscription", () => {
     const eventA = makeEvent({ id: "evt_a", created: 1_700_000_000, subscriptionId: "sub_A" });
     const eventB = makeEvent({ id: "evt_b", created: 1_700_000_000, subscriptionId: "sub_A" });
 
-    await Promise.all([syncSubscription(eventA), syncSubscription(eventB)]);
+    const both = Promise.all([syncSubscription(eventA), syncSubscription(eventB)]);
+
+    await firstStarted.promise;
+    // The second transaction is blocked on the advisory lock, so it can't
+    // have reached `retrieve` yet even though "first" hasn't finished.
+    expect(order).toEqual(["first-start"]);
+
+    releaseFirst.resolve();
+    await both;
 
     expect(retrieveMock).toHaveBeenCalledTimes(2);
-    // No interleaving: whichever transaction acquires the lock first runs
-    // its retrieve-to-write section to completion before the other starts.
-    expect(order).toEqual(["first-start", "first-end", "second-start", "second-end"]);
+    expect(order).toEqual(["first-start", "first-end", "second-start"]);
     expect(db.subscriptions.get("sub_A")?.status).toBe("CANCELED");
   });
 });

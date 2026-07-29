@@ -8,10 +8,12 @@ import { prisma } from "@/lib/prisma";
 // before that check existed may have a >72-byte password that bcrypt
 // already truncated when hashing, and still authenticate correctly
 // against that hash. Rejecting them here would lock those users out even
-// though bcrypt.compare would succeed.
+// though bcrypt.compare would succeed. The upper bound is only there to
+// cap input size handed to bcrypt.compare — it's far above the 72-byte
+// truncation point, so it never rejects a password bcrypt would accept.
 const credentialsSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
+  password: z.string().min(8).max(512),
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
