@@ -18,13 +18,7 @@ user can reach `/dashboard`.
 
 ## Local setup
 
-1. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-2. Copy `.env.example` to `.env` and fill in real values:
+1. Copy `.env.example` to `.env` and fill in real values:
 
    ```bash
    cp .env.example .env
@@ -36,6 +30,17 @@ user can reach `/dashboard`.
    - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`: see
      [Stripe setup](#stripe-setup) below. Optional for local dev if you're
      not touching billing code.
+
+2. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+   (`postinstall` runs `prisma generate`; it works even without a `.env`
+   file, since generating the client only reads the schema, not the
+   database — but real values are needed before anything that talks to
+   Postgres.)
 
 3. Apply the database schema:
 
@@ -89,6 +94,16 @@ session.
 3. Point a webhook endpoint at `/api/webhooks/stripe` (via `stripe listen`
    locally, or a dashboard-configured endpoint in production) and set
    `STRIPE_WEBHOOK_SECRET` to the signing secret it gives you.
+
+A webhook endpoint's payloads are serialized using whatever API version the
+endpoint (or your account default) is pinned to in the Stripe dashboard —
+that's independent of the `apiVersion` pinned in `src/lib/stripe.ts`, and
+Stripe doesn't guarantee delivery order either. The webhook handler doesn't
+trust the raw payload for either reason: on a subscription event it only
+reads the subscription ID off the payload, re-fetches that subscription
+through our pinned SDK client (so the shape always matches what we coded
+against), and skips applying the update if it already has a same-or-newer
+event recorded for that customer (`Subscription.lastStripeEventAt`).
 
 The webhook handler (`src/app/api/webhooks/stripe/route.ts`) verifies the
 signature and keeps the `Subscription` table in sync for subscription

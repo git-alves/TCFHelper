@@ -3,10 +3,11 @@ import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { passwordSchema } from "@/lib/validation";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
 });
 
 export const { handlers, auth, signIn, signOut } = NextAuth({

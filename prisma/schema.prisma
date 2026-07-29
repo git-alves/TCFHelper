@@ -49,8 +49,10 @@ enum CefrLevel {
 
 enum SubscriptionStatus {
   INCOMPLETE
+  INCOMPLETE_EXPIRED
   TRIALING
   ACTIVE
+  PAUSED
   PAST_DUE
   CANCELED
   UNPAID
@@ -79,6 +81,11 @@ model Subscription {
   status               SubscriptionStatus  @default(INCOMPLETE)
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean             @default(false)
+  // Timestamp (from the Stripe event, not our own clock) of the last webhook
+  // event applied to this row. Stripe doesn't guarantee webhook delivery
+  // order, so this guards against an older/out-of-order event clobbering
+  // newer state.
+  lastStripeEventAt    DateTime?
   createdAt            DateTime            @default(now())
   updatedAt            DateTime            @updatedAt
 
