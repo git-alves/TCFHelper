@@ -5,8 +5,15 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client"
+  output        = "../src/generated/prisma"
+  // deploy.yml runs `vercel build` on a GitHub Actions (Debian) runner and
+  // uploads the prebuilt output to Vercel, rather than letting Vercel's own
+  // build step (which auto-detects its Lambda runtime target) run `prisma
+  // generate`. Without an explicit target for that runtime, the query
+  // engine binary generated on the runner doesn't match it, and Prisma
+  // Client fails at request time on Vercel.
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
