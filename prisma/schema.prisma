@@ -1,0 +1,150 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Locale {
+  en
+  fr
+  es
+  pt
+}
+
+enum TaskType {
+  TASK_1
+  TASK_2
+  TASK_3
+}
+
+enum TopicSource {
+  OFFICIAL_EXAM
+  AI_GENERATED
+  USER_SUBMITTED
+}
+
+enum EssayStatus {
+  DRAFT
+  SUBMITTED
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAUSED
+  PAST_DUE
+  CANCELED
+  UNPAID
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  passwordHash  String
+  name          String?
+  locale        Locale   @default(en)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  subscriptions Subscription[]
+  essays        Essay[]
+}
+
+model Subscription {
+  id                   String              @id @default(cuid())
+  userId               String
+  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // A customer can hold more than one subscription over time (or, in
+  // principle, concurrently), so this is the indexed lookup key, not the
+  // unique identity of the row — that's stripeSubscriptionId.
+  stripeCustomerId     String
+  stripeSubscriptionId String              @unique
+  stripePriceId        String?
+  status               SubscriptionStatus  @default(INCOMPLETE)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean             @default(false)
+  // Informational only — the last Stripe event's timestamp applied to this
+  // row. Writes are serialized per-subscription (see the webhook handler),
+  // so this is not used to gate whether a write is applied.
+  lastStripeEventAt    DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+}
+
+/// Durable record of processed Stripe webhook events, keyed by Stripe's own
+/// event ID, so a redelivered event (Stripe explicitly does not guarantee
+/// exactly-once or in-order delivery) is a no-op instead of reapplied.
+model StripeEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
+}
+
+model Topic {
+  id        String      @id @default(cuid())
+  taskType  TaskType
+  title     String
+  prompt    String
+  source    TopicSource @default(USER_SUBMITTED)
+  createdAt DateTime    @default(now())
+
+  essays    Essay[]
+
+  @@index([taskType])
+}
+
+model Essay {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId     String?
+  topic       Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  taskType    TaskType
+  content     String
+  wordCount   Int         @default(0)
+  status      EssayStatus @default(DRAFT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  feedback    Feedback?
+
+  @@index([userId])
+  @@index([topicId])
+}
+
+model Feedback {
+  id                String    @id @default(cuid())
+  essayId           String    @unique
+  essay             Essay     @relation(fields: [essayId], references: [id], onDelete: Cascade)
+  level             CefrLevel?
+  summary           String
+  grammarNotes      Json?
+  suggestions       Json?
+  translatedText    String?
+  meetsWordCount    Boolean   @default(false)
+  createdAt         DateTime  @default(now())
+}
