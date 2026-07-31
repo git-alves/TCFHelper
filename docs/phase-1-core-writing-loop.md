@@ -20,6 +20,7 @@
 - No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
 - No automatic topic generation or fallback to a prior month's source. A recent-exam topic must come from the current month and match the selected task; custom prompts remain learner supplied.
+- No project-wide translation spending cap. The durable product quota is per learner; Google Cloud billing budgets and alerts remain the project-level cost control.
 - No guarantee of feedback quality until the validation protocol below has been completed with a live Anthropic key.
 
 ## Decision
@@ -34,7 +35,9 @@ The selected application language controls visible product-interface copy and th
 
 Live draft translation is a separate, low-latency aid. It translates French learner text into the selected non-French language through Google Cloud Translation Basic; static UI strings come from a maintained local dictionary rather than consuming translation quota at runtime. Claude remains responsible for structured correction because translation alone cannot produce the error, word-count, CEFR, and suggestion contract. The Google credential stays server-only, and every directly displayed Google result shows Google's unmodified attribution badge alongside a linkable disclosure and disclaimer.
 
-Google's NMT allowance covers the first 500,000 characters each month at no charge, after which usage is billed. This is a shared service allowance, not a promise of permanently free translation per learner. The product debounces and cancels stale draft requests, enforces a 4,000-character request ceiling, keeps the API key server-only, and returns a clear degraded state when the Google key or service is unavailable. A missing live translation must never block writing or correction. Before production launch, configure Google Cloud billing budgets and usage alerts; an application-level per-user quota is a follow-up once real volume is known.
+Google's NMT allowance covers the first 500,000 characters each month at no charge, after which usage is billed. This is a shared service allowance, not a promise of permanently free translation per learner. The product debounces and cancels stale draft requests, enforces a 4,000-character request ceiling, keeps the API key server-only, and returns a clear degraded state when the Google key or service is unavailable. A missing live translation must never block writing or correction.
+
+A durable Postgres-backed per-user guard reserves each attempted live translation before Google is called: at most 20 requests and 20,000 input Unicode code points per UTC minute, plus 50,000 input code points per UTC calendar month. A transaction-scoped advisory lock keeps concurrent server instances from overspending the same allowance. A request aborted after its reservation remains counted deliberately: this makes the accounting atomic and conservative rather than trying to reverse a reservation that could race another request. Those limits are deliberately far below Google's documented 6,000,000-code-point-per-minute quota while still allowing a debounced update roughly every three seconds. Rate and monthly-limit responses use `TRANSLATION_RATE_LIMITED` and `TRANSLATION_MONTHLY_QUOTA_REACHED`, return `Retry-After` plus a UTC `resetAt`, and map to localized recovery copy. This per-user guard does not cap the shared project allowance, so configure Google Cloud billing budgets and usage alerts before production launch as a separate project-wide safety net.
 
 ## Interaction and recovery flow
 
@@ -87,7 +90,7 @@ Claude must return a structured object with:
 - corrected French text that preserves the learner's ideas;
 - an estimated CEFR level (`A1`–`C2`) for the original response;
 - an in-range/out-of-range word-count judgement plus an explanation;
-- zero or more errors with original excerpt, correction, short English explanation, and category;
+- zero or more errors with original excerpt, correction, short explanation in the learner's selected feedback language, and category;
 - a summary and actionable suggestions in the learner's selected feedback language.
 
 The API treats malformed input, an unknown/mismatched selected topic, a model refusal, a malformed structured response, and an upstream model failure as request failures. It must not save an `Essay` until a valid feedback object is available; the learner sees a retryable error instead. This avoids audit records that look successfully reviewed when they were not.

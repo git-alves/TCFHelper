@@ -19,9 +19,10 @@ const geistMono = Geist_Mono({
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
+  const copy = getAppCopy(locale);
   return {
     title: "TCF Helper",
-    description: getAppCopy(locale).home.description,
+    description: `${copy.home.description} ${copy.home.translationDisclosure}`,
   };
 }
 

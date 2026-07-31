@@ -24,6 +24,9 @@ interface RecentExamTopic {
 }
 
 type TopicMode = "recent" | "custom" | null;
+type RecentTopicErrorKind = "fetch" | "unavailable";
+type PendingSwitchKind = "task" | "topic";
+type TranslationErrorKind = "notConfigured" | "rateLimited" | "monthlyQuota" | "unavailable";
 
 function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
   if (!value || typeof value !== "object") return null;
@@ -67,13 +70,20 @@ export function WritingWorkspace() {
 
   const [recentTopic, setRecentTopic] = useState<RecentExamTopic | null>(null);
   const [isRecentTopicLoading, setIsRecentTopicLoading] = useState(false);
-  const [recentTopicError, setRecentTopicError] = useState<string | null>(null);
+  // Keep transient errors as stable states rather than translated strings.
+  // A language switch can happen while either request is in flight, and the
+  // message should follow the current interface language when it appears.
+  const [recentTopicError, setRecentTopicError] = useState<RecentTopicErrorKind | null>(null);
 
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
 
   const [isCorrecting, setIsCorrecting] = useState(false);
-  const [correctError, setCorrectError] = useState<string | null>(null);
+  // Keep only the failure state, not a localized message captured when the
+  // request started. The learner can change the interface language while a
+  // correction is pending, so the visible message must always use the copy
+  // from the current render.
+  const [hasCorrectionError, setHasCorrectionError] = useState(false);
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
@@ -81,7 +91,7 @@ export function WritingWorkspace() {
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
 
-  const [pendingSwitch, setPendingSwitch] = useState<{ description: string; run: () => void } | null>(
+  const [pendingSwitch, setPendingSwitch] = useState<{ kind: PendingSwitchKind; run: () => void } | null>(
     null
   );
 
@@ -94,7 +104,7 @@ export function WritingWorkspace() {
     text: string;
     locale: typeof locale;
   } | null>(null);
-  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationError, setTranslationError] = useState<TranslationErrorKind | null>(null);
   const [translationErrorFor, setTranslationErrorFor] = useState<{
     text: string;
     locale: typeof locale;
@@ -180,11 +190,17 @@ export function WritingWorkspace() {
               data && typeof data === "object" && "code" in data
                 ? (data as { code?: unknown }).code
                 : undefined;
-            throw new Error(
+            setTranslationError(
               errorCode === "TRANSLATION_NOT_CONFIGURED"
-                ? copy.workspace.translation.notConfiguredError
-                : copy.workspace.translation.unavailableError,
+                ? "notConfigured"
+                : errorCode === "TRANSLATION_RATE_LIMITED"
+                  ? "rateLimited"
+                  : errorCode === "TRANSLATION_MONTHLY_QUOTA_REACHED"
+                    ? "monthlyQuota"
+                    : "unavailable",
             );
+            setTranslationErrorFor({ text: trimmed, locale });
+            return;
           }
 
           const data: unknown = await res.json();
@@ -204,9 +220,7 @@ export function WritingWorkspace() {
             requestId === translationRequestId.current &&
             !(error instanceof Error && error.name === "AbortError")
           ) {
-            setTranslationError(
-              error instanceof Error ? error.message : copy.workspace.translation.unavailableError,
-            );
+            setTranslationError("unavailable");
             setTranslationErrorFor({ text: trimmed, locale });
           }
         })
@@ -222,14 +236,14 @@ export function WritingWorkspace() {
         translationRequestId.current += 1;
       }
     };
-  }, [content, copy, locale]);
+  }, [content, locale]);
 
   function resetDraftAndFeedback() {
     setContent("");
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
-    setCorrectError(null);
+    setHasCorrectionError(false);
     translationRequestId.current += 1;
     setTranslation("");
     setTranslationFor(null);
@@ -257,20 +271,20 @@ export function WritingWorkspace() {
 
   // Runs `run` immediately when there's nothing to lose; otherwise defers it
   // behind the confirmation modal so a destructive switch is never silent.
-  function runOrConfirm(description: string, run: () => void) {
+  function runOrConfirm(kind: PendingSwitchKind, run: () => void) {
     if (!hasUnsavedWork()) {
       run();
       return;
     }
 
-    setPendingSwitch({ description, run });
+    setPendingSwitch({ kind, run });
   }
 
   function resetForTask(next: TaskType) {
     if (next === taskType) return;
 
     runOrConfirm(
-      copy.workspace.dialog.taskSwitchDescription,
+      "task",
       () => {
         recentTopicRequestId.current += 1;
         setTaskType(next);
@@ -293,7 +307,7 @@ export function WritingWorkspace() {
     }
 
     runOrConfirm(
-      copy.workspace.dialog.topicSwitchDescription,
+      "topic",
       () => {
         recentTopicRequestId.current += 1;
         setIsRecentTopicLoading(false);
@@ -308,7 +322,7 @@ export function WritingWorkspace() {
 
   function getRecentTopic(currentTaskType: TaskType) {
     runOrConfirm(
-      copy.workspace.dialog.topicSwitchDescription,
+      "topic",
       () => {
         void fetchRecentTopic(currentTaskType);
       },
@@ -326,7 +340,8 @@ export function WritingWorkspace() {
       );
 
       if (!res.ok) {
-        throw new Error(copy.workspace.topic.fetchError);
+        if (requestId === recentTopicRequestId.current) setRecentTopicError("fetch");
+        return;
       }
 
       const data: unknown = await res.json();
@@ -334,20 +349,17 @@ export function WritingWorkspace() {
 
       const nextTopic = readRecentExamTopic(data, currentTaskType);
       if (!nextTopic) {
-        throw new Error(copy.workspace.topic.unavailableError);
+        setRecentTopicError("unavailable");
+        return;
       }
 
       setRecentTopic(nextTopic);
       setCustomTopic("");
       setTopicMode("recent");
       resetDraftAndFeedback();
-    } catch (error) {
+    } catch {
       if (requestId === recentTopicRequestId.current) {
-        setRecentTopicError(
-          error instanceof Error
-            ? error.message
-            : copy.workspace.topic.fetchError,
-        );
+        setRecentTopicError("fetch");
       }
     } finally {
       if (requestId === recentTopicRequestId.current) setIsRecentTopicLoading(false);
@@ -365,7 +377,7 @@ export function WritingWorkspace() {
         : { topicPrompt: activeTopicPrompt };
 
     setIsCorrecting(true);
-    setCorrectError(null);
+    setHasCorrectionError(false);
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
@@ -382,16 +394,14 @@ export function WritingWorkspace() {
       });
 
       if (!res.ok) {
-        throw new Error(copy.workspace.editor.genericCorrectionError);
+        throw new Error("Correction request failed");
       }
 
       const data: { feedback: EssayFeedback } = await res.json();
       setFeedback(data.feedback);
       setFeedbackLocale(correctionLocale);
-    } catch (error) {
-      setCorrectError(
-        error instanceof Error ? error.message : copy.workspace.editor.genericCorrectionError,
-      );
+    } catch {
+      setHasCorrectionError(true);
     } finally {
       setIsCorrecting(false);
     }
@@ -411,6 +421,16 @@ export function WritingWorkspace() {
     translationErrorFor.locale === locale
       ? translationError
       : null;
+  const visibleTranslationErrorMessage =
+    visibleTranslationError === "notConfigured"
+      ? copy.workspace.translation.notConfiguredError
+      : visibleTranslationError === "rateLimited"
+        ? copy.workspace.translation.rateLimitedError
+        : visibleTranslationError === "monthlyQuota"
+          ? copy.workspace.translation.monthlyQuotaError
+          : visibleTranslationError
+            ? copy.workspace.translation.unavailableError
+            : null;
   // Hide an older response immediately when the learner edits the draft or
   // changes the target language; the matching response will render once it
   // arrives. A French interface simply shows the original French draft.
@@ -506,7 +526,9 @@ export function WritingWorkspace() {
 
             {recentTopicError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {recentTopicError}
+                {recentTopicError === "unavailable"
+                  ? copy.workspace.topic.unavailableError
+                  : copy.workspace.topic.fetchError}
               </p>
             )}
 
@@ -545,7 +567,7 @@ export function WritingWorkspace() {
                   onChange={(e) => {
                     cancelPendingRecentTopicRequest();
                     setCustomTopic(e.target.value);
-                    setCorrectError(null);
+                    setHasCorrectionError(false);
                     if (feedback) setFeedbackIsStale(true);
                   }}
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
@@ -588,7 +610,7 @@ export function WritingWorkspace() {
                 cancelPendingRecentTopicRequest();
                 const value = e.target.value;
                 setContent(value);
-                setCorrectError(null);
+                setHasCorrectionError(false);
                 setTranslationError(null);
                 setTranslationErrorFor(null);
                 if (feedback) setFeedbackIsStale(true);
@@ -622,9 +644,9 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.correctingStatus}
               </p>
             )}
-            {correctError && (
+            {hasCorrectionError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {correctError}
+                {copy.workspace.editor.genericCorrectionError}
               </p>
             )}
           </section>
@@ -649,7 +671,7 @@ export function WritingWorkspace() {
                 ? ""
                 : visibleTranslation || (trimmedContent ? "" : copy.workspace.translation.empty)}
             </div>
-            {locale !== "fr" && (
+            {locale !== "fr" && visibleTranslation && (
               <GoogleTranslateAttribution
                 alt={copy.workspace.translation.googleAttributionAlt}
                 notice={copy.workspace.translation.googleNotice}
@@ -664,9 +686,9 @@ export function WritingWorkspace() {
                 })}
               </p>
             ) : (
-              visibleTranslationError && (
+              visibleTranslationErrorMessage && (
                 <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                  {visibleTranslationError}
+                  {visibleTranslationErrorMessage}
                 </p>
               )
             )}
@@ -677,7 +699,7 @@ export function WritingWorkspace() {
               ref={feedbackRef}
               tabIndex={-1}
               aria-labelledby="feedback-heading"
-              lang={feedbackLocale ?? locale}
+              lang={locale}
               className="flex flex-col gap-4 rounded-xl border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -692,6 +714,7 @@ export function WritingWorkspace() {
               </div>
 
               <p
+                lang={feedbackLocale ?? locale}
                 className={`text-sm ${
                   feedback.meetsWordCount
                     ? "text-green-700 dark:text-green-400"
@@ -701,7 +724,9 @@ export function WritingWorkspace() {
                 {feedback.wordCountNote}
               </p>
 
-              <p className="text-sm">{feedback.summary}</p>
+              <p lang={feedbackLocale ?? locale} className="text-sm">
+                {feedback.summary}
+              </p>
 
               {feedbackLocale && feedbackLocale !== locale && (
                 <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
@@ -745,7 +770,12 @@ export function WritingWorkspace() {
                             {copy.workspace.feedback.errorCategories[err.category]}
                           </span>
                         </div>
-                        <p className="mt-1 text-zinc-500 dark:text-zinc-400">{err.explanation}</p>
+                        <p
+                          lang={feedbackLocale ?? locale}
+                          className="mt-1 text-zinc-500 dark:text-zinc-400"
+                        >
+                          {err.explanation}
+                        </p>
                       </li>
                     ))}
                   </ul>
@@ -757,7 +787,7 @@ export function WritingWorkspace() {
                   <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
                     {copy.workspace.feedback.suggestions}
                   </h3>
-                  <ul className="list-disc pl-5 text-sm">
+                  <ul lang={feedbackLocale ?? locale} className="list-disc pl-5 text-sm">
                     {feedback.suggestions.map((s, i) => (
                       <li key={i}>{s}</li>
                     ))}
@@ -772,7 +802,13 @@ export function WritingWorkspace() {
       <ConfirmDialog
         open={pendingSwitch !== null}
         title={copy.workspace.dialog.title}
-        description={pendingSwitch?.description ?? ""}
+        description={
+          pendingSwitch?.kind === "task"
+            ? copy.workspace.dialog.taskSwitchDescription
+            : pendingSwitch?.kind === "topic"
+              ? copy.workspace.dialog.topicSwitchDescription
+              : ""
+        }
         confirmLabel={copy.workspace.dialog.confirm}
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {
