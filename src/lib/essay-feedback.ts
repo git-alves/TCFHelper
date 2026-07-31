@@ -34,7 +34,9 @@ export const essayFeedbackSchema = z.object({
     z.object({
       original: z.string().describe("The erroneous excerpt from the original text."),
       correction: z.string().describe("The corrected version of that excerpt."),
-      explanation: z.string().describe("A short explanation of the error, in English."),
+      explanation: z
+        .string()
+        .describe("A short explanation of the error, written in the feedback language specified in the system prompt."),
       category: z.enum(ERROR_CATEGORIES),
     })
   ),
@@ -43,7 +45,9 @@ export const essayFeedbackSchema = z.object({
     .describe("Actionable suggestions for improving future writing."),
   summary: z
     .string()
-    .describe("A brief overall assessment of the essay's strengths and weaknesses, in English."),
+    .describe(
+      "A brief overall assessment of the essay's strengths and weaknesses, written in the feedback language specified in the system prompt."
+    ),
 });
 
 export type EssayFeedback = z.infer<typeof essayFeedbackSchema>;
