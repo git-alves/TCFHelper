@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema } from "@/lib/essay-feedback";
+import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
@@ -19,6 +20,7 @@ const requestSchema = z.object({
   topicId: z.string().min(1).optional(),
   topicPrompt: z.string().trim().min(1).max(2000).optional(),
   content: z.string().trim().min(1).max(20000),
+  locale: z.enum(APP_LOCALES).default(DEFAULT_APP_LOCALE),
 }).superRefine((data, ctx) => {
   if (!data.topicId && !data.topicPrompt) {
     ctx.addIssue({
@@ -45,9 +47,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const { taskType, topicId, topicPrompt: submittedTopicPrompt, content } = parsed.data;
+  const { taskType, topicId, topicPrompt: submittedTopicPrompt, content, locale } = parsed.data;
   const task = TASK_INSTRUCTIONS[taskType];
   const wordCount = countWords(content);
+  const feedbackLanguage = APP_LOCALE_LANGUAGE_NAMES[locale];
 
   let resolvedTopicId: string;
   let resolvedTopicPrompt: string;
@@ -91,8 +94,8 @@ export async function POST(request: Request) {
       system:
         "You are an examiner grading TCF (Test de Connaissance du Français) written expression " +
         "tasks. Correct errors precisely, estimate the writer's CEFR level honestly (do not " +
-        "inflate it), and give constructive, encouraging feedback. Write all feedback in " +
-        "English, except for the corrected essay text itself, which stays in French.",
+        `inflate it), and give constructive, encouraging feedback. Write all feedback in ` +
+        `${feedbackLanguage}, except for the corrected essay text itself, which stays in French.`,
       messages: [
         {
           role: "user",

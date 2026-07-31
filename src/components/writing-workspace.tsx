@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
+import {
+  APP_LOCALE_LABELS,
+  TRANSLATABLE_MAX_CHARS,
+  type AppLocale,
+} from "@/lib/app-locale";
+import { useAppLocale } from "@/components/app-locale-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface RecentExamTopic {
   id: string;
@@ -64,6 +71,8 @@ function formatSourceMonth(sourceMonth: string) {
 }
 
 export function WritingWorkspace() {
+  const { locale } = useAppLocale();
+
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
 
@@ -77,10 +86,32 @@ export function WritingWorkspace() {
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctError, setCorrectError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
+  const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
   const feedbackRef = useRef<HTMLElement>(null);
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
+
+  const [pendingSwitch, setPendingSwitch] = useState<{ description: string; run: () => void } | null>(
+    null
+  );
+
+  const [translation, setTranslation] = useState("");
+  const [translationFor, setTranslationFor] = useState<{
+    text: string;
+    locale: typeof locale;
+  } | null>(null);
+  const [translationRequestFor, setTranslationRequestFor] = useState<{
+    text: string;
+    locale: typeof locale;
+  } | null>(null);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [translationErrorFor, setTranslationErrorFor] = useState<{
+    text: string;
+    locale: typeof locale;
+  } | null>(null);
+  const translationRequestId = useRef(0);
+  const lastTranslatedRef = useRef<{ text: string; locale: typeof locale } | null>(null);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -99,11 +130,116 @@ export function WritingWorkspace() {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
 
+  // Debounced live translation of the draft into the app's display
+  // language. Fires 800ms after the learner stops typing, skips re-sending
+  // the same text/locale pair, and drops stale responses via requestId.
+  useEffect(() => {
+    const trimmed = content.trim();
+
+    if (!trimmed) {
+      // Content only becomes empty via the textarea's onChange handler or
+      // resetDraftAndFeedback() — both already clear translation state
+      // synchronously there. This just guards against a stale in-flight
+      // request resolving after the fact.
+      translationRequestId.current += 1;
+      return;
+    }
+
+    // A French-language interface shows the learner's French draft directly.
+    // This avoids an unnecessary model call that could otherwise paraphrase
+    // their words rather than faithfully show the same-language text.
+    if (locale === "fr") {
+      translationRequestId.current += 1;
+      lastTranslatedRef.current = { text: trimmed, locale };
+      return;
+    }
+
+    // Beyond this, /api/translate rejects the request outright (same shared
+    // limit). Skip the doomed call — the too-long notice below is derived
+    // straight from `content`, so there is nothing to schedule here.
+    if (trimmed.length > TRANSLATABLE_MAX_CHARS) {
+      translationRequestId.current += 1;
+      return;
+    }
+
+    if (
+      lastTranslatedRef.current?.text === trimmed &&
+      lastTranslatedRef.current?.locale === locale
+    ) {
+      return;
+    }
+
+    const requestId = ++translationRequestId.current;
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      setTranslationRequestFor({ text: trimmed, locale });
+      setTranslationError(null);
+      setTranslationErrorFor(null);
+
+      fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed, targetLocale: locale }),
+        signal: controller.signal,
+      })
+        .then(async (res) => {
+          if (requestId !== translationRequestId.current) return;
+
+          if (!res.ok) {
+            const data: unknown = await res.json().catch(() => null);
+            throw new Error(
+              responseErrorMessage(data, "Translation is unavailable right now."),
+            );
+          }
+
+          const data: unknown = await res.json();
+          if (requestId !== translationRequestId.current) return;
+
+          const nextTranslation =
+            data && typeof data === "object" && typeof (data as { translation?: unknown }).translation === "string"
+              ? (data as { translation: string }).translation
+              : "";
+
+          setTranslation(nextTranslation);
+          setTranslationFor({ text: trimmed, locale });
+          lastTranslatedRef.current = { text: trimmed, locale };
+        })
+        .catch((error: unknown) => {
+          if (
+            requestId === translationRequestId.current &&
+            !(error instanceof Error && error.name === "AbortError")
+          ) {
+            setTranslationError(error instanceof Error ? error.message : "Translation is unavailable right now.");
+            setTranslationErrorFor({ text: trimmed, locale });
+          }
+        })
+        .finally(() => {
+          if (requestId === translationRequestId.current) setTranslationRequestFor(null);
+        });
+    }, 800);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+      if (translationRequestId.current === requestId) {
+        translationRequestId.current += 1;
+      }
+    };
+  }, [content, locale]);
+
   function resetDraftAndFeedback() {
     setContent("");
     setFeedback(null);
+    setFeedbackLocale(null);
     setFeedbackIsStale(false);
     setCorrectError(null);
+    translationRequestId.current += 1;
+    setTranslation("");
+    setTranslationFor(null);
+    setTranslationError(null);
+    setTranslationErrorFor(null);
+    setTranslationRequestFor(null);
+    lastTranslatedRef.current = null;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -113,53 +249,76 @@ export function WritingWorkspace() {
     setIsRecentTopicLoading(false);
   }
 
-  function confirmTopicChange() {
-    if (!content.trim() && !feedback && !(topicMode === "custom" && customTopic.trim())) {
-      return true;
+  function hasUnsavedWork() {
+    return Boolean(
+      content.trim() ||
+        feedback ||
+        (topicMode === "recent" && recentTopic) ||
+        (topicMode === "custom" && customTopic.trim())
+    );
+  }
+
+  // Runs `run` immediately when there's nothing to lose; otherwise defers it
+  // behind the confirmation modal so a destructive switch is never silent.
+  function runOrConfirm(description: string, run: () => void) {
+    if (!hasUnsavedWork()) {
+      run();
+      return;
     }
 
-    return window.confirm("Change topic? This will clear your topic, draft, and feedback.");
+    setPendingSwitch({ description, run });
   }
 
   function resetForTask(next: TaskType) {
     if (next === taskType) return;
 
-    if (
-      (content.trim() || customTopic.trim() || feedback) &&
-      !window.confirm("Change task? This will clear your topic, draft, and feedback.")
-    ) {
-      return;
-    }
-
-    recentTopicRequestId.current += 1;
-    setTaskType(next);
-    setTopicMode(null);
-    setRecentTopic(null);
-    setIsRecentTopicLoading(false);
-    setRecentTopicError(null);
-    setCustomTopic("");
-    resetDraftAndFeedback();
+    runOrConfirm(
+      "Switching tasks will discard your current topic, draft, and feedback.",
+      () => {
+        recentTopicRequestId.current += 1;
+        setTaskType(next);
+        setTopicMode(null);
+        setRecentTopic(null);
+        setIsRecentTopicLoading(false);
+        setRecentTopicError(null);
+        setCustomTopic("");
+        resetDraftAndFeedback();
+      },
+    );
   }
 
   function chooseCustomTopic() {
     if (topicMode === "custom") {
       cancelPendingRecentTopicRequest();
+      setRecentTopicError(null);
       customTopicRef.current?.focus();
       return;
     }
 
-    if (!confirmTopicChange()) return;
-
-    recentTopicRequestId.current += 1;
-    setIsRecentTopicLoading(false);
-    setRecentTopicError(null);
-    setTopicMode("custom");
-    resetDraftAndFeedback();
+    runOrConfirm(
+      "Switching topics will discard your current topic, draft, and feedback.",
+      () => {
+        recentTopicRequestId.current += 1;
+        setIsRecentTopicLoading(false);
+        setRecentTopicError(null);
+        setRecentTopic(null);
+        setCustomTopic("");
+        setTopicMode("custom");
+        resetDraftAndFeedback();
+      },
+    );
   }
 
-  async function getRecentTopic(currentTaskType: TaskType) {
-    if (!confirmTopicChange()) return;
+  function getRecentTopic(currentTaskType: TaskType) {
+    runOrConfirm(
+      "Switching topics will discard your current topic, draft, and feedback.",
+      () => {
+        void fetchRecentTopic(currentTaskType);
+      },
+    );
+  }
 
+  async function fetchRecentTopic(currentTaskType: TaskType) {
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
@@ -188,6 +347,7 @@ export function WritingWorkspace() {
       }
 
       setRecentTopic(nextTopic);
+      setCustomTopic("");
       setTopicMode("recent");
       resetDraftAndFeedback();
     } catch (error) {
@@ -204,7 +364,9 @@ export function WritingWorkspace() {
   }
 
   async function handleCorrect() {
-    if (!taskType || !activeTopicPrompt || wordCount === 0) return;
+    if (!taskType || !activeTopicPrompt || wordCount === 0 || isRecentTopicLoading) return;
+
+    const correctionLocale = locale;
 
     const topicContext =
       topicMode === "recent" && recentTopic
@@ -214,6 +376,7 @@ export function WritingWorkspace() {
     setIsCorrecting(true);
     setCorrectError(null);
     setFeedback(null);
+    setFeedbackLocale(null);
     setFeedbackIsStale(false);
     try {
       const res = await fetch("/api/essays/correct", {
@@ -223,6 +386,7 @@ export function WritingWorkspace() {
           taskType,
           ...topicContext,
           content,
+          locale: correctionLocale,
         }),
       });
 
@@ -233,6 +397,7 @@ export function WritingWorkspace() {
 
       const data: { feedback: EssayFeedback } = await res.json();
       setFeedback(data.feedback);
+      setFeedbackLocale(correctionLocale);
     } catch (error) {
       setCorrectError(error instanceof Error ? error.message : "Something went wrong.");
     } finally {
@@ -241,6 +406,23 @@ export function WritingWorkspace() {
   }
 
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
+  const trimmedContent = content.trim();
+  const isDraftTooLongToTranslate =
+    locale !== "fr" && trimmedContent.length > TRANSLATABLE_MAX_CHARS;
+  const translationIsCurrent =
+    translationFor?.text === trimmedContent && translationFor.locale === locale;
+  const isTranslating =
+    translationRequestFor?.text === trimmedContent &&
+    translationRequestFor.locale === locale;
+  const visibleTranslationError =
+    translationErrorFor?.text === trimmedContent &&
+    translationErrorFor.locale === locale
+      ? translationError
+      : null;
+  // Hide an older response immediately when the learner edits the draft or
+  // changes the target language; the matching response will render once it
+  // arrives. A French interface simply shows the original French draft.
+  const visibleTranslation = locale === "fr" ? content : translationIsCurrent ? translation : "";
 
   return (
     <div className="flex w-full flex-col gap-8">
@@ -370,7 +552,7 @@ export function WritingWorkspace() {
                   placeholder="Paste or write the topic/prompt you want to respond to…"
                   rows={3}
                   maxLength={2000}
-                  disabled={isCorrecting}
+                  disabled={isCorrecting || isRecentTopicLoading}
                   className="w-full rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
                 />
               </div>
@@ -399,21 +581,33 @@ export function WritingWorkspace() {
               value={content}
               onChange={(e) => {
                 cancelPendingRecentTopicRequest();
-                setContent(e.target.value);
+                const value = e.target.value;
+                setContent(value);
                 setCorrectError(null);
+                setTranslationError(null);
+                setTranslationErrorFor(null);
                 if (feedback) setFeedbackIsStale(true);
+                if (!value.trim()) {
+                  translationRequestId.current += 1;
+                  setTranslation("");
+                  setTranslationFor(null);
+                  setTranslationError(null);
+                  setTranslationErrorFor(null);
+                  setTranslationRequestFor(null);
+                  lastTranslatedRef.current = null;
+                }
               }}
               placeholder="Écrivez votre texte ici…"
               rows={14}
               maxLength={20000}
-              disabled={isCorrecting}
+              disabled={isCorrecting || isRecentTopicLoading}
               aria-describedby="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
             <button
               type="button"
               onClick={handleCorrect}
-              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting}
+              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isRecentTopicLoading}
               className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
             >
               {isCorrecting ? "Correcting…" : "Correct"}
@@ -430,6 +624,38 @@ export function WritingWorkspace() {
             )}
           </section>
 
+          <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                Translation ({APP_LOCALE_LABELS[locale]})
+              </h2>
+              {isTranslating && !isDraftTooLongToTranslate && (
+                <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">Translating…</span>
+              )}
+            </div>
+            <div
+              role="status"
+              aria-live="polite"
+              className="min-h-16 w-full whitespace-pre-wrap rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
+            >
+              {isDraftTooLongToTranslate
+                ? ""
+                : visibleTranslation || (trimmedContent ? "" : "Your translation will appear here as you write.")}
+            </div>
+            {isDraftTooLongToTranslate ? (
+              <p className="text-sm text-amber-600 dark:text-amber-400">
+                Live translation is available for drafts up to {TRANSLATABLE_MAX_CHARS.toLocaleString()}{" "}
+                characters. This draft is longer — submit it for correction to see full feedback.
+              </p>
+            ) : (
+              visibleTranslationError && (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                  {visibleTranslationError}
+                </p>
+              )
+            )}
+          </section>
+
           {feedback && (
             <section
               ref={feedbackRef}
@@ -439,7 +665,7 @@ export function WritingWorkspace() {
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="feedback-heading" className="text-lg font-semibold">
-                  Feedback
+                  Feedback{feedbackLocale ? ` (${APP_LOCALE_LABELS[feedbackLocale]})` : ""}
                 </h2>
                 <span className="rounded-full bg-black/[.06] px-3 py-1 text-sm font-medium dark:bg-white/[.1]">
                   Estimated CEFR / CECRL level: {feedback.cefrLevel}
@@ -457,6 +683,12 @@ export function WritingWorkspace() {
               </p>
 
               <p className="text-sm">{feedback.summary}</p>
+
+              {feedbackLocale && feedbackLocale !== locale && (
+                <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  This feedback was generated in {APP_LOCALE_LABELS[feedbackLocale]}. Select Correct again to receive feedback in {APP_LOCALE_LABELS[locale]}.
+                </p>
+              )}
 
               {feedbackIsStale && (
                 <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
@@ -514,6 +746,20 @@ export function WritingWorkspace() {
           )}
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingSwitch !== null}
+        title="Discard your current work?"
+        description={pendingSwitch?.description ?? ""}
+        confirmLabel="Discard and switch"
+        cancelLabel="Keep working"
+        onConfirm={() => {
+          const action = pendingSwitch;
+          setPendingSwitch(null);
+          action?.run();
+        }}
+        onCancel={() => setPendingSwitch(null)}
+      />
     </div>
   );
 }

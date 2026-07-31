@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
+import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { NavBar } from "@/components/nav-bar";
 
 const geistSans = Geist({
@@ -31,8 +32,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <SessionProvider>
-          <NavBar />
-          <div className="flex flex-1 flex-col">{children}</div>
+          <AppLocaleProvider>
+            <NavBar />
+            <div className="flex flex-1 flex-col">{children}</div>
+          </AppLocaleProvider>
         </SessionProvider>
       </body>
     </html>

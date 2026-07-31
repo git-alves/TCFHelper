@@ -129,6 +129,57 @@ describe("POST /api/essays/correct", () => {
     );
   });
 
+  it("writes feedback in the requested app locale", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+      locale: "pt",
+    });
+
+    expect(response.status).toBe(200);
+    const requestToClaude = parseMock.mock.calls[0][0];
+    expect(requestToClaude.system).toContain("Portuguese");
+  });
+
+  it("defaults the feedback language to English when no locale is given", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    const requestToClaude = parseMock.mock.calls[0][0];
+    expect(requestToClaude.system).toContain("English");
+  });
+
+  it("rejects an unsupported feedback locale before calling Claude", async () => {
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+      locale: "de",
+    });
+
+    expect(response.status).toBe(400);
+    expect(parseMock).not.toHaveBeenCalled();
+  });
+
   it("requires a learner-supplied prompt when no topic ID is given", async () => {
     const response = await post({ taskType: "TASK_1", content: "Bonjour voisin." });
 
