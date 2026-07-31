@@ -87,7 +87,7 @@ vi.mock("@/lib/prisma", () => {
   };
 });
 
-const { syncSubscription } = await import("./route");
+const { syncSubscription } = await import("./sync-stripe-subscription");
 
 function makeSubscription(overrides: { id: string; status?: string }) {
   return {
