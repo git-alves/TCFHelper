@@ -1,8 +1,9 @@
 # TCF Helper
 
 Writing practice and feedback for the TCF (Test de Connaissance du Français)
-exam. Students choose a task, select or enter a prompt, write a response, and
-receive structured grammar, vocabulary, word-count, and CEFR-level feedback.
+exam. Students choose a task, get a matching topic from the current month's
+recent-exam source or enter their own prompt, write a response, and receive
+structured grammar, vocabulary, word-count, and CEFR-level feedback.
 
 Phase 1 is the core writing loop. Its purpose is to validate feedback quality
 before the product invests in retention or monetization features. See the
@@ -53,12 +54,6 @@ gate yet — every logged-in user can reach `/dashboard`.
    npm run db:migrate
    ```
 
-   Seed the built-in TCF topic bank before trying the writing loop:
-
-   ```bash
-   npm run db:seed
-   ```
-
 4. Run the dev server:
 
    ```bash
@@ -67,6 +62,21 @@ gate yet — every logged-in user can reach `/dashboard`.
 
    Visit `http://localhost:3000`. Sign up at `/signup`, which logs you in
    and redirects to `/dashboard`.
+
+## Recent-exam topics
+
+The dashboard has two topic choices: **Get a topic from recent exams** and
+**Write or paste my own topic**. The first choice is a server-side integration
+with the authorised recent-exam source. It derives the current French
+month/year URL, verifies that the page is for that month, and returns only the
+literal `Tâche 1`, `Tâche 2`, or `Tâche 3` matching the learner's selected
+task. It never accepts a client-supplied source URL or silently falls back to
+an older month.
+
+If the current month's page is unavailable or its structure changes, the app
+keeps the learner's draft and offers the paste-your-own path instead. Retrieved
+topics are saved with immutable provenance so Claude grades against the exact
+prompt the learner saw.
 
 ## Database
 

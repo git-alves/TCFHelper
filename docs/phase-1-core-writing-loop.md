@@ -8,7 +8,7 @@
 
 ### Goals
 
-- Let an authenticated learner choose Tâche 1, 2, or 3, see its fixed instructions and target word range, choose a seeded prompt or enter one, and write a response.
+- Let an authenticated learner choose Tâche 1, 2, or 3, see its fixed instructions and target word range, get a matching topic from the current month's recent-exam source or enter one, and write a response.
 - Show the live word count before submission.
 - Return one structured AI review containing corrected French text, categorized errors, a word-count check, a CEFR estimate, an overall summary, and actionable suggestions.
 - Persist the submitted essay and successful review so a human can audit the feedback during validation.
@@ -19,7 +19,7 @@
 - No subscription, checkout, entitlement, or billing gate. Existing sign-in remains out of scope for this phase.
 - No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
-- No automatic topic generation; the bank is deliberately seeded and custom prompts are learner supplied.
+- No automatic topic generation or fallback to a prior month's source. A recent-exam topic must come from the current month and match the selected task; custom prompts remain learner supplied.
 - No guarantee of feedback quality until the validation protocol below has been completed with a live Anthropic key.
 
 ## Decision
@@ -37,7 +37,7 @@ The learner should be able to complete that path without having to remember word
 | State / transition | Product behavior | Why |
 | --- | --- | --- |
 | No task selected | Only the three task choices are shown. Selecting one immediately reveals its fixed instructions and target range. | It gives a clear first action without exposing fields that lack context. |
-| Task, but no topic | The topic-bank action and “write my own” choice are visible before the editor can be submitted. | A response without a prompt cannot receive task-specific feedback. |
+| Task, but no topic | “Get a topic from recent exams” and “Write or paste my own topic” are visible before the editor can be submitted. The source action requests only the current month's matching Tâche. | A response without a prompt cannot receive task-specific feedback, and a stale prior-month topic would undermine exam relevance. |
 | Changing the active task | Clicking the already-selected task does nothing. Switching tasks after entering a topic, draft, or feedback asks before clearing that work. | Task changes invalidate the context; accidental re-clicks and irreversible draft loss are avoidable. |
 | Changing a topic or topic mode | If a draft or feedback exists, ask before clearing those response-specific results. | Retaining an essay under a different prompt risks feedback that appears valid but is about the wrong task. |
 | Request in progress | The correction control says “Correcting…”, the response context is temporarily locked, and assistive technology receives a status update. | It confirms the click registered and prevents the visible prompt or essay from drifting away from the submitted version. |
@@ -47,12 +47,27 @@ The learner should be able to complete that path without having to remember word
 
 ## Product and technical contract
 
+### Recent-exam source
+
+The recent-exam action is server-side only. It derives the authorised source
+URL from the server's current UTC month and year, verifies that the returned
+page declares that same month, and extracts only the literal task heading that
+matches the learner's `TASK_1`, `TASK_2`, or `TASK_3` selection. It does not
+trust a client-provided source URL, month, task label, prompt, or external
+identifier. A source failure or changed page structure is an explicit retryable
+failure; it never falls back to a prior month.
+
+Each retrieved prompt is persisted under an immutable content-based external
+reference. If the upstream source changes, the revised content becomes a new
+topic record rather than rewriting the context of earlier essays. The correction
+API uses the record ID as its authoritative prompt context.
+
 ### Input
 
 | Field | Rule |
 | --- | --- |
 | Task | Exactly one of `TASK_1`, `TASK_2`, or `TASK_3`; instructions and word range come from the static task configuration. |
-| Topic | Either a topic-bank record for the selected task or a non-empty learner-supplied prompt (up to 2,000 characters). |
+| Topic | Either a server-authoritative current-month recent-exam topic for the selected task or a non-empty learner-supplied prompt (up to 2,000 characters). The recent-exam topic's stored ID, not a client-supplied prompt, is used during grading. |
 | Essay | Non-empty French response, up to 20,000 characters. The visible word counter and server use whitespace-delimited words. |
 
 ### Output
@@ -65,7 +80,7 @@ Claude must return a structured object with:
 - zero or more errors with original excerpt, correction, short English explanation, and category;
 - English-language summary and actionable suggestions.
 
-The API treats malformed input, an unknown/mismatched bank topic, a model refusal, a malformed structured response, and an upstream model failure as request failures. It must not save an `Essay` until a valid feedback object is available; the learner sees a retryable error instead. This avoids audit records that look successfully reviewed when they were not.
+The API treats malformed input, an unknown/mismatched selected topic, a model refusal, a malformed structured response, and an upstream model failure as request failures. It must not save an `Essay` until a valid feedback object is available; the learner sees a retryable error instead. This avoids audit records that look successfully reviewed when they were not.
 
 ## Validation plan and success metric
 
@@ -84,7 +99,7 @@ This metric intentionally weights harmful false corrections more heavily than a 
 
 ## Review workflow
 
-1. Seed the topic bank and collect/prepare the 30 consented test responses.
+1. Collect current-month topics and prepare the 30 consented test responses.
 2. Submit each response through the production-like loop using a live `ANTHROPIC_API_KEY`.
 3. Export the persisted `Essay` and `Feedback` records for blinded review; redact learner identifiers from the review sheet.
 4. Score with the four checks above, log failures by task, error category, and severity, then make the advance/iterate decision against the stated gate.
@@ -97,7 +112,7 @@ The current persistence model is sufficient for this small, manual audit. A dedi
 
 **Build billing/auth work first** — rejected because it would add funnel mechanics before there is evidence that the paid-for outcome is valuable. Authentication already exists and is sufficient for ownership of submitted writing.
 
-**Automatically generate all topics with AI** — rejected for Phase 1 because static seeded topics make coverage and evaluation reproducible; custom prompts cover learner variety without adding another unvalidated model workflow.
+**Automatically generate all topics with AI** — rejected for Phase 1 because a current recent-exam source and custom prompts cover the required variety without adding another unvalidated model workflow.
 
 ## Open questions
 

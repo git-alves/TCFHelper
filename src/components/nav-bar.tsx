@@ -8,7 +8,7 @@ export function NavBar() {
 
   return (
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
-      <nav className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
+      <nav className="flex w-full items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="font-semibold tracking-tight">
           TCF Helper
         </Link>

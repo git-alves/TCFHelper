@@ -9,6 +9,10 @@ import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema } from "@/lib/essay-feedback";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
+const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
+  TopicSource.OFFICIAL_EXAM,
+  TopicSource.RECENT_EXAM,
+]);
 
 const requestSchema = z.object({
   taskType: z.enum(TASK_TYPES),
@@ -49,19 +53,16 @@ export async function POST(request: Request) {
   let resolvedTopicPrompt: string;
   if (topicId) {
     const topic = await prisma.topic.findUnique({ where: { id: topicId } });
-    // `topicId` represents a selection from the shared bank. Learner-supplied
-    // prompts must enter through `topicPrompt`, never be addressable by a
-    // shared ID that could link another learner's private prompt.
-    if (
-      !topic ||
-      topic.taskType !== taskType ||
-      topic.source !== TopicSource.OFFICIAL_EXAM
-    ) {
+    // `topicId` represents a server-authoritative shared source (the legacy
+    // official bank or an imported recent-exam topic). Learner-supplied prompts
+    // must enter through `topicPrompt`, never be addressable by a shared ID
+    // that could link another learner's private prompt.
+    if (!topic || topic.taskType !== taskType || !SHARED_TOPIC_SOURCES.has(topic.source)) {
       return NextResponse.json({ error: "Unknown topic." }, { status: 400 });
     }
     resolvedTopicId = topic.id;
-    // A bank topic ID is the source of truth. Never let the client pair an
-    // existing topic record with a different prompt in the grading request.
+    // A server-issued topic ID is the source of truth. Never let the client
+    // pair an existing topic record with a different grading prompt.
     resolvedTopicPrompt = topic.prompt;
   } else {
     // The schema refinement above guarantees a prompt for this branch.
