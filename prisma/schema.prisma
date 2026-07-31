@@ -4,15 +4,16 @@
 // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
+// Deliberately the classic generator with its default node_modules output,
+// not the newer "prisma-client" generator with a custom `output` path: that
+// combination bakes the build machine's absolute filesystem path into the
+// compiled engine-lookup logic (confirmed from the actual bundled chunk in
+// production), which breaks the moment the deploy environment's filesystem
+// layout differs from the one that ran `prisma generate` — regardless of
+// which machine that build happens on. This default layout is the one
+// Next.js has first-class, externalized support for.
 generator client {
-  provider      = "prisma-client"
-  output        = "../src/generated/prisma"
-  // deploy.yml runs `vercel build` on a GitHub Actions (Debian) runner and
-  // uploads the prebuilt output to Vercel, rather than letting Vercel's own
-  // build step (which auto-detects its Lambda runtime target) run `prisma
-  // generate`. Without an explicit target for that runtime, the query
-  // engine binary generated on the runner doesn't match it, and Prisma
-  // Client fails at request time on Vercel.
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
