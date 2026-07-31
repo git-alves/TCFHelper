@@ -101,6 +101,34 @@ describe("POST /api/essays/correct", () => {
     expect(parseMock).toHaveBeenCalledTimes(1);
   });
 
+  it("accepts a recent-exam topic ID and uses its stored prompt", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "recent_topic_1",
+      taskType: "TASK_2",
+      source: "RECENT_EXAM",
+      prompt: "Vous participez à un forum sur les activités culturelles.",
+    });
+
+    const response = await post({
+      taskType: "TASK_2",
+      topicId: "recent_topic_1",
+      topicPrompt: "A client-supplied replacement must be ignored.",
+      content: "Bonjour, je recommande une exposition locale.",
+    });
+
+    expect(response.status).toBe(200);
+    const requestToClaude = parseMock.mock.calls[0][0];
+    expect(requestToClaude.messages[0].content).toContain(
+      "Vous participez à un forum sur les activités culturelles."
+    );
+    expect(requestToClaude.messages[0].content).not.toContain(
+      "A client-supplied replacement must be ignored."
+    );
+    expect(essayCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ topicId: "recent_topic_1" }) })
+    );
+  });
+
   it("requires a learner-supplied prompt when no topic ID is given", async () => {
     const response = await post({ taskType: "TASK_1", content: "Bonjour voisin." });
 

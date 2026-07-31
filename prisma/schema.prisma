@@ -37,6 +37,7 @@ enum TaskType {
 
 enum TopicSource {
   OFFICIAL_EXAM
+  RECENT_EXAM
   AI_GENERATED
   USER_SUBMITTED
 }
@@ -113,12 +114,18 @@ model StripeEvent {
 }
 
 model Topic {
-  id        String      @id @default(cuid())
-  taskType  TaskType
-  title     String
-  prompt    String
-  source    TopicSource @default(USER_SUBMITTED)
-  createdAt DateTime    @default(now())
+  id          String      @id @default(cuid())
+  taskType    TaskType
+  title       String
+  prompt      String
+  source      TopicSource @default(USER_SUBMITTED)
+  // Provenance for a server-fetched prompt. Both fields stay null for the
+  // existing seeded and learner-supplied topics.
+  sourceUrl   String?
+  // This includes a content hash so revised upstream prompts produce a new,
+  // immutable Topic rather than mutating the context of saved essays.
+  externalRef String?     @unique
+  createdAt   DateTime    @default(now())
 
   essays    Essay[]
 

@@ -5,22 +5,71 @@ import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
 
-interface BankTopic {
+interface RecentExamTopic {
   id: string;
+  taskType: TaskType;
   title: string;
   prompt: string;
+  sourceUrl: string;
+  sourceMonth: string;
 }
 
-type TopicMode = "bank" | "custom";
+type TopicMode = "recent" | "custom" | null;
+
+function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
+  if (!value || typeof value !== "object") return null;
+
+  const topic = (value as { topic?: unknown }).topic;
+  if (!topic || typeof topic !== "object") return null;
+
+  const candidate = topic as Record<string, unknown>;
+  const { id, taskType, title, prompt, sourceUrl, sourceMonth } = candidate;
+  if (
+    typeof id !== "string" ||
+    taskType !== expectedTaskType ||
+    typeof title !== "string" ||
+    typeof prompt !== "string" ||
+    typeof sourceUrl !== "string" ||
+    typeof sourceMonth !== "string"
+  ) {
+    return null;
+  }
+
+  return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
+}
+
+function responseErrorMessage(value: unknown, fallback: string) {
+  if (
+    value &&
+    typeof value === "object" &&
+    "error" in value &&
+    typeof value.error === "string" &&
+    value.error.trim()
+  ) {
+    return value.error;
+  }
+
+  return fallback;
+}
+
+function formatSourceMonth(sourceMonth: string) {
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
+  if (!match) return sourceMonth;
+
+  return new Intl.DateTimeFormat("fr-FR", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
+}
 
 export function WritingWorkspace() {
   const [taskType, setTaskType] = useState<TaskType | null>(null);
-  const [topicMode, setTopicMode] = useState<TopicMode>("bank");
+  const [topicMode, setTopicMode] = useState<TopicMode>(null);
 
-  const [bankTopics, setBankTopics] = useState<BankTopic[]>([]);
-  const [bankIndex, setBankIndex] = useState(0);
-  const [bankLoading, setBankLoading] = useState(false);
-  const [bankError, setBankError] = useState<string | null>(null);
+  const [recentTopic, setRecentTopic] = useState<RecentExamTopic | null>(null);
+  const [isRecentTopicLoading, setIsRecentTopicLoading] = useState(false);
+  const [recentTopicError, setRecentTopicError] = useState<string | null>(null);
 
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
@@ -30,16 +79,25 @@ export function WritingWorkspace() {
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
   const feedbackRef = useRef<HTMLElement>(null);
-  const bankRequestId = useRef(0);
+  const customTopicRef = useRef<HTMLTextAreaElement>(null);
+  const recentTopicRequestId = useRef(0);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
-  const selectedBankTopic = bankTopics[bankIndex] ?? null;
-  const activeTopicPrompt = topicMode === "bank" ? selectedBankTopic?.prompt ?? "" : customTopic.trim();
+  const activeTopicPrompt =
+    topicMode === "recent"
+      ? recentTopic?.prompt ?? ""
+      : topicMode === "custom"
+        ? customTopic.trim()
+        : "";
 
   useEffect(() => {
     if (feedback) feedbackRef.current?.focus();
   }, [feedback]);
+
+  useEffect(() => {
+    if (topicMode === "custom") customTopicRef.current?.focus();
+  }, [topicMode]);
 
   function resetDraftAndFeedback() {
     setContent("");
@@ -48,12 +106,19 @@ export function WritingWorkspace() {
     setCorrectError(null);
   }
 
-  function confirmTopicChange() {
-    if (!content.trim() && !feedback) return true;
+  function cancelPendingRecentTopicRequest() {
+    // Do not rely on a loading-state render to have committed yet: a learner
+    // can start typing immediately after requesting a topic.
+    recentTopicRequestId.current += 1;
+    setIsRecentTopicLoading(false);
+  }
 
-    return window.confirm(
-      "Change topic? This will clear your draft and feedback.",
-    );
+  function confirmTopicChange() {
+    if (!content.trim() && !feedback && !(topicMode === "custom" && customTopic.trim())) {
+      return true;
+    }
+
+    return window.confirm("Change topic? This will clear your topic, draft, and feedback.");
   }
 
   function resetForTask(next: TaskType) {
@@ -66,62 +131,85 @@ export function WritingWorkspace() {
       return;
     }
 
-    bankRequestId.current += 1;
+    recentTopicRequestId.current += 1;
     setTaskType(next);
-    setBankTopics([]);
-    setBankIndex(0);
-    setBankLoading(false);
-    setBankError(null);
+    setTopicMode(null);
+    setRecentTopic(null);
+    setIsRecentTopicLoading(false);
+    setRecentTopicError(null);
     setCustomTopic("");
     resetDraftAndFeedback();
   }
 
-  function changeTopicMode(nextMode: TopicMode) {
-    if (nextMode === topicMode || !confirmTopicChange()) return;
-
-    setTopicMode(nextMode);
-    resetDraftAndFeedback();
-  }
-
-  async function pullFromBank(currentTaskType: TaskType) {
-    if (bankTopics.length > 1) {
-      if (!confirmTopicChange()) return;
-
-      setBankIndex((prev) => (prev + 1) % bankTopics.length);
-      resetDraftAndFeedback();
+  function chooseCustomTopic() {
+    if (topicMode === "custom") {
+      cancelPendingRecentTopicRequest();
+      customTopicRef.current?.focus();
       return;
     }
 
-    if (selectedBankTopic && !confirmTopicChange()) return;
+    if (!confirmTopicChange()) return;
 
-    const requestId = ++bankRequestId.current;
-    setBankLoading(true);
-    setBankError(null);
+    recentTopicRequestId.current += 1;
+    setIsRecentTopicLoading(false);
+    setRecentTopicError(null);
+    setTopicMode("custom");
+    resetDraftAndFeedback();
+  }
+
+  async function getRecentTopic(currentTaskType: TaskType) {
+    if (!confirmTopicChange()) return;
+
+    const requestId = ++recentTopicRequestId.current;
+    setIsRecentTopicLoading(true);
+    setRecentTopicError(null);
+
     try {
-      const res = await fetch(`/api/topics?taskType=${currentTaskType}`);
-      if (!res.ok) throw new Error("Failed to load topics.");
-      const data: { topics: BankTopic[] } = await res.json();
-      if (requestId !== bankRequestId.current) return;
+      const res = await fetch(
+        `/api/topics/recent?taskType=${encodeURIComponent(currentTaskType)}`,
+      );
 
-      if (data.topics.length === 0) {
-        setBankError("No topics available yet for this task. Try writing your own.");
-        setBankTopics([]);
-        return;
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        throw new Error(
+          responseErrorMessage(
+            data,
+            "We couldn't get a topic from recent exams. Please try again or write your own.",
+          ),
+        );
       }
-      setBankTopics(data.topics);
-      setBankIndex(0);
-      if (selectedBankTopic) resetDraftAndFeedback();
-    } catch {
-      if (requestId === bankRequestId.current) {
-        setBankError("Couldn't load the topic bank. Please try again.");
+
+      const data: unknown = await res.json();
+      if (requestId !== recentTopicRequestId.current) return;
+
+      const nextTopic = readRecentExamTopic(data, currentTaskType);
+      if (!nextTopic) {
+        throw new Error("The recent-exam topic was unavailable. Please try again or write your own.");
+      }
+
+      setRecentTopic(nextTopic);
+      setTopicMode("recent");
+      resetDraftAndFeedback();
+    } catch (error) {
+      if (requestId === recentTopicRequestId.current) {
+        setRecentTopicError(
+          error instanceof Error
+            ? error.message
+            : "We couldn't get a topic from recent exams. Please try again or write your own.",
+        );
       }
     } finally {
-      if (requestId === bankRequestId.current) setBankLoading(false);
+      if (requestId === recentTopicRequestId.current) setIsRecentTopicLoading(false);
     }
   }
 
   async function handleCorrect() {
     if (!taskType || !activeTopicPrompt || wordCount === 0) return;
+
+    const topicContext =
+      topicMode === "recent" && recentTopic
+        ? { topicId: recentTopic.id }
+        : { topicPrompt: activeTopicPrompt };
 
     setIsCorrecting(true);
     setCorrectError(null);
@@ -133,8 +221,7 @@ export function WritingWorkspace() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskType,
-          topicId: topicMode === "bank" ? selectedBankTopic?.id : undefined,
-          topicPrompt: activeTopicPrompt,
+          ...topicContext,
           content,
         }),
       });
@@ -157,10 +244,9 @@ export function WritingWorkspace() {
 
   return (
     <div className="flex w-full flex-col gap-8">
-      {/* Task selector */}
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">1. Choose a task</h2>
-        <div className="flex gap-3">
+        <div className="grid gap-3 sm:grid-cols-3">
           {TASK_ORDER.map((type) => (
             <button
               key={type}
@@ -168,7 +254,7 @@ export function WritingWorkspace() {
               onClick={() => resetForTask(type)}
               aria-pressed={taskType === type}
               disabled={isCorrecting}
-              className={`flex-1 rounded-lg border px-4 py-3 text-left transition-colors ${
+              className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                 taskType === type
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
                   : "border-black/[.1] hover:bg-black/[.03] dark:border-white/[.15] dark:hover:bg-white/[.05]"
@@ -182,7 +268,7 @@ export function WritingWorkspace() {
           ))}
         </div>
         {task && (
-          <div className="rounded-lg border border-black/[.08] bg-black/[.02] p-4 text-sm dark:border-white/[.1] dark:bg-white/[.03]">
+          <div className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 text-sm dark:border-white/[.1] dark:bg-white/[.03]">
             <p>{task.description}</p>
             <p className="mt-1 text-zinc-500 dark:text-zinc-400">
               Target length: {task.minWords}–{task.maxWords} words.
@@ -193,93 +279,110 @@ export function WritingWorkspace() {
 
       {task && (
         <>
-          {/* Topic */}
-          <section className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">2. Pick a topic</h2>
-            <div className="flex gap-2 text-sm">
+          <section className="flex flex-col gap-3" aria-labelledby="topic-heading">
+            <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+              2. Choose a topic
+            </h2>
+            <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
-                onClick={() => changeTopicMode("bank")}
-                aria-pressed={topicMode === "bank"}
-                disabled={isCorrecting}
-                className={`rounded-full border px-3 py-1 ${
-                  topicMode === "bank"
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-black/[.15] dark:border-white/[.2]"
+                onClick={() => getRecentTopic(taskType!)}
+                aria-pressed={topicMode === "recent"}
+                aria-busy={isRecentTopicLoading}
+                disabled={isCorrecting || isRecentTopicLoading}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  topicMode === "recent"
+                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                    : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                Topic bank
+                <span className="block font-medium">Get a topic from recent exams</span>
+                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                  Load a topic for the task you selected.
+                </span>
               </button>
               <button
                 type="button"
-                onClick={() => changeTopicMode("custom")}
+                onClick={chooseCustomTopic}
                 aria-pressed={topicMode === "custom"}
                 disabled={isCorrecting}
-                className={`rounded-full border px-3 py-1 ${
+                className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "custom"
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-black/[.15] dark:border-white/[.2]"
+                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                    : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                Write my own
+                <span className="block font-medium">Write or paste my own topic</span>
+                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                  Use a prompt you already have.
+                </span>
               </button>
             </div>
 
-            {topicMode === "bank" ? (
-              <div className="flex flex-col gap-2">
-                <button
-                  type="button"
-                  onClick={() => pullFromBank(taskType!)}
-                  disabled={bankLoading || isCorrecting}
-                  className="self-start rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                >
-                  {bankLoading
-                    ? "Loading…"
-                    : bankTopics.length > 0
-                      ? "Next topic"
-                      : "Pull a topic"}
-                </button>
-                {bankError && (
-                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                    {bankError}
-                  </p>
-                )}
-                {selectedBankTopic && (
-                  <p className="rounded-lg border border-black/[.08] p-3 text-sm dark:border-white/[.1]">
-                    {selectedBankTopic.prompt}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <>
+            {isRecentTopicLoading && (
+              <p role="status" aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
+                Getting a topic from recent exams…
+              </p>
+            )}
+
+            {recentTopicError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {recentTopicError}
+              </p>
+            )}
+
+            {topicMode === "recent" && recentTopic && (
+              <article
+                aria-label="Selected recent-exam topic"
+                className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
+              >
+                <h3 className="font-medium">{recentTopic.title}</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{recentTopic.prompt}</p>
+                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  Source: {" "}
+                  <a
+                    href={recentTopic.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-foreground"
+                  >
+                    Recent exams — {formatSourceMonth(recentTopic.sourceMonth)}
+                  </a>
+                </p>
+              </article>
+            )}
+
+            {topicMode === "custom" && (
+              <div>
                 <label htmlFor="custom-topic" className="sr-only">
                   Your topic or prompt
                 </label>
                 <textarea
+                  ref={customTopicRef}
                   id="custom-topic"
                   value={customTopic}
                   onChange={(e) => {
+                    cancelPendingRecentTopicRequest();
                     setCustomTopic(e.target.value);
                     setCorrectError(null);
                     if (feedback) setFeedbackIsStale(true);
                   }}
                   placeholder="Paste or write the topic/prompt you want to respond to…"
-                  rows={2}
+                  rows={3}
                   maxLength={2000}
                   disabled={isCorrecting}
-                  className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
+                  className="w-full rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
                 />
-              </>
+              </div>
             )}
           </section>
 
-          {/* Editor */}
           <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">3. Write</h2>
               <span
                 id="word-count"
-                className={`text-sm ${
+                className={`shrink-0 text-sm ${
                   wordCountInRange
                     ? "text-zinc-500 dark:text-zinc-400"
                     : "text-amber-600 dark:text-amber-400"
@@ -295,16 +398,17 @@ export function WritingWorkspace() {
               id="essay-content"
               value={content}
               onChange={(e) => {
+                cancelPendingRecentTopicRequest();
                 setContent(e.target.value);
                 setCorrectError(null);
                 if (feedback) setFeedbackIsStale(true);
               }}
               placeholder="Écrivez votre texte ici…"
-              rows={10}
+              rows={14}
               maxLength={20000}
               disabled={isCorrecting}
               aria-describedby="word-count"
-              className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
+              className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
             <button
               type="button"
@@ -326,15 +430,14 @@ export function WritingWorkspace() {
             )}
           </section>
 
-          {/* Feedback */}
           {feedback && (
             <section
               ref={feedbackRef}
               tabIndex={-1}
               aria-labelledby="feedback-heading"
-              className="flex flex-col gap-4 rounded-lg border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
+              className="flex flex-col gap-4 rounded-xl border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
             >
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="feedback-heading" className="text-lg font-semibold">
                   Feedback
                 </h2>
