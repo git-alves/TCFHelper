@@ -31,23 +31,15 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Debug - list Prisma engine files in build output
+      - name: Debug - inspect .vercel/output structure
         run: |
-          echo "--- node_modules/.prisma/client ---"
-          find node_modules/.prisma/client -maxdepth 1 -type f 2>&1 || true
-          echo "--- all *.so.node under .vercel/output ---"
-          find .vercel/output -iname '*.so.node' 2>&1 || true
-          echo "--- all files under .vercel/output/functions matching *prisma* ---"
-          find .vercel/output/functions -iname '*prisma*' 2>&1 || true
+          echo "--- .next/server (post next build) ---"
+          find .next/server -maxdepth 3 | sort
+          echo "--- .vercel/output full tree ---"
+          find .vercel/output | sort
 
       - name: Verify Prisma engine is packaged
-        run: |
-          engine_path="$(find .vercel/output/functions -type f -name 'libquery_engine-rhel-openssl-3.0.x.so.node' -print -quit)"
-          if [ -z "$engine_path" ]; then
-            echo "::error::Prisma query engine for rhel-openssl-3.0.x is missing from .vercel/output/functions — every Prisma-touching route would fail at request time. See prisma/schema.prisma's generator comment."
-            exit 1
-          fi
-          echo "Found engine at: $engine_path"
+        run: node scripts/verify-prisma-engine.mjs .vercel/output/functions
 
       - name: Deploy to Vercel
         run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
