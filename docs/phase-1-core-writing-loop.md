@@ -1,0 +1,88 @@
+# Phase 1 — Core Writing Loop
+
+**Problem** — TCF written-expression learners need prompt-specific, timely feedback they can use to revise a French response. Today the product can collect a response, but it cannot demonstrate that its AI feedback is accurate enough, actionable enough, or reliable enough to earn investment in the rest of the learning product.
+
+**Job to be done** — When I finish a TCF writing response, help me understand what to correct and what to practise next, in the context of the exact task and word-count requirement, so I can improve before the exam.
+
+## Goals / non-goals
+
+### Goals
+
+- Let an authenticated learner choose Tâche 1, 2, or 3, see its fixed instructions and target word range, choose a seeded prompt or enter one, and write a response.
+- Show the live word count before submission.
+- Return one structured AI review containing corrected French text, categorized errors, a word-count check, a CEFR estimate, an overall summary, and actionable suggestions.
+- Persist the submitted essay and successful review so a human can audit the feedback during validation.
+- Establish whether feedback quality justifies a next phase of learner history, iteration, and monetization.
+
+### Non-goals
+
+- No subscription, checkout, entitlement, or billing gate. Existing sign-in remains out of scope for this phase.
+- No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
+- No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
+- No automatic topic generation; the bank is deliberately seeded and custom prompts are learner supplied.
+- No guarantee of feedback quality until the validation protocol below has been completed with a live Anthropic key.
+
+## Decision
+
+Build the smallest complete loop around one persisted essay and one schema-constrained Claude response. The interface should expose the context that determines useful feedback (task, prompt, word range, and text) and return feedback in sections rather than a free-form chat answer.
+
+This is preferable to building a dashboard or subscription gate first: the unproven product risk is feedback quality, not account management. Schema-constrained output makes the review display and later human audit predictable; it does not itself establish that the feedback is correct.
+
+## Product and technical contract
+
+### Input
+
+| Field | Rule |
+| --- | --- |
+| Task | Exactly one of `TASK_1`, `TASK_2`, or `TASK_3`; instructions and word range come from the static task configuration. |
+| Topic | Either a topic-bank record for the selected task or a non-empty learner-supplied prompt (up to 2,000 characters). |
+| Essay | Non-empty French response, up to 20,000 characters. The visible word counter and server use whitespace-delimited words. |
+
+### Output
+
+Claude must return a structured object with:
+
+- corrected French text that preserves the learner's ideas;
+- an estimated CEFR level (`A1`–`C2`) for the original response;
+- an in-range/out-of-range word-count judgement plus an explanation;
+- zero or more errors with original excerpt, correction, short English explanation, and category;
+- English-language summary and actionable suggestions.
+
+The API treats malformed input, an unknown/mismatched bank topic, a model refusal, a malformed structured response, and an upstream model failure as request failures. It must not save an `Essay` until a valid feedback object is available; the learner sees a retryable error instead. This avoids audit records that look successfully reviewed when they were not.
+
+## Validation plan and success metric
+
+The phase passes only after an evaluator reviews a stratified sample of **30 successful live Claude reviews** (10 per task; include below-range, in-range, and above-range responses and a range of learner proficiency). The baseline is unmeasured at the start of Phase 1; this review establishes it.
+
+For each review, a TCF-qualified reviewer—or two reviewers with disagreements adjudicated by one qualified reviewer—records whether:
+
+1. every surfaced correction is materially correct and preserves the intended meaning;
+2. the word-count judgement is correct under the product's displayed counting rule;
+3. the CEFR estimate is within one CEFR band of the reviewer estimate;
+4. the feedback identifies the most important improvement opportunity and offers at least one actionable next step.
+
+**Advance recommendation:** proceed to the next product phase if at least 27 of 30 reviews (90%) meet all four checks, there are no high-severity meaning-changing false corrections, and structured-response completion is at least 95% across the sample. If these conditions are not met, improve the rubric/prompt/schema and repeat the sample before investing in retention or billing features.
+
+This metric intentionally weights harmful false corrections more heavily than a merely unhelpful suggestion. A 90% threshold is a decision gate, not a claim of statistical proof; the small sample is appropriate for discovering whether the core value proposition is viable before expanding scope.
+
+## Review workflow
+
+1. Seed the topic bank and collect/prepare the 30 consented test responses.
+2. Submit each response through the production-like loop using a live `ANTHROPIC_API_KEY`.
+3. Export the persisted `Essay` and `Feedback` records for blinded review; redact learner identifiers from the review sheet.
+4. Score with the four checks above, log failures by task, error category, and severity, then make the advance/iterate decision against the stated gate.
+
+The current persistence model is sufficient for this small, manual audit. A dedicated evaluator-rating table or analytics events would be follow-up work only if the loop passes and validation becomes ongoing.
+
+## Alternatives considered
+
+**Free-form model response** — rejected because the UI and audit protocol need stable fields, and a prose blob makes it too easy to omit a required review element.
+
+**Build billing/auth work first** — rejected because it would add funnel mechanics before there is evidence that the paid-for outcome is valuable. Authentication already exists and is sufficient for ownership of submitted writing.
+
+**Automatically generate all topics with AI** — rejected for Phase 1 because static seeded topics make coverage and evaluation reproducible; custom prompts cover learner variety without adding another unvalidated model workflow.
+
+## Open questions
+
+- Which qualified reviewer(s) will conduct the 30-sample audit, and where will the redacted score sheet live?
+- Should the visible label use the French exam terminology “CECRL” alongside the internationally familiar “CEFR”? The stored level scale is the same; this is a UX wording decision, not a grading-model change.
