@@ -27,16 +27,19 @@ export async function POST(request: Request) {
   try {
     // Haiku, no thinking, low max_tokens: this fires repeatedly while the
     // learner types, so latency matters far more than depth here.
-    const response = await anthropic.messages.create({
-      model: "claude-haiku-4-5",
-      max_tokens: 1024,
-      system:
-        `Translate the given French text into ${languageName}. Respond with ONLY the ` +
-        "translation — no preamble, no quotes, no notes. The source text is a language " +
-        "learner's in-progress draft and may contain grammar mistakes; translate the intended " +
-        "meaning rather than refusing or correcting it.",
-      messages: [{ role: "user", content: text }],
-    });
+    const response = await anthropic.messages.create(
+      {
+        model: "claude-haiku-4-5",
+        max_tokens: 1024,
+        system:
+          `Translate the given French text into ${languageName}. Respond with ONLY the ` +
+          "translation — no preamble, no quotes, no notes. The source text is a language " +
+          "learner's in-progress draft and may contain grammar mistakes; translate the intended " +
+          "meaning rather than refusing or correcting it.",
+        messages: [{ role: "user", content: text }],
+      },
+      { signal: request.signal },
+    );
 
     if (response.stop_reason === "refusal") {
       return NextResponse.json({ error: "The translation was declined." }, { status: 502 });
@@ -61,6 +64,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ translation });
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json({ error: "Translation request was cancelled." }, { status: 499 });
+    }
+
     console.error("Translation failed", error);
     return NextResponse.json({ error: "Something went wrong while translating." }, { status: 502 });
   }

@@ -61,7 +61,8 @@ describe("POST /api/translate", () => {
       expect.objectContaining({
         system: expect.stringContaining("Portuguese"),
         messages: [{ role: "user", content: "J'aime apprendre le français." }],
-      })
+      }),
+      expect.objectContaining({ signal: expect.anything() }),
     );
     await expect(response.json()).resolves.toEqual({ translation: "I enjoy learning French." });
   });
