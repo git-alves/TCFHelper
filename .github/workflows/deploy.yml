@@ -31,24 +31,7 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
-      - name: Debug - inspect signup function's launcher and config
-        run: |
-          echo "--- .vc-config.json ---"
-          cat .vercel/output/functions/api/auth/signup.func/.vc-config.json
-          echo
-          echo "--- ___next_launcher.cjs ---"
-          cat .vercel/output/functions/api/auth/signup.func/___next_launcher.cjs
-          echo
-          echo "--- .next/server/app-paths-manifest.json ---"
-          cat .vercel/output/functions/api/auth/signup.func/.next/server/app-paths-manifest.json
-          echo
-          echo "--- .next/server/pages-manifest.json ---"
-          cat .vercel/output/functions/api/auth/signup.func/.next/server/pages-manifest.json
-          echo
-          echo "--- config.json ---"
-          cat .vercel/output/config.json
-
-      - name: Verify Prisma engine is packaged
+      - name: Verify Prisma runtime is mapped into Vercel functions
         run: node scripts/verify-prisma-engine.mjs .vercel/output/functions
 
       - name: Deploy to Vercel
