@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
@@ -28,35 +28,81 @@ export function WritingWorkspace() {
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctError, setCorrectError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
+  const [feedbackIsStale, setFeedbackIsStale] = useState(false);
+  const feedbackRef = useRef<HTMLElement>(null);
+  const bankRequestId = useRef(0);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
   const selectedBankTopic = bankTopics[bankIndex] ?? null;
   const activeTopicPrompt = topicMode === "bank" ? selectedBankTopic?.prompt ?? "" : customTopic.trim();
 
+  useEffect(() => {
+    if (feedback) feedbackRef.current?.focus();
+  }, [feedback]);
+
+  function resetDraftAndFeedback() {
+    setContent("");
+    setFeedback(null);
+    setFeedbackIsStale(false);
+    setCorrectError(null);
+  }
+
+  function confirmTopicChange() {
+    if (!content.trim() && !feedback) return true;
+
+    return window.confirm(
+      "Change topic? This will clear your draft and feedback.",
+    );
+  }
+
   function resetForTask(next: TaskType) {
+    if (next === taskType) return;
+
+    if (
+      (content.trim() || customTopic.trim() || feedback) &&
+      !window.confirm("Change task? This will clear your topic, draft, and feedback.")
+    ) {
+      return;
+    }
+
+    bankRequestId.current += 1;
     setTaskType(next);
     setBankTopics([]);
     setBankIndex(0);
+    setBankLoading(false);
     setBankError(null);
     setCustomTopic("");
-    setContent("");
-    setFeedback(null);
-    setCorrectError(null);
+    resetDraftAndFeedback();
+  }
+
+  function changeTopicMode(nextMode: TopicMode) {
+    if (nextMode === topicMode || !confirmTopicChange()) return;
+
+    setTopicMode(nextMode);
+    resetDraftAndFeedback();
   }
 
   async function pullFromBank(currentTaskType: TaskType) {
     if (bankTopics.length > 1) {
+      if (!confirmTopicChange()) return;
+
       setBankIndex((prev) => (prev + 1) % bankTopics.length);
+      resetDraftAndFeedback();
       return;
     }
 
+    if (selectedBankTopic && !confirmTopicChange()) return;
+
+    const requestId = ++bankRequestId.current;
     setBankLoading(true);
     setBankError(null);
     try {
       const res = await fetch(`/api/topics?taskType=${currentTaskType}`);
       if (!res.ok) throw new Error("Failed to load topics.");
       const data: { topics: BankTopic[] } = await res.json();
+      if (requestId !== bankRequestId.current) return;
+
       if (data.topics.length === 0) {
         setBankError("No topics available yet for this task. Try writing your own.");
         setBankTopics([]);
@@ -64,10 +110,13 @@ export function WritingWorkspace() {
       }
       setBankTopics(data.topics);
       setBankIndex(0);
+      if (selectedBankTopic) resetDraftAndFeedback();
     } catch {
-      setBankError("Couldn't load the topic bank. Please try again.");
+      if (requestId === bankRequestId.current) {
+        setBankError("Couldn't load the topic bank. Please try again.");
+      }
     } finally {
-      setBankLoading(false);
+      if (requestId === bankRequestId.current) setBankLoading(false);
     }
   }
 
@@ -77,6 +126,7 @@ export function WritingWorkspace() {
     setIsCorrecting(true);
     setCorrectError(null);
     setFeedback(null);
+    setFeedbackIsStale(false);
     try {
       const res = await fetch("/api/essays/correct", {
         method: "POST",
@@ -116,11 +166,13 @@ export function WritingWorkspace() {
               key={type}
               type="button"
               onClick={() => resetForTask(type)}
+              aria-pressed={taskType === type}
+              disabled={isCorrecting}
               className={`flex-1 rounded-lg border px-4 py-3 text-left transition-colors ${
                 taskType === type
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
                   : "border-black/[.1] hover:bg-black/[.03] dark:border-white/[.15] dark:hover:bg-white/[.05]"
-              }`}
+              } disabled:cursor-not-allowed disabled:opacity-60`}
             >
               <div className="font-medium">{TASK_INSTRUCTIONS[type].label}</div>
               <div className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -147,23 +199,27 @@ export function WritingWorkspace() {
             <div className="flex gap-2 text-sm">
               <button
                 type="button"
-                onClick={() => setTopicMode("bank")}
+                onClick={() => changeTopicMode("bank")}
+                aria-pressed={topicMode === "bank"}
+                disabled={isCorrecting}
                 className={`rounded-full border px-3 py-1 ${
                   topicMode === "bank"
                     ? "border-foreground bg-foreground text-background"
                     : "border-black/[.15] dark:border-white/[.2]"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 Topic bank
               </button>
               <button
                 type="button"
-                onClick={() => setTopicMode("custom")}
+                onClick={() => changeTopicMode("custom")}
+                aria-pressed={topicMode === "custom"}
+                disabled={isCorrecting}
                 className={`rounded-full border px-3 py-1 ${
                   topicMode === "custom"
                     ? "border-foreground bg-foreground text-background"
                     : "border-black/[.15] dark:border-white/[.2]"
-                }`}
+                } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 Write my own
               </button>
@@ -174,7 +230,7 @@ export function WritingWorkspace() {
                 <button
                   type="button"
                   onClick={() => pullFromBank(taskType!)}
-                  disabled={bankLoading}
+                  disabled={bankLoading || isCorrecting}
                   className="self-start rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
                   {bankLoading
@@ -183,7 +239,11 @@ export function WritingWorkspace() {
                       ? "Next topic"
                       : "Pull a topic"}
                 </button>
-                {bankError && <p className="text-sm text-red-600 dark:text-red-400">{bankError}</p>}
+                {bankError && (
+                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                    {bankError}
+                  </p>
+                )}
                 {selectedBankTopic && (
                   <p className="rounded-lg border border-black/[.08] p-3 text-sm dark:border-white/[.1]">
                     {selectedBankTopic.prompt}
@@ -191,13 +251,25 @@ export function WritingWorkspace() {
                 )}
               </div>
             ) : (
-              <textarea
-                value={customTopic}
-                onChange={(e) => setCustomTopic(e.target.value)}
-                placeholder="Paste or write the topic/prompt you want to respond to…"
-                rows={2}
-                className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
-              />
+              <>
+                <label htmlFor="custom-topic" className="sr-only">
+                  Your topic or prompt
+                </label>
+                <textarea
+                  id="custom-topic"
+                  value={customTopic}
+                  onChange={(e) => {
+                    setCustomTopic(e.target.value);
+                    setCorrectError(null);
+                    if (feedback) setFeedbackIsStale(true);
+                  }}
+                  placeholder="Paste or write the topic/prompt you want to respond to…"
+                  rows={2}
+                  maxLength={2000}
+                  disabled={isCorrecting}
+                  className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
+                />
+              </>
             )}
           </section>
 
@@ -206,6 +278,7 @@ export function WritingWorkspace() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">3. Write</h2>
               <span
+                id="word-count"
                 className={`text-sm ${
                   wordCountInRange
                     ? "text-zinc-500 dark:text-zinc-400"
@@ -215,12 +288,23 @@ export function WritingWorkspace() {
                 {wordCount} / {task.minWords}–{task.maxWords} words
               </span>
             </div>
+            <label htmlFor="essay-content" className="sr-only">
+              Your response
+            </label>
             <textarea
+              id="essay-content"
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                setCorrectError(null);
+                if (feedback) setFeedbackIsStale(true);
+              }}
               placeholder="Écrivez votre texte ici…"
               rows={10}
-              className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
+              maxLength={20000}
+              disabled={isCorrecting}
+              aria-describedby="word-count"
+              className="rounded-md border border-black/[.15] bg-transparent px-3 py-2 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
             <button
               type="button"
@@ -230,16 +314,32 @@ export function WritingWorkspace() {
             >
               {isCorrecting ? "Correcting…" : "Correct"}
             </button>
-            {correctError && <p className="text-sm text-red-600 dark:text-red-400">{correctError}</p>}
+            {isCorrecting && (
+              <p role="status" className="sr-only">
+                Getting your feedback. This can take a moment.
+              </p>
+            )}
+            {correctError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {correctError}
+              </p>
+            )}
           </section>
 
           {/* Feedback */}
           {feedback && (
-            <section className="flex flex-col gap-4 rounded-lg border border-black/[.1] p-5 dark:border-white/[.15]">
+            <section
+              ref={feedbackRef}
+              tabIndex={-1}
+              aria-labelledby="feedback-heading"
+              className="flex flex-col gap-4 rounded-lg border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
+            >
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Feedback</h2>
+                <h2 id="feedback-heading" className="text-lg font-semibold">
+                  Feedback
+                </h2>
                 <span className="rounded-full bg-black/[.06] px-3 py-1 text-sm font-medium dark:bg-white/[.1]">
-                  CEFR level: {feedback.cefrLevel}
+                  Estimated CEFR / CECRL level: {feedback.cefrLevel}
                 </span>
               </div>
 
@@ -254,6 +354,12 @@ export function WritingWorkspace() {
               </p>
 
               <p className="text-sm">{feedback.summary}</p>
+
+              {feedbackIsStale && (
+                <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  You&apos;ve edited your response since this feedback. Correct again for feedback on your latest draft.
+                </p>
+              )}
 
               <div>
                 <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">

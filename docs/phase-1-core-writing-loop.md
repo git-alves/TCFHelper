@@ -28,6 +28,23 @@ Build the smallest complete loop around one persisted essay and one schema-const
 
 This is preferable to building a dashboard or subscription gate first: the unproven product risk is feedback quality, not account management. Schema-constrained output makes the review display and later human audit predictable; it does not itself establish that the feedback is correct.
 
+## Interaction and recovery flow
+
+`Choose task → read fixed instructions → choose or enter topic → write → request correction → review feedback`
+
+The learner should be able to complete that path without having to remember word limits or recover from an ambiguous state.
+
+| State / transition | Product behavior | Why |
+| --- | --- | --- |
+| No task selected | Only the three task choices are shown. Selecting one immediately reveals its fixed instructions and target range. | It gives a clear first action without exposing fields that lack context. |
+| Task, but no topic | The topic-bank action and “write my own” choice are visible before the editor can be submitted. | A response without a prompt cannot receive task-specific feedback. |
+| Changing the active task | Clicking the already-selected task does nothing. Switching tasks after entering a topic, draft, or feedback asks before clearing that work. | Task changes invalidate the context; accidental re-clicks and irreversible draft loss are avoidable. |
+| Changing a topic or topic mode | If a draft or feedback exists, ask before clearing those response-specific results. | Retaining an essay under a different prompt risks feedback that appears valid but is about the wrong task. |
+| Request in progress | The correction control says “Correcting…”, the response context is temporarily locked, and assistive technology receives a status update. | It confirms the click registered and prevents the visible prompt or essay from drifting away from the submitted version. |
+| Request succeeds | Focus moves to the labelled feedback region, which contains the word-count result, estimated CEFR / CECRL level, corrected text, errors, and suggestions. | The result may land below the fold; moving to it removes the need to hunt for the outcome. |
+| Learner edits after feedback | Feedback stays available but is visibly marked as applying to the prior submission, with a clear invitation to correct again. | A learner often revises immediately; silently presenting old feedback as if it applies to the new draft would be misleading. |
+| Topic or correction request fails | A concise, retryable error is shown and announced; the learner's current work stays in place. | A transient model or network failure must not cost the learner their writing. |
+
 ## Product and technical contract
 
 ### Input
