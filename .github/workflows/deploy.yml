@@ -31,6 +31,15 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
 
+      - name: Debug - list Prisma engine files in build output
+        run: |
+          echo "--- node_modules/.prisma/client ---"
+          find node_modules/.prisma/client -maxdepth 1 -type f 2>&1 || true
+          echo "--- all *.so.node under .vercel/output ---"
+          find .vercel/output -iname '*.so.node' 2>&1 || true
+          echo "--- all files under .vercel/output/functions matching *prisma* ---"
+          find .vercel/output/functions -iname '*prisma*' 2>&1 || true
+
       - name: Verify Prisma engine is packaged
         run: |
           engine_path="$(find .vercel/output/functions -type f -name 'libquery_engine-rhel-openssl-3.0.x.so.node' -print -quit)"
