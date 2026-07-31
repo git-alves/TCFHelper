@@ -103,6 +103,22 @@ free, so production should set Cloud Billing budgets and alerts before launch.
 See Google's [pricing](https://cloud.google.com/translate/pricing) and
 [attribution requirements](https://docs.cloud.google.com/translate/attribution).
 
+Before calling Google, the translation route also reserves a durable allowance
+for the signed-in learner in Postgres: at most 20 requests and 20,000 input
+Unicode code points per UTC minute, plus 50,000 input code points per UTC
+calendar month. Google meters code points (including whitespace), so the
+server counts them the same way. A transaction-scoped per-user PostgreSQL lock
+serializes concurrent reservations across server instances; a direct caller
+cannot race two requests through the same remaining allowance. Rejections use
+stable error codes plus `Retry-After` and UTC `resetAt` metadata while the
+client continues to show localized recovery copy.
+
+Reservations deliberately account for an accepted request attempt rather than
+only a completed Google response. If a client disconnects immediately after
+the durable reservation, that learner's allowance remains spent; this avoids a
+release racing a newer request for the same learner. The aborted request never
+reaches Google, and it cannot spend anyone else's allowance.
+
 ## Database
 
 Schema lives in `prisma/schema.prisma`. The initial migration is committed

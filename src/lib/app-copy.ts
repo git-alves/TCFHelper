@@ -113,6 +113,8 @@ export interface AppCopy {
       empty: string;
       unavailableError: string;
       notConfiguredError: string;
+      rateLimitedError: string;
+      monthlyQuotaError: string;
       tooLong: (values: TranslationLimitValues) => string;
       googleAttributionAlt: string;
       googleNotice: string;
@@ -223,6 +225,9 @@ export const APP_COPY = {
         empty: "Your translation will appear here as you write.",
         unavailableError: "Translation is unavailable right now.",
         notConfiguredError: "Live translation is not configured yet. Please try again later.",
+        rateLimitedError: "You’re translating too quickly. Please wait a moment and try again.",
+        monthlyQuotaError:
+          "You’ve reached this month’s live translation limit. Please try again next month.",
         tooLong: ({ maxCharacters }) =>
           `Live translation is available for drafts up to ${maxCharacters} characters. This draft is longer — submit it for correction to see full feedback.`,
         googleAttributionAlt: "Powered by Google Translate",
@@ -341,6 +346,9 @@ export const APP_COPY = {
         empty: "Votre traduction apparaîtra ici au fur et à mesure de votre rédaction.",
         unavailableError: "La traduction est indisponible pour le moment.",
         notConfiguredError: "La traduction en direct n’est pas encore configurée. Réessayez plus tard.",
+        rateLimitedError: "Vous traduisez trop rapidement. Patientez un instant puis réessayez.",
+        monthlyQuotaError:
+          "Vous avez atteint la limite mensuelle de traduction en direct. Réessayez le mois prochain.",
         tooLong: ({ maxCharacters }) =>
           `La traduction en direct est disponible pour les brouillons de ${maxCharacters} caractères maximum. Ce brouillon est plus long : soumettez-le pour obtenir des commentaires complets.`,
         googleAttributionAlt: "Propulsé par Google Translate",
@@ -460,6 +468,9 @@ export const APP_COPY = {
         empty: "Tu traducción aparecerá aquí mientras escribes.",
         unavailableError: "La traducción no está disponible en este momento.",
         notConfiguredError: "La traducción en tiempo real todavía no está configurada. Inténtalo más tarde.",
+        rateLimitedError: "Estás traduciendo demasiado rápido. Espera un momento e inténtalo de nuevo.",
+        monthlyQuotaError:
+          "Has alcanzado el límite mensual de traducción en tiempo real. Inténtalo de nuevo el próximo mes.",
         tooLong: ({ maxCharacters }) =>
           `La traducción en tiempo real está disponible para borradores de hasta ${maxCharacters} caracteres. Este borrador es más largo; envíalo para corregirlo y recibir comentarios completos.`,
         googleAttributionAlt: "Con la tecnología de Google Translate",
@@ -579,6 +590,9 @@ export const APP_COPY = {
         empty: "Sua tradução aparecerá aqui enquanto você escreve.",
         unavailableError: "A tradução não está disponível no momento.",
         notConfiguredError: "A tradução em tempo real ainda não está configurada. Tente mais tarde.",
+        rateLimitedError: "Você está traduzindo rápido demais. Aguarde um momento e tente novamente.",
+        monthlyQuotaError:
+          "Você atingiu o limite mensal de tradução em tempo real. Tente novamente no próximo mês.",
         tooLong: ({ maxCharacters }) =>
           `A tradução em tempo real está disponível para rascunhos de até ${maxCharacters} caracteres. Este rascunho é maior; envie-o para correção e receba comentários completos.`,
         googleAttributionAlt: "Desenvolvido pelo Google Translate",

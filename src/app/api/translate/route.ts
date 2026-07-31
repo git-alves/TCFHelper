@@ -2,10 +2,21 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { APP_LOCALES, TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
+import { prisma } from "@/lib/prisma";
 
 const GOOGLE_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2";
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
+
+// Google documents a default quota of 6,000,000 input code points per
+// project/user each minute and recommends requests of at most 5,000 code
+// points. These tighter product limits still allow a debounced live update
+// about every three seconds, while preventing a direct caller from consuming
+// the shared Google project quota at that provider-scale rate.
+const TRANSLATION_REQUESTS_PER_MINUTE = 20;
+const TRANSLATION_CHARACTERS_PER_MINUTE = 20_000;
+const TRANSLATION_CHARACTERS_PER_MONTH = 50_000;
+const QUOTA_TRANSACTION_TIMEOUT_MS = 3_000;
 
 const requestSchema = z
   .object({
@@ -19,6 +30,13 @@ const requestSchema = z
   .strict();
 
 type JsonRecord = Record<string, unknown>;
+type QuotaReservation =
+  | { allowed: true }
+  | {
+      allowed: false;
+      reason: "rate" | "monthly";
+      resetAt: Date;
+    };
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
@@ -77,6 +95,97 @@ function getGoogleErrorMetadata(payload: unknown) {
   };
 }
 
+function startOfUtcMinute(date: Date) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+    ),
+  );
+}
+
+function startOfUtcMonth(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function startOfNextUtcMonth(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1));
+}
+
+function isSameWindow(left: Date, right: Date) {
+  return left.getTime() === right.getTime();
+}
+
+// Cloud Translation meters Unicode code points, not UTF-16 code units. This
+// matches its billing model even for text containing astral-plane characters.
+function countCodePoints(text: string) {
+  return Array.from(text).length;
+}
+
+function retryAfterSeconds(now: Date, resetAt: Date) {
+  return Math.max(1, Math.ceil((resetAt.getTime() - now.getTime()) / 1_000));
+}
+
+async function reserveTranslationQuota(userId: string, characterCount: number): Promise<QuotaReservation> {
+  return prisma.$transaction(
+    async (tx) => {
+      // A unique row alone is not enough for a read/modify/write limit: two
+      // server instances could both read the same remaining allowance. This
+      // PostgreSQL transaction-scoped lock serializes all quota reservations
+      // for this learner without blocking other learners.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
+
+      const now = new Date();
+      const minuteStartedAt = startOfUtcMinute(now);
+      const monthStartedAt = startOfUtcMonth(now);
+      const minuteResetsAt = new Date(minuteStartedAt.getTime() + 60_000);
+      const monthResetsAt = startOfNextUtcMonth(now);
+      const existing = await tx.translationQuota.findUnique({ where: { userId } });
+
+      const continuingMinute =
+        existing !== null && isSameWindow(existing.minuteStartedAt, minuteStartedAt);
+      const continuingMonth =
+        existing !== null && isSameWindow(existing.monthStartedAt, monthStartedAt);
+      const minuteRequestCount = (continuingMinute ? existing.minuteRequestCount : 0) + 1;
+      const minuteCharacterCount =
+        (continuingMinute ? existing.minuteCharacterCount : 0) + characterCount;
+      const monthCharacterCount =
+        (continuingMonth ? existing.monthCharacterCount : 0) + characterCount;
+
+      if (
+        minuteRequestCount > TRANSLATION_REQUESTS_PER_MINUTE ||
+        minuteCharacterCount > TRANSLATION_CHARACTERS_PER_MINUTE
+      ) {
+        return { allowed: false, reason: "rate", resetAt: minuteResetsAt };
+      }
+
+      if (monthCharacterCount > TRANSLATION_CHARACTERS_PER_MONTH) {
+        return { allowed: false, reason: "monthly", resetAt: monthResetsAt };
+      }
+
+      const data = {
+        minuteStartedAt,
+        minuteRequestCount,
+        minuteCharacterCount,
+        monthStartedAt,
+        monthCharacterCount,
+      };
+
+      await tx.translationQuota.upsert({
+        where: { userId },
+        create: { userId, ...data },
+        update: data,
+      });
+
+      return { allowed: true };
+    },
+    { timeout: QUOTA_TRANSACTION_TIMEOUT_MS },
+  );
+}
+
 function createTranslationSignal(requestSignal: AbortSignal) {
   const controller = new AbortController();
   let timedOut = false;
@@ -103,8 +212,15 @@ function createTranslationSignal(requestSignal: AbortSignal) {
   };
 }
 
-function translationResponse(body: Record<string, string>, status = 200) {
-  return NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
+function translationResponse(
+  body: Record<string, string>,
+  status = 200,
+  headers: Record<string, string> = {},
+) {
+  return NextResponse.json(body, {
+    status,
+    headers: { ...NO_STORE_HEADERS, ...headers },
+  });
 }
 
 export async function POST(request: Request) {
@@ -139,6 +255,47 @@ export async function POST(request: Request) {
   }
 
   if (request.signal.aborted) {
+    return translationResponse({ error: "Translation request was cancelled." }, 499);
+  }
+
+  let quotaReservation: QuotaReservation;
+  try {
+    quotaReservation = await reserveTranslationQuota(session.user.id, countCodePoints(text));
+  } catch {
+    // Fail closed: if usage cannot be recorded durably, do not make an
+    // unmetered call with the shared server-side Google credential.
+    console.error("Translation quota reservation failed");
+    return translationResponse(
+      {
+        error: "Translation service is temporarily unavailable.",
+        code: "TRANSLATION_QUOTA_UNAVAILABLE",
+      },
+      503,
+    );
+  }
+
+  if (!quotaReservation.allowed) {
+    const resetAt = quotaReservation.resetAt.toISOString();
+    return translationResponse(
+      {
+        error: "Translation service is temporarily unavailable.",
+        code:
+          quotaReservation.reason === "rate"
+            ? "TRANSLATION_RATE_LIMITED"
+            : "TRANSLATION_MONTHLY_QUOTA_REACHED",
+        resetAt,
+      },
+      429,
+      { "Retry-After": String(retryAfterSeconds(new Date(), quotaReservation.resetAt)) },
+    );
+  }
+
+  if (request.signal.aborted) {
+    // Reservations intentionally count accepted attempts, even if the client
+    // disconnects just after the durable write. Releasing here could race a
+    // newer reservation for the same user and reopen the quota bypass; this
+    // path never reaches Google, so it can only consume the caller's own
+    // conservative allowance.
     return translationResponse({ error: "Translation request was cancelled." }, 499);
   }
 

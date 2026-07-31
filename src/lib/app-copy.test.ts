@@ -74,6 +74,8 @@ describe("APP_COPY", () => {
         copy.workspace.translation.empty,
         copy.workspace.translation.unavailableError,
         copy.workspace.translation.notConfiguredError,
+        copy.workspace.translation.rateLimitedError,
+        copy.workspace.translation.monthlyQuotaError,
         copy.workspace.translation.tooLong({ maxCharacters: "4,000" }),
         copy.workspace.translation.googleAttributionAlt,
         copy.workspace.translation.googleNotice,
