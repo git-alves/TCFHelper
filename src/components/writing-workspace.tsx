@@ -5,12 +5,14 @@ import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
 import {
+  APP_LOCALE_INTL_TAGS,
   APP_LOCALE_LABELS,
   TRANSLATABLE_MAX_CHARS,
   type AppLocale,
 } from "@/lib/app-locale";
-import { useAppLocale } from "@/components/app-locale-provider";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { GoogleTranslateAttribution } from "@/components/google-translate-attribution";
 
 interface RecentExamTopic {
   id: string;
@@ -45,25 +47,11 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
 }
 
-function responseErrorMessage(value: unknown, fallback: string) {
-  if (
-    value &&
-    typeof value === "object" &&
-    "error" in value &&
-    typeof value.error === "string" &&
-    value.error.trim()
-  ) {
-    return value.error;
-  }
-
-  return fallback;
-}
-
-function formatSourceMonth(sourceMonth: string) {
+function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
   if (!match) return sourceMonth;
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(APP_LOCALE_INTL_TAGS[locale], {
     month: "long",
     year: "numeric",
     timeZone: "UTC",
@@ -72,6 +60,7 @@ function formatSourceMonth(sourceMonth: string) {
 
 export function WritingWorkspace() {
   const { locale } = useAppLocale();
+  const copy = useAppCopy();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -187,8 +176,14 @@ export function WritingWorkspace() {
 
           if (!res.ok) {
             const data: unknown = await res.json().catch(() => null);
+            const errorCode =
+              data && typeof data === "object" && "code" in data
+                ? (data as { code?: unknown }).code
+                : undefined;
             throw new Error(
-              responseErrorMessage(data, "Translation is unavailable right now."),
+              errorCode === "TRANSLATION_NOT_CONFIGURED"
+                ? copy.workspace.translation.notConfiguredError
+                : copy.workspace.translation.unavailableError,
             );
           }
 
@@ -209,7 +204,9 @@ export function WritingWorkspace() {
             requestId === translationRequestId.current &&
             !(error instanceof Error && error.name === "AbortError")
           ) {
-            setTranslationError(error instanceof Error ? error.message : "Translation is unavailable right now.");
+            setTranslationError(
+              error instanceof Error ? error.message : copy.workspace.translation.unavailableError,
+            );
             setTranslationErrorFor({ text: trimmed, locale });
           }
         })
@@ -225,7 +222,7 @@ export function WritingWorkspace() {
         translationRequestId.current += 1;
       }
     };
-  }, [content, locale]);
+  }, [content, copy, locale]);
 
   function resetDraftAndFeedback() {
     setContent("");
@@ -273,7 +270,7 @@ export function WritingWorkspace() {
     if (next === taskType) return;
 
     runOrConfirm(
-      "Switching tasks will discard your current topic, draft, and feedback.",
+      copy.workspace.dialog.taskSwitchDescription,
       () => {
         recentTopicRequestId.current += 1;
         setTaskType(next);
@@ -296,7 +293,7 @@ export function WritingWorkspace() {
     }
 
     runOrConfirm(
-      "Switching topics will discard your current topic, draft, and feedback.",
+      copy.workspace.dialog.topicSwitchDescription,
       () => {
         recentTopicRequestId.current += 1;
         setIsRecentTopicLoading(false);
@@ -311,7 +308,7 @@ export function WritingWorkspace() {
 
   function getRecentTopic(currentTaskType: TaskType) {
     runOrConfirm(
-      "Switching topics will discard your current topic, draft, and feedback.",
+      copy.workspace.dialog.topicSwitchDescription,
       () => {
         void fetchRecentTopic(currentTaskType);
       },
@@ -329,13 +326,7 @@ export function WritingWorkspace() {
       );
 
       if (!res.ok) {
-        const data: unknown = await res.json().catch(() => null);
-        throw new Error(
-          responseErrorMessage(
-            data,
-            "We couldn't get a topic from recent exams. Please try again or write your own.",
-          ),
-        );
+        throw new Error(copy.workspace.topic.fetchError);
       }
 
       const data: unknown = await res.json();
@@ -343,7 +334,7 @@ export function WritingWorkspace() {
 
       const nextTopic = readRecentExamTopic(data, currentTaskType);
       if (!nextTopic) {
-        throw new Error("The recent-exam topic was unavailable. Please try again or write your own.");
+        throw new Error(copy.workspace.topic.unavailableError);
       }
 
       setRecentTopic(nextTopic);
@@ -355,7 +346,7 @@ export function WritingWorkspace() {
         setRecentTopicError(
           error instanceof Error
             ? error.message
-            : "We couldn't get a topic from recent exams. Please try again or write your own.",
+            : copy.workspace.topic.fetchError,
         );
       }
     } finally {
@@ -391,15 +382,16 @@ export function WritingWorkspace() {
       });
 
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error ?? "Something went wrong.");
+        throw new Error(copy.workspace.editor.genericCorrectionError);
       }
 
       const data: { feedback: EssayFeedback } = await res.json();
       setFeedback(data.feedback);
       setFeedbackLocale(correctionLocale);
     } catch (error) {
-      setCorrectError(error instanceof Error ? error.message : "Something went wrong.");
+      setCorrectError(
+        error instanceof Error ? error.message : copy.workspace.editor.genericCorrectionError,
+      );
     } finally {
       setIsCorrecting(false);
     }
@@ -427,7 +419,9 @@ export function WritingWorkspace() {
   return (
     <div className="flex w-full flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">1. Choose a task</h2>
+        <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+          {copy.workspace.task.heading}
+        </h2>
         <div className="grid gap-3 sm:grid-cols-3">
           {TASK_ORDER.map((type) => (
             <button
@@ -442,8 +436,8 @@ export function WritingWorkspace() {
                   : "border-black/[.1] hover:bg-black/[.03] dark:border-white/[.15] dark:hover:bg-white/[.05]"
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
-              <div className="font-medium">{TASK_INSTRUCTIONS[type].label}</div>
-              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+              <div lang="fr" className="font-medium">{TASK_INSTRUCTIONS[type].label}</div>
+              <div lang="fr" className="text-sm text-zinc-500 dark:text-zinc-400">
                 {TASK_INSTRUCTIONS[type].title}
               </div>
             </button>
@@ -451,9 +445,12 @@ export function WritingWorkspace() {
         </div>
         {task && (
           <div className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 text-sm dark:border-white/[.1] dark:bg-white/[.03]">
-            <p>{task.description}</p>
+            <p lang="fr">{task.description}</p>
             <p className="mt-1 text-zinc-500 dark:text-zinc-400">
-              Target length: {task.minWords}–{task.maxWords} words.
+              {copy.workspace.task.targetLength({
+                minWords: task.minWords,
+                maxWords: task.maxWords,
+              })}
             </p>
           </div>
         )}
@@ -463,7 +460,7 @@ export function WritingWorkspace() {
         <>
           <section className="flex flex-col gap-3" aria-labelledby="topic-heading">
             <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-              2. Choose a topic
+              {copy.workspace.topic.heading}
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <button
@@ -478,9 +475,9 @@ export function WritingWorkspace() {
                     : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                <span className="block font-medium">Get a topic from recent exams</span>
+                <span className="block font-medium">{copy.workspace.topic.recentExamTitle}</span>
                 <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                  Load a topic for the task you selected.
+                  {copy.workspace.topic.recentExamDescription}
                 </span>
               </button>
               <button
@@ -494,16 +491,16 @@ export function WritingWorkspace() {
                     : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                <span className="block font-medium">Write or paste my own topic</span>
+                <span className="block font-medium">{copy.workspace.topic.customTitle}</span>
                 <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                  Use a prompt you already have.
+                  {copy.workspace.topic.customDescription}
                 </span>
               </button>
             </div>
 
             {isRecentTopicLoading && (
               <p role="status" aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
-                Getting a topic from recent exams…
+                {copy.workspace.topic.loading}
               </p>
             )}
 
@@ -515,20 +512,22 @@ export function WritingWorkspace() {
 
             {topicMode === "recent" && recentTopic && (
               <article
-                aria-label="Selected recent-exam topic"
+                aria-label={copy.workspace.topic.selectedRecentExamAriaLabel}
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
-                <h3 className="font-medium">{recentTopic.title}</h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{recentTopic.prompt}</p>
+                <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
+                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">{recentTopic.prompt}</p>
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  Source: {" "}
+                  {copy.workspace.topic.sourceLabel}{" "}
                   <a
                     href={recentTopic.sourceUrl}
                     target="_blank"
                     rel="noreferrer"
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    Recent exams — {formatSourceMonth(recentTopic.sourceMonth)}
+                    {copy.workspace.topic.recentExamsSource({
+                      month: formatSourceMonth(recentTopic.sourceMonth, locale),
+                    })}
                   </a>
                 </p>
               </article>
@@ -537,7 +536,7 @@ export function WritingWorkspace() {
             {topicMode === "custom" && (
               <div>
                 <label htmlFor="custom-topic" className="sr-only">
-                  Your topic or prompt
+                  {copy.workspace.topic.customTopicLabel}
                 </label>
                 <textarea
                   ref={customTopicRef}
@@ -549,7 +548,7 @@ export function WritingWorkspace() {
                     setCorrectError(null);
                     if (feedback) setFeedbackIsStale(true);
                   }}
-                  placeholder="Paste or write the topic/prompt you want to respond to…"
+                  placeholder={copy.workspace.topic.customTopicPlaceholder}
                   rows={3}
                   maxLength={2000}
                   disabled={isCorrecting || isRecentTopicLoading}
@@ -561,7 +560,9 @@ export function WritingWorkspace() {
 
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">3. Write</h2>
+              <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                {copy.workspace.editor.heading}
+              </h2>
               <span
                 id="word-count"
                 className={`shrink-0 text-sm ${
@@ -570,11 +571,15 @@ export function WritingWorkspace() {
                     : "text-amber-600 dark:text-amber-400"
                 }`}
               >
-                {wordCount} / {task.minWords}–{task.maxWords} words
+                {copy.workspace.editor.wordCount({
+                  count: wordCount,
+                  minWords: task.minWords,
+                  maxWords: task.maxWords,
+                })}
               </span>
             </div>
             <label htmlFor="essay-content" className="sr-only">
-              Your response
+              {copy.workspace.editor.responseLabel}
             </label>
             <textarea
               id="essay-content"
@@ -597,7 +602,7 @@ export function WritingWorkspace() {
                   lastTranslatedRef.current = null;
                 }
               }}
-              placeholder="Écrivez votre texte ici…"
+              placeholder={copy.workspace.editor.frenchResponsePlaceholder}
               rows={14}
               maxLength={20000}
               disabled={isCorrecting || isRecentTopicLoading}
@@ -610,11 +615,11 @@ export function WritingWorkspace() {
               disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isRecentTopicLoading}
               className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
             >
-              {isCorrecting ? "Correcting…" : "Correct"}
+              {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
             </button>
             {isCorrecting && (
               <p role="status" className="sr-only">
-                Getting your feedback. This can take a moment.
+                {copy.workspace.editor.correctingStatus}
               </p>
             )}
             {correctError && (
@@ -627,10 +632,12 @@ export function WritingWorkspace() {
           <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
             <div className="flex items-center justify-between gap-4">
               <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                Translation ({APP_LOCALE_LABELS[locale]})
+                {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
               </h2>
               {isTranslating && !isDraftTooLongToTranslate && (
-                <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">Translating…</span>
+                <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">
+                  {copy.workspace.translation.inProgress}
+                </span>
               )}
             </div>
             <div
@@ -640,12 +647,21 @@ export function WritingWorkspace() {
             >
               {isDraftTooLongToTranslate
                 ? ""
-                : visibleTranslation || (trimmedContent ? "" : "Your translation will appear here as you write.")}
+                : visibleTranslation || (trimmedContent ? "" : copy.workspace.translation.empty)}
             </div>
+            {locale !== "fr" && (
+              <GoogleTranslateAttribution
+                alt={copy.workspace.translation.googleAttributionAlt}
+                notice={copy.workspace.translation.googleNotice}
+              />
+            )}
             {isDraftTooLongToTranslate ? (
               <p className="text-sm text-amber-600 dark:text-amber-400">
-                Live translation is available for drafts up to {TRANSLATABLE_MAX_CHARS.toLocaleString()}{" "}
-                characters. This draft is longer — submit it for correction to see full feedback.
+                {copy.workspace.translation.tooLong({
+                  maxCharacters: new Intl.NumberFormat(APP_LOCALE_INTL_TAGS[locale]).format(
+                    TRANSLATABLE_MAX_CHARS,
+                  ),
+                })}
               </p>
             ) : (
               visibleTranslationError && (
@@ -661,14 +677,17 @@ export function WritingWorkspace() {
               ref={feedbackRef}
               tabIndex={-1}
               aria-labelledby="feedback-heading"
+              lang={feedbackLocale ?? locale}
               className="flex flex-col gap-4 rounded-xl border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 id="feedback-heading" className="text-lg font-semibold">
-                  Feedback{feedbackLocale ? ` (${APP_LOCALE_LABELS[feedbackLocale]})` : ""}
+                  {copy.workspace.feedback.heading({
+                    language: feedbackLocale ? APP_LOCALE_LABELS[feedbackLocale] : "",
+                  })}
                 </h2>
                 <span className="rounded-full bg-black/[.06] px-3 py-1 text-sm font-medium dark:bg-white/[.1]">
-                  Estimated CEFR / CECRL level: {feedback.cefrLevel}
+                  {copy.workspace.feedback.estimatedLevel({ level: feedback.cefrLevel })}
                 </span>
               </div>
 
@@ -686,21 +705,24 @@ export function WritingWorkspace() {
 
               {feedbackLocale && feedbackLocale !== locale && (
                 <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  This feedback was generated in {APP_LOCALE_LABELS[feedbackLocale]}. Select Correct again to receive feedback in {APP_LOCALE_LABELS[locale]}.
+                  {copy.workspace.feedback.generatedInOtherLanguage({
+                    generatedLanguage: APP_LOCALE_LABELS[feedbackLocale],
+                    selectedLanguage: APP_LOCALE_LABELS[locale],
+                  })}
                 </p>
               )}
 
               {feedbackIsStale && (
                 <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  You&apos;ve edited your response since this feedback. Correct again for feedback on your latest draft.
+                  {copy.workspace.feedback.stale}
                 </p>
               )}
 
               <div>
                 <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  Corrected text
+                  {copy.workspace.feedback.correctedText}
                 </h3>
-                <p className="whitespace-pre-wrap rounded-md bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">
+                <p lang="fr" className="whitespace-pre-wrap rounded-md bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">
                   {feedback.correctedText}
                 </p>
               </div>
@@ -708,19 +730,19 @@ export function WritingWorkspace() {
               {feedback.errors.length > 0 && (
                 <div>
                   <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                    Errors ({feedback.errors.length})
+                  {copy.workspace.feedback.errors({ count: feedback.errors.length })}
                   </h3>
                   <ul className="flex flex-col gap-2">
                     {feedback.errors.map((err, i) => (
                       <li key={i} className="rounded-md border border-black/[.08] p-3 text-sm dark:border-white/[.1]">
                         <div className="flex flex-wrap items-baseline gap-2">
-                          <span className="text-red-600 line-through dark:text-red-400">
+                          <span lang="fr" className="text-red-600 line-through dark:text-red-400">
                             {err.original}
                           </span>
                           <span aria-hidden>→</span>
-                          <span className="text-green-700 dark:text-green-400">{err.correction}</span>
+                          <span lang="fr" className="text-green-700 dark:text-green-400">{err.correction}</span>
                           <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-xs uppercase tracking-wide dark:bg-white/[.1]">
-                            {err.category}
+                            {copy.workspace.feedback.errorCategories[err.category]}
                           </span>
                         </div>
                         <p className="mt-1 text-zinc-500 dark:text-zinc-400">{err.explanation}</p>
@@ -733,7 +755,7 @@ export function WritingWorkspace() {
               {feedback.suggestions.length > 0 && (
                 <div>
                   <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                    Suggestions
+                    {copy.workspace.feedback.suggestions}
                   </h3>
                   <ul className="list-disc pl-5 text-sm">
                     {feedback.suggestions.map((s, i) => (
@@ -749,10 +771,10 @@ export function WritingWorkspace() {
 
       <ConfirmDialog
         open={pendingSwitch !== null}
-        title="Discard your current work?"
+        title={copy.workspace.dialog.title}
         description={pendingSwitch?.description ?? ""}
-        confirmLabel="Discard and switch"
-        cancelLabel="Keep working"
+        confirmLabel={copy.workspace.dialog.confirm}
+        cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {
           const action = pendingSwitch;
           setPendingSwitch(null);

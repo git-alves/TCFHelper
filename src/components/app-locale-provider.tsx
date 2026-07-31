@@ -1,12 +1,23 @@
 "use client";
 
-import { createContext, useContext, useEffect, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import { useRouter } from "next/navigation";
+import { persistAppLocale } from "@/app/locale-actions";
 import {
   APP_LOCALE_STORAGE_KEY,
-  DEFAULT_APP_LOCALE,
   isAppLocale,
   type AppLocale,
 } from "@/lib/app-locale";
+import { getAppCopy, type AppCopy } from "@/lib/app-copy";
 
 interface AppLocaleContextValue {
   locale: AppLocale;
@@ -14,50 +25,67 @@ interface AppLocaleContextValue {
 }
 
 const AppLocaleContext = createContext<AppLocaleContextValue | null>(null);
-const APP_LOCALE_CHANGE_EVENT = "tcfhelper:app-locale-change";
 
-function getBrowserLocale(): AppLocale {
-  const stored = window.localStorage.getItem(APP_LOCALE_STORAGE_KEY);
-  return isAppLocale(stored) ? stored : DEFAULT_APP_LOCALE;
-}
-
-function getServerLocale(): AppLocale {
-  return DEFAULT_APP_LOCALE;
-}
-
-function subscribeToLocale(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(APP_LOCALE_CHANGE_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(APP_LOCALE_CHANGE_EVENT, callback);
-  };
-}
-
-// Client-only preference for now: persisted to localStorage, not the
-// per-user `User.locale` column. Wiring it to a real account setting is a
-// natural follow-up once there's a profile/settings page to host the picker.
-export function AppLocaleProvider({ children }: { children: ReactNode }) {
-  // `useSyncExternalStore` keeps the server snapshot deterministic while
-  // still restoring the browser preference after hydration without a state
-  // update inside an effect.
-  const locale = useSyncExternalStore(
-    subscribeToLocale,
-    getBrowserLocale,
-    getServerLocale,
-  );
+// The cookie is the source of truth so Server Components can render the
+// chosen language. localStorage is only retained to migrate the previous
+// feedback-language preference without losing it for existing learners.
+export function AppLocaleProvider({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode;
+  initialLocale: AppLocale;
+}) {
+  const [locale, setCurrentLocale] = useState(initialLocale);
+  const router = useRouter();
+  const hasMigratedLegacyPreference = useRef(false);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  function setLocale(next: AppLocale) {
+  useEffect(() => {
+    if (hasMigratedLegacyPreference.current) return;
+    hasMigratedLegacyPreference.current = true;
+
+    const stored = window.localStorage.getItem(APP_LOCALE_STORAGE_KEY);
+    if (!isAppLocale(stored) || stored === initialLocale) {
+      window.localStorage.setItem(APP_LOCALE_STORAGE_KEY, initialLocale);
+      return;
+    }
+
+    // Wait until the cookie is persisted before switching client copy. This
+    // avoids a render where Server Components still use the old locale, and
+    // keeps the legacy-localStorage migration asynchronous rather than
+    // synchronously deriving state inside this effect.
+    void persistAppLocale(stored)
+      .then(() => {
+        setCurrentLocale(stored);
+        router.refresh();
+      })
+      .catch(() => {
+        // The previous browser-only preference still provides a useful
+        // session-local fallback if the persistence request is interrupted.
+        setCurrentLocale(stored);
+      });
+  }, [initialLocale, router]);
+
+  const setLocale = useCallback((next: AppLocale) => {
+    if (!isAppLocale(next) || next === locale) return;
+
+    // Client copy changes immediately. Once the server action has written
+    // the HttpOnly cookie, refresh Server Components and metadata as well.
+    setCurrentLocale(next);
     window.localStorage.setItem(APP_LOCALE_STORAGE_KEY, next);
-    window.dispatchEvent(new Event(APP_LOCALE_CHANGE_EVENT));
-  }
+    void persistAppLocale(next)
+      .then(() => router.refresh())
+      .catch(() => undefined);
+  }, [locale, router]);
+
+  const value = useMemo(() => ({ locale, setLocale }), [locale, setLocale]);
 
   return (
-    <AppLocaleContext.Provider value={{ locale, setLocale }}>
+    <AppLocaleContext.Provider value={value}>
       {children}
     </AppLocaleContext.Provider>
   );
@@ -69,4 +97,13 @@ export function useAppLocale(): AppLocaleContextValue {
     throw new Error("useAppLocale must be used within an AppLocaleProvider");
   }
   return ctx;
+}
+
+// Static interface copy follows the same client-side preference as the
+// feedback and translation target. Server components can pass their
+// authorization decisions into small client display components without
+// needing access to this browser-only preference.
+export function useAppCopy(): AppCopy {
+  const { locale } = useAppLocale();
+  return getAppCopy(locale);
 }

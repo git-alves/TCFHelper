@@ -4,6 +4,8 @@ import "./globals.css";
 import { SessionProvider } from "@/components/session-provider";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { NavBar } from "@/components/nav-bar";
+import { getAppCopy } from "@/lib/app-copy";
+import { getRequestLocale } from "@/lib/request-locale";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -15,24 +17,29 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "TCF Helper",
-  description: "Writing practice and feedback for the TCF exam.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  return {
+    title: "TCF Helper",
+    description: getAppCopy(locale).home.description,
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+
   return (
     <html
-      lang="en"
+      lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <SessionProvider>
-          <AppLocaleProvider>
+          <AppLocaleProvider initialLocale={locale}>
             <NavBar />
             <div className="flex flex-1 flex-col">{children}</div>
           </AppLocaleProvider>

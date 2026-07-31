@@ -31,6 +31,13 @@ gate yet — every logged-in user can reach `/dashboard`.
      Supabase, or Vercel Postgres all work).
    - `AUTH_SECRET`: generate with `openssl rand -base64 32`.
    - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
+   - `GOOGLE_TRANSLATE_API_KEY`: an API key from a Google Cloud project with
+     [Cloud Translation](https://cloud.google.com/translate/docs/setup)
+     enabled, used server-side for live draft translation. Cloud Translation
+     Basic v2 includes the first 500,000 input characters each month at no
+     charge (via a $10 monthly credit shared with Advanced), but still requires
+     a Cloud project, billing account, and API key. Restrict the key to the
+     Cloud Translation API; see [pricing](https://cloud.google.com/translate/pricing).
    - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`: see
      [Stripe setup](#stripe-setup) below. Optional for local dev if you're
      not touching billing code.
@@ -77,6 +84,24 @@ If the current month's page is unavailable or its structure changes, the app
 keeps the learner's draft and offers the paste-your-own path instead. Retrieved
 topics are saved with immutable provenance so Claude grades against the exact
 prompt the learner saw.
+
+## Live translation
+
+Live draft translation sends the learner's French draft from the server to
+[Google Translate](https://translate.google.com/) through Cloud Translation
+Basic v2 only when the selected application language is English, Spanish, or
+Portuguese. It is a writing aid, not part of Claude's correction workflow; a
+translation failure never prevents writing or requesting feedback. The key is
+kept server-side in `GOOGLE_TRANSLATE_API_KEY` and must not be exposed through
+`NEXT_PUBLIC_*` variables.
+
+Displayed translations carry Google's required “Powered by Google Translate”
+attribution and make Google's translation disclaimer available in the
+dashboard. The first 500,000 translated input characters each month are
+covered by Google Cloud's shared monthly credit, rather than being permanently
+free, so production should set Cloud Billing budgets and alerts before launch.
+See Google's [pricing](https://cloud.google.com/translate/pricing) and
+[attribution requirements](https://docs.cloud.google.com/translate/attribution).
 
 ## Database
 
@@ -207,7 +232,7 @@ on every push to `main`. Requires these repository secrets:
 
 Either way, set these environment variables on the Vercel project:
 
-`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`,
+`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `GOOGLE_TRANSLATE_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 
 `npm run db:deploy` (applies pending migrations) should be run against the

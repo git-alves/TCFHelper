@@ -28,6 +28,14 @@ Build the smallest complete loop around one persisted essay and one schema-const
 
 This is preferable to building a dashboard or subscription gate first: the unproven product risk is feedback quality, not account management. Schema-constrained output makes the review display and later human audit predictable; it does not itself establish that the feedback is correct.
 
+## Language and live-translation decision
+
+The selected application language controls visible product-interface copy and the language of AI feedback. It does **not** translate the French exam task, topic, learner draft, or corrected French text: those are learning material and must remain faithful to the source language. Static instructions use their official French TCF terminology; surrounding controls, labels, errors, and status messages use the selected interface language.
+
+Live draft translation is a separate, low-latency aid. It translates French learner text into the selected non-French language through Google Cloud Translation Basic; static UI strings come from a maintained local dictionary rather than consuming translation quota at runtime. Claude remains responsible for structured correction because translation alone cannot produce the error, word-count, CEFR, and suggestion contract. The Google credential stays server-only, and every directly displayed Google result shows Google's unmodified attribution badge alongside a linkable disclosure and disclaimer.
+
+Google's NMT allowance covers the first 500,000 characters each month at no charge, after which usage is billed. This is a shared service allowance, not a promise of permanently free translation per learner. The product debounces and cancels stale draft requests, enforces a 4,000-character request ceiling, keeps the API key server-only, and returns a clear degraded state when the Google key or service is unavailable. A missing live translation must never block writing or correction. Before production launch, configure Google Cloud billing budgets and usage alerts; an application-level per-user quota is a follow-up once real volume is known.
+
 ## Interaction and recovery flow
 
 `Choose task → read fixed instructions → choose or enter topic → write → request correction → review feedback`
@@ -80,7 +88,7 @@ Claude must return a structured object with:
 - an estimated CEFR level (`A1`–`C2`) for the original response;
 - an in-range/out-of-range word-count judgement plus an explanation;
 - zero or more errors with original excerpt, correction, short English explanation, and category;
-- English-language summary and actionable suggestions.
+- a summary and actionable suggestions in the learner's selected feedback language.
 
 The API treats malformed input, an unknown/mismatched selected topic, a model refusal, a malformed structured response, and an upstream model failure as request failures. It must not save an `Essay` until a valid feedback object is available; the learner sees a retryable error instead. This avoids audit records that look successfully reviewed when they were not.
 

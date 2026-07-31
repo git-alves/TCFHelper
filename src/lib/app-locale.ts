@@ -28,6 +28,19 @@ export function isAppLocale(value: unknown): value is AppLocale {
 
 export const APP_LOCALE_STORAGE_KEY = "tcfhelper:app-locale";
 
+// The cookie lets Server Components render in the learner's selected
+// language on the next request. localStorage is retained only to migrate the
+// preference stored by the first version of the picker.
+export const APP_LOCALE_COOKIE_NAME = "tcfhelper_locale";
+export const APP_LOCALE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
+export const APP_LOCALE_INTL_TAGS: Record<AppLocale, string> = {
+  en: "en-US",
+  fr: "fr-FR",
+  es: "es-ES",
+  pt: "pt-BR",
+};
+
 // Shared by the client (to skip a doomed request) and /api/translate (to
 // reject it) so the two can never drift out of sync. The editor's own
 // maxLength (20,000 chars) is a broad safety cap, not a realistic essay
