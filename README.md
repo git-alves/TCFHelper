@@ -1,12 +1,14 @@
 # TCF Helper
 
 Writing practice and feedback for the TCF (Test de Connaissance du Français)
-exam. Students pick a task, write an essay, and (eventually) get grammar,
-vocabulary, and CEFR-level feedback.
+exam. Students choose a task, select or enter a prompt, write a response, and
+receive structured grammar, vocabulary, word-count, and CEFR-level feedback.
 
-This is the phase-0 foundation: app shell, database schema, auth, and a
-Stripe product/webhook stub. There is no billing gate yet — every logged-in
-user can reach `/dashboard`.
+Phase 1 is the core writing loop. Its purpose is to validate feedback quality
+before the product invests in retention or monetization features. See the
+[Phase 1 validation spec](docs/phase-1-core-writing-loop.md) for the job to
+be done, success gate, and deliberately excluded scope. There is no billing
+gate yet — every logged-in user can reach `/dashboard`.
 
 ## Stack
 
@@ -27,6 +29,7 @@ user can reach `/dashboard`.
    - `DATABASE_URL`: a Postgres connection string (local Postgres, Neon,
      Supabase, or Vercel Postgres all work).
    - `AUTH_SECRET`: generate with `openssl rand -base64 32`.
+   - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
    - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`: see
      [Stripe setup](#stripe-setup) below. Optional for local dev if you're
      not touching billing code.
@@ -48,6 +51,12 @@ user can reach `/dashboard`.
    npm run db:deploy   # applies committed migrations
    # or, while iterating on the schema:
    npm run db:migrate
+   ```
+
+   Seed the built-in TCF topic bank before trying the writing loop:
+
+   ```bash
+   npm run db:seed
    ```
 
 4. Run the dev server:
@@ -188,7 +197,7 @@ on every push to `main`. Requires these repository secrets:
 
 Either way, set these environment variables on the Vercel project:
 
-`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `STRIPE_SECRET_KEY`,
+`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 
 `npm run db:deploy` (applies pending migrations) should be run against the

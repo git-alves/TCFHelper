@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { WritingWorkspace } from "@/components/writing-workspace";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -13,10 +14,7 @@ export default async function DashboardPage() {
       <h1 className="text-2xl font-semibold tracking-tight">
         Welcome, {session.user.name ?? session.user.email}
       </h1>
-      <p className="text-zinc-600 dark:text-zinc-400">
-        The essay writing workspace, topic picker, and feedback report live
-        here. This is a placeholder while that feature is built out.
-      </p>
+      <WritingWorkspace />
     </main>
   );
 }
