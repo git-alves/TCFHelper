@@ -18,7 +18,8 @@ function isRecord(value: unknown): value is JsonRecord {
 
 /** DeepL's documented signal that the account's monthly character quota (API
  * Free: 500,000 characters) has been used up — distinct from a rate limit or
- * an invalid key, and the only case that should trigger the scraper backup. */
+ * an invalid key, so callers can log it as a plan/quota issue rather than a
+ * generic failure. */
 export class DeepLQuotaExceededError extends Error {}
 
 export async function translateWithDeepL(

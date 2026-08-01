@@ -32,10 +32,12 @@ gate yet — every logged-in user can reach `/dashboard`.
    - `AUTH_SECRET`: generate with `openssl rand -base64 32`.
    - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
-     key (ends in `:fx`), used server-side for live draft translation. Free
-     covers 500,000 characters/month, no billing details required. If unset,
-     or once that quota is reached, translation falls back to an unofficial
-     method — see [Live translation](#live-translation).
+     key (ends in `:fx`), used server-side for live draft translation. Usage
+     up to 500,000 characters/month is free, but DeepL's signup flow may
+     still ask for payment details for identity verification and abuse
+     prevention. If unset, or once that quota is reached, live translation
+     fails closed rather than blocking writing or correction — see
+     [Live translation](#live-translation).
    - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`: see
      [Stripe setup](#stripe-setup) below. Optional for local dev if you're
      not touching billing code.
@@ -114,44 +116,17 @@ client continues to show localized recovery copy. DeepL's API Free plan does
 not require end-user attribution, so the UI shows only a plain "Translations
 powered by DeepL" credit, not a mandated badge.
 
-### Unofficial scraper fallback
-
-`DEEPL_API_KEY` is optional. If it is unset, or DeepL responds with its
-documented HTTP 456 (the account's 500,000-character monthly quota has been
-reached), the route falls back to
-[`@vitalets/google-translate-api`](https://www.npmjs.com/package/@vitalets/google-translate-api)
-(`src/lib/unofficial-translate.ts`), which calls Google Translate's public web
-endpoint directly with no API key and no billing. Any other DeepL failure
-(invalid key, malformed response, network error) still fails closed with the
-existing "temporarily unavailable" response — only quota exhaustion (or a
-missing key) reaches the fallback.
-
-This is a deliberate stopgap, not a second production-grade provider:
-
-- It scrapes the same web endpoint `translate.google.com` itself uses, which
-  is against Google's Translate terms of service, has no SLA, and can be
-  rate-limited, IP-blocked, or broken by an upstream change with no notice.
-- A durable, project-wide circuit breaker (`src/lib/translation-fallback-circuit.ts`,
-  the `TranslationFallbackCircuit` table) tracks consecutive fallback
-  failures across every server instance. After 5 in a row it stops attempting
-  the fallback for 10 minutes and returns `TRANSLATION_FALLBACK_UNAVAILABLE`
-  instead, so a blocked or broken endpoint isn't hammered by every learner's
-  request.
-- The learner-facing UI shows a distinct disclosure whenever a translation was
-  produced this way (`copy.workspace.translation.unofficialFallbackNotice`),
-  rather than presenting it as an ordinary DeepL result.
-- The learner-facing per-user quota above still applies to fallback requests,
-  since they carry the same abuse risk against the server's own IP.
-
-Set `DEEPL_API_KEY` as soon as it's available; treat the scraper purely as
-what keeps translation working before the key exists or after the free quota
-runs out for the month, not as a long-term replacement for it.
+If `DEEPL_API_KEY` is unset, or DeepL's monthly quota is exhausted (its
+documented HTTP 456), the route fails closed with a stable
+`TRANSLATION_NOT_CONFIGURED` (missing key) or generic "temporarily
+unavailable" (quota/other failure) response and a matching localized message,
+rather than silently switching to an alternative translation method.
 
 Reservations deliberately account for an accepted request attempt rather than
 only a completed provider response. If a client disconnects immediately after
 the durable reservation, that learner's allowance remains spent; this avoids a
 release racing a newer request for the same learner. The aborted request never
-reaches DeepL or the fallback, and it cannot spend anyone else's allowance.
+reaches DeepL, and it cannot spend anyone else's allowance.
 
 ## Database
 

@@ -4,12 +4,6 @@ import { auth } from "@/auth";
 import { APP_LOCALES, TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 import { prisma } from "@/lib/prisma";
 import { DeepLQuotaExceededError, translateWithDeepL } from "@/lib/deepl-translate";
-import { translateWithUnofficialScraper } from "@/lib/unofficial-translate";
-import {
-  isFallbackCircuitOpen,
-  recordFallbackFailure,
-  recordFallbackSuccess,
-} from "@/lib/translation-fallback-circuit";
 
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -18,9 +12,8 @@ const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 // cap that returns HTTP 456, not a billing overage. This per-learner cap
 // keeps any single learner from exhausting that shared allowance alone,
 // leaving room for roughly ten learners' full monthly usage before DeepL's
-// quota response triggers the unofficial fallback for everyone. The
-// per-minute limits are an independent abuse guard, not tied to either
-// provider's own rate limit.
+// own quota is reached. The per-minute limits are an independent abuse
+// guard, not tied to DeepL's own rate limit.
 const TRANSLATION_REQUESTS_PER_MINUTE = 20;
 const TRANSLATION_CHARACTERS_PER_MINUTE = 20_000;
 const TRANSLATION_CHARACTERS_PER_MONTH = 50_000;
@@ -69,9 +62,8 @@ function isSameWindow(left: Date, right: Date) {
   return left.getTime() === right.getTime();
 }
 
-// Both DeepL and Google meter Unicode code points, not UTF-16 code units.
-// This matches that billing model even for text containing astral-plane
-// characters.
+// DeepL meters Unicode code points, not UTF-16 code units. This matches its
+// billing model even for text containing astral-plane characters.
 function countCodePoints(text: string) {
   return Array.from(text).length;
 }
@@ -191,12 +183,19 @@ export async function POST(request: Request) {
   // The draft is already French. Avoid an unnecessary translation request
   // when the learner has selected the French interface.
   if (targetLocale === "fr") {
-    return translationResponse({ translation: text, provider: "source" });
+    return translationResponse({ translation: text });
   }
 
-  // A missing key means only the unofficial scraper fallback is available;
-  // that path is attempted further down instead of failing the request here.
   const deeplApiKey = process.env.DEEPL_API_KEY?.trim();
+  if (!deeplApiKey) {
+    return translationResponse(
+      {
+        error: "Translation service is not configured.",
+        code: "TRANSLATION_NOT_CONFIGURED",
+      },
+      503,
+    );
+  }
 
   if (request.signal.aborted) {
     return translationResponse({ error: "Translation request was cancelled." }, 499);
@@ -246,49 +245,14 @@ export async function POST(request: Request) {
   const translationRequest = createTranslationSignal(request.signal);
 
   try {
-    if (deeplApiKey) {
-      try {
-        const translation = await translateWithDeepL(
-          text,
-          targetLocale,
-          deeplApiKey,
-          translationRequest.signal,
-        );
-        return translationResponse({ translation, provider: "deepl" });
-      } catch (error) {
-        if (!(error instanceof DeepLQuotaExceededError)) {
-          throw error;
-        }
-
-        // Only quota exhaustion falls through to the unofficial scraper
-        // below; every other DeepL failure is handled by the outer catch.
-        console.warn("DeepL monthly quota exhausted; falling back to the unofficial scraper.");
-      }
-    }
-
-    if (await isFallbackCircuitOpen()) {
-      return translationResponse(
-        {
-          error: "Translation service is temporarily unavailable.",
-          code: "TRANSLATION_FALLBACK_UNAVAILABLE",
-        },
-        503,
-      );
-    }
-
-    try {
-      const fallbackTranslation = await translateWithUnofficialScraper(
-        text,
-        targetLocale,
-        translationRequest.signal,
-      );
-      await recordFallbackSuccess();
-      return translationResponse({ translation: fallbackTranslation, provider: "unofficial" });
-    } catch (error) {
-      await recordFallbackFailure();
-      throw error;
-    }
-  } catch {
+    const translation = await translateWithDeepL(
+      text,
+      targetLocale,
+      deeplApiKey,
+      translationRequest.signal,
+    );
+    return translationResponse({ translation });
+  } catch (error) {
     if (request.signal.aborted) {
       return translationResponse({ error: "Translation request was cancelled." }, 499);
     }
@@ -297,9 +261,15 @@ export async function POST(request: Request) {
       return translationResponse({ error: "Translation request timed out." }, 504);
     }
 
-    // Do not log the thrown error: an implementation may include the request
-    // URL, which contains a server-only API key.
-    console.error("Translation request failed before a response was received");
+    if (error instanceof DeepLQuotaExceededError) {
+      // Logged distinctly (no fallback provider exists) so this shows up as
+      // a signal to upgrade the DeepL plan rather than a generic failure.
+      console.warn("DeepL monthly quota exhausted.");
+    } else {
+      // Do not log the thrown error itself: an implementation may include
+      // the request URL, which contains a server-only API key.
+      console.error("Translation request failed before a response was received");
+    }
     return translationResponse({ error: "Translation service is temporarily unavailable." }, 502);
   } finally {
     translationRequest.dispose();

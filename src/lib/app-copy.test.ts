@@ -75,11 +75,11 @@ describe("APP_COPY", () => {
         copy.workspace.translation.inProgress,
         copy.workspace.translation.empty,
         copy.workspace.translation.unavailableError,
+        copy.workspace.translation.notConfiguredError,
         copy.workspace.translation.rateLimitedError,
         copy.workspace.translation.monthlyQuotaError,
         copy.workspace.translation.tooLong({ maxCharacters: "4,000" }),
         copy.workspace.translation.deeplNotice,
-        copy.workspace.translation.unofficialFallbackNotice,
         copy.workspace.feedback.heading({ language: "English" }),
         copy.workspace.feedback.estimatedLevel({ level: "B2" }),
         copy.workspace.feedback.generatedInOtherLanguage({

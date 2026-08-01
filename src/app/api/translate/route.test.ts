@@ -1,29 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 
-const {
-  authMock,
-  transactionMock,
-  executeRawMock,
-  quotaFindUniqueMock,
-  quotaUpsertMock,
-  deeplTranslateMock,
-  scraperTranslateMock,
-  isFallbackCircuitOpenMock,
-  recordFallbackFailureMock,
-  recordFallbackSuccessMock,
-} = vi.hoisted(() => ({
-  authMock: vi.fn(),
-  transactionMock: vi.fn(),
-  executeRawMock: vi.fn(),
-  quotaFindUniqueMock: vi.fn(),
-  quotaUpsertMock: vi.fn(),
-  deeplTranslateMock: vi.fn(),
-  scraperTranslateMock: vi.fn(),
-  isFallbackCircuitOpenMock: vi.fn(),
-  recordFallbackFailureMock: vi.fn(),
-  recordFallbackSuccessMock: vi.fn(),
-}));
+const { authMock, transactionMock, executeRawMock, quotaFindUniqueMock, quotaUpsertMock, deeplTranslateMock } =
+  vi.hoisted(() => ({
+    authMock: vi.fn(),
+    transactionMock: vi.fn(),
+    executeRawMock: vi.fn(),
+    quotaFindUniqueMock: vi.fn(),
+    quotaUpsertMock: vi.fn(),
+    deeplTranslateMock: vi.fn(),
+  }));
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/prisma", () => ({
@@ -33,14 +19,6 @@ vi.mock("@/lib/deepl-translate", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/deepl-translate")>();
   return { ...actual, translateWithDeepL: deeplTranslateMock };
 });
-vi.mock("@/lib/unofficial-translate", () => ({
-  translateWithUnofficialScraper: scraperTranslateMock,
-}));
-vi.mock("@/lib/translation-fallback-circuit", () => ({
-  isFallbackCircuitOpen: isFallbackCircuitOpenMock,
-  recordFallbackFailure: recordFallbackFailureMock,
-  recordFallbackSuccess: recordFallbackSuccessMock,
-}));
 
 const { POST } = await import("./route");
 const { DeepLQuotaExceededError } = await import("@/lib/deepl-translate");
@@ -75,10 +53,6 @@ beforeEach(() => {
   quotaFindUniqueMock.mockReset();
   quotaUpsertMock.mockReset();
   deeplTranslateMock.mockReset();
-  scraperTranslateMock.mockReset();
-  isFallbackCircuitOpenMock.mockReset();
-  recordFallbackFailureMock.mockReset();
-  recordFallbackSuccessMock.mockReset();
 
   vi.stubEnv("DEEPL_API_KEY", "deepl-server-secret");
   authMock.mockResolvedValue({ user: { id: "user_1" } });
@@ -94,10 +68,6 @@ beforeEach(() => {
     }),
   );
   deeplTranslateMock.mockResolvedValue("I enjoy learning French.");
-  scraperTranslateMock.mockResolvedValue("Scraper translation.");
-  isFallbackCircuitOpenMock.mockResolvedValue(false);
-  recordFallbackFailureMock.mockResolvedValue(undefined);
-  recordFallbackSuccessMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -136,20 +106,16 @@ describe("POST /api/translate", () => {
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("returns the French source without using a key or contacting a provider", async () => {
+  it("returns the French source without using a key or contacting DeepL", async () => {
     const response = await post({ text: "Bonjour, tout le monde.", targetLocale: "fr" });
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({
-      translation: "Bonjour, tout le monde.",
-      provider: "source",
-    });
+    await expect(response.json()).resolves.toEqual({ translation: "Bonjour, tout le monde." });
     expect(deeplTranslateMock).not.toHaveBeenCalled();
-    expect(scraperTranslateMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("uses DeepL by default and reports its provider", async () => {
+  it("uses DeepL server-side", async () => {
     const response = await post({
       text: "J'aime apprendre le français.",
       targetLocale: "pt",
@@ -162,11 +128,7 @@ describe("POST /api/translate", () => {
       "deepl-server-secret",
       expect.any(AbortSignal),
     );
-    expect(scraperTranslateMock).not.toHaveBeenCalled();
-    await expect(response.json()).resolves.toEqual({
-      translation: "I enjoy learning French.",
-      provider: "deepl",
-    });
+    await expect(response.json()).resolves.toEqual({ translation: "I enjoy learning French." });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 3000 });
     expect(quotaFindUniqueMock).toHaveBeenCalledWith({ where: { userId: "user_1" } });
@@ -188,36 +150,34 @@ describe("POST /api/translate", () => {
     expect(executeRawMock.mock.calls[0]?.[1]).toBe("user_1");
   });
 
-  it("uses the unofficial scraper directly when DEEPL_API_KEY is missing", async () => {
+  it("returns a configuration error without calling DeepL when the key is missing", async () => {
     vi.stubEnv("DEEPL_API_KEY", "   ");
 
     const response = await post({ text: "Bonjour.", targetLocale: "en" });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({
-      translation: "Scraper translation.",
-      provider: "unofficial",
+      error: "Translation service is not configured.",
+      code: "TRANSLATION_NOT_CONFIGURED",
     });
     expect(deeplTranslateMock).not.toHaveBeenCalled();
-    expect(scraperTranslateMock).toHaveBeenCalledWith("Bonjour.", "en", expect.any(AbortSignal));
-    expect(recordFallbackSuccessMock).toHaveBeenCalledTimes(1);
+    expect(transactionMock).not.toHaveBeenCalled();
   });
 
-  it("falls back to the unofficial scraper when DeepL's monthly quota is exhausted", async () => {
+  it("fails closed with a generic unavailable response when DeepL's monthly quota is exhausted", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     deeplTranslateMock.mockRejectedValue(new DeepLQuotaExceededError("quota reached"));
 
     const response = await post({ text: "Bonjour.", targetLocale: "en" });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({
-      translation: "Scraper translation.",
-      provider: "unofficial",
+      error: "Translation service is temporarily unavailable.",
     });
-    expect(scraperTranslateMock).toHaveBeenCalledWith("Bonjour.", "en", expect.any(AbortSignal));
-    expect(recordFallbackSuccessMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith("DeepL monthly quota exhausted.");
   });
 
-  it("does not use the scraper fallback for a non-quota DeepL failure", async () => {
+  it("fails closed with a generic unavailable response for any other DeepL failure", async () => {
     deeplTranslateMock.mockRejectedValue(new Error("DeepL translation request failed (403)"));
 
     const response = await post({ text: "Bonjour.", targetLocale: "es" });
@@ -226,38 +186,9 @@ describe("POST /api/translate", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Translation service is temporarily unavailable.",
     });
-    expect(scraperTranslateMock).not.toHaveBeenCalled();
   });
 
-  it("skips the scraper and reports unavailable when the fallback circuit is open", async () => {
-    vi.stubEnv("DEEPL_API_KEY", "   ");
-    isFallbackCircuitOpenMock.mockResolvedValue(true);
-
-    const response = await post({ text: "Bonjour.", targetLocale: "en" });
-
-    expect(response.status).toBe(503);
-    await expect(response.json()).resolves.toEqual({
-      error: "Translation service is temporarily unavailable.",
-      code: "TRANSLATION_FALLBACK_UNAVAILABLE",
-    });
-    expect(scraperTranslateMock).not.toHaveBeenCalled();
-  });
-
-  it("records a fallback failure and reports unavailable when the scraper itself fails", async () => {
-    vi.stubEnv("DEEPL_API_KEY", "   ");
-    scraperTranslateMock.mockRejectedValue(new Error("scraper request failed"));
-
-    const response = await post({ text: "Bonjour.", targetLocale: "en" });
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({
-      error: "Translation service is temporarily unavailable.",
-    });
-    expect(recordFallbackFailureMock).toHaveBeenCalledTimes(1);
-    expect(recordFallbackSuccessMock).not.toHaveBeenCalled();
-  });
-
-  it("stops a direct caller at the durable per-minute request limit before contacting a provider", async () => {
+  it("stops a direct caller at the durable per-minute request limit before contacting DeepL", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
     quotaFindUniqueMock.mockResolvedValue(
@@ -302,7 +233,7 @@ describe("POST /api/translate", () => {
     });
   });
 
-  it("stops a direct caller at the per-minute character limit before contacting a provider", async () => {
+  it("stops a direct caller at the per-minute character limit before contacting DeepL", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
     quotaFindUniqueMock.mockResolvedValue(
@@ -324,7 +255,7 @@ describe("POST /api/translate", () => {
     expect(quotaUpsertMock).not.toHaveBeenCalled();
   });
 
-  it("stops a direct caller at the durable monthly character limit before contacting a provider", async () => {
+  it("stops a direct caller at the durable monthly character limit before contacting DeepL", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
     quotaFindUniqueMock.mockResolvedValue(

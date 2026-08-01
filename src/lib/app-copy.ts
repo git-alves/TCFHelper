@@ -114,11 +114,11 @@ export interface AppCopy {
       inProgress: string;
       empty: string;
       unavailableError: string;
+      notConfiguredError: string;
       rateLimitedError: string;
       monthlyQuotaError: string;
       tooLong: (values: TranslationLimitValues) => string;
       deeplNotice: string;
-      unofficialFallbackNotice: string;
     };
     feedback: {
       heading: (values: LanguageValues) => string;
@@ -228,14 +228,13 @@ export const APP_COPY = {
         inProgress: "Translating…",
         empty: "Your translation will appear here as you write.",
         unavailableError: "Translation is unavailable right now.",
+        notConfiguredError: "Live translation is not configured yet. Please try again later.",
         rateLimitedError: "You’re translating too quickly. Please wait a moment and try again.",
         monthlyQuotaError:
           "You’ve reached this month’s live translation limit. Please try again next month.",
         tooLong: ({ maxCharacters }) =>
           `Live translation is available for drafts up to ${maxCharacters} characters. This draft is longer — submit it for correction to see full feedback.`,
         deeplNotice: "Translations powered by DeepL.",
-        unofficialFallbackNotice:
-          "This translation used an unofficial backup method, not the DeepL API. It may be less accurate and can be briefly unavailable.",
       },
       feedback: {
         heading: ({ language }) => `Feedback (${language})`,
@@ -353,14 +352,13 @@ export const APP_COPY = {
         inProgress: "Traduction en cours…",
         empty: "Votre traduction apparaîtra ici au fur et à mesure de votre rédaction.",
         unavailableError: "La traduction est indisponible pour le moment.",
+        notConfiguredError: "La traduction en direct n’est pas encore configurée. Réessayez plus tard.",
         rateLimitedError: "Vous traduisez trop rapidement. Patientez un instant puis réessayez.",
         monthlyQuotaError:
           "Vous avez atteint la limite mensuelle de traduction en direct. Réessayez le mois prochain.",
         tooLong: ({ maxCharacters }) =>
           `La traduction en direct est disponible pour les brouillons de ${maxCharacters} caractères maximum. Ce brouillon est plus long : soumettez-le pour obtenir des commentaires complets.`,
         deeplNotice: "Traductions fournies par DeepL.",
-        unofficialFallbackNotice:
-          "Cette traduction provient d’une méthode de secours non officielle, pas de l’API DeepL. Elle peut être moins précise et parfois indisponible.",
       },
       feedback: {
         heading: ({ language }) => `Commentaires (${language})`,
@@ -479,14 +477,13 @@ export const APP_COPY = {
         inProgress: "Traduciendo…",
         empty: "Tu traducción aparecerá aquí mientras escribes.",
         unavailableError: "La traducción no está disponible en este momento.",
+        notConfiguredError: "La traducción en tiempo real todavía no está configurada. Inténtalo más tarde.",
         rateLimitedError: "Estás traduciendo demasiado rápido. Espera un momento e inténtalo de nuevo.",
         monthlyQuotaError:
           "Has alcanzado el límite mensual de traducción en tiempo real. Inténtalo de nuevo el próximo mes.",
         tooLong: ({ maxCharacters }) =>
           `La traducción en tiempo real está disponible para borradores de hasta ${maxCharacters} caracteres. Este borrador es más largo; envíalo para corregirlo y recibir comentarios completos.`,
         deeplNotice: "Traducciones proporcionadas por DeepL.",
-        unofficialFallbackNotice:
-          "Esta traducción se obtuvo mediante un método de respaldo no oficial, no la API de DeepL. Puede ser menos precisa y no estar disponible en ocasiones.",
       },
       feedback: {
         heading: ({ language }) => `Comentarios (${language})`,
@@ -605,14 +602,13 @@ export const APP_COPY = {
         inProgress: "Traduzindo…",
         empty: "Sua tradução aparecerá aqui enquanto você escreve.",
         unavailableError: "A tradução não está disponível no momento.",
+        notConfiguredError: "A tradução em tempo real ainda não está configurada. Tente mais tarde.",
         rateLimitedError: "Você está traduzindo rápido demais. Aguarde um momento e tente novamente.",
         monthlyQuotaError:
           "Você atingiu o limite mensal de tradução em tempo real. Tente novamente no próximo mês.",
         tooLong: ({ maxCharacters }) =>
           `A tradução em tempo real está disponível para rascunhos de até ${maxCharacters} caracteres. Este rascunho é maior; envie-o para correção e receba comentários completos.`,
         deeplNotice: "Traduções fornecidas pelo DeepL.",
-        unofficialFallbackNotice:
-          "Esta tradução usou um método de backup não oficial, não a API do DeepL. Ela pode ser menos precisa e ficar indisponível ocasionalmente.",
       },
       feedback: {
         heading: ({ language }) => `Comentários (${language})`,
