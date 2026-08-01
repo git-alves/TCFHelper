@@ -333,14 +333,6 @@ export function WritingWorkspace() {
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
-    // A replacement has either been explicitly confirmed or there was no
-    // existing work. Clear the old context before the request starts so an
-    // older prompt/draft cannot remain visible or be submitted while the new
-    // topic is loading.
-    setTopicMode(null);
-    setRecentTopic(null);
-    setCustomTopic("");
-    resetDraftAndFeedback();
 
     try {
       const res = await fetch(
