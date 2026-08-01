@@ -78,6 +78,7 @@ model User {
 
   subscriptions Subscription[]
   essays        Essay[]
+  translationQuota TranslationQuota?
 }
 
 model Subscription {
@@ -162,4 +163,20 @@ model Feedback {
   translatedText    String?
   meetsWordCount    Boolean   @default(false)
   createdAt         DateTime  @default(now())
+}
+
+/// A durable, per-learner quota reservation for live Google translations.
+/// The route updates this row inside a PostgreSQL transaction advisory lock,
+/// so concurrent requests from separate server instances cannot both spend
+/// the same minute or month allowance.
+model TranslationQuota {
+  userId               String   @id
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minuteStartedAt      DateTime
+  minuteRequestCount   Int      @default(0)
+  minuteCharacterCount Int      @default(0)
+  monthStartedAt       DateTime
+  monthCharacterCount  Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }

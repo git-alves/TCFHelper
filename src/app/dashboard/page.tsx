@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { DashboardHeading } from "@/components/dashboard-heading";
 import { WritingWorkspace } from "@/components/writing-workspace";
 
 export default async function DashboardPage() {
@@ -11,9 +12,7 @@ export default async function DashboardPage() {
 
   return (
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Welcome, {session.user.name ?? session.user.email}
-      </h1>
+      <DashboardHeading name={session.user.name ?? session.user.email} />
       <WritingWorkspace />
     </main>
   );
