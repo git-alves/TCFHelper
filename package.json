@@ -18,7 +18,8 @@
     "db:seed": "tsx scripts/seed-topics.ts",
     "stripe:setup": "tsx scripts/stripe-setup.ts",
     "clerk:import": "tsx scripts/import-users-to-clerk.ts",
-    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run build && npm run verify:prisma-engine"
+    "db:verify:clerk-cutover": "tsx scripts/verify-clerk-cutover.ts",
+    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",

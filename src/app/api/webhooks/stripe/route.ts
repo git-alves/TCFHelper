@@ -14,8 +14,9 @@ const SUBSCRIPTION_EVENT_TYPES = new Set([
 /**
  * Verifies and logs Stripe billing events. There is no checkout flow or
  * feature gate wired up yet, so this only keeps the Subscription table in
- * sync for events that already carry a userId in metadata; everything else
- * is accepted and logged so Stripe considers delivery successful.
+ * sync for events that already carry a valid local application CUID in
+ * metadata; everything else is accepted and logged so Stripe considers
+ * delivery successful.
  */
 export async function POST(request: Request) {
   const signature = request.headers.get("stripe-signature");

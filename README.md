@@ -286,12 +286,14 @@ Before production cutover, import existing bcrypt hashes into the Clerk
 
 ```bash
 npm run clerk:import
-npm run clerk:import -- --apply --allow-auto-verified-email-import
+npm run clerk:import -- --apply --production --allow-auto-verified-email-import
 ```
 
 The first command is a read-only dry run. The second performs the import after
 you have reviewed it and explicitly approved Clerk auto-verifying imported
-legacy email addresses. The script requires `DATABASE_URL` and
+legacy email addresses. It also requires a Clerk production (`sk_live_*`)
+secret key, so a production database cannot accidentally be linked to a
+development Clerk instance. The script requires `DATABASE_URL` and
 `CLERK_SECRET_KEY` to apply, sends each legacy hash directly to Clerk with the
 local CUID as Clerk's `externalId`, records the returned Clerk ID, and never
 logs a password digest. It is re-runnable after a partial failure. Do not put
@@ -312,7 +314,11 @@ Use this order for the production cutover:
    a new local account appearing after the import cursor has passed and becoming
    unmapped at the Clerk cutover.
 4. Run the guarded `--apply` command. It exits non-zero unless every local user
-   is mapped; verify the final "local users remain unmapped" count is zero.
+   is mapped; verify the final "local users remain unmapped" count is zero. The
+   Vercel production build repeats that database check before building, so it
+   cannot release the Clerk code while any legacy mapping is missing. It also
+   requires production Clerk `sk_live_*` / `pk_live_*` keys and the webhook
+   signing secret, rather than a development instance.
 5. Deploy this Clerk build, validate a legacy password sign-in and a Google
    sign-in, then re-enable signup through Clerk.
 
@@ -366,8 +372,9 @@ the same production branch.
 **Option A — Vercel's Git integration (simplest):** import this repo in the
 Vercel dashboard, set the environment variables below on the project, and
 push to `main`. Also set `RUN_PRODUCTION_MIGRATIONS=1` for the **Production**
-environment only, so previews never touch a database. No GitHub secrets are
-needed.
+environment only, so previews never touch a database. A production Vercel
+build fails closed if this value is missing, preventing the migration and
+Clerk cutover checks from being skipped. No GitHub secrets are needed.
 
 **Option B — `.github/workflows/deploy.yml`:** deploys via the Vercel CLI
 on every push to `main`. It uploads source with `vercel deploy --prod` rather

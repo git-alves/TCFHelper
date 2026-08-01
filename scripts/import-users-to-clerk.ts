@@ -8,8 +8,9 @@
  * deliberately does not call Clerk, so it cannot discover remote collisions.
  * Clerk automatically verifies an email supplied to createUser(), while this
  * legacy app never verified signup emails. The mutating command therefore
- * requires both `--apply` and `--allow-auto-verified-email-import` after a
- * human has approved the account-linking cutover policy.
+ * requires `--apply --production --allow-auto-verified-email-import` after a
+ * human has approved the account-linking cutover policy. The production flag
+ * also refuses development (`sk_test_*`) Clerk keys.
  *
  * Idempotent: before creating anything it looks up Clerk by externalId, so a
  * user already created by a prior partial run is only linked, not duplicated.
@@ -28,6 +29,7 @@ const BATCH_SIZE = 50;
 const MAX_RATE_LIMIT_RETRIES = 5;
 const args = new Set(process.argv.slice(2));
 const apply = args.has("--apply");
+const production = args.has("--production");
 const allowAutoVerifiedEmailImport = args.has("--allow-auto-verified-email-import");
 
 type LegacyUser = {
@@ -40,11 +42,11 @@ type LegacyUser = {
 async function main() {
   if (!apply) {
     console.log(
-      "Local eligibility dry run: no Clerk API calls or database rows will be changed. Clerk auto-verifies imported emails, so a mutating run requires both --apply and --allow-auto-verified-email-import.",
+      "Local eligibility dry run: no Clerk API calls or database rows will be changed. Clerk auto-verifies imported emails, so a mutating run requires --apply --production --allow-auto-verified-email-import.",
     );
-  } else if (!allowAutoVerifiedEmailImport) {
+  } else if (!production || !allowAutoVerifiedEmailImport) {
     throw new Error(
-      "Refusing to import: Clerk auto-verifies imported emails, but legacy signup emails were not verified. Re-run only after an approved account-linking cutover with --apply --allow-auto-verified-email-import.",
+      "Refusing to import: production writes require --apply --production --allow-auto-verified-email-import after an approved account-linking cutover.",
     );
   }
 
@@ -52,6 +54,11 @@ async function main() {
   const secretKey = process.env.CLERK_SECRET_KEY;
   if (apply && !secretKey) {
     throw new Error("CLERK_SECRET_KEY is not set. Add it to .env before using --apply.");
+  }
+  if (apply && !secretKey?.startsWith("sk_live_")) {
+    throw new Error(
+      "Refusing to import: a production import requires a Clerk production secret key (sk_live_*), not a development key.",
+    );
   }
   const clerk = secretKey ? createClerkClient({ secretKey }) : null;
 

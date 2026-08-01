@@ -39,11 +39,13 @@ email address.
    controlled machine with the production `DATABASE_URL`), then run
    `npm run clerk:import` for its local eligibility dry run. After resolving
    every conflict and temporarily freezing legacy Auth.js signup, run
-   `npm run clerk:import -- --apply --allow-auto-verified-email-import` in a
+   `npm run clerk:import -- --apply --production --allow-auto-verified-email-import` in a
    controlled environment that has database access and `CLERK_SECRET_KEY`.
    The extra flag is intentional: Clerk auto-verifies an imported email whereas
    the legacy app did not verify signups, so an operator must explicitly accept
-   that account-linking policy. The script imports each legacy bcrypt digest
+   that account-linking policy. `--production` requires an `sk_live_*` Clerk
+   key, preventing a production database from being linked to a development
+   Clerk instance. The script imports each legacy bcrypt digest
    into Clerk with the local CUID as Clerk's `externalId`, then records the
    returned Clerk ID locally. It never prints password hashes and exits non-zero
    if any local user remains unmapped. Existing Auth.js sessions do not
@@ -75,8 +77,15 @@ email address.
 apply the additive migration, configure Google, run and review the local dry
 run, freeze legacy signup, perform the guarded import until the unmapped count
 is zero, then deploy the Clerk build and validate both a legacy password and a
-Google sign-in. This order prevents an Auth.js signup from racing past the
-import cursor and being stranded without a Clerk mapping.
+Google sign-in. The Vercel production build runs `npm run db:verify:clerk-cutover`
+after the additive migration and refuses to release
+while any local user has no `clerkUserId`. This order prevents an Auth.js
+signup from racing past the import cursor and being stranded without a Clerk
+mapping. That check also requires the production Clerk `sk_live_*` and
+`pk_live_*` keys plus the user-sync webhook signing secret, so a live database
+cannot be paired with a development Clerk instance. Vercel production builds
+also fail if `RUN_PRODUCTION_MIGRATIONS=1` is missing; previews and ordinary
+local builds remain database-free.
 
 **Failure modes** — Missing/invalid Clerk configuration prevents the auth UI
 from initializing and must fail deployment configuration checks. A valid
