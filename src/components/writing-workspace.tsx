@@ -12,7 +12,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { GoogleTranslateAttribution } from "@/components/google-translate-attribution";
+import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 
 interface RecentExamTopic {
   id: string;
@@ -26,7 +26,8 @@ interface RecentExamTopic {
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
 type PendingSwitchKind = "task" | "topic";
-type TranslationErrorKind = "notConfigured" | "rateLimited" | "monthlyQuota" | "unavailable";
+type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
+type TranslationProviderKind = "deepl" | "unofficial";
 
 function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
   if (!value || typeof value !== "object") return null;
@@ -96,6 +97,7 @@ export function WritingWorkspace() {
   );
 
   const [translation, setTranslation] = useState("");
+  const [translationProvider, setTranslationProvider] = useState<TranslationProviderKind | null>(null);
   const [translationFor, setTranslationFor] = useState<{
     text: string;
     locale: typeof locale;
@@ -191,13 +193,11 @@ export function WritingWorkspace() {
                 ? (data as { code?: unknown }).code
                 : undefined;
             setTranslationError(
-              errorCode === "TRANSLATION_NOT_CONFIGURED"
-                ? "notConfigured"
-                : errorCode === "TRANSLATION_RATE_LIMITED"
-                  ? "rateLimited"
-                  : errorCode === "TRANSLATION_MONTHLY_QUOTA_REACHED"
-                    ? "monthlyQuota"
-                    : "unavailable",
+              errorCode === "TRANSLATION_RATE_LIMITED"
+                ? "rateLimited"
+                : errorCode === "TRANSLATION_MONTHLY_QUOTA_REACHED"
+                  ? "monthlyQuota"
+                  : "unavailable",
             );
             setTranslationErrorFor({ text: trimmed, locale });
             return;
@@ -210,8 +210,13 @@ export function WritingWorkspace() {
             data && typeof data === "object" && typeof (data as { translation?: unknown }).translation === "string"
               ? (data as { translation: string }).translation
               : "";
+          const nextProvider =
+            data && typeof data === "object" && (data as { provider?: unknown }).provider === "unofficial"
+              ? "unofficial"
+              : "deepl";
 
           setTranslation(nextTranslation);
+          setTranslationProvider(nextProvider);
           setTranslationFor({ text: trimmed, locale });
           lastTranslatedRef.current = { text: trimmed, locale };
         })
@@ -246,6 +251,7 @@ export function WritingWorkspace() {
     setHasCorrectionError(false);
     translationRequestId.current += 1;
     setTranslation("");
+    setTranslationProvider(null);
     setTranslationFor(null);
     setTranslationError(null);
     setTranslationErrorFor(null);
@@ -429,15 +435,13 @@ export function WritingWorkspace() {
       ? translationError
       : null;
   const visibleTranslationErrorMessage =
-    visibleTranslationError === "notConfigured"
-      ? copy.workspace.translation.notConfiguredError
-      : visibleTranslationError === "rateLimited"
-        ? copy.workspace.translation.rateLimitedError
-        : visibleTranslationError === "monthlyQuota"
-          ? copy.workspace.translation.monthlyQuotaError
-          : visibleTranslationError
-            ? copy.workspace.translation.unavailableError
-            : null;
+    visibleTranslationError === "rateLimited"
+      ? copy.workspace.translation.rateLimitedError
+      : visibleTranslationError === "monthlyQuota"
+        ? copy.workspace.translation.monthlyQuotaError
+        : visibleTranslationError
+          ? copy.workspace.translation.unavailableError
+          : null;
   // Hide an older response immediately when the learner edits the draft or
   // changes the target language; the matching response will render once it
   // arrives. A French interface simply shows the original French draft.
@@ -626,6 +630,7 @@ export function WritingWorkspace() {
                 if (!value.trim()) {
                   translationRequestId.current += 1;
                   setTranslation("");
+                  setTranslationProvider(null);
                   setTranslationFor(null);
                   setTranslationError(null);
                   setTranslationErrorFor(null);
@@ -680,10 +685,11 @@ export function WritingWorkspace() {
                 ? ""
                 : visibleTranslation || (trimmedContent ? "" : copy.workspace.translation.empty)}
             </div>
-            {locale !== "fr" && visibleTranslation && (
-              <GoogleTranslateAttribution
-                alt={copy.workspace.translation.googleAttributionAlt}
-                notice={copy.workspace.translation.googleNotice}
+            {locale !== "fr" && visibleTranslation && translationProvider && (
+              <TranslationProviderNotice
+                provider={translationProvider}
+                deeplNotice={copy.workspace.translation.deeplNotice}
+                unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
               />
             )}
             {isDraftTooLongToTranslate ? (

@@ -180,3 +180,15 @@ model TranslationQuota {
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 }
+
+/// A durable, project-wide circuit breaker for the unofficial translation
+/// scraper fallback. Unlike TranslationQuota (per learner), this is a single
+/// fixed-id row: repeated scraper failures (e.g. an upstream IP block) should
+/// stop every learner's requests from retrying a broken endpoint, not just
+/// one learner's.
+model TranslationFallbackCircuit {
+  id                  String    @id
+  consecutiveFailures Int       @default(0)
+  openUntil           DateTime?
+  updatedAt           DateTime  @updatedAt
+}

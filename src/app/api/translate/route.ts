@@ -3,16 +3,24 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { APP_LOCALES, TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 import { prisma } from "@/lib/prisma";
+import { DeepLQuotaExceededError, translateWithDeepL } from "@/lib/deepl-translate";
+import { translateWithUnofficialScraper } from "@/lib/unofficial-translate";
+import {
+  isFallbackCircuitOpen,
+  recordFallbackFailure,
+  recordFallbackSuccess,
+} from "@/lib/translation-fallback-circuit";
 
-const GOOGLE_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2";
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
-// Google documents a default quota of 6,000,000 input code points per
-// project/user each minute and recommends requests of at most 5,000 code
-// points. These tighter product limits still allow a debounced live update
-// about every three seconds, while preventing a direct caller from consuming
-// the shared Google project quota at that provider-scale rate.
+// DeepL API Free allows 500,000 characters per account per month — a hard
+// cap that returns HTTP 456, not a billing overage. This per-learner cap
+// keeps any single learner from exhausting that shared allowance alone,
+// leaving room for roughly ten learners' full monthly usage before DeepL's
+// quota response triggers the unofficial fallback for everyone. The
+// per-minute limits are an independent abuse guard, not tied to either
+// provider's own rate limit.
 const TRANSLATION_REQUESTS_PER_MINUTE = 20;
 const TRANSLATION_CHARACTERS_PER_MINUTE = 20_000;
 const TRANSLATION_CHARACTERS_PER_MONTH = 50_000;
@@ -29,7 +37,6 @@ const requestSchema = z
   })
   .strict();
 
-type JsonRecord = Record<string, unknown>;
 type QuotaReservation =
   | { allowed: true }
   | {
@@ -37,63 +44,6 @@ type QuotaReservation =
       reason: "rate" | "monthly";
       resetAt: Date;
     };
-
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
-}
-
-function decodeHtmlEntities(value: string): string {
-  const namedEntities: Record<string, string> = {
-    amp: "&",
-    apos: "'",
-    gt: ">",
-    lt: "<",
-    nbsp: "\u00a0",
-    quot: '"',
-  };
-
-  return value.replace(/&(#x[\da-f]+|#\d+|amp|apos|gt|lt|nbsp|quot);/gi, (entity, value) => {
-    if (value[0] !== "#") {
-      return namedEntities[value.toLowerCase()] ?? entity;
-    }
-
-    const codePoint = Number.parseInt(value.slice(value[1].toLowerCase() === "x" ? 2 : 1), value[1].toLowerCase() === "x" ? 16 : 10);
-    if (!Number.isInteger(codePoint) || codePoint < 0 || codePoint > 0x10ffff) {
-      return entity;
-    }
-
-    try {
-      return String.fromCodePoint(codePoint);
-    } catch {
-      return entity;
-    }
-  });
-}
-
-function getTranslation(payload: unknown): string | null {
-  if (!isRecord(payload) || !isRecord(payload.data) || !Array.isArray(payload.data.translations)) {
-    return null;
-  }
-
-  const firstTranslation = payload.data.translations[0];
-  if (!isRecord(firstTranslation) || typeof firstTranslation.translatedText !== "string") {
-    return null;
-  }
-
-  const translation = decodeHtmlEntities(firstTranslation.translatedText).trim();
-  return translation || null;
-}
-
-function getGoogleErrorMetadata(payload: unknown) {
-  if (!isRecord(payload) || !isRecord(payload.error)) {
-    return {};
-  }
-
-  return {
-    googleCode: typeof payload.error.code === "number" ? payload.error.code : undefined,
-    googleStatus: typeof payload.error.status === "string" ? payload.error.status : undefined,
-  };
-}
 
 function startOfUtcMinute(date: Date) {
   return new Date(
@@ -119,8 +69,9 @@ function isSameWindow(left: Date, right: Date) {
   return left.getTime() === right.getTime();
 }
 
-// Cloud Translation meters Unicode code points, not UTF-16 code units. This
-// matches its billing model even for text containing astral-plane characters.
+// Both DeepL and Google meter Unicode code points, not UTF-16 code units.
+// This matches that billing model even for text containing astral-plane
+// characters.
 function countCodePoints(text: string) {
   return Array.from(text).length;
 }
@@ -237,22 +188,15 @@ export async function POST(request: Request) {
 
   const { text, targetLocale } = parsed.data;
 
-  // The draft is already French. Avoid an unnecessary paid API request when
-  // the learner has selected the French interface.
+  // The draft is already French. Avoid an unnecessary translation request
+  // when the learner has selected the French interface.
   if (targetLocale === "fr") {
-    return translationResponse({ translation: text });
+    return translationResponse({ translation: text, provider: "source" });
   }
 
-  const apiKey = process.env.GOOGLE_TRANSLATE_API_KEY?.trim();
-  if (!apiKey) {
-    return translationResponse(
-      {
-        error: "Translation service is not configured.",
-        code: "TRANSLATION_NOT_CONFIGURED",
-      },
-      503,
-    );
-  }
+  // A missing key means only the unofficial scraper fallback is available;
+  // that path is attempted further down instead of failing the request here.
+  const deeplApiKey = process.env.DEEPL_API_KEY?.trim();
 
   if (request.signal.aborted) {
     return translationResponse({ error: "Translation request was cancelled." }, 499);
@@ -263,7 +207,7 @@ export async function POST(request: Request) {
     quotaReservation = await reserveTranslationQuota(session.user.id, countCodePoints(text));
   } catch {
     // Fail closed: if usage cannot be recorded durably, do not make an
-    // unmetered call with the shared server-side Google credential.
+    // unmetered call with the shared server-side DeepL credential.
     console.error("Translation quota reservation failed");
     return translationResponse(
       {
@@ -294,7 +238,7 @@ export async function POST(request: Request) {
     // Reservations intentionally count accepted attempts, even if the client
     // disconnects just after the durable write. Releasing here could race a
     // newer reservation for the same user and reopen the quota bypass; this
-    // path never reaches Google, so it can only consume the caller's own
+    // path never reaches a provider, so it can only consume the caller's own
     // conservative allowance.
     return translationResponse({ error: "Translation request was cancelled." }, 499);
   }
@@ -302,44 +246,48 @@ export async function POST(request: Request) {
   const translationRequest = createTranslationSignal(request.signal);
 
   try {
-    const response = await fetch(GOOGLE_TRANSLATE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Keep the key out of URLs, traces, and error messages. This header
-        // is supported by Google APIs for API-key authentication.
-        "X-Goog-Api-Key": apiKey,
-      },
-      body: JSON.stringify({
-        q: text,
-        source: "fr",
-        target: targetLocale,
-        format: "text",
-      }),
-      signal: translationRequest.signal,
-      cache: "no-store",
-    });
+    if (deeplApiKey) {
+      try {
+        const translation = await translateWithDeepL(
+          text,
+          targetLocale,
+          deeplApiKey,
+          translationRequest.signal,
+        );
+        return translationResponse({ translation, provider: "deepl" });
+      } catch (error) {
+        if (!(error instanceof DeepLQuotaExceededError)) {
+          throw error;
+        }
 
-    const payload: unknown = await response.json().catch(() => null);
-
-    if (request.signal.aborted) {
-      return translationResponse({ error: "Translation request was cancelled." }, 499);
+        // Only quota exhaustion falls through to the unofficial scraper
+        // below; every other DeepL failure is handled by the outer catch.
+        console.warn("DeepL monthly quota exhausted; falling back to the unofficial scraper.");
+      }
     }
 
-    if (!response.ok) {
-      console.error("Google Translation API request failed", {
-        status: response.status,
-        ...getGoogleErrorMetadata(payload),
-      });
-      return translationResponse({ error: "Translation service is temporarily unavailable." }, 502);
+    if (await isFallbackCircuitOpen()) {
+      return translationResponse(
+        {
+          error: "Translation service is temporarily unavailable.",
+          code: "TRANSLATION_FALLBACK_UNAVAILABLE",
+        },
+        503,
+      );
     }
 
-    const translation = getTranslation(payload);
-    if (!translation) {
-      return translationResponse({ error: "No translation was returned." }, 502);
+    try {
+      const fallbackTranslation = await translateWithUnofficialScraper(
+        text,
+        targetLocale,
+        translationRequest.signal,
+      );
+      await recordFallbackSuccess();
+      return translationResponse({ translation: fallbackTranslation, provider: "unofficial" });
+    } catch (error) {
+      await recordFallbackFailure();
+      throw error;
     }
-
-    return translationResponse({ translation });
   } catch {
     if (request.signal.aborted) {
       return translationResponse({ error: "Translation request was cancelled." }, 499);
@@ -350,8 +298,8 @@ export async function POST(request: Request) {
     }
 
     // Do not log the thrown error: an implementation may include the request
-    // URL, which contains the server-only Google API key.
-    console.error("Google Translation API request failed before a response was received");
+    // URL, which contains a server-only API key.
+    console.error("Translation request failed before a response was received");
     return translationResponse({ error: "Translation service is temporarily unavailable." }, 502);
   } finally {
     translationRequest.dispose();
