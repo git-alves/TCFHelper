@@ -70,9 +70,16 @@ enum SubscriptionStatus {
 model User {
   id            String   @id @default(cuid())
   email         String   @unique
-  passwordHash  String
+  // Legacy bcrypt hashes remain only for the Clerk import/cutover. New
+  // Clerk users (including Google sign-ins) have no app-managed password.
+  passwordHash  String?
   name          String?
   locale        Locale   @default(en)
+  // Additive Clerk identity mapping. Nullable until each existing learner is
+  // imported into Clerk; every essay/subscription/quota FK keeps pointing at
+  // `id` (the CUID), never at this Clerk subject, so no foreign key needs to
+  // be rewritten as part of the Clerk cutover.
+  clerkUserId   String?  @unique
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -191,4 +198,13 @@ model TranslationFallbackCircuit {
   consecutiveFailures Int       @default(0)
   openUntil           DateTime?
   updatedAt           DateTime  @updatedAt
+}
+
+/// Clerk webhooks are delivered at least once. Recording their Svix IDs keeps
+/// side effects idempotent and intentionally does not cascade Clerk account
+/// deletion into the learner's essays, quotas, or subscriptions.
+model ClerkWebhookEvent {
+  id        String   @id
+  type      String
+  createdAt DateTime @default(now())
 }

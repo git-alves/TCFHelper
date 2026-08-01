@@ -77,6 +77,8 @@ export interface AppCopy {
   };
   dashboard: {
     welcome: (name: string) => string;
+    accountUnavailableTitle: string;
+    accountUnavailableDescription: string;
   };
   workspace: {
     task: {
@@ -190,6 +192,9 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Welcome, ${name}`,
+      accountUnavailableTitle: "Your account needs to be set up",
+      accountUnavailableDescription:
+        "We can’t connect this Clerk account to your TCF Helper data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
     },
     workspace: {
       task: {
@@ -313,6 +318,9 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Bienvenue, ${name}`,
+      accountUnavailableTitle: "Votre compte doit être finalisé",
+      accountUnavailableDescription:
+        "Nous ne pouvons pas encore associer ce compte Clerk à vos données TCF Helper. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
     },
     workspace: {
       task: {
@@ -439,6 +447,9 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Te damos la bienvenida, ${name}`,
+      accountUnavailableTitle: "Tu cuenta necesita configurarse",
+      accountUnavailableDescription:
+        "Todavía no podemos vincular esta cuenta de Clerk con tus datos de TCF Helper. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
     },
     workspace: {
       task: {
@@ -565,6 +576,9 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Boas-vindas, ${name}`,
+      accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
+      accountUnavailableDescription:
+        "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do TCF Helper. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
     },
     workspace: {
       task: {

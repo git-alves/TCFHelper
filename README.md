@@ -15,7 +15,7 @@ gate yet — every logged-in user can reach `/dashboard`.
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS 4
 - Postgres via Prisma 6 (models: `User`, `Subscription`, `Topic`, `Essay`, `Feedback`)
-- Auth.js (`next-auth@beta`) with a Credentials (email/password) provider
+- Clerk for email/password authentication and Google sign-in
 - Stripe SDK, with a setup script for the product/price and a webhook stub
 - Vercel-hosted production builds, triggered from GitHub Actions after CI
 
@@ -29,7 +29,11 @@ gate yet — every logged-in user can reach `/dashboard`.
 
    - `DATABASE_URL`: a Postgres connection string (local Postgres, Neon,
      Supabase, or Vercel Postgres all work).
-   - `AUTH_SECRET`: generate with `openssl rand -base64 32`.
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`: retrieve
+     these from the Clerk dashboard. The publishable key is browser-safe; the
+     secret key stays server-only.
+   - `CLERK_WEBHOOK_SIGNING_SECRET`: the Svix signing secret for the Clerk
+     webhook endpoint. Required once the Clerk user-sync webhook is enabled.
    - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
      key (ends in `:fx`), used server-side for live draft translation. Free
@@ -65,8 +69,9 @@ gate yet — every logged-in user can reach `/dashboard`.
    npm run dev
    ```
 
-   Visit `http://localhost:3000`. Sign up at `/signup`, which logs you in
-   and redirects to `/dashboard`.
+   Visit `http://localhost:3000`. Sign up at `/signup`, which uses Clerk's
+   prebuilt flow and redirects to `/dashboard`. Enable Google in the Clerk
+   dashboard to show it as a sign-in option.
 
 ## Recent-exam topics
 
@@ -244,16 +249,79 @@ Vercel production build bootstraps the empty database before any code goes
 live; do not add the production `DATABASE_URL` to GitHub merely to run a
 manual migration there.
 
-## Auth
+## Authentication
 
-`src/auth.ts` configures Auth.js with a Credentials provider backed by
-`prisma.user` (bcrypt-hashed passwords, JWT sessions). `src/proxy.ts`
-redirects unauthenticated requests to `/dashboard/*` to `/login`; the
-dashboard page also checks the session server-side as defense in depth.
+Clerk owns sign-in, sign-up, password recovery, and Google social sign-in.
+The app keeps its self-hosted Clerk pages at `/login` and `/signup`; the
+prebuilt components use the currently selected product language where Clerk
+provides a localization. Configure Clerk with:
 
-There's no email verification, password reset, or OAuth provider yet —
-just enough to unblock building the writing tool behind a logged-in
-session.
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk
+  dashboard;
+- `CLERK_WEBHOOK_SIGNING_SECRET` for `/api/webhooks/clerk`;
+- the four `NEXT_PUBLIC_CLERK_*_URL` / fallback-redirect variables shown in
+  `.env.example`.
+
+For development, enable **Google** under Clerk's SSO connections. For
+production, configure custom Google OAuth credentials in Clerk, copy Clerk's
+exact redirect URI into Google Cloud, and set the Google OAuth consent screen
+to **In production**. Those Google credentials belong in Google Cloud and
+Clerk, not in this repository or Vercel.
+
+Also create a Clerk Dashboard webhook for
+`https://<your-production-domain>/api/webhooks/clerk`, subscribe it to
+`user.created` and `user.updated`, and put its signing secret in
+`CLERK_WEBHOOK_SIGNING_SECRET`. The handler verifies each Svix delivery and
+does not delete learner data for a Clerk `user.deleted` event.
+
+### Migrating existing learners
+
+The application identity stays the existing Prisma CUID `User.id`: essays,
+subscriptions, translation quotas, and Stripe subscription metadata continue
+to reference it. `User.clerkUserId` maps the Clerk subject to that CUID; no
+foreign keys are rewritten.
+
+Before production cutover, import existing bcrypt hashes into the Clerk
+**production** instance from a controlled machine that can reach the database:
+
+```bash
+npm run clerk:import
+npm run clerk:import -- --apply --allow-auto-verified-email-import
+```
+
+The first command is a read-only dry run. The second performs the import after
+you have reviewed it and explicitly approved Clerk auto-verifying imported
+legacy email addresses. The script requires `DATABASE_URL` and
+`CLERK_SECRET_KEY` to apply, sends each legacy hash directly to Clerk with the
+local CUID as Clerk's `externalId`, records the returned Clerk ID, and never
+logs a password digest. It is re-runnable after a partial failure. Do not put
+production database credentials or exported hashes in GitHub, chat, or this
+repository. Existing Auth.js sessions cannot transfer, so users sign in once
+through Clerk after deployment.
+
+Use this order for the production cutover:
+
+1. Apply the additive Clerk database migration from a controlled machine
+   before changing the live auth code (for example,
+   `RUN_PRODUCTION_MIGRATIONS=1 npm run db:deploy:additive` with the production
+   `DATABASE_URL`).
+2. Configure the production Clerk instance, Google connection, and the verified
+   webhook above. Run the local eligibility dry run and resolve every reported
+   duplicate, missing-password, or existing-Clerk conflict.
+3. Temporarily freeze legacy Auth.js signups while the import runs. This avoids
+   a new local account appearing after the import cursor has passed and becoming
+   unmapped at the Clerk cutover.
+4. Run the guarded `--apply` command. It exits non-zero unless every local user
+   is mapped; verify the final "local users remain unmapped" count is zero.
+5. Deploy this Clerk build, validate a legacy password sign-in and a Google
+   sign-in, then re-enable signup through Clerk.
+
+Protected pages and JSON API routes resolve Clerk's user ID to the mapped local
+CUID before accessing data. A legacy record is never claimed merely because an
+email matches; imported accounts must present the exact Clerk `externalId`.
+Clerk `user.created` and `user.updated` webhooks are idempotent, while local
+user deletion is deliberately out of scope because it would cascade-delete
+learning history and subscriptions.
 
 ## Stripe setup
 
@@ -316,8 +384,12 @@ It requires these repository secrets:
 Either way, set these environment variables on the Vercel project (with
 `DATABASE_URL` and API credentials marked sensitive):
 
-`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
+`DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
+`CLERK_WEBHOOK_SIGNING_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
+`NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
+`NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `ANTHROPIC_API_KEY`,
+`DEEPL_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+`STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary

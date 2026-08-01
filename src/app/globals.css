@@ -1,3 +1,8 @@
+/* Keep Clerk's generated styles below Tailwind's base reset but above this
+ * application's utility classes. Without this explicit order, a prebuilt
+ * Clerk screen can unexpectedly override Tailwind utilities. */
+@layer theme, base, clerk, components, utilities;
+
 @import "tailwindcss";
 
 :root {

@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useSession, signOut } from "next-auth/react";
+import { Show, SignOutButton } from "@clerk/nextjs";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { APP_LOCALES, APP_LOCALE_LABELS } from "@/lib/app-locale";
 
 export function NavBar() {
-  const { status } = useSession();
   const { locale, setLocale } = useAppLocale();
   const copy = useAppCopy();
 
@@ -32,19 +31,22 @@ export function NavBar() {
               ))}
             </select>
           </label>
-          {status === "authenticated" ? (
+          <Show when="signed-in">
             <>
               <Link href="/dashboard" className="hover:underline">
                 {copy.nav.dashboard}
               </Link>
-              <button
-                onClick={() => signOut({ callbackUrl: "/" })}
-                className="rounded-full border border-black/[.08] px-4 py-1.5 transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-white/[.06]"
-              >
-                {copy.nav.signOut}
-              </button>
+              <SignOutButton redirectUrl="/">
+                <button
+                  type="button"
+                  className="rounded-full border border-black/[.08] px-4 py-1.5 transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-white/[.06]"
+                >
+                  {copy.nav.signOut}
+                </button>
+              </SignOutButton>
             </>
-          ) : status === "loading" ? null : (
+          </Show>
+          <Show when="signed-out">
             <>
               <Link href="/login" className="hover:underline">
                 {copy.nav.logIn}
@@ -56,7 +58,7 @@ export function NavBar() {
                 {copy.nav.signUp}
               </Link>
             </>
-          )}
+          </Show>
         </div>
       </nav>
     </header>

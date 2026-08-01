@@ -14,8 +14,16 @@ jobs:
       # DATABASE_URL. Route handlers that need STRIPE_SECRET_KEY only touch
       # it at request time, not at build time.
       DATABASE_URL: "postgresql://user:password@localhost:5432/tcfhelper?schema=public"
-      AUTH_SECRET: "ci-build-placeholder-secret"
-      NEXTAUTH_URL: "http://localhost:3000"
+      # Valid-shaped non-production Clerk values stop keyless mode from
+      # attempting to create an instance during the build. No Clerk API call
+      # is made by the checks below.
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "pk_test_Y2ktdGVzdC0xLmNsZXJrLmFjY291bnRzLmRldiQ"
+      CLERK_SECRET_KEY: "sk_test_ci-placeholder"
+      CLERK_WEBHOOK_SIGNING_SECRET: "whsec_ci-placeholder"
+      NEXT_PUBLIC_CLERK_SIGN_IN_URL: "/login"
+      NEXT_PUBLIC_CLERK_SIGN_UP_URL: "/signup"
+      NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL: "/dashboard"
+      NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL: "/dashboard"
       STRIPE_SECRET_KEY: "sk_test_placeholder"
       STRIPE_WEBHOOK_SECRET: "whsec_placeholder"
       STRIPE_PRICE_ID: "price_placeholder"

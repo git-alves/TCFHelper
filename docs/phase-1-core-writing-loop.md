@@ -16,7 +16,9 @@
 
 ### Non-goals
 
-- No subscription, checkout, entitlement, or billing gate. Existing sign-in remains out of scope for this phase.
+- No subscription, checkout, entitlement, or billing gate. Clerk authentication
+  exists only to establish learner ownership of persisted work; it is not a
+  retention or monetization feature in this phase.
 - No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
 - No automatic topic generation or broad historical search. A recent-exam topic must match the selected task and come from the current month, except for one prior-month retry when the current WordPress page is genuinely not yet published; custom prompts remain learner supplied.
@@ -38,6 +40,23 @@ Live draft translation is a separate, low-latency aid. It translates French lear
 DeepL API Free allows 500,000 characters per account per month at no charge and no billing details — a hard cap (HTTP 456), not an overage. The product debounces and cancels stale draft requests, enforces a 4,000-character request ceiling, keeps the API key server-only, and returns a clear degraded state when the DeepL key or service is unavailable. A missing live translation must never block writing or correction.
 
 A durable Postgres-backed per-user guard reserves each attempted live translation before DeepL is called: at most 20 requests and 20,000 input Unicode code points per UTC minute, plus 50,000 input code points per UTC calendar month. A transaction-scoped advisory lock keeps concurrent server instances from overspending the same allowance. A request aborted after its reservation remains counted deliberately: this makes the accounting atomic and conservative rather than trying to reverse a reservation that could race another request. The monthly per-learner cap leaves room for roughly ten learners' full usage before DeepL's account-wide quota is reached and the fallback below engages for everyone. Rate and monthly-limit responses use `TRANSLATION_RATE_LIMITED` and `TRANSLATION_MONTHLY_QUOTA_REACHED`, return `Retry-After` plus a UTC `resetAt`, and map to localized recovery copy.
+
+## Authentication and identity decision
+
+Clerk owns sign-in, sign-up, password recovery, and the Google social
+connection. The application still owns its local CUID `User.id`: it remains
+the foreign key on essays, subscriptions, translation quotas, and Stripe
+metadata. A nullable unique `User.clerkUserId` maps Clerk's subject to that
+existing CUID before any protected route reads or writes application data.
+This prevents an authentication-provider migration from changing learner
+ownership or Stripe history.
+
+Existing bcrypt credentials are imported into Clerk with the local CUID as
+Clerk's server-controlled `externalId`. The first authenticated request can
+link that exact external ID to its local user record; it must not link a
+legacy account merely because two accounts share an email address. New Clerk
+users receive a new local CUID record. Existing sessions do not transfer, so
+learners sign in once through Clerk after the cutover.
 
 ### Unofficial fallback when DeepL is unconfigured or exhausted
 
@@ -143,7 +162,7 @@ The current persistence model is sufficient for this small, manual audit. A dedi
 
 **Free-form model response** — rejected because the UI and audit protocol need stable fields, and a prose blob makes it too easy to omit a required review element.
 
-**Build billing/auth work first** — rejected because it would add funnel mechanics before there is evidence that the paid-for outcome is valuable. Authentication already exists and is sufficient for ownership of submitted writing.
+**Build billing or more account features first** — rejected because it would add funnel mechanics before there is evidence that the paid-for outcome is valuable. Clerk authentication is limited to ownership of submitted writing and secure access to the writing loop.
 
 **Automatically generate all topics with AI** — rejected for Phase 1 because a current recent-exam source and custom prompts cover the required variety without adding another unvalidated model workflow.
 
