@@ -13,9 +13,11 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:deploy:additive": "tsx scripts/deploy-additive-migrations.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed-topics.ts",
-    "stripe:setup": "tsx scripts/stripe-setup.ts"
+    "stripe:setup": "tsx scripts/stripe-setup.ts",
+    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
