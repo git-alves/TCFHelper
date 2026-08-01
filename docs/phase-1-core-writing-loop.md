@@ -8,7 +8,7 @@
 
 ### Goals
 
-- Let an authenticated learner choose Tâche 1, 2, or 3, see its fixed instructions and target word range, get a matching topic from the current month's recent-exam source or enter one, and write a response.
+- Let an authenticated learner choose Tâche 1, 2, or 3, see its fixed instructions and target word range, get a matching topic from the current month's recent-exam source (or the immediately prior month only when the current page is not yet published) or enter one, and write a response.
 - Show the live word count before submission.
 - Return one structured AI review containing corrected French text, categorized errors, a word-count check, a CEFR estimate, an overall summary, and actionable suggestions.
 - Persist the submitted essay and successful review so a human can audit the feedback during validation.
@@ -19,7 +19,7 @@
 - No subscription, checkout, entitlement, or billing gate. Existing sign-in remains out of scope for this phase.
 - No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
-- No automatic topic generation or fallback to a prior month's source. A recent-exam topic must come from the current month and match the selected task; custom prompts remain learner supplied.
+- No automatic topic generation or broad historical search. A recent-exam topic must match the selected task and come from the current month, except for one prior-month retry when the current WordPress page is genuinely not yet published; custom prompts remain learner supplied.
 - No project-wide translation spending cap. The durable product quota is per learner; Google Cloud billing budgets and alerts remain the project-level cost control.
 - No guarantee of feedback quality until the validation protocol below has been completed with a live Anthropic key.
 
@@ -48,7 +48,8 @@ The learner should be able to complete that path without having to remember word
 | State / transition | Product behavior | Why |
 | --- | --- | --- |
 | No task selected | Only the three task choices are shown. Selecting one immediately reveals its fixed instructions and target range. | It gives a clear first action without exposing fields that lack context. |
-| Task, but no topic | “Get a topic from recent exams” and “Write or paste my own topic” are visible before the editor can be submitted. The source action requests only the current month's matching Tâche. | A response without a prompt cannot receive task-specific feedback, and a stale prior-month topic would undermine exam relevance. |
+| Task, but no topic | “Get a topic from recent exams” and “Write or paste my own topic” are visible before the editor can be submitted. The source action requests the current month's matching Tâche, then retries exactly once with the prior month only if the current WordPress page is not published. | A response without a prompt cannot receive task-specific feedback; the narrow fallback keeps the action usable during the publisher's normal early-month delay without masking an outage or changed source. |
+| Neither month is published | The learner sees a message stating this month's (and last month's) recent-exam topics are not published yet, distinct from the generic “topic unavailable” retry message, and the paste-your-own path stays available. | A learner who tries early in the month is not the same case as an actual outage or a parser broken by an upstream redesign; a distinct message avoids implying a retry will help when the topic simply doesn't exist yet. |
 | Changing the active task | Clicking the already-selected task does nothing. Switching tasks after entering a topic, draft, or feedback asks before clearing that work. | Task changes invalidate the context; accidental re-clicks and irreversible draft loss are avoidable. |
 | Changing a topic or topic mode | If a draft or feedback exists, ask before clearing those response-specific results. | Retaining an essay under a different prompt risks feedback that appears valid but is about the wrong task. |
 | Changing task with a selected topic | A selected recent-exam topic counts as work even before the learner starts writing, so task switching asks before discarding it. | A prompt choice is meaningful learner progress and should not silently disappear. |
@@ -56,7 +57,7 @@ The learner should be able to complete that path without having to remember word
 | Request succeeds | Focus moves to the labelled feedback region, which contains the word-count result, estimated CEFR / CECRL level, corrected text, errors, and suggestions. | The result may land below the fold; moving to it removes the need to hunt for the outcome. |
 | Learner edits after feedback | Feedback stays available but is visibly marked as applying to the prior submission, with a clear invitation to correct again. | A learner often revises immediately; silently presenting old feedback as if it applies to the new draft would be misleading. |
 | Live translation | After a brief pause, the French draft is shown in the selected feedback-and-translation language. The result expands with the text, ignores obsolete requests, and never shows a response for a different draft or language. | Translation is a writing aid, so it must remain legible and trustworthy while the learner types. |
-| Topic or correction request fails | A concise, retryable error is shown and announced; the learner's current work stays in place. | A transient model or network failure must not cost the learner their writing. |
+| Topic or correction request fails | A concise, retryable error is shown and announced. A confirmed replacement-topic switch clears the prior context before its request begins; otherwise the learner's current work stays in place. | A transient model or network failure must not cost the learner their writing, while an old prompt or draft must never remain submittable after the learner confirmed it should be discarded. |
 
 ## Product and technical contract
 
@@ -67,8 +68,18 @@ URL from the server's current UTC month and year, verifies that the returned
 page declares that same month, and extracts only the literal task heading that
 matches the learner's `TASK_1`, `TASK_2`, or `TASK_3` selection. It does not
 trust a client-provided source URL, month, task label, prompt, or external
-identifier. A source failure or changed page structure is an explicit retryable
-failure; it never falls back to a prior month.
+identifier. If and only if the authorised WordPress endpoint returns an empty
+result (the month has not been published), it retries exactly once against the
+immediately preceding UTC month and verifies that page in the same way. A
+transport failure, malformed response, changed page structure, or missing task
+fails closed without an older-topic fallback.
+
+If neither the current nor the prior month has been published, the API
+returns a stable `RECENT_EXAM_NOT_PUBLISHED` code (HTTP 404), distinct from the
+generic unavailable response used for a transport failure, malformed response,
+or changed page structure. The client renders a matching “not published yet”
+message rather than its generic retryable-error copy, since a retry cannot
+succeed until the publisher's next update.
 
 Each retrieved prompt is persisted under an immutable content-based external
 reference. If the upstream source changes, the revised content becomes a new
@@ -80,7 +91,7 @@ API uses the record ID as its authoritative prompt context.
 | Field | Rule |
 | --- | --- |
 | Task | Exactly one of `TASK_1`, `TASK_2`, or `TASK_3`; instructions and word range come from the static task configuration. |
-| Topic | Either a server-authoritative current-month recent-exam topic for the selected task or a non-empty learner-supplied prompt (up to 2,000 characters). The recent-exam topic's stored ID, not a client-supplied prompt, is used during grading. |
+| Topic | Either a server-authoritative current-month recent-exam topic for the selected task, or an immediately preceding-month topic only after the current source returns an empty result, or a non-empty learner-supplied prompt (up to 2,000 characters). The recent-exam topic's stored ID, not a client-supplied prompt, is used during grading. |
 | Essay | Non-empty French response, up to 20,000 characters. The visible word counter and server use whitespace-delimited words. |
 
 ### Output
@@ -112,7 +123,7 @@ This metric intentionally weights harmful false corrections more heavily than a 
 
 ## Review workflow
 
-1. Collect current-month topics and prepare the 30 consented test responses.
+1. Collect current-month topics (or the permitted immediately prior-month fallback when the current page is unpublished) and prepare the 30 consented test responses.
 2. Submit each response through the production-like loop using a live `ANTHROPIC_API_KEY`.
 3. Export the persisted `Essay` and `Feedback` records for blinded review; redact learner identifiers from the review sheet.
 4. Score with the four checks above, log failures by task, error category, and severity, then make the advance/iterate decision against the stated gate.

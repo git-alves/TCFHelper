@@ -24,7 +24,7 @@ interface RecentExamTopic {
 }
 
 type TopicMode = "recent" | "custom" | null;
-type RecentTopicErrorKind = "fetch" | "unavailable";
+type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
 type PendingSwitchKind = "task" | "topic";
 type TranslationErrorKind = "notConfigured" | "rateLimited" | "monthlyQuota" | "unavailable";
 
@@ -333,6 +333,14 @@ export function WritingWorkspace() {
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
+    // A replacement has either been explicitly confirmed or there was no
+    // existing work. Clear the old context before the request starts so an
+    // older prompt/draft cannot remain visible or be submitted while the new
+    // topic is loading.
+    setTopicMode(null);
+    setRecentTopic(null);
+    setCustomTopic("");
+    resetDraftAndFeedback();
 
     try {
       const res = await fetch(
@@ -340,7 +348,14 @@ export function WritingWorkspace() {
       );
 
       if (!res.ok) {
-        if (requestId === recentTopicRequestId.current) setRecentTopicError("fetch");
+        const data: unknown = await res.json().catch(() => null);
+        const errorCode =
+          data && typeof data === "object" && "code" in data
+            ? (data as { code?: unknown }).code
+            : undefined;
+        if (requestId === recentTopicRequestId.current) {
+          setRecentTopicError(errorCode === "RECENT_EXAM_NOT_PUBLISHED" ? "notPublished" : "fetch");
+        }
         return;
       }
 
@@ -526,9 +541,11 @@ export function WritingWorkspace() {
 
             {recentTopicError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {recentTopicError === "unavailable"
-                  ? copy.workspace.topic.unavailableError
-                  : copy.workspace.topic.fetchError}
+                {recentTopicError === "notPublished"
+                  ? copy.workspace.topic.notPublishedError
+                  : recentTopicError === "unavailable"
+                    ? copy.workspace.topic.unavailableError
+                    : copy.workspace.topic.fetchError}
               </p>
             )}
 

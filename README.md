@@ -77,13 +77,23 @@ The dashboard has two topic choices: **Get a topic from recent exams** and
 with the authorised recent-exam source. It derives the current French
 month/year URL, verifies that the page is for that month, and returns only the
 literal `Tâche 1`, `Tâche 2`, or `Tâche 3` matching the learner's selected
-task. It never accepts a client-supplied source URL or silently falls back to
-an older month.
+task. It never accepts a client-supplied source URL.
 
-If the current month's page is unavailable or its structure changes, the app
-keeps the learner's draft and offers the paste-your-own path instead. Retrieved
-topics are saved with immutable provenance so Claude grades against the exact
-prompt the learner saw.
+The upstream site lags a few days into each month before publishing that
+month's page. If the current month's page has not been published yet (an
+empty result from its WordPress API), the app retries once against last
+month's already-published page instead of failing outright; the displayed
+source label always reflects whichever month was actually used. Any other
+failure (the source is unreachable, or its structure changed) does not fall
+back — the app keeps the learner's draft and offers the paste-your-own path
+instead. Retrieved topics are saved with immutable provenance so Claude grades
+against the exact prompt the learner saw.
+
+If neither the current nor the prior month is published, `/api/topics/recent`
+returns a stable `RECENT_EXAM_NOT_PUBLISHED` code (HTTP 404) instead of the
+generic unavailable response used for an actual outage or a changed page
+structure, and the UI shows a matching “not published yet” message rather than
+its generic retry copy.
 
 ## Live translation
 

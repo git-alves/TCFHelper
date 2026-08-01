@@ -190,6 +190,133 @@ describe("getRecentExamTopic", () => {
     ).rejects.toMatchObject({ code: "UNAVAILABLE" });
   });
 
+  it("falls back to last month when the current month has not been published yet", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input : new URL(String(input));
+      if (url.searchParams.get("slug") === "aout-2026-expression-ecrite") {
+        return new Response("[]", { headers: { "content-type": "application/json" } });
+      }
+      return wordPressResponse(currentMonthHtml());
+    });
+
+    const topic = await getRecentExamTopic("TASK_1", {
+      now: new Date("2026-08-01T00:00:00.000Z"),
+      fetch: fetchMock as typeof fetch,
+      random: () => 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      fetchMock.mock.calls.map(([input]) => {
+        const url = input instanceof URL ? input : new URL(String(input));
+        return url.searchParams.get("slug");
+      }),
+    ).toEqual([
+      "aout-2026-expression-ecrite",
+      "juillet-2026-expression-ecrite",
+    ]);
+    expect(topic.sourceMonth).toBe("2026-07");
+    expect(topic.sourceUrl).toBe("https://reussir-tcfcanada.com/juillet-2026-expression-ecrite/");
+  });
+
+  it("falls back across the year boundary when January has not been published yet", async () => {
+    const decemberHtml = currentMonthHtml().replace("Juillet 2026", "Décembre 2025");
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input : new URL(String(input));
+      if (url.searchParams.get("slug") === "janvier-2026-expression-ecrite") {
+        return new Response("[]", { headers: { "content-type": "application/json" } });
+      }
+      return wordPressResponse(decemberHtml, {
+        slug: "decembre-2025-expression-ecrite",
+        title: "Décembre 2025 Expression écrite",
+      });
+    });
+
+    const topic = await getRecentExamTopic("TASK_1", {
+      now: new Date("2026-01-01T00:00:00.000Z"),
+      fetch: fetchMock as typeof fetch,
+      random: () => 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(
+      fetchMock.mock.calls.map(([input]) => {
+        const url = input instanceof URL ? input : new URL(String(input));
+        return url.searchParams.get("slug");
+      }),
+    ).toEqual([
+      "janvier-2026-expression-ecrite",
+      "decembre-2025-expression-ecrite",
+    ]);
+    expect(topic.sourceMonth).toBe("2025-12");
+    expect(topic.sourceUrl).toBe("https://reussir-tcfcanada.com/decembre-2025-expression-ecrite/");
+    expect(topic.externalRef).toMatch(/^reussir-tcf-canada:2025-12:TASK_1:1:/);
+  });
+
+  it("fails closed as NOT_PUBLISHED when both the current and prior month are unpublished", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(
+        async () => new Response("[]", { headers: { "content-type": "application/json" } })
+      );
+
+    await expect(
+      getRecentExamTopic("TASK_1", {
+        now: new Date("2026-08-01T00:00:00.000Z"),
+        fetch: fetchMock as typeof fetch,
+      })
+    ).rejects.toMatchObject({ code: "NOT_PUBLISHED", sourceMonth: "2026-08" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not mask a published source missing the selected task with an older topic", async () => {
+    const currentMonthWithoutTaskTwo = currentMonthHtml()
+      .replace("Juillet 2026", "Août 2026")
+      .replaceAll(
+        '<span class="elementor-heading-title">Tâche 2</span>',
+        '<span class="elementor-heading-title">Sujet libre</span>',
+      );
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = input instanceof URL ? input : new URL(String(input));
+      if (url.searchParams.get("slug") === "aout-2026-expression-ecrite") {
+        return wordPressResponse(currentMonthWithoutTaskTwo, {
+          slug: "aout-2026-expression-ecrite",
+          title: "Août 2026 Expression écrite",
+        });
+      }
+
+      // A valid prior-month response must not conceal a malformed current
+      // month source.
+      return wordPressResponse(currentMonthHtml());
+    });
+
+    await expect(
+      getRecentExamTopic("TASK_2", {
+        now: new Date("2026-08-01T00:00:00.000Z"),
+        fetch: fetchMock as typeof fetch,
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_SOURCE" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      fetchMock.mock.calls.map(([input]) => {
+        const url = input instanceof URL ? input : new URL(String(input));
+        return url.searchParams.get("slug");
+      }),
+    ).toEqual(["aout-2026-expression-ecrite"]);
+  });
+
+  it("does not fall back to last month on a genuine upstream failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 }));
+
+    await expect(
+      getRecentExamTopic("TASK_1", {
+        now: new Date("2026-08-01T00:00:00.000Z"),
+        fetch: fetchMock as typeof fetch,
+      })
+    ).rejects.toMatchObject({ code: "UNAVAILABLE" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("aborts a source request that outlives its timeout", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn(
@@ -212,12 +339,18 @@ describe("getRecentExamTopic", () => {
   });
 });
 
-function wordPressResponse(content: string): Response {
+function wordPressResponse(
+  content: string,
+  {
+    slug = "juillet-2026-expression-ecrite",
+    title = "Juillet 2026 Expression écrite",
+  }: { slug?: string; title?: string } = {},
+): Response {
   return new Response(
     JSON.stringify([
       {
-        slug: "juillet-2026-expression-ecrite",
-        title: { rendered: "Juillet 2026 Expression écrite" },
+        slug,
+        title: { rendered: title },
         content: { rendered: content },
       },
     ]),
