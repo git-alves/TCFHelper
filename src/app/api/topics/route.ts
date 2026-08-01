@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
-import { auth } from "@/auth";
+import { getCurrentClerkUserId } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 
 const TASK_TYPES = Object.values(TaskType);
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
+  const userId = await getCurrentClerkUserId();
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

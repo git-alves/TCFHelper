@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { APP_LOCALES, TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 import { prisma } from "@/lib/prisma";
 import { DeepLQuotaExceededError, translateWithDeepL } from "@/lib/deepl-translate";
@@ -175,8 +175,24 @@ function translationResponse(
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
+  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  try {
+    user = await getCurrentAppUser();
+  } catch (error) {
+    if (error instanceof AppUserProvisioningError) {
+      return translationResponse(
+        {
+          error: "Your account is still being set up. Please try again.",
+          code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
+        },
+        503,
+      );
+    }
+
+    throw error;
+  }
+
+  if (!user) {
     return translationResponse({ error: "Unauthorized" }, 401);
   }
 
@@ -204,7 +220,7 @@ export async function POST(request: Request) {
 
   let quotaReservation: QuotaReservation;
   try {
-    quotaReservation = await reserveTranslationQuota(session.user.id, countCodePoints(text));
+    quotaReservation = await reserveTranslationQuota(user.id, countCodePoints(text));
   } catch {
     // Fail closed: if usage cannot be recorded durably, do not make an
     // unmetered call with the shared server-side DeepL credential.

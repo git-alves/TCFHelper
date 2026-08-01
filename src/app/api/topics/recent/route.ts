@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
-import { auth } from "@/auth";
+import { getCurrentClerkUserId } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { getRecentExamTopic, RecentExamTopicError } from "@/lib/recent-exam-topics";
 
@@ -29,8 +29,8 @@ function notPublishedResponse() {
 }
 
 export async function GET(request: Request) {
-  const session = await auth();
-  if (!session?.user) {
+  const userId = await getCurrentClerkUserId();
+  if (!userId) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401, headers: NO_STORE_HEADERS }
