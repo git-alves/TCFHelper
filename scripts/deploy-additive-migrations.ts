@@ -24,6 +24,7 @@ const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260729140000_add_stripe_event_and_customer_index",
   "20260731170000_add_recent_exam_topic_provenance",
   "20260731200000_add_translation_quota",
+  "20260801140000_add_translation_fallback_circuit",
 ]);
 
 const migrationsDirectory = join(process.cwd(), "prisma", "migrations");

@@ -31,13 +31,11 @@ gate yet — every logged-in user can reach `/dashboard`.
      Supabase, or Vercel Postgres all work).
    - `AUTH_SECRET`: generate with `openssl rand -base64 32`.
    - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
-   - `GOOGLE_TRANSLATE_API_KEY`: an API key from a Google Cloud project with
-     [Cloud Translation](https://cloud.google.com/translate/docs/setup)
-     enabled, used server-side for live draft translation. Cloud Translation
-     Basic v2 includes the first 500,000 input characters each month at no
-     charge (via a $10 monthly credit shared with Advanced), but still requires
-     a Cloud project, billing account, and API key. Restrict the key to the
-     Cloud Translation API; see [pricing](https://cloud.google.com/translate/pricing).
+   - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
+     key (ends in `:fx`), used server-side for live draft translation. Free
+     covers 500,000 characters/month, no billing details required. If unset,
+     or once that quota is reached, translation falls back to an unofficial
+     method — see [Live translation](#live-translation).
    - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` / `STRIPE_PRICE_ID`: see
      [Stripe setup](#stripe-setup) below. Optional for local dev if you're
      not touching billing code.
@@ -98,36 +96,62 @@ its generic retry copy.
 ## Live translation
 
 Live draft translation sends the learner's French draft from the server to
-[Google Translate](https://translate.google.com/) through Cloud Translation
-Basic v2 only when the selected application language is English, Spanish, or
-Portuguese. It is a writing aid, not part of Claude's correction workflow; a
-translation failure never prevents writing or requesting feedback. The key is
-kept server-side in `GOOGLE_TRANSLATE_API_KEY` and must not be exposed through
-`NEXT_PUBLIC_*` variables.
+[DeepL](https://www.deepl.com/) via the API Free plan only when the selected
+application language is English, Spanish, or Portuguese. It is a writing aid,
+not part of Claude's correction workflow; a translation failure never prevents
+writing or requesting feedback. The key is kept server-side in
+`DEEPL_API_KEY` and must not be exposed through `NEXT_PUBLIC_*` variables.
 
-Displayed translations carry Google's required “Powered by Google Translate”
-attribution and make Google's translation disclaimer available in the
-dashboard. The first 500,000 translated input characters each month are
-covered by Google Cloud's shared monthly credit, rather than being permanently
-free, so production should set Cloud Billing budgets and alerts before launch.
-See Google's [pricing](https://cloud.google.com/translate/pricing) and
-[attribution requirements](https://docs.cloud.google.com/translate/attribution).
-
-Before calling Google, the translation route also reserves a durable allowance
+Before calling DeepL, the translation route also reserves a durable allowance
 for the signed-in learner in Postgres: at most 20 requests and 20,000 input
 Unicode code points per UTC minute, plus 50,000 input code points per UTC
-calendar month. Google meters code points (including whitespace), so the
-server counts them the same way. A transaction-scoped per-user PostgreSQL lock
+calendar month. DeepL meters code points (including whitespace), so the server
+counts them the same way. A transaction-scoped per-user PostgreSQL lock
 serializes concurrent reservations across server instances; a direct caller
 cannot race two requests through the same remaining allowance. Rejections use
 stable error codes plus `Retry-After` and UTC `resetAt` metadata while the
-client continues to show localized recovery copy.
+client continues to show localized recovery copy. DeepL's API Free plan does
+not require end-user attribution, so the UI shows only a plain "Translations
+powered by DeepL" credit, not a mandated badge.
+
+### Unofficial scraper fallback
+
+`DEEPL_API_KEY` is optional. If it is unset, or DeepL responds with its
+documented HTTP 456 (the account's 500,000-character monthly quota has been
+reached), the route falls back to
+[`@vitalets/google-translate-api`](https://www.npmjs.com/package/@vitalets/google-translate-api)
+(`src/lib/unofficial-translate.ts`), which calls Google Translate's public web
+endpoint directly with no API key and no billing. Any other DeepL failure
+(invalid key, malformed response, network error) still fails closed with the
+existing "temporarily unavailable" response — only quota exhaustion (or a
+missing key) reaches the fallback.
+
+This is a deliberate stopgap, not a second production-grade provider:
+
+- It scrapes the same web endpoint `translate.google.com` itself uses, which
+  is against Google's Translate terms of service, has no SLA, and can be
+  rate-limited, IP-blocked, or broken by an upstream change with no notice.
+- A durable, project-wide circuit breaker (`src/lib/translation-fallback-circuit.ts`,
+  the `TranslationFallbackCircuit` table) tracks consecutive fallback
+  failures across every server instance. After 5 in a row it stops attempting
+  the fallback for 10 minutes and returns `TRANSLATION_FALLBACK_UNAVAILABLE`
+  instead, so a blocked or broken endpoint isn't hammered by every learner's
+  request.
+- The learner-facing UI shows a distinct disclosure whenever a translation was
+  produced this way (`copy.workspace.translation.unofficialFallbackNotice`),
+  rather than presenting it as an ordinary DeepL result.
+- The learner-facing per-user quota above still applies to fallback requests,
+  since they carry the same abuse risk against the server's own IP.
+
+Set `DEEPL_API_KEY` as soon as it's available; treat the scraper purely as
+what keeps translation working before the key exists or after the free quota
+runs out for the month, not as a long-term replacement for it.
 
 Reservations deliberately account for an accepted request attempt rather than
-only a completed Google response. If a client disconnects immediately after
+only a completed provider response. If a client disconnects immediately after
 the durable reservation, that learner's allowance remains spent; this avoids a
 release racing a newer request for the same learner. The aborted request never
-reaches Google, and it cannot spend anyone else's allowance.
+reaches DeepL or the fallback, and it cannot spend anyone else's allowance.
 
 ## Database
 
@@ -292,7 +316,7 @@ It requires these repository secrets:
 Either way, set these environment variables on the Vercel project (with
 `DATABASE_URL` and API credentials marked sensitive):
 
-`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `GOOGLE_TRANSLATE_API_KEY`, `STRIPE_SECRET_KEY`,
+`DATABASE_URL`, `AUTH_SECRET`, `NEXTAUTH_URL`, `ANTHROPIC_API_KEY`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 
 For an existing production database, complete any pending contract/destructive

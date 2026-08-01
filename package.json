@@ -22,6 +22,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
     "@prisma/client": "^6.19.3",
+    "@vitalets/google-translate-api": "^9.2.1",
     "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "next": "16.2.12",
