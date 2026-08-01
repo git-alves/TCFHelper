@@ -33,15 +33,21 @@ const TASK_HEADINGS: Record<TaskType, string> = {
   TASK_3: "Tâche 3",
 };
 
-export type RecentExamTopicErrorCode = "INVALID_TASK" | "UNAVAILABLE" | "INVALID_SOURCE";
+export type RecentExamTopicErrorCode =
+  | "INVALID_TASK"
+  | "UNAVAILABLE"
+  | "INVALID_SOURCE"
+  | "NOT_PUBLISHED";
 
 export class RecentExamTopicError extends Error {
   readonly code: RecentExamTopicErrorCode;
+  readonly sourceMonth?: string;
 
-  constructor(code: RecentExamTopicErrorCode, message: string) {
+  constructor(code: RecentExamTopicErrorCode, message: string, sourceMonth?: string) {
     super(message);
     this.name = "RecentExamTopicError";
     this.code = code;
+    this.sourceMonth = sourceMonth;
   }
 }
 
@@ -97,7 +103,7 @@ export function getRecentExamSource(now: Date = new Date()): {
   pageUrl: string;
   sourceMonth: string;
 } {
-  const source = buildRecentExamSource(now);
+  const source = buildRecentExamSource(now, 0);
   return {
     apiUrl: source.apiUrl.toString(),
     pageUrl: source.pageUrl,
@@ -105,9 +111,16 @@ export function getRecentExamSource(now: Date = new Date()): {
   };
 }
 
+// The upstream site can lag a few days into a new month before publishing its
+// page. Retry exactly once against the prior month, but only after a genuine
+// "not published" response rather than a transport or parsing failure.
+const MONTHS_AGO_TO_TRY = [0, 1] as const;
+
 /**
- * Fetches one current-month topic for the selected task. All upstream HTML is
- * converted to validated plain text before it leaves this server-only module.
+ * Fetches one topic for the selected task, preferring the current month and
+ * falling back to last month if the current month has not been published
+ * yet. All upstream HTML is converted to validated plain text before it
+ * leaves this server-only module.
  */
 export async function getRecentExamTopic(
   taskType: TaskType,
@@ -118,45 +131,69 @@ export async function getRecentExamTopic(
     throw new RecentExamTopicError("INVALID_TASK", "Unsupported TCF task type.");
   }
 
-  const source = buildRecentExamSource(options.now ?? new Date());
-  const responseText = await fetchCurrentMonthPage(source, options);
-  let candidates: ParsedTopic[];
-  try {
-    const page = parseWordPressResponse(responseText, source);
-    candidates = parseElementorTopics(page.content.rendered, source.expectedMonthTitle, taskType);
-  } catch (error) {
-    if (error instanceof RecentExamTopicError) {
+  const now = options.now ?? new Date();
+  let notPublishedError: RecentExamTopicError | undefined;
+
+  for (const monthsAgo of MONTHS_AGO_TO_TRY) {
+    const source = buildRecentExamSource(now, monthsAgo);
+
+    try {
+      const responseText = await fetchCurrentMonthPage(source, options);
+      let candidates: ParsedTopic[];
+      try {
+        const page = parseWordPressResponse(responseText, source);
+        candidates = parseElementorTopics(page.content.rendered, source.expectedMonthTitle, taskType);
+      } catch (error) {
+        if (error instanceof RecentExamTopicError) {
+          throw error;
+        }
+        throw new RecentExamTopicError("INVALID_SOURCE", "The recent-exam source could not be parsed.");
+      }
+
+      if (candidates.length === 0) {
+        throw new RecentExamTopicError("INVALID_SOURCE", "No matching task was found in this month.");
+      }
+
+      const selected = candidates[pickIndex(candidates.length, options.random ?? Math.random)];
+      const externalRef = createExternalRef(source.sourceMonth, taskType, selected);
+
+      return {
+        taskType,
+        combination: selected.combination,
+        title: selected.title,
+        prompt: selected.prompt,
+        sourceUrl: source.pageUrl,
+        sourceMonth: source.sourceMonth,
+        externalRef,
+      };
+    } catch (error) {
+      // Only a genuinely unpublished month falls back; a real failure (bad
+      // response, changed markup, network outage) fails closed instead of
+      // masking itself behind an older, unrelated topic.
+      if (error instanceof RecentExamTopicError && error.code === "NOT_PUBLISHED") {
+        notPublishedError ??= error;
+        continue;
+      }
+
       throw error;
     }
-    throw new RecentExamTopicError("INVALID_SOURCE", "The recent-exam source could not be parsed.");
   }
 
-  if (candidates.length === 0) {
-    throw new RecentExamTopicError("INVALID_SOURCE", "No matching task was found in this month.");
-  }
-
-  const selected = candidates[pickIndex(candidates.length, options.random ?? Math.random)];
-  const externalRef = createExternalRef(source.sourceMonth, taskType, selected);
-
-  return {
-    taskType,
-    combination: selected.combination,
-    title: selected.title,
-    prompt: selected.prompt,
-    sourceUrl: source.pageUrl,
-    sourceMonth: source.sourceMonth,
-    externalRef,
-  };
+  throw (
+    notPublishedError ??
+    new RecentExamTopicError("UNAVAILABLE", "The recent-exam topic is unavailable.")
+  );
 }
 
-function buildRecentExamSource(now: Date): RecentExamSource {
+function buildRecentExamSource(now: Date, monthsAgo: number): RecentExamSource {
   if (!(now instanceof Date) || Number.isNaN(now.getTime())) {
     throw new RecentExamTopicError("INVALID_SOURCE", "A valid current date is required.");
   }
 
-  const year = now.getUTCFullYear();
-  const month = FRENCH_MONTHS[now.getUTCMonth()];
-  const monthNumber = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const target = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - monthsAgo, 1));
+  const year = target.getUTCFullYear();
+  const month = FRENCH_MONTHS[target.getUTCMonth()];
+  const monthNumber = String(target.getUTCMonth() + 1).padStart(2, "0");
   const slug = `${month.slug}-${year}-expression-ecrite`;
   const pageUrl = new URL(`/${slug}/`, SOURCE_ORIGIN).toString();
   const apiUrl = new URL(WORDPRESS_PAGES_PATH, SOURCE_ORIGIN);
@@ -309,7 +346,19 @@ function parseWordPressResponse(text: string, source: RecentExamSource): WordPre
     throw new RecentExamTopicError("INVALID_SOURCE", "The source returned malformed JSON.");
   }
 
-  if (!Array.isArray(payload) || payload.length !== 1 || !isWordPressPage(payload[0])) {
+  if (!Array.isArray(payload)) {
+    throw new RecentExamTopicError("INVALID_SOURCE", "The source returned an invalid page list.");
+  }
+
+  if (payload.length === 0) {
+    throw new RecentExamTopicError(
+      "NOT_PUBLISHED",
+      `${source.expectedMonthTitle} has not been published yet.`,
+      source.sourceMonth,
+    );
+  }
+
+  if (payload.length !== 1 || !isWordPressPage(payload[0])) {
     throw new RecentExamTopicError("UNAVAILABLE", "This month's recent-exam page is unavailable.");
   }
 

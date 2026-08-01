@@ -57,6 +57,7 @@ describe("APP_COPY", () => {
         copy.workspace.topic.loading,
         copy.workspace.topic.fetchError,
         copy.workspace.topic.unavailableError,
+        copy.workspace.topic.notPublishedError,
         copy.workspace.topic.selectedRecentExamAriaLabel,
         copy.workspace.topic.sourceLabel,
         copy.workspace.topic.recentExamsSource({ month: "July 2026" }),

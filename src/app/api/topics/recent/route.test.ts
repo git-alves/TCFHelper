@@ -1,14 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, getRecentExamTopicMock, upsertMock } = vi.hoisted(() => ({
-  authMock: vi.fn(),
-  getRecentExamTopicMock: vi.fn(),
-  upsertMock: vi.fn(),
-}));
+const { authMock, getRecentExamTopicMock, upsertMock, RecentExamTopicErrorMock } = vi.hoisted(() => {
+  class RecentExamTopicErrorMock extends Error {
+    readonly code: string;
+
+    constructor(code: string, message: string) {
+      super(message);
+      this.code = code;
+    }
+  }
+
+  return {
+    authMock: vi.fn(),
+    getRecentExamTopicMock: vi.fn(),
+    upsertMock: vi.fn(),
+    RecentExamTopicErrorMock,
+  };
+});
 
 vi.mock("@/auth", () => ({ auth: authMock }));
 vi.mock("@/lib/recent-exam-topics", () => ({
   getRecentExamTopic: getRecentExamTopicMock,
+  RecentExamTopicError: RecentExamTopicErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { topic: { upsert: upsertMock } },
@@ -123,7 +136,25 @@ describe("GET /api/topics/recent", () => {
     expect(response.status).toBe(502);
     await expect(response.json()).resolves.toEqual({
       error:
-        "This month's recent-exam topic is unavailable. Please write or paste your own topic.",
+        "The recent-exam topic is unavailable. Please write or paste your own topic.",
+    });
+    expect(upsertMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a stable not-published code when neither month has a source page", async () => {
+    getRecentExamTopicMock.mockRejectedValue(
+      new RecentExamTopicErrorMock("NOT_PUBLISHED", "August 2026 has not been published yet."),
+    );
+
+    const response = await GET(
+      new Request("http://localhost/api/topics/recent?taskType=TASK_2"),
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "No recent-exam topics have been published for this month or the previous month. Please write or paste your own topic.",
+      code: "RECENT_EXAM_NOT_PUBLISHED",
     });
     expect(upsertMock).not.toHaveBeenCalled();
   });

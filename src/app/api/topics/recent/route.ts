@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { getRecentExamTopic } from "@/lib/recent-exam-topics";
+import { getRecentExamTopic, RecentExamTopicError } from "@/lib/recent-exam-topics";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -11,9 +11,20 @@ function unavailableResponse() {
   return NextResponse.json(
     {
       error:
-        "This month's recent-exam topic is unavailable. Please write or paste your own topic.",
+        "The recent-exam topic is unavailable. Please write or paste your own topic.",
     },
     { status: 502, headers: NO_STORE_HEADERS }
+  );
+}
+
+function notPublishedResponse() {
+  return NextResponse.json(
+    {
+      error:
+        "No recent-exam topics have been published for this month or the previous month. Please write or paste your own topic.",
+      code: "RECENT_EXAM_NOT_PUBLISHED",
+    },
+    { status: 404, headers: NO_STORE_HEADERS },
   );
 }
 
@@ -38,9 +49,9 @@ export async function GET(request: Request) {
   const taskType = requestedTaskType as TaskType;
 
   try {
-    // The retrieval library constructs the current-month URL itself and only
-    // returns validated source content. The browser never supplies a prompt,
-    // month, source URL, or external reference for this path.
+    // The retrieval library constructs the authorised month URL itself and
+    // only returns validated source content. The browser never supplies a
+    // prompt, month, source URL, or external reference for this path.
     const recentTopic = await getRecentExamTopic(taskType);
     if (recentTopic.taskType !== taskType) {
       throw new Error("Recent-exam source returned a topic for a different task.");
@@ -96,6 +107,10 @@ export async function GET(request: Request) {
       { headers: NO_STORE_HEADERS }
     );
   } catch (error) {
+    if (error instanceof RecentExamTopicError && error.code === "NOT_PUBLISHED") {
+      return notPublishedResponse();
+    }
+
     console.error("Recent-exam topic retrieval failed", error);
     return unavailableResponse();
   }

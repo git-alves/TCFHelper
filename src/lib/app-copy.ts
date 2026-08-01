@@ -92,6 +92,7 @@ export interface AppCopy {
       loading: string;
       fetchError: string;
       unavailableError: string;
+      notPublishedError: string;
       selectedRecentExamAriaLabel: string;
       sourceLabel: string;
       recentExamsSource: (values: SourceMonthValues) => string;
@@ -205,6 +206,8 @@ export const APP_COPY = {
         loading: "Getting a topic from recent exams…",
         fetchError: "We couldn't get a topic from recent exams. Please try again or write your own.",
         unavailableError: "The recent-exam topic was unavailable. Please try again or write your own.",
+        notPublishedError:
+          "No recent-exam topics have been published for this month or the previous month. Write or paste your own topic.",
         selectedRecentExamAriaLabel: "Selected recent-exam topic",
         sourceLabel: "Source:",
         recentExamsSource: ({ month }) => `Recent exams — ${month}`,
@@ -328,6 +331,8 @@ export const APP_COPY = {
           "Nous n’avons pas pu obtenir un sujet d’examens récents. Réessayez ou rédigez votre propre sujet.",
         unavailableError:
           "Le sujet d’examens récents n’est pas disponible. Réessayez ou rédigez votre propre sujet.",
+        notPublishedError:
+          "Aucun sujet d’examens récents n’a été publié pour ce mois-ci ni le mois précédent. Rédigez ou collez votre propre sujet.",
         selectedRecentExamAriaLabel: "Sujet d’examen récent sélectionné",
         sourceLabel: "Source :",
         recentExamsSource: ({ month }) => `Examens récents — ${month}`,
@@ -452,6 +457,8 @@ export const APP_COPY = {
           "No pudimos obtener un tema de exámenes recientes. Inténtalo de nuevo o escribe el tuyo.",
         unavailableError:
           "El tema de exámenes recientes no estaba disponible. Inténtalo de nuevo o escribe el tuyo.",
+        notPublishedError:
+          "No se ha publicado ningún tema de exámenes recientes para este mes ni el anterior. Escribe o pega tu propio tema.",
         selectedRecentExamAriaLabel: "Tema de examen reciente seleccionado",
         sourceLabel: "Fuente:",
         recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
@@ -576,6 +583,8 @@ export const APP_COPY = {
           "Não foi possível obter um tema de exames recentes. Tente novamente ou escreva o seu próprio tema.",
         unavailableError:
           "O tema de exames recentes não está disponível. Tente novamente ou escreva o seu próprio tema.",
+        notPublishedError:
+          "Nenhum tema de exames recentes foi publicado para este mês nem para o anterior. Escreva ou cole o seu próprio tema.",
         selectedRecentExamAriaLabel: "Tema de exame recente selecionado",
         sourceLabel: "Fonte:",
         recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
