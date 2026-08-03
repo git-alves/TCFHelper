@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 
 const {
-  authMock,
+  getCurrentAppUserMock,
+  AppUserProvisioningErrorMock,
   transactionMock,
   executeRawMock,
   quotaFindUniqueMock,
@@ -12,20 +13,28 @@ const {
   isFallbackCircuitOpenMock,
   recordFallbackFailureMock,
   recordFallbackSuccessMock,
-} = vi.hoisted(() => ({
-  authMock: vi.fn(),
-  transactionMock: vi.fn(),
-  executeRawMock: vi.fn(),
-  quotaFindUniqueMock: vi.fn(),
-  quotaUpsertMock: vi.fn(),
-  deeplTranslateMock: vi.fn(),
-  scraperTranslateMock: vi.fn(),
-  isFallbackCircuitOpenMock: vi.fn(),
-  recordFallbackFailureMock: vi.fn(),
-  recordFallbackSuccessMock: vi.fn(),
-}));
+} = vi.hoisted(() => {
+  class AppUserProvisioningErrorMock extends Error {}
 
-vi.mock("@/auth", () => ({ auth: authMock }));
+  return {
+    getCurrentAppUserMock: vi.fn(),
+    AppUserProvisioningErrorMock,
+    transactionMock: vi.fn(),
+    executeRawMock: vi.fn(),
+    quotaFindUniqueMock: vi.fn(),
+    quotaUpsertMock: vi.fn(),
+    deeplTranslateMock: vi.fn(),
+    scraperTranslateMock: vi.fn(),
+    isFallbackCircuitOpenMock: vi.fn(),
+    recordFallbackFailureMock: vi.fn(),
+    recordFallbackSuccessMock: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/app-user", () => ({
+  getCurrentAppUser: getCurrentAppUserMock,
+  AppUserProvisioningError: AppUserProvisioningErrorMock,
+}));
 vi.mock("@/lib/prisma", () => ({
   prisma: { $transaction: transactionMock },
 }));
@@ -45,6 +54,8 @@ vi.mock("@/lib/translation-fallback-circuit", () => ({
 const { POST } = await import("./route");
 const { DeepLQuotaExceededError } = await import("@/lib/deepl-translate");
 
+const LOCAL_USER_ID = "cuid_local_user_1";
+
 function post(body: unknown, signal?: AbortSignal) {
   return POST(
     new Request("http://localhost/api/translate", {
@@ -58,7 +69,7 @@ function post(body: unknown, signal?: AbortSignal) {
 
 function quotaRecord(overrides: Record<string, unknown> = {}) {
   return {
-    userId: "user_1",
+    userId: LOCAL_USER_ID,
     minuteStartedAt: new Date("2026-07-31T12:34:00.000Z"),
     minuteRequestCount: 0,
     minuteCharacterCount: 0,
@@ -69,7 +80,7 @@ function quotaRecord(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  authMock.mockReset();
+  getCurrentAppUserMock.mockReset();
   transactionMock.mockReset();
   executeRawMock.mockReset();
   quotaFindUniqueMock.mockReset();
@@ -81,7 +92,7 @@ beforeEach(() => {
   recordFallbackSuccessMock.mockReset();
 
   vi.stubEnv("DEEPL_API_KEY", "deepl-server-secret");
-  authMock.mockResolvedValue({ user: { id: "user_1" } });
+  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   quotaFindUniqueMock.mockResolvedValue(null);
   quotaUpsertMock.mockResolvedValue(quotaRecord());
   transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
@@ -108,11 +119,28 @@ afterEach(() => {
 
 describe("POST /api/translate", () => {
   it("requires an authenticated learner", async () => {
-    authMock.mockResolvedValue(null);
+    getCurrentAppUserMock.mockResolvedValue(null);
 
     const response = await post({ text: "J'aime apprendre le français.", targetLocale: "en" });
 
     expect(response.status).toBe(401);
+    expect(deeplTranslateMock).not.toHaveBeenCalled();
+    expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
+    getCurrentAppUserMock.mockRejectedValue(
+      new AppUserProvisioningErrorMock("identity cannot be linked"),
+    );
+
+    const response = await post({ text: "Bonjour.", targetLocale: "en" });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Your account is still being set up. Please try again.",
+      code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
+    });
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(deeplTranslateMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
   });
@@ -169,11 +197,11 @@ describe("POST /api/translate", () => {
     });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 3000 });
-    expect(quotaFindUniqueMock).toHaveBeenCalledWith({ where: { userId: "user_1" } });
+    expect(quotaFindUniqueMock).toHaveBeenCalledWith({ where: { userId: LOCAL_USER_ID } });
     expect(quotaUpsertMock).toHaveBeenCalledWith({
-      where: { userId: "user_1" },
+      where: { userId: LOCAL_USER_ID },
       create: expect.objectContaining({
-        userId: "user_1",
+        userId: LOCAL_USER_ID,
         minuteRequestCount: 1,
         minuteCharacterCount: 29,
         monthCharacterCount: 29,
@@ -185,7 +213,7 @@ describe("POST /api/translate", () => {
       }),
     });
     expect(executeRawMock.mock.calls[0]?.[0]?.join("")).toContain("pg_advisory_xact_lock");
-    expect(executeRawMock.mock.calls[0]?.[1]).toBe("user_1");
+    expect(executeRawMock.mock.calls[0]?.[1]).toBe(LOCAL_USER_ID);
   });
 
   it("uses the unofficial scraper directly when DEEPL_API_KEY is missing", async () => {
@@ -293,7 +321,7 @@ describe("POST /api/translate", () => {
 
     expect(response.status).toBe(200);
     expect(quotaUpsertMock).toHaveBeenCalledWith({
-      where: { userId: "user_1" },
+      where: { userId: LOCAL_USER_ID },
       create: expect.any(Object),
       update: expect.objectContaining({
         minuteCharacterCount: 20_000,
@@ -363,7 +391,7 @@ describe("POST /api/translate", () => {
 
     expect(response.status).toBe(200);
     expect(quotaUpsertMock).toHaveBeenCalledWith({
-      where: { userId: "user_1" },
+      where: { userId: LOCAL_USER_ID },
       create: expect.any(Object),
       update: expect.objectContaining({
         minuteStartedAt: new Date("2026-08-01T00:00:00.000Z"),

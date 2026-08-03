@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, findManyMock } = vi.hoisted(() => ({
-  authMock: vi.fn(),
+const { getCurrentClerkUserIdMock, findManyMock } = vi.hoisted(() => ({
+  getCurrentClerkUserIdMock: vi.fn(),
   findManyMock: vi.fn(),
 }));
 
-vi.mock("@/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/app-user", () => ({ getCurrentClerkUserId: getCurrentClerkUserIdMock }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { topic: { findMany: findManyMock } },
 }));
@@ -13,13 +13,22 @@ vi.mock("@/lib/prisma", () => ({
 const { GET } = await import("./route");
 
 beforeEach(() => {
-  authMock.mockReset();
+  getCurrentClerkUserIdMock.mockReset();
   findManyMock.mockReset();
-  authMock.mockResolvedValue({ user: { id: "user_1" } });
+  getCurrentClerkUserIdMock.mockResolvedValue("clerk_user_1");
   findManyMock.mockResolvedValue([]);
 });
 
 describe("GET /api/topics", () => {
+  it("requires an authenticated Clerk subject", async () => {
+    getCurrentClerkUserIdMock.mockResolvedValue(null);
+
+    const response = await GET(new Request("http://localhost/api/topics?taskType=TASK_1"));
+
+    expect(response.status).toBe(401);
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
+
   it("returns only seeded, official topics rather than learner-supplied prompts", async () => {
     const response = await GET(new Request("http://localhost/api/topics?taskType=TASK_1"));
 

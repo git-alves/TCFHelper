@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { authMock, getRecentExamTopicMock, upsertMock, RecentExamTopicErrorMock } = vi.hoisted(() => {
+const { getCurrentClerkUserIdMock, getRecentExamTopicMock, upsertMock, RecentExamTopicErrorMock } = vi.hoisted(() => {
   class RecentExamTopicErrorMock extends Error {
     readonly code: string;
 
@@ -11,14 +11,14 @@ const { authMock, getRecentExamTopicMock, upsertMock, RecentExamTopicErrorMock }
   }
 
   return {
-    authMock: vi.fn(),
+    getCurrentClerkUserIdMock: vi.fn(),
     getRecentExamTopicMock: vi.fn(),
     upsertMock: vi.fn(),
     RecentExamTopicErrorMock,
   };
 });
 
-vi.mock("@/auth", () => ({ auth: authMock }));
+vi.mock("@/lib/app-user", () => ({ getCurrentClerkUserId: getCurrentClerkUserIdMock }));
 vi.mock("@/lib/recent-exam-topics", () => ({
   getRecentExamTopic: getRecentExamTopicMock,
   RecentExamTopicError: RecentExamTopicErrorMock,
@@ -40,11 +40,11 @@ const recentTopic = {
 };
 
 beforeEach(() => {
-  authMock.mockReset();
+  getCurrentClerkUserIdMock.mockReset();
   getRecentExamTopicMock.mockReset();
   upsertMock.mockReset();
 
-  authMock.mockResolvedValue({ user: { id: "user_1" } });
+  getCurrentClerkUserIdMock.mockResolvedValue("clerk_user_1");
   getRecentExamTopicMock.mockResolvedValue(recentTopic);
   upsertMock.mockResolvedValue({
     id: "recent_topic_1",
@@ -115,7 +115,7 @@ describe("GET /api/topics/recent", () => {
   });
 
   it("requires an authenticated learner", async () => {
-    authMock.mockResolvedValue(null);
+    getCurrentClerkUserIdMock.mockResolvedValue(null);
 
     const response = await GET(
       new Request("http://localhost/api/topics/recent?taskType=TASK_2")

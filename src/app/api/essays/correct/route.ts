@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { auth } from "@/auth";
+import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
@@ -36,8 +36,24 @@ function countWords(text: string): number {
 }
 
 export async function POST(request: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  try {
+    user = await getCurrentAppUser();
+  } catch (error) {
+    if (error instanceof AppUserProvisioningError) {
+      return NextResponse.json(
+        {
+          error: "Your account is still being set up. Please try again.",
+          code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
+        },
+        { status: 503 },
+      );
+    }
+
+    throw error;
+  }
+
+  if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -134,7 +150,7 @@ export async function POST(request: Request) {
 
   const essay = await prisma.essay.create({
     data: {
-      userId: session.user.id,
+      userId: user.id,
       topicId: resolvedTopicId,
       taskType,
       content,

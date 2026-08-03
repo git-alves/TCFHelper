@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { SessionProvider } from "@/components/session-provider";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
+import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
 import { NavBar } from "@/components/nav-bar";
 import { getAppCopy } from "@/lib/app-copy";
 import { getRequestLocale } from "@/lib/request-locale";
@@ -39,12 +39,12 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <SessionProvider>
-          <AppLocaleProvider initialLocale={locale}>
+        <AppLocaleProvider initialLocale={locale}>
+          <ClerkLocaleProvider>
             <NavBar />
             <div className="flex flex-1 flex-col">{children}</div>
-          </AppLocaleProvider>
-        </SessionProvider>
+          </ClerkLocaleProvider>
+        </AppLocaleProvider>
       </body>
     </html>
   );

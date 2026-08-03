@@ -7,6 +7,7 @@ const { db, retrieveMock } = vi.hoisted(() => {
       stripeEventIds: new Set<string>(),
       subscriptions: new Map<string, Record<string, unknown>>(),
       locks: new Map<string, Promise<void>>(),
+      localUserIds: new Set<string>(),
     },
     retrieveMock: vi.fn(),
   };
@@ -75,6 +76,11 @@ vi.mock("@/lib/prisma", () => {
               return row;
             },
           },
+          user: {
+            async findUnique({ where }: { where: { id: string } }) {
+              return db.localUserIds.has(where.id) ? { id: where.id } : null;
+            },
+          },
         };
 
         try {
@@ -92,7 +98,7 @@ const { syncSubscription } = await import("./sync-stripe-subscription");
 function makeSubscription(overrides: { id: string; status?: string }) {
   return {
     id: overrides.id,
-    metadata: { userId: "user_1" },
+    metadata: { userId: "cuid_local_user_1" },
     customer: "cus_1",
     status: overrides.status ?? "active",
     cancel_at_period_end: false,
@@ -121,6 +127,8 @@ beforeEach(() => {
   db.stripeEventIds.clear();
   db.subscriptions.clear();
   db.locks.clear();
+  db.localUserIds.clear();
+  db.localUserIds.add("cuid_local_user_1");
   retrieveMock.mockReset();
 });
 
@@ -149,6 +157,24 @@ describe("syncSubscription", () => {
     await syncSubscription(event);
 
     expect(retrieveMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not treat a Clerk subject in Stripe metadata as the local ownership key", async () => {
+    retrieveMock.mockResolvedValue({
+      ...makeSubscription({ id: "sub_clerk_subject" }),
+      metadata: { userId: "user_clerk_1" },
+    });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await syncSubscription(
+      makeEvent({ id: "evt_clerk_subject", created: 1_700_000_000, subscriptionId: "sub_clerk_subject" }),
+    );
+
+    expect(db.subscriptions.size).toBe(0);
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Subscription sub_clerk_subject references no local application user; skipping DB sync.",
+    );
+    errorSpy.mockRestore();
   });
 
   it("serializes concurrent, same-second events for one subscription instead of racing", async () => {

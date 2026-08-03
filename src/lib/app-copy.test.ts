@@ -47,6 +47,8 @@ describe("APP_COPY", () => {
         copy.signup.alreadyHaveAccount,
         copy.signup.logIn,
         copy.dashboard.welcome("Ana"),
+        copy.dashboard.accountUnavailableTitle,
+        copy.dashboard.accountUnavailableDescription,
         copy.workspace.task.heading,
         copy.workspace.task.targetLength({ minWords: 60, maxWords: 120 }),
         copy.workspace.topic.heading,

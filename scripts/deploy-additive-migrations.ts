@@ -25,6 +25,7 @@ const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260731170000_add_recent_exam_topic_provenance",
   "20260731200000_add_translation_quota",
   "20260801140000_add_translation_fallback_circuit",
+  "20260801150000_add_user_clerk_id",
 ]);
 
 const migrationsDirectory = join(process.cwd(), "prisma", "migrations");
@@ -69,7 +70,9 @@ async function applicationTablesExist(prisma: PrismaClient) {
           'Essay',
           'Feedback',
           'StripeEvent',
-          'TranslationQuota'
+          'TranslationQuota',
+          'TranslationFallbackCircuit',
+          'ClerkWebhookEvent'
         )
     ) AS "exists"
   `;

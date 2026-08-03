@@ -17,16 +17,19 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed-topics.ts",
     "stripe:setup": "tsx scripts/stripe-setup.ts",
-    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run build && npm run verify:prisma-engine"
+    "clerk:import": "tsx scripts/import-users-to-clerk.ts",
+    "db:verify:clerk-cutover": "tsx scripts/verify-clerk-cutover.ts",
+    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
+    "@clerk/backend": "^3.15.0",
+    "@clerk/localizations": "^4.13.10",
+    "@clerk/nextjs": "^7.6.4",
     "@prisma/client": "^6.19.3",
     "@vitalets/google-translate-api": "^9.2.1",
-    "bcryptjs": "^3.0.3",
     "cheerio": "^1.2.0",
     "next": "16.2.12",
-    "next-auth": "^5.0.0-beta.32",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "stripe": "^22.3.2",
@@ -35,7 +38,6 @@
   "devDependencies": {
     "@prisma/nextjs-monorepo-workaround-plugin": "^6.19.3",
     "@tailwindcss/postcss": "^4",
-    "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

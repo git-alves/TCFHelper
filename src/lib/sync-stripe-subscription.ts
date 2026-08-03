@@ -46,9 +46,25 @@ export async function syncSubscription(event: Stripe.Event) {
         return;
       }
 
+      // Stripe metadata is the application CUID that existed before the
+      // Clerk migration, not Clerk's `user_…` subject. Confirming it still
+      // resolves to a local row before the upsert preserves the foreign-key
+      // boundary and makes a bad/future checkout payload a safe no-op instead
+      // of an endlessly retried database constraint failure.
+      const localUser = await tx.user.findUnique({
+        where: { id: userId },
+        select: { id: true },
+      });
+      if (!localUser) {
+        console.error(
+          `Subscription ${subscription.id} references no local application user; skipping DB sync.`,
+        );
+        return;
+      }
+
       const item = subscription.items.data[0];
       const data = {
-        userId,
+        userId: localUser.id,
         stripeCustomerId: String(subscription.customer),
         stripeSubscriptionId: subscription.id,
         stripePriceId: item?.price.id,
