@@ -100,6 +100,12 @@ export interface AppCopy {
       recentExamsSource: (values: SourceMonthValues) => string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
+      generatedTitle: string;
+      generatedDescription: string;
+      generating: string;
+      generateError: string;
+      selectedGeneratedAriaLabel: string;
+      generatedBadgeLabel: string;
     };
     editor: {
       heading: string;
@@ -217,6 +223,12 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Recent exams — ${month}`,
         customTopicLabel: "Your topic or prompt",
         customTopicPlaceholder: "Paste or write the topic/prompt you want to respond to…",
+        generatedTitle: "Generate a new topic",
+        generatedDescription: "Get an original, AI-generated topic for this task.",
+        generating: "Generating a new topic…",
+        generateError: "We couldn't generate a new topic. Please try again or write your own.",
+        selectedGeneratedAriaLabel: "Generated topic",
+        generatedBadgeLabel: "AI-generated topic",
       },
       editor: {
         heading: "3. Write",
@@ -345,6 +357,12 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Examens récents — ${month}`,
         customTopicLabel: "Votre sujet ou consigne",
         customTopicPlaceholder: "Collez ou rédigez le sujet ou la consigne auquel vous souhaitez répondre…",
+        generatedTitle: "Générer un nouveau sujet",
+        generatedDescription: "Obtenez un sujet original généré par IA pour cette tâche.",
+        generating: "Génération d’un nouveau sujet…",
+        generateError: "Nous n’avons pas pu générer de nouveau sujet. Réessayez ou rédigez votre propre sujet.",
+        selectedGeneratedAriaLabel: "Sujet généré",
+        generatedBadgeLabel: "Sujet généré par IA",
       },
       editor: {
         heading: "3. Rédigez",
@@ -474,6 +492,12 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
         customTopicLabel: "Tu tema o consigna",
         customTopicPlaceholder: "Pega o escribe el tema o la consigna a la que quieres responder…",
+        generatedTitle: "Generar un nuevo tema",
+        generatedDescription: "Obtén un tema original generado por IA para esta tarea.",
+        generating: "Generando un nuevo tema…",
+        generateError: "No pudimos generar un nuevo tema. Inténtalo de nuevo o escribe el tuyo.",
+        selectedGeneratedAriaLabel: "Tema generado",
+        generatedBadgeLabel: "Tema generado por IA",
       },
       editor: {
         heading: "3. Escribe",
@@ -603,6 +627,12 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
         customTopicLabel: "Seu tema ou proposta",
         customTopicPlaceholder: "Cole ou escreva o tema ou a proposta à qual você quer responder…",
+        generatedTitle: "Gerar um novo tema",
+        generatedDescription: "Obtenha um tema original gerado por IA para esta tarefa.",
+        generating: "Gerando um novo tema…",
+        generateError: "Não foi possível gerar um novo tema. Tente novamente ou escreva o seu próprio tema.",
+        selectedGeneratedAriaLabel: "Tema gerado",
+        generatedBadgeLabel: "Tema gerado por IA",
       },
       editor: {
         heading: "3. Escreva",

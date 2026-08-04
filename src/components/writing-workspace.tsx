@@ -23,7 +23,16 @@ interface RecentExamTopic {
   sourceMonth: string;
 }
 
-type TopicMode = "recent" | "custom" | null;
+interface GeneratedExamTopic {
+  id: string;
+  taskType: TaskType;
+  title: string;
+  prompt: string;
+  imageData: string | null;
+  imageAlt: string | null;
+}
+
+type TopicMode = "recent" | "custom" | "generated" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
 type PendingSwitchKind = "task" | "topic";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
@@ -51,6 +60,35 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
 }
 
+function readGeneratedTopic(value: unknown, expectedTaskType: TaskType): GeneratedExamTopic | null {
+  if (!value || typeof value !== "object") return null;
+
+  const topic = (value as { topic?: unknown }).topic;
+  if (!topic || typeof topic !== "object") return null;
+
+  const candidate = topic as Record<string, unknown>;
+  const { id, taskType, title, prompt, imageData, imageAlt } = candidate;
+  if (
+    typeof id !== "string" ||
+    taskType !== expectedTaskType ||
+    typeof title !== "string" ||
+    typeof prompt !== "string" ||
+    (imageData !== null && typeof imageData !== "string") ||
+    (imageAlt !== null && typeof imageAlt !== "string")
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    taskType: expectedTaskType,
+    title,
+    prompt,
+    imageData: imageData ?? null,
+    imageAlt: imageAlt ?? null,
+  };
+}
+
 function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
   if (!match) return sourceMonth;
@@ -75,6 +113,11 @@ export function WritingWorkspace() {
   // A language switch can happen while either request is in flight, and the
   // message should follow the current interface language when it appears.
   const [recentTopicError, setRecentTopicError] = useState<RecentTopicErrorKind | null>(null);
+
+  const [generatedTopic, setGeneratedTopic] = useState<GeneratedExamTopic | null>(null);
+  const [isGeneratedTopicLoading, setIsGeneratedTopicLoading] = useState(false);
+  const [generatedTopicError, setGeneratedTopicError] = useState(false);
+  const generatedTopicRequestId = useRef(0);
 
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
@@ -116,12 +159,15 @@ export function WritingWorkspace() {
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
+  const isTopicLoading = isRecentTopicLoading || isGeneratedTopicLoading;
   const activeTopicPrompt =
     topicMode === "recent"
       ? recentTopic?.prompt ?? ""
       : topicMode === "custom"
         ? customTopic.trim()
-        : "";
+        : topicMode === "generated"
+          ? generatedTopic?.prompt ?? ""
+          : "";
 
   useEffect(() => {
     if (feedback) feedbackRef.current?.focus();
@@ -266,12 +312,23 @@ export function WritingWorkspace() {
     setIsRecentTopicLoading(false);
   }
 
+  function cancelPendingGeneratedTopicRequest() {
+    generatedTopicRequestId.current += 1;
+    setIsGeneratedTopicLoading(false);
+  }
+
+  function cancelPendingTopicRequests() {
+    cancelPendingRecentTopicRequest();
+    cancelPendingGeneratedTopicRequest();
+  }
+
   function hasUnsavedWork() {
     return Boolean(
       content.trim() ||
         feedback ||
         (topicMode === "recent" && recentTopic) ||
-        (topicMode === "custom" && customTopic.trim())
+        (topicMode === "custom" && customTopic.trim()) ||
+        (topicMode === "generated" && generatedTopic)
     );
   }
 
@@ -292,12 +349,13 @@ export function WritingWorkspace() {
     runOrConfirm(
       "task",
       () => {
-        recentTopicRequestId.current += 1;
+        cancelPendingTopicRequests();
         setTaskType(next);
         setTopicMode(null);
         setRecentTopic(null);
-        setIsRecentTopicLoading(false);
         setRecentTopicError(null);
+        setGeneratedTopic(null);
+        setGeneratedTopicError(false);
         setCustomTopic("");
         resetDraftAndFeedback();
       },
@@ -306,8 +364,9 @@ export function WritingWorkspace() {
 
   function chooseCustomTopic() {
     if (topicMode === "custom") {
-      cancelPendingRecentTopicRequest();
+      cancelPendingTopicRequests();
       setRecentTopicError(null);
+      setGeneratedTopicError(false);
       customTopicRef.current?.focus();
       return;
     }
@@ -315,10 +374,11 @@ export function WritingWorkspace() {
     runOrConfirm(
       "topic",
       () => {
-        recentTopicRequestId.current += 1;
-        setIsRecentTopicLoading(false);
+        cancelPendingTopicRequests();
         setRecentTopicError(null);
         setRecentTopic(null);
+        setGeneratedTopicError(false);
+        setGeneratedTopic(null);
         setCustomTopic("");
         setTopicMode("custom");
         resetDraftAndFeedback();
@@ -336,6 +396,7 @@ export function WritingWorkspace() {
   }
 
   async function fetchRecentTopic(currentTaskType: TaskType) {
+    cancelPendingGeneratedTopicRequest();
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
@@ -368,6 +429,8 @@ export function WritingWorkspace() {
 
       setRecentTopic(nextTopic);
       setCustomTopic("");
+      setGeneratedTopic(null);
+      setGeneratedTopicError(false);
       setTopicMode("recent");
       resetDraftAndFeedback();
     } catch {
@@ -379,15 +442,70 @@ export function WritingWorkspace() {
     }
   }
 
+  function getGeneratedTopic(currentTaskType: TaskType) {
+    runOrConfirm(
+      "topic",
+      () => {
+        void fetchGeneratedTopic(currentTaskType);
+      },
+    );
+  }
+
+  async function fetchGeneratedTopic(currentTaskType: TaskType) {
+    cancelPendingRecentTopicRequest();
+    const requestId = ++generatedTopicRequestId.current;
+    setIsGeneratedTopicLoading(true);
+    setGeneratedTopicError(false);
+
+    try {
+      const res = await fetch("/api/topics/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskType: currentTaskType }),
+      });
+
+      if (!res.ok) {
+        if (requestId === generatedTopicRequestId.current) {
+          setGeneratedTopicError(true);
+        }
+        return;
+      }
+
+      const data: unknown = await res.json();
+      if (requestId !== generatedTopicRequestId.current) return;
+
+      const nextTopic = readGeneratedTopic(data, currentTaskType);
+      if (!nextTopic) {
+        setGeneratedTopicError(true);
+        return;
+      }
+
+      setGeneratedTopic(nextTopic);
+      setRecentTopic(null);
+      setRecentTopicError(null);
+      setCustomTopic("");
+      setTopicMode("generated");
+      resetDraftAndFeedback();
+    } catch {
+      if (requestId === generatedTopicRequestId.current) {
+        setGeneratedTopicError(true);
+      }
+    } finally {
+      if (requestId === generatedTopicRequestId.current) setIsGeneratedTopicLoading(false);
+    }
+  }
+
   async function handleCorrect() {
-    if (!taskType || !activeTopicPrompt || wordCount === 0 || isRecentTopicLoading) return;
+    if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading) return;
 
     const correctionLocale = locale;
 
     const topicContext =
       topicMode === "recent" && recentTopic
         ? { topicId: recentTopic.id }
-        : { topicPrompt: activeTopicPrompt };
+        : topicMode === "generated" && generatedTopic
+          ? { topicId: generatedTopic.id }
+          : { topicPrompt: activeTopicPrompt };
 
     setIsCorrecting(true);
     setHasCorrectionError(false);
@@ -493,13 +611,13 @@ export function WritingWorkspace() {
             <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               {copy.workspace.topic.heading}
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
               <button
                 type="button"
                 onClick={() => getRecentTopic(taskType!)}
                 aria-pressed={topicMode === "recent"}
                 aria-busy={isRecentTopicLoading}
-                disabled={isCorrecting || isRecentTopicLoading}
+                disabled={isCorrecting || isTopicLoading}
                 className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "recent"
                     ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -527,6 +645,23 @@ export function WritingWorkspace() {
                   {copy.workspace.topic.customDescription}
                 </span>
               </button>
+              <button
+                type="button"
+                onClick={() => getGeneratedTopic(taskType!)}
+                aria-pressed={topicMode === "generated"}
+                aria-busy={isGeneratedTopicLoading}
+                disabled={isCorrecting || isTopicLoading}
+                className={`rounded-xl border p-4 text-left transition-colors ${
+                  topicMode === "generated"
+                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                    : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <span className="block font-medium">{copy.workspace.topic.generatedTitle}</span>
+                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                  {copy.workspace.topic.generatedDescription}
+                </span>
+              </button>
             </div>
 
             {isRecentTopicLoading && (
@@ -542,6 +677,18 @@ export function WritingWorkspace() {
                   : recentTopicError === "unavailable"
                     ? copy.workspace.topic.unavailableError
                     : copy.workspace.topic.fetchError}
+              </p>
+            )}
+
+            {isGeneratedTopicLoading && (
+              <p role="status" aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
+                {copy.workspace.topic.generating}
+              </p>
+            )}
+
+            {generatedTopicError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {copy.workspace.topic.generateError}
               </p>
             )}
 
@@ -568,6 +715,27 @@ export function WritingWorkspace() {
               </article>
             )}
 
+            {topicMode === "generated" && generatedTopic && (
+              <article
+                aria-label={copy.workspace.topic.selectedGeneratedAriaLabel}
+                className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
+              >
+                <h3 lang="fr" className="font-medium">{generatedTopic.title}</h3>
+                {generatedTopic.imageData && (
+                  // eslint-disable-next-line @next/next/no-img-element -- self-contained data URL, not an optimizable remote asset
+                  <img
+                    src={generatedTopic.imageData}
+                    alt={generatedTopic.imageAlt ?? generatedTopic.title}
+                    className="mt-3 w-full rounded-lg border border-black/[.08] dark:border-white/[.1]"
+                  />
+                )}
+                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">{generatedTopic.prompt}</p>
+                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                  {copy.workspace.topic.generatedBadgeLabel}
+                </p>
+              </article>
+            )}
+
             {topicMode === "custom" && (
               <div>
                 <label htmlFor="custom-topic" className="sr-only">
@@ -578,7 +746,7 @@ export function WritingWorkspace() {
                   id="custom-topic"
                   value={customTopic}
                   onChange={(e) => {
-                    cancelPendingRecentTopicRequest();
+                    cancelPendingTopicRequests();
                     setCustomTopic(e.target.value);
                     setHasCorrectionError(false);
                     if (feedback) setFeedbackIsStale(true);
@@ -586,7 +754,7 @@ export function WritingWorkspace() {
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
                   rows={3}
                   maxLength={2000}
-                  disabled={isCorrecting || isRecentTopicLoading}
+                  disabled={isCorrecting || isTopicLoading}
                   className="w-full rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
                 />
               </div>
@@ -620,7 +788,7 @@ export function WritingWorkspace() {
               id="essay-content"
               value={content}
               onChange={(e) => {
-                cancelPendingRecentTopicRequest();
+                cancelPendingTopicRequests();
                 const value = e.target.value;
                 setContent(value);
                 setHasCorrectionError(false);
@@ -641,14 +809,14 @@ export function WritingWorkspace() {
               placeholder={copy.workspace.editor.frenchResponsePlaceholder}
               rows={14}
               maxLength={20000}
-              disabled={isCorrecting || isRecentTopicLoading}
+              disabled={isCorrecting || isTopicLoading}
               aria-describedby="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
             <button
               type="button"
               onClick={handleCorrect}
-              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isRecentTopicLoading}
+              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isTopicLoading}
               className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
             >
               {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}

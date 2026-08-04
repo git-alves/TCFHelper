@@ -13,6 +13,7 @@ const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
   TopicSource.OFFICIAL_EXAM,
   TopicSource.RECENT_EXAM,
+  TopicSource.AI_GENERATED,
 ]);
 
 const requestSchema = z.object({

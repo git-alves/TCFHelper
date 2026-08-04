@@ -133,6 +133,15 @@ model Topic {
   // This includes a content hash so revised upstream prompts produce a new,
   // immutable Topic rather than mutating the context of saved essays.
   externalRef String?     @unique
+  // Populated only for AI_GENERATED Task 3 topics: a generated illustrative
+  // photo stored as a self-contained data URL (no external blob storage, and
+  // no expiring provider-hosted URL to keep re-resolving). Null for every
+  // other topic and for a generated topic whose image call failed or was
+  // skipped, since a missing illustration must never block topic generation.
+  imageData   String?
+  // French, generated alongside the image so it stays specific to that
+  // topic's illustration; required whenever imageData is set.
+  imageAlt    String?
   createdAt   DateTime    @default(now())
 
   essays    Essay[]
