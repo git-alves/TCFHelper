@@ -26,12 +26,12 @@ export function isAppLocale(value: unknown): value is AppLocale {
   return typeof value === "string" && (APP_LOCALES as readonly string[]).includes(value);
 }
 
-export const APP_LOCALE_STORAGE_KEY = "tcfhelper:app-locale";
+export const APP_LOCALE_STORAGE_KEY = "mytcflab:app-locale";
 
 // The cookie lets Server Components render in the learner's selected
 // language on the next request. localStorage is retained only to migrate the
 // preference stored by the first version of the picker.
-export const APP_LOCALE_COOKIE_NAME = "tcfhelper_locale";
+export const APP_LOCALE_COOKIE_NAME = "mytcflab_locale";
 export const APP_LOCALE_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
 
 export const APP_LOCALE_INTL_TAGS: Record<AppLocale, string> = {

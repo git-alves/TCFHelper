@@ -13,7 +13,7 @@ export function NavBar() {
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="font-semibold tracking-tight">
-          TCF Helper
+          MyTCFLab
         </Link>
         <div className="flex items-center gap-3 text-sm sm:gap-4">
           <label className="flex items-center gap-1.5">
