@@ -31,6 +31,9 @@ export function NavBar() {
               ))}
             </select>
           </label>
+          <Link href="/settings" className="hover:underline">
+            {copy.nav.settings}
+          </Link>
           <Show when="signed-in">
             <>
               <Link href="/dashboard" className="hover:underline">

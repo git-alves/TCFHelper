@@ -26,6 +26,7 @@
     "@clerk/backend": "^3.15.0",
     "@clerk/localizations": "^4.13.10",
     "@clerk/nextjs": "^7.6.4",
+    "@clerk/themes": "^2.4.57",
     "@prisma/client": "^6.19.3",
     "@vitalets/google-translate-api": "^9.2.1",
     "cheerio": "^1.2.0",

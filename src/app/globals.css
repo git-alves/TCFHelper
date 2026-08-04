@@ -5,6 +5,13 @@
 
 @import "tailwindcss";
 
+/* A manual theme choice (see AppThemeProvider) takes priority over the OS
+ * preference, so `dark:` utilities and the variables below key off this
+ * class instead of `prefers-color-scheme` directly. The blocking script in
+ * the root layout's <head> sets this class before first paint, including
+ * for a "system" preference, so there is a single source of truth here. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   --background: #ffffff;
   --foreground: #171717;
@@ -17,11 +24,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --background: #0a0a0a;
+  --foreground: #ededed;
 }
 
 body {

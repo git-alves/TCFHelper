@@ -40,6 +40,7 @@ export interface AppCopy {
     localeLabel: string;
     localeHelp: string;
     dashboard: string;
+    settings: string;
     signOut: string;
     logIn: string;
     signUp: string;
@@ -79,6 +80,14 @@ export interface AppCopy {
     welcome: (name: string) => string;
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
+  };
+  settings: {
+    title: string;
+    appearanceHeading: string;
+    appearanceDescription: string;
+    themeLight: string;
+    themeDark: string;
+    themeSystem: string;
   };
   workspace: {
     task: {
@@ -160,6 +169,7 @@ export const APP_COPY = {
       localeLabel: "Application language",
       localeHelp: "Language used in the interface, feedback, and live translation panel",
       dashboard: "Dashboard",
+      settings: "Settings",
       signOut: "Sign out",
       logIn: "Log in",
       signUp: "Sign up",
@@ -201,6 +211,14 @@ export const APP_COPY = {
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
+    },
+    settings: {
+      title: "Settings",
+      appearanceHeading: "Appearance",
+      appearanceDescription: "Choose how MyTCFLab looks on this device, including sign-in and sign-up.",
+      themeLight: "Light",
+      themeDark: "Dark",
+      themeSystem: "Match system",
     },
     workspace: {
       task: {
@@ -290,6 +308,7 @@ export const APP_COPY = {
       localeHelp:
         "Langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct",
       dashboard: "Tableau de bord",
+      settings: "Paramètres",
       signOut: "Se déconnecter",
       logIn: "Se connecter",
       signUp: "S’inscrire",
@@ -333,6 +352,15 @@ export const APP_COPY = {
       accountUnavailableTitle: "Votre compte doit être finalisé",
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
+    },
+    settings: {
+      title: "Paramètres",
+      appearanceHeading: "Apparence",
+      appearanceDescription:
+        "Choisissez l’apparence de MyTCFLab sur cet appareil, y compris la connexion et l’inscription.",
+      themeLight: "Clair",
+      themeDark: "Sombre",
+      themeSystem: "Système",
     },
     workspace: {
       task: {
@@ -425,6 +453,7 @@ export const APP_COPY = {
       localeHelp:
         "Idioma utilizado en la interfaz, los comentarios y el panel de traducción en tiempo real",
       dashboard: "Panel",
+      settings: "Configuración",
       signOut: "Cerrar sesión",
       logIn: "Iniciar sesión",
       signUp: "Crear cuenta",
@@ -468,6 +497,15 @@ export const APP_COPY = {
       accountUnavailableTitle: "Tu cuenta necesita configurarse",
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
+    },
+    settings: {
+      title: "Configuración",
+      appearanceHeading: "Apariencia",
+      appearanceDescription:
+        "Elige el aspecto de MyTCFLab en este dispositivo, incluidos el inicio de sesión y el registro.",
+      themeLight: "Claro",
+      themeDark: "Oscuro",
+      themeSystem: "Igual que el sistema",
     },
     workspace: {
       task: {
@@ -560,6 +598,7 @@ export const APP_COPY = {
       localeHelp:
         "Idioma usado na interface, nos comentários e no painel de tradução em tempo real",
       dashboard: "Painel",
+      settings: "Configurações",
       signOut: "Sair",
       logIn: "Entrar",
       signUp: "Criar conta",
@@ -603,6 +642,15 @@ export const APP_COPY = {
       accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
+    },
+    settings: {
+      title: "Configurações",
+      appearanceHeading: "Aparência",
+      appearanceDescription:
+        "Escolha a aparência do MyTCFLab neste dispositivo, incluindo o login e a criação de conta.",
+      themeLight: "Claro",
+      themeDark: "Escuro",
+      themeSystem: "Igual ao sistema",
     },
     workspace: {
       task: {
