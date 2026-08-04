@@ -109,12 +109,6 @@ export interface AppCopy {
       recentExamsSource: (values: SourceMonthValues) => string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
-      generatedTitle: string;
-      generatedDescription: string;
-      generating: string;
-      generateError: string;
-      selectedGeneratedAriaLabel: string;
-      generatedBadgeLabel: string;
     };
     editor: {
       heading: string;
@@ -125,6 +119,18 @@ export interface AppCopy {
       correcting: string;
       correctingStatus: string;
       genericCorrectionError: string;
+      exampleLevelLabel: string;
+      generateExample: string;
+      generatingExample: string;
+      generatingExampleStatus: string;
+      exampleRateLimitedError: string;
+      exampleDailyLimitError: string;
+      exampleUnavailableError: string;
+      exampleGenericError: string;
+      exampleProviderDisclosure: string;
+      copy: string;
+      copied: string;
+      copyFailed: string;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -151,6 +157,8 @@ export interface AppCopy {
       title: string;
       taskSwitchDescription: string;
       topicSwitchDescription: string;
+      exampleOverwriteDescription: string;
+      exampleOverwriteConfirm: string;
       confirm: string;
       cancel: string;
     };
@@ -241,12 +249,6 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Recent exams — ${month}`,
         customTopicLabel: "Your topic or prompt",
         customTopicPlaceholder: "Paste or write the topic/prompt you want to respond to…",
-        generatedTitle: "Generate a new topic",
-        generatedDescription: "Get an original, AI-generated topic for this task.",
-        generating: "Generating a new topic…",
-        generateError: "We couldn't generate a new topic. Please try again or write your own.",
-        selectedGeneratedAriaLabel: "Generated topic",
-        generatedBadgeLabel: "AI-generated topic",
       },
       editor: {
         heading: "3. Write",
@@ -257,6 +259,18 @@ export const APP_COPY = {
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
+        exampleLevelLabel: "Target level",
+        generateExample: "Generate example",
+        generatingExample: "Generating…",
+        generatingExampleStatus: "Generating an example response. This can take a moment.",
+        exampleRateLimitedError: "The example generator is busy. Please try again shortly.",
+        exampleDailyLimitError: "You've reached today's example limit. Please try again tomorrow.",
+        exampleUnavailableError: "The example generator isn't available right now.",
+        exampleGenericError: "We couldn't generate an example. Please try again.",
+        exampleProviderDisclosure: "Examples use Gemini's free tier, with Cloudflare Workers AI as a fallback.",
+        copy: "Copy text",
+        copied: "Copied!",
+        copyFailed: "Couldn't copy",
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -294,6 +308,8 @@ export const APP_COPY = {
         title: "Discard your current work?",
         taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
+        exampleOverwriteDescription: "Generating an example will replace your current draft.",
+        exampleOverwriteConfirm: "Replace draft",
         confirm: "Discard and switch",
         cancel: "Keep working",
       },
@@ -385,12 +401,6 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Examens récents — ${month}`,
         customTopicLabel: "Votre sujet ou consigne",
         customTopicPlaceholder: "Collez ou rédigez le sujet ou la consigne auquel vous souhaitez répondre…",
-        generatedTitle: "Générer un nouveau sujet",
-        generatedDescription: "Obtenez un sujet original généré par IA pour cette tâche.",
-        generating: "Génération d’un nouveau sujet…",
-        generateError: "Nous n’avons pas pu générer de nouveau sujet. Réessayez ou rédigez votre propre sujet.",
-        selectedGeneratedAriaLabel: "Sujet généré",
-        generatedBadgeLabel: "Sujet généré par IA",
       },
       editor: {
         heading: "3. Rédigez",
@@ -401,6 +411,18 @@ export const APP_COPY = {
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
+        exampleLevelLabel: "Niveau visé",
+        generateExample: "Générer un exemple",
+        generatingExample: "Génération en cours…",
+        generatingExampleStatus: "Génération d’un exemple de réponse. Cela peut prendre un instant.",
+        exampleRateLimitedError: "Le générateur d’exemples est occupé. Réessayez dans un instant.",
+        exampleDailyLimitError: "Vous avez atteint la limite d’exemples pour aujourd’hui. Réessayez demain.",
+        exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
+        exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
+        exampleProviderDisclosure: "Les exemples utilisent l’offre gratuite de Gemini, avec Cloudflare Workers AI en secours.",
+        copy: "Copier le texte",
+        copied: "Copié !",
+        copyFailed: "Impossible de copier",
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -439,6 +461,8 @@ export const APP_COPY = {
         title: "Supprimer votre travail actuel ?",
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
+        exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
+        exampleOverwriteConfirm: "Remplacer le brouillon",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
       },
@@ -530,12 +554,6 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
         customTopicLabel: "Tu tema o consigna",
         customTopicPlaceholder: "Pega o escribe el tema o la consigna a la que quieres responder…",
-        generatedTitle: "Generar un nuevo tema",
-        generatedDescription: "Obtén un tema original generado por IA para esta tarea.",
-        generating: "Generando un nuevo tema…",
-        generateError: "No pudimos generar un nuevo tema. Inténtalo de nuevo o escribe el tuyo.",
-        selectedGeneratedAriaLabel: "Tema generado",
-        generatedBadgeLabel: "Tema generado por IA",
       },
       editor: {
         heading: "3. Escribe",
@@ -546,6 +564,18 @@ export const APP_COPY = {
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
+        exampleLevelLabel: "Nivel objetivo",
+        generateExample: "Generar ejemplo",
+        generatingExample: "Generando…",
+        generatingExampleStatus: "Generando una respuesta de ejemplo. Esto puede tardar un momento.",
+        exampleRateLimitedError: "El generador de ejemplos está ocupado. Inténtalo de nuevo en un momento.",
+        exampleDailyLimitError: "Has alcanzado el límite de ejemplos de hoy. Inténtalo de nuevo mañana.",
+        exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
+        exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
+        exampleProviderDisclosure: "Los ejemplos usan el nivel gratuito de Gemini, con Cloudflare Workers AI como respaldo.",
+        copy: "Copiar texto",
+        copied: "¡Copiado!",
+        copyFailed: "No se pudo copiar",
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
@@ -584,6 +614,8 @@ export const APP_COPY = {
         title: "¿Descartar tu trabajo actual?",
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
+        exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
+        exampleOverwriteConfirm: "Reemplazar borrador",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
       },
@@ -675,12 +707,6 @@ export const APP_COPY = {
         recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
         customTopicLabel: "Seu tema ou proposta",
         customTopicPlaceholder: "Cole ou escreva o tema ou a proposta à qual você quer responder…",
-        generatedTitle: "Gerar um novo tema",
-        generatedDescription: "Obtenha um tema original gerado por IA para esta tarefa.",
-        generating: "Gerando um novo tema…",
-        generateError: "Não foi possível gerar um novo tema. Tente novamente ou escreva o seu próprio tema.",
-        selectedGeneratedAriaLabel: "Tema gerado",
-        generatedBadgeLabel: "Tema gerado por IA",
       },
       editor: {
         heading: "3. Escreva",
@@ -691,6 +717,18 @@ export const APP_COPY = {
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
+        exampleLevelLabel: "Nível desejado",
+        generateExample: "Gerar exemplo",
+        generatingExample: "Gerando…",
+        generatingExampleStatus: "Gerando uma resposta de exemplo. Isso pode levar um momento.",
+        exampleRateLimitedError: "O gerador de exemplos está ocupado. Tente novamente em instantes.",
+        exampleDailyLimitError: "Você atingiu o limite de exemplos de hoje. Tente novamente amanhã.",
+        exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
+        exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
+        exampleProviderDisclosure: "Os exemplos usam o nível gratuito do Gemini, com Cloudflare Workers AI como alternativa.",
+        copy: "Copiar texto",
+        copied: "Copiado!",
+        copyFailed: "Não foi possível copiar",
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
@@ -729,6 +767,8 @@ export const APP_COPY = {
         title: "Descartar seu trabalho atual?",
         taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
+        exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
+        exampleOverwriteConfirm: "Substituir rascunho",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
       },

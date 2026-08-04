@@ -23,20 +23,14 @@ interface RecentExamTopic {
   sourceMonth: string;
 }
 
-interface GeneratedExamTopic {
-  id: string;
-  taskType: TaskType;
-  title: string;
-  prompt: string;
-  imageData: string | null;
-  imageAlt: string | null;
-}
-
-type TopicMode = "recent" | "custom" | "generated" | null;
+type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic";
+type PendingSwitchKind = "task" | "topic" | "example";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
+type ExampleLevel = "B2" | "C1" | "C2";
+type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
+const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 
 function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
   if (!value || typeof value !== "object") return null;
@@ -58,35 +52,6 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   }
 
   return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
-}
-
-function readGeneratedTopic(value: unknown, expectedTaskType: TaskType): GeneratedExamTopic | null {
-  if (!value || typeof value !== "object") return null;
-
-  const topic = (value as { topic?: unknown }).topic;
-  if (!topic || typeof topic !== "object") return null;
-
-  const candidate = topic as Record<string, unknown>;
-  const { id, taskType, title, prompt, imageData, imageAlt } = candidate;
-  if (
-    typeof id !== "string" ||
-    taskType !== expectedTaskType ||
-    typeof title !== "string" ||
-    typeof prompt !== "string" ||
-    (imageData !== null && typeof imageData !== "string") ||
-    (imageAlt !== null && typeof imageAlt !== "string")
-  ) {
-    return null;
-  }
-
-  return {
-    id,
-    taskType: expectedTaskType,
-    title,
-    prompt,
-    imageData: imageData ?? null,
-    imageAlt: imageAlt ?? null,
-  };
 }
 
 function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
@@ -114,11 +79,6 @@ export function WritingWorkspace() {
   // message should follow the current interface language when it appears.
   const [recentTopicError, setRecentTopicError] = useState<RecentTopicErrorKind | null>(null);
 
-  const [generatedTopic, setGeneratedTopic] = useState<GeneratedExamTopic | null>(null);
-  const [isGeneratedTopicLoading, setIsGeneratedTopicLoading] = useState(false);
-  const [generatedTopicError, setGeneratedTopicError] = useState(false);
-  const generatedTopicRequestId = useRef(0);
-
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
 
@@ -128,12 +88,21 @@ export function WritingWorkspace() {
   // correction is pending, so the visible message must always use the copy
   // from the current render.
   const [hasCorrectionError, setHasCorrectionError] = useState(false);
+
+  const [exampleLevel, setExampleLevel] = useState<ExampleLevel>("B2");
+  const [isGeneratingExample, setIsGeneratingExample] = useState(false);
+  const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
   const feedbackRef = useRef<HTMLElement>(null);
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
+  const exampleRequestId = useRef(0);
+  const exampleAbortController = useRef<AbortController | null>(null);
 
   const [pendingSwitch, setPendingSwitch] = useState<{ kind: PendingSwitchKind; run: () => void } | null>(
     null
@@ -156,18 +125,17 @@ export function WritingWorkspace() {
   } | null>(null);
   const translationRequestId = useRef(0);
   const lastTranslatedRef = useRef<{ text: string; locale: typeof locale } | null>(null);
+  const suppressedTranslationForRef = useRef<string | null>(null);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
-  const isTopicLoading = isRecentTopicLoading || isGeneratedTopicLoading;
+  const isTopicLoading = isRecentTopicLoading;
   const activeTopicPrompt =
     topicMode === "recent"
       ? recentTopic?.prompt ?? ""
       : topicMode === "custom"
         ? customTopic.trim()
-        : topicMode === "generated"
-          ? generatedTopic?.prompt ?? ""
-          : "";
+        : "";
 
   useEffect(() => {
     if (feedback) feedbackRef.current?.focus();
@@ -176,6 +144,13 @@ export function WritingWorkspace() {
   useEffect(() => {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
+
+  useEffect(() => {
+    return () => {
+      if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+      exampleAbortController.current?.abort();
+    };
+  }, []);
 
   // Debounced live translation of the draft into the app's display
   // language. Fires 800ms after the learner stops typing, skips re-sending
@@ -188,6 +163,11 @@ export function WritingWorkspace() {
       // resetDraftAndFeedback() — both already clear translation state
       // synchronously there. This just guards against a stale in-flight
       // request resolving after the fact.
+      translationRequestId.current += 1;
+      return;
+    }
+
+    if (suppressedTranslationForRef.current === trimmed) {
       translationRequestId.current += 1;
       return;
     }
@@ -289,12 +269,34 @@ export function WritingWorkspace() {
     };
   }, [content, locale]);
 
+  // A model answer invalidates stale feedback like a learner edit, but its
+  // first insertion deliberately skips the separate live-translation quota.
+  function applyDraftContent(value: string, { suppressTranslation = false } = {}) {
+    suppressedTranslationForRef.current = suppressTranslation ? value.trim() : null;
+    setContent(value);
+    setHasCorrectionError(false);
+    setTranslationError(null);
+    setTranslationErrorFor(null);
+    if (feedback) setFeedbackIsStale(true);
+    if (!value.trim()) {
+      translationRequestId.current += 1;
+      setTranslation("");
+      setTranslationProvider(null);
+      setTranslationFor(null);
+      setTranslationError(null);
+      setTranslationErrorFor(null);
+      setTranslationRequestFor(null);
+      lastTranslatedRef.current = null;
+    }
+  }
+
   function resetDraftAndFeedback() {
     setContent("");
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
     setHasCorrectionError(false);
+    setExampleError(null);
     translationRequestId.current += 1;
     setTranslation("");
     setTranslationProvider(null);
@@ -303,6 +305,7 @@ export function WritingWorkspace() {
     setTranslationErrorFor(null);
     setTranslationRequestFor(null);
     lastTranslatedRef.current = null;
+    suppressedTranslationForRef.current = null;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -312,14 +315,17 @@ export function WritingWorkspace() {
     setIsRecentTopicLoading(false);
   }
 
-  function cancelPendingGeneratedTopicRequest() {
-    generatedTopicRequestId.current += 1;
-    setIsGeneratedTopicLoading(false);
+  function cancelPendingExampleRequest() {
+    exampleRequestId.current += 1;
+    exampleAbortController.current?.abort();
+    exampleAbortController.current = null;
+    setIsGeneratingExample(false);
+    setExampleError(null);
   }
 
   function cancelPendingTopicRequests() {
     cancelPendingRecentTopicRequest();
-    cancelPendingGeneratedTopicRequest();
+    cancelPendingExampleRequest();
   }
 
   function hasUnsavedWork() {
@@ -327,8 +333,7 @@ export function WritingWorkspace() {
       content.trim() ||
         feedback ||
         (topicMode === "recent" && recentTopic) ||
-        (topicMode === "custom" && customTopic.trim()) ||
-        (topicMode === "generated" && generatedTopic)
+        (topicMode === "custom" && customTopic.trim())
     );
   }
 
@@ -354,8 +359,6 @@ export function WritingWorkspace() {
         setTopicMode(null);
         setRecentTopic(null);
         setRecentTopicError(null);
-        setGeneratedTopic(null);
-        setGeneratedTopicError(false);
         setCustomTopic("");
         resetDraftAndFeedback();
       },
@@ -366,7 +369,6 @@ export function WritingWorkspace() {
     if (topicMode === "custom") {
       cancelPendingTopicRequests();
       setRecentTopicError(null);
-      setGeneratedTopicError(false);
       customTopicRef.current?.focus();
       return;
     }
@@ -377,8 +379,6 @@ export function WritingWorkspace() {
         cancelPendingTopicRequests();
         setRecentTopicError(null);
         setRecentTopic(null);
-        setGeneratedTopicError(false);
-        setGeneratedTopic(null);
         setCustomTopic("");
         setTopicMode("custom");
         resetDraftAndFeedback();
@@ -396,7 +396,7 @@ export function WritingWorkspace() {
   }
 
   async function fetchRecentTopic(currentTaskType: TaskType) {
-    cancelPendingGeneratedTopicRequest();
+    cancelPendingExampleRequest();
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
@@ -429,8 +429,6 @@ export function WritingWorkspace() {
 
       setRecentTopic(nextTopic);
       setCustomTopic("");
-      setGeneratedTopic(null);
-      setGeneratedTopicError(false);
       setTopicMode("recent");
       resetDraftAndFeedback();
     } catch {
@@ -442,59 +440,6 @@ export function WritingWorkspace() {
     }
   }
 
-  function getGeneratedTopic(currentTaskType: TaskType) {
-    runOrConfirm(
-      "topic",
-      () => {
-        void fetchGeneratedTopic(currentTaskType);
-      },
-    );
-  }
-
-  async function fetchGeneratedTopic(currentTaskType: TaskType) {
-    cancelPendingRecentTopicRequest();
-    const requestId = ++generatedTopicRequestId.current;
-    setIsGeneratedTopicLoading(true);
-    setGeneratedTopicError(false);
-
-    try {
-      const res = await fetch("/api/topics/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType: currentTaskType }),
-      });
-
-      if (!res.ok) {
-        if (requestId === generatedTopicRequestId.current) {
-          setGeneratedTopicError(true);
-        }
-        return;
-      }
-
-      const data: unknown = await res.json();
-      if (requestId !== generatedTopicRequestId.current) return;
-
-      const nextTopic = readGeneratedTopic(data, currentTaskType);
-      if (!nextTopic) {
-        setGeneratedTopicError(true);
-        return;
-      }
-
-      setGeneratedTopic(nextTopic);
-      setRecentTopic(null);
-      setRecentTopicError(null);
-      setCustomTopic("");
-      setTopicMode("generated");
-      resetDraftAndFeedback();
-    } catch {
-      if (requestId === generatedTopicRequestId.current) {
-        setGeneratedTopicError(true);
-      }
-    } finally {
-      if (requestId === generatedTopicRequestId.current) setIsGeneratedTopicLoading(false);
-    }
-  }
-
   async function handleCorrect() {
     if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading) return;
 
@@ -503,9 +448,7 @@ export function WritingWorkspace() {
     const topicContext =
       topicMode === "recent" && recentTopic
         ? { topicId: recentTopic.id }
-        : topicMode === "generated" && generatedTopic
-          ? { topicId: generatedTopic.id }
-          : { topicPrompt: activeTopicPrompt };
+        : { topicPrompt: activeTopicPrompt };
 
     setIsCorrecting(true);
     setHasCorrectionError(false);
@@ -536,6 +479,92 @@ export function WritingWorkspace() {
     } finally {
       setIsCorrecting(false);
     }
+  }
+
+  // A generated example replaces the whole draft, so an existing draft
+  // needs the same explicit confirmation as a destructive task/topic switch
+  // before it is overwritten.
+  function requestGenerateExample() {
+    if (!taskType || !activeTopicPrompt || isTopicLoading || isCorrecting || isGeneratingExample) return;
+
+    if (content.trim()) {
+      setPendingSwitch({ kind: "example", run: () => void generateExample() });
+      return;
+    }
+
+    void generateExample();
+  }
+
+  async function generateExample() {
+    if (!taskType || !activeTopicPrompt) return;
+
+    const topicContext =
+      topicMode === "recent" && recentTopic
+        ? { topicId: recentTopic.id }
+        : { topicPrompt: activeTopicPrompt };
+
+    const requestId = ++exampleRequestId.current;
+    const controller = new AbortController();
+    exampleAbortController.current?.abort();
+    exampleAbortController.current = controller;
+    setIsGeneratingExample(true);
+    setExampleError(null);
+    try {
+      const res = await fetch("/api/essays/example", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskType, level: exampleLevel, ...topicContext }),
+        signal: controller.signal,
+      });
+
+      if (requestId !== exampleRequestId.current) return;
+
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        const errorCode =
+          data && typeof data === "object" && "code" in data
+            ? (data as { code?: unknown }).code
+            : undefined;
+        if (requestId !== exampleRequestId.current) return;
+        setExampleError(
+          errorCode === "EXAMPLE_DAILY_LIMIT_REACHED"
+            ? "dailyLimit"
+            : errorCode === "EXAMPLE_RATE_LIMITED" || errorCode === "EXAMPLE_GENERATION_IN_PROGRESS"
+              ? "rateLimited"
+              : errorCode === "EXAMPLE_GENERATOR_UNAVAILABLE"
+                ? "unavailable"
+                : "generic",
+        );
+        return;
+      }
+
+      const data: { text: string } = await res.json();
+      if (requestId !== exampleRequestId.current) return;
+      applyDraftContent(data.text, { suppressTranslation: true });
+    } catch (error) {
+      if (requestId === exampleRequestId.current && !(error instanceof Error && error.name === "AbortError")) {
+        setExampleError("generic");
+      }
+    } finally {
+      if (requestId === exampleRequestId.current) {
+        exampleAbortController.current = null;
+        setIsGeneratingExample(false);
+      }
+    }
+  }
+
+  async function handleCopyContent() {
+    if (!content.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+
+    if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+    copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
   }
 
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
@@ -578,7 +607,7 @@ export function WritingWorkspace() {
               type="button"
               onClick={() => resetForTask(type)}
               aria-pressed={taskType === type}
-              disabled={isCorrecting}
+              disabled={isCorrecting || isGeneratingExample}
               className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                 taskType === type
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -611,13 +640,13 @@ export function WritingWorkspace() {
             <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               {copy.workspace.topic.heading}
             </h2>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => getRecentTopic(taskType!)}
                 aria-pressed={topicMode === "recent"}
                 aria-busy={isRecentTopicLoading}
-                disabled={isCorrecting || isTopicLoading}
+                disabled={isCorrecting || isTopicLoading || isGeneratingExample}
                 className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "recent"
                     ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -633,7 +662,7 @@ export function WritingWorkspace() {
                 type="button"
                 onClick={chooseCustomTopic}
                 aria-pressed={topicMode === "custom"}
-                disabled={isCorrecting}
+                disabled={isCorrecting || isGeneratingExample}
                 className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "custom"
                     ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -643,23 +672,6 @@ export function WritingWorkspace() {
                 <span className="block font-medium">{copy.workspace.topic.customTitle}</span>
                 <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
                   {copy.workspace.topic.customDescription}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => getGeneratedTopic(taskType!)}
-                aria-pressed={topicMode === "generated"}
-                aria-busy={isGeneratedTopicLoading}
-                disabled={isCorrecting || isTopicLoading}
-                className={`rounded-xl border p-4 text-left transition-colors ${
-                  topicMode === "generated"
-                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
-                    : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
-                } disabled:cursor-not-allowed disabled:opacity-60`}
-              >
-                <span className="block font-medium">{copy.workspace.topic.generatedTitle}</span>
-                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.generatedDescription}
                 </span>
               </button>
             </div>
@@ -677,18 +689,6 @@ export function WritingWorkspace() {
                   : recentTopicError === "unavailable"
                     ? copy.workspace.topic.unavailableError
                     : copy.workspace.topic.fetchError}
-              </p>
-            )}
-
-            {isGeneratedTopicLoading && (
-              <p role="status" aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
-                {copy.workspace.topic.generating}
-              </p>
-            )}
-
-            {generatedTopicError && (
-              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {copy.workspace.topic.generateError}
               </p>
             )}
 
@@ -711,27 +711,6 @@ export function WritingWorkspace() {
                       month: formatSourceMonth(recentTopic.sourceMonth, locale),
                     })}
                   </a>
-                </p>
-              </article>
-            )}
-
-            {topicMode === "generated" && generatedTopic && (
-              <article
-                aria-label={copy.workspace.topic.selectedGeneratedAriaLabel}
-                className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
-              >
-                <h3 lang="fr" className="font-medium">{generatedTopic.title}</h3>
-                {generatedTopic.imageData && (
-                  // eslint-disable-next-line @next/next/no-img-element -- self-contained data URL, not an optimizable remote asset
-                  <img
-                    src={generatedTopic.imageData}
-                    alt={generatedTopic.imageAlt ?? generatedTopic.title}
-                    className="mt-3 w-full rounded-lg border border-black/[.08] dark:border-white/[.1]"
-                  />
-                )}
-                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">{generatedTopic.prompt}</p>
-                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.generatedBadgeLabel}
                 </p>
               </article>
             )}
@@ -789,38 +768,65 @@ export function WritingWorkspace() {
               value={content}
               onChange={(e) => {
                 cancelPendingTopicRequests();
-                const value = e.target.value;
-                setContent(value);
-                setHasCorrectionError(false);
-                setTranslationError(null);
-                setTranslationErrorFor(null);
-                if (feedback) setFeedbackIsStale(true);
-                if (!value.trim()) {
-                  translationRequestId.current += 1;
-                  setTranslation("");
-                  setTranslationProvider(null);
-                  setTranslationFor(null);
-                  setTranslationError(null);
-                  setTranslationErrorFor(null);
-                  setTranslationRequestFor(null);
-                  lastTranslatedRef.current = null;
-                }
+                applyDraftContent(e.target.value);
               }}
               placeholder={copy.workspace.editor.frenchResponsePlaceholder}
               rows={14}
               maxLength={20000}
-              disabled={isCorrecting || isTopicLoading}
+              disabled={isCorrecting || isTopicLoading || isGeneratingExample}
               aria-describedby="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
-            <button
-              type="button"
-              onClick={handleCorrect}
-              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isTopicLoading}
-              className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
-            >
-              {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCorrect}
+                disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isTopicLoading || isGeneratingExample}
+                className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
+              >
+                {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
+              </button>
+
+              <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]">
+                <label htmlFor="example-level" className="sr-only">
+                  {copy.workspace.editor.exampleLevelLabel}
+                </label>
+                <select
+                  id="example-level"
+                  value={exampleLevel}
+                  onChange={(e) => setExampleLevel(e.target.value as ExampleLevel)}
+                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
+                  className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {EXAMPLE_LEVELS.map((level) => (
+                    <option key={level} value={level} className="text-black">
+                      {level}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={requestGenerateExample}
+                  disabled={!activeTopicPrompt || isCorrecting || isTopicLoading || isGeneratingExample}
+                  className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+                >
+                  {isGeneratingExample ? copy.workspace.editor.generatingExample : copy.workspace.editor.generateExample}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCopyContent}
+                disabled={!content.trim()}
+                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {copyStatus === "copied"
+                  ? copy.workspace.editor.copied
+                  : copyStatus === "failed"
+                    ? copy.workspace.editor.copyFailed
+                    : copy.workspace.editor.copy}
+              </button>
+            </div>
             {isCorrecting && (
               <p role="status" className="sr-only">
                 {copy.workspace.editor.correctingStatus}
@@ -831,6 +837,25 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.genericCorrectionError}
               </p>
             )}
+            {isGeneratingExample && (
+              <p role="status" className="sr-only">
+                {copy.workspace.editor.generatingExampleStatus}
+              </p>
+            )}
+            {exampleError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {exampleError === "rateLimited"
+                  ? copy.workspace.editor.exampleRateLimitedError
+                  : exampleError === "dailyLimit"
+                    ? copy.workspace.editor.exampleDailyLimitError
+                  : exampleError === "unavailable"
+                    ? copy.workspace.editor.exampleUnavailableError
+                    : copy.workspace.editor.exampleGenericError}
+              </p>
+            )}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {copy.workspace.editor.exampleProviderDisclosure}
+            </p>
           </section>
 
           <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
@@ -990,9 +1015,15 @@ export function WritingWorkspace() {
             ? copy.workspace.dialog.taskSwitchDescription
             : pendingSwitch?.kind === "topic"
               ? copy.workspace.dialog.topicSwitchDescription
-              : ""
+              : pendingSwitch?.kind === "example"
+                ? copy.workspace.dialog.exampleOverwriteDescription
+                : ""
         }
-        confirmLabel={copy.workspace.dialog.confirm}
+        confirmLabel={
+          pendingSwitch?.kind === "example"
+            ? copy.workspace.dialog.exampleOverwriteConfirm
+            : copy.workspace.dialog.confirm
+        }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {
           const action = pendingSwitch;

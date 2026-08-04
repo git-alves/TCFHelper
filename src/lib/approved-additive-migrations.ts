@@ -8,6 +8,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260731200000_add_translation_quota",
   "20260801140000_add_translation_fallback_circuit",
   "20260801150000_add_user_clerk_id",
-  // Adds nullable fields only, so existing Topic records remain valid.
-  "20260804160000_add_generated_topic_image",
+  "20260804180000_add_example_answer_cache_and_quota",
 ]);

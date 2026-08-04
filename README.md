@@ -34,11 +34,10 @@ gate yet — every logged-in user can reach `/dashboard`.
      secret key stays server-only.
    - `CLERK_WEBHOOK_SIGNING_SECRET`: the Svix signing secret for the Clerk
      webhook endpoint. Required once the Clerk user-sync webhook is enabled.
-   - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback
-     and AI-generated topics.
-   - `OPENAI_API_KEY` (optional): used only to illustrate AI-generated Task 3
-     topics with a generated photo. If unset, "Generate a new topic" still
-     works for every task; Task 3 topics simply have no image.
+   - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
+   - `GEMINI_API_KEY`: a free-tier Gemini API key used first for model
+     answers; `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_API_TOKEN` provide
+     the Cloudflare Workers AI fallback when Gemini reaches its free limit.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
      key (ends in `:fx`), used server-side for live draft translation. Free
      covers 500,000 characters/month, no billing details required. If unset,
@@ -102,22 +101,18 @@ generic unavailable response used for an actual outage or a changed page
 structure, and the UI shows a matching “not published yet” message rather than
 its generic retry copy.
 
-## Seeded and AI-generated topics
+## Seeded topics
 
 `npm run db:seed` loads a starter bank of original topics into `Topic`
 (`OFFICIAL_EXAM` source) — 11 per task, format-matched to the real exam
 structure (Task 3's are a title plus two contrasting `Document 1` /
 `Document 2` paragraphs) but not copied from any real exam.
 
-The dashboard also has a **Generate a new topic** choice, backed by
-`POST /api/topics/generate`. It first looks for an existing AI-generated
-topic for that task the current learner has not used yet; a hit is returned
-immediately at no API cost. Only a miss calls Claude for a brand-new,
-non-copied topic in the same format as the seed bank, and — for Task 3 only,
-when `OPENAI_API_KEY` is set — an illustrative photo. Every generated topic
-is persisted (`AI_GENERATED` source), which is what makes the reuse pool grow
-over time instead of regenerating on every click. A failed or skipped image
-never blocks the topic itself.
+The dashboard keeps its recent-exam and custom-topic choices. Once a topic is
+selected, learners can generate a B2, C1, or C2 French model answer directly
+into the editor. The app caches answers privately per learner/topic/level and
+limits fresh generations per day. Gemini is tried first; Cloudflare Workers AI
+is used only when Gemini's free-tier limit is reached.
 
 ## Live translation
 

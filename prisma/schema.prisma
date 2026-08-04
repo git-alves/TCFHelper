@@ -83,9 +83,12 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  subscriptions    Subscription[]
-  essays           Essay[]
-  translationQuota TranslationQuota?
+  subscriptions           Subscription[]
+  essays                  Essay[]
+  exampleAnswers          ExampleAnswer[]
+  exampleGenerationQuota  ExampleGenerationQuota?
+  exampleGenerationLeases ExampleGenerationLease[]
+  translationQuota        TranslationQuota?
 }
 
 model Subscription {
@@ -133,15 +136,6 @@ model Topic {
   // This includes a content hash so revised upstream prompts produce a new,
   // immutable Topic rather than mutating the context of saved essays.
   externalRef String?     @unique
-  // Populated only for AI_GENERATED Task 3 topics: a generated illustrative
-  // photo stored as a self-contained data URL (no external blob storage, and
-  // no expiring provider-hosted URL to keep re-resolving). Null for every
-  // other topic and for a generated topic whose image call failed or was
-  // skipped, since a missing illustration must never block topic generation.
-  imageData   String?
-  // French, generated alongside the image so it stays specific to that
-  // topic's illustration; required whenever imageData is set.
-  imageAlt    String?
   createdAt   DateTime    @default(now())
 
   essays Essay[]
@@ -179,6 +173,51 @@ model Feedback {
   translatedText String?
   meetsWordCount Boolean    @default(false)
   createdAt      DateTime   @default(now())
+}
+
+/// A cached model answer is private to its learner. The hash avoids storing a
+/// custom prompt a second time while making repeat requests free of provider
+/// usage.
+model ExampleAnswer {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType  TaskType
+  level     String
+  topicHash String
+  content   String
+  provider  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskType, level, topicHash])
+  @@index([userId])
+}
+
+/// Limits fresh provider calls, while cache hits stay free. The route holds a
+/// transaction-scoped per-user lock before updating this row.
+model ExampleGenerationQuota {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayStartedAt      DateTime
+  dailyRequestCount Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// A short-lived claim for a single model-answer cache key. It keeps rapid
+/// double-clicks or concurrent tabs from reserving two provider calls while
+/// the first response is still being generated.
+model ExampleGenerationLease {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType   TaskType
+  level      String
+  topicHash  String
+  claimToken String
+  expiresAt  DateTime
+
+  @@id([userId, taskType, level, topicHash])
+  @@index([expiresAt])
 }
 
 /// A durable, per-learner quota reservation for live Google translations.

@@ -241,7 +241,7 @@ describe("POST /api/essays/correct", () => {
     expect(parseMock).not.toHaveBeenCalled();
   });
 
-  it("accepts an AI-generated topic ID and uses its stored prompt", async () => {
+  it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {
     findUniqueMock.mockResolvedValue({
       id: "generated_topic_1",
       taskType: "TASK_3",
@@ -255,12 +255,8 @@ describe("POST /api/essays/correct", () => {
       content: "Le télétravail présente des avantages et des inconvénients.",
     });
 
-    expect(response.status).toBe(200);
-    expect(essayCreateMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({ topicId: "generated_topic_1" }),
-      }),
-    );
+    expect(response.status).toBe(400);
+    expect(essayCreateMock).not.toHaveBeenCalled();
   });
 
   it("does not accept a learner-supplied topic through the shared-bank ID path", async () => {
