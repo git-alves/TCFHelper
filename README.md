@@ -105,7 +105,7 @@ its generic retry copy.
 ## Seeded and AI-generated topics
 
 `npm run db:seed` loads a starter bank of original topics into `Topic`
-(`OFFICIAL_EXAM` source) — 12 per task, format-matched to the real exam
+(`OFFICIAL_EXAM` source) — 11 per task, format-matched to the real exam
 structure (Task 3's are a title plus two contrasting `Document 1` /
 `Document 2` paragraphs) but not copied from any real exam.
 

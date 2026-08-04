@@ -2,15 +2,16 @@
  * Seed script: populates the Topic table with a starter bank of writing
  * prompts for each TCF task type. Run with `npm run db:seed`.
  *
- * Safe to re-run: it skips a topic if one with the same title and task type
- * already exists.
+ * Safe to re-run: it preserves learner/recent/AI topics and keeps the
+ * managed OFFICIAL_EXAM starter prompts aligned with this bank.
  */
 import "dotenv/config";
-import { PrismaClient, TaskType, TopicSource } from "@prisma/client";
+import { PrismaClient, TaskType } from "@prisma/client";
+import { syncSeedTopics, type SeedTopic } from "../src/lib/seed-topic-sync";
 
 const prisma = new PrismaClient();
 
-const TOPICS: { taskType: TaskType; title: string; prompt: string }[] = [
+const TOPICS: SeedTopic[] = [
   // Tâche 1 — décrire, raconter (60-120 mots)
   {
     taskType: TaskType.TASK_1,
@@ -221,20 +222,9 @@ const TOPICS: { taskType: TaskType; title: string; prompt: string }[] = [
 ];
 
 async function main() {
-  let created = 0;
-  for (const topic of TOPICS) {
-    const existing = await prisma.topic.findFirst({
-      where: { title: topic.title, taskType: topic.taskType },
-    });
-    if (existing) continue;
+  const { created, updated, unchanged } = await syncSeedTopics(prisma, TOPICS);
 
-    await prisma.topic.create({
-      data: { ...topic, source: TopicSource.OFFICIAL_EXAM },
-    });
-    created += 1;
-  }
-
-  console.log(`Seed complete: ${created} topic(s) created, ${TOPICS.length - created} already present.`);
+  console.log(`Seed complete: ${created} created, ${updated} updated, ${unchanged} already current.`);
 }
 
 main()
