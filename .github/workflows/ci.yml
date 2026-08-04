@@ -13,7 +13,7 @@ jobs:
       # Prisma's client generator reads the schema, it doesn't connect to
       # DATABASE_URL. Route handlers that need STRIPE_SECRET_KEY only touch
       # it at request time, not at build time.
-      DATABASE_URL: "postgresql://user:password@localhost:5432/mytcflab?schema=public"
+      DATABASE_URL: "postgresql://user:password@localhost:5432/tcfhelper?schema=public"
       AUTH_SECRET: "ci-build-placeholder-secret"
       NEXTAUTH_URL: "http://localhost:3000"
       STRIPE_SECRET_KEY: "sk_test_placeholder"
