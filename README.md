@@ -1,4 +1,4 @@
-# TCF Helper
+# MyTCFLab
 
 Writing practice and feedback for the TCF (Test de Connaissance du Français)
 exam. Students choose a task, get a matching topic from the current month's
@@ -338,7 +338,7 @@ learning history and subscriptions.
    npm run stripe:setup
    ```
 
-   This creates (or reuses) a "TCF Helper Pro" product and a $15/month
+   This creates (or reuses) a "MyTCFLab Pro" product and a $15/month
    price, and prints the price ID to save as `STRIPE_PRICE_ID`.
 3. Point a webhook endpoint at `/api/webhooks/stripe` (via `stripe listen`
    locally, or a dashboard-configured endpoint in production) and set

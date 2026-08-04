@@ -10,7 +10,7 @@ const verifierPath = resolve(process.cwd(), "scripts/verify-prisma-engine.mjs");
 const temporaryDirectories: string[] = [];
 
 function createFunctionFixture(includeSchema = true) {
-  const fixtureDirectory = mkdtempSync(join(tmpdir(), "tcfhelper-prisma-runtime-"));
+  const fixtureDirectory = mkdtempSync(join(tmpdir(), "mytcflab-prisma-runtime-"));
   temporaryDirectories.push(fixtureDirectory);
 
   const chunkDirectory = join(fixtureDirectory, ".next", "server", "chunks");

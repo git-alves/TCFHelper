@@ -1,5 +1,5 @@
 /**
- * One-time setup script: creates the TCF Helper Pro product and its monthly
+ * One-time setup script: creates the MyTCFLab Pro product and its monthly
  * price in Stripe. Run with `npm run stripe:setup` after setting
  * STRIPE_SECRET_KEY. Prints the price ID to store as STRIPE_PRICE_ID.
  *
@@ -9,7 +9,7 @@
 import "dotenv/config";
 import Stripe from "stripe";
 
-const PRODUCT_NAME = "TCF Helper Pro";
+const PRODUCT_NAME = "MyTCFLab Pro";
 const PRICE_UNIT_AMOUNT = 1500; // $15.00
 const PRICE_CURRENCY = "usd";
 const PRICE_INTERVAL = "month";

@@ -1,6 +1,6 @@
 # Clerk authentication migration
 
-**Problem** — TCF Helper currently owns email/password authentication through
+**Problem** — MyTCFLab currently owns email/password authentication through
 Auth.js and bcrypt. That leaves Google sign-in unavailable and makes the app
 responsible for credential handling, reset flows, and identity-provider
 maintenance. Replacing that layer must not detach existing learners from their
