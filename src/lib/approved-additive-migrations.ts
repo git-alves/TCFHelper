@@ -9,4 +9,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260801140000_add_translation_fallback_circuit",
   "20260801150000_add_user_clerk_id",
   "20260804180000_add_example_answer_cache_and_quota",
+  "20260805220000_add_example_generation_lease_day",
 ]);

@@ -68,7 +68,7 @@ export async function claimExampleGeneration(
       });
       if (cached) return { kind: "cached", content: cached.content };
 
-      const now = new Date();
+      let now = new Date();
       const lease = await tx.exampleGenerationLease.findUnique({
         where: { userId_taskType_level_topicHash: cacheKey },
         select: { expiresAt: true },
@@ -81,6 +81,10 @@ export async function claimExampleGeneration(
       // two requests. The user lock additionally preserves the daily counter
       // when different topics are requested simultaneously.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
+      // Recomputed after this (possibly blocking) lock, not reused from
+      // above: a long wait here must never let a stale pre-wait timestamp
+      // compute the wrong UTC day for the reservation.
+      now = new Date();
       const dayStartedAt = startOfUtcDay(now);
       const existing = await tx.exampleGenerationQuota.findUnique({ where: { userId } });
       const continuingDay = existing?.dayStartedAt.getTime() === dayStartedAt.getTime();
@@ -97,8 +101,8 @@ export async function claimExampleGeneration(
       const claimToken = randomUUID();
       await tx.exampleGenerationLease.upsert({
         where: { userId_taskType_level_topicHash: cacheKey },
-        create: { ...cacheKey, claimToken, expiresAt: new Date(now.getTime() + LEASE_DURATION_MS) },
-        update: { claimToken, expiresAt: new Date(now.getTime() + LEASE_DURATION_MS) },
+        create: { ...cacheKey, claimToken, dayStartedAt, expiresAt: new Date(now.getTime() + LEASE_DURATION_MS) },
+        update: { claimToken, dayStartedAt, expiresAt: new Date(now.getTime() + LEASE_DURATION_MS) },
       });
       return { kind: "claimed", claimToken };
     },
@@ -137,7 +141,15 @@ export async function cacheExample(
   });
 }
 
-/** Releases a failed provider call early instead of making learners wait for the lease TTL. */
+/**
+ * Cleans up a lease early (instead of making a concurrent request wait for
+ * its TTL) WITHOUT refunding the daily slot it reserved. Use this when the
+ * learner already received a valid generated answer — the provider call
+ * succeeded — but a secondary step (caching it) failed; they got real value
+ * from their reserved slot, so it must still count. For a failed provider
+ * call, where the learner received nothing, use refundExampleGenerationLease
+ * instead.
+ */
 export async function releaseExampleGenerationLease(
   userId: string,
   taskType: TaskType,
@@ -145,7 +157,61 @@ export async function releaseExampleGenerationLease(
   topicHash: string,
   claimToken: string,
 ) {
-  return prisma.exampleGenerationLease.deleteMany({
-    where: { userId, taskType, level, topicHash, claimToken },
+  return prisma.$transaction(async (tx) => {
+    const key = `${userId}:${taskType}:${level}:${topicHash}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
+    return tx.exampleGenerationLease.deleteMany({ where: { userId, taskType, level, topicHash, claimToken } });
+  });
+}
+
+/**
+ * Cleans up a lease AND refunds the daily slot it reserved. Use this only
+ * when the provider call itself failed and the learner received nothing for
+ * the slot they spent.
+ *
+ * Takes the same per-key -> per-user advisory lock order as
+ * claimExampleGeneration, so a concurrent claim's read-then-write cannot
+ * interleave with this refund and silently overwrite it with a stale
+ * computed count (a lost-update race) — claimExampleGeneration's own update
+ * writes an absolute value it read earlier in its transaction, not a
+ * relative increment, so it is not safe against an unsynchronized
+ * concurrent decrement.
+ *
+ * Refunds only the exact UTC day the reservation was made for, read back
+ * from the lease itself rather than recomputed as "today": a reservation
+ * claimed just before midnight must never refund a request made just after
+ * it, even though both would look like "today" at different points in time.
+ */
+export async function refundExampleGenerationLease(
+  userId: string,
+  taskType: TaskType,
+  level: ExampleCefrLevel,
+  topicHash: string,
+  claimToken: string,
+) {
+  const cacheKey = { userId, taskType, level, topicHash };
+  return prisma.$transaction(async (tx) => {
+    const key = `${userId}:${taskType}:${level}:${topicHash}`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${key})::bigint)`;
+
+    const lease = await tx.exampleGenerationLease.findUnique({
+      where: { userId_taskType_level_topicHash: cacheKey },
+      select: { claimToken: true, dayStartedAt: true },
+    });
+    // A stale/timed-out call that lost its race to a newer claim must never
+    // delete the newer lease or refund the newer claim's slot.
+    if (!lease || lease.claimToken !== claimToken) {
+      return { count: 0 };
+    }
+
+    const deleted = await tx.exampleGenerationLease.deleteMany({ where: { ...cacheKey, claimToken } });
+
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
+    await tx.exampleGenerationQuota.updateMany({
+      where: { userId, dayStartedAt: lease.dayStartedAt, dailyRequestCount: { gt: 0 } },
+      data: { dailyRequestCount: { decrement: 1 } },
+    });
+
+    return deleted;
   });
 }
