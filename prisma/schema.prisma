@@ -68,45 +68,48 @@ enum SubscriptionStatus {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
+  id           String   @id @default(cuid())
+  email        String   @unique
   // Legacy bcrypt hashes remain only for the Clerk import/cutover. New
   // Clerk users (including Google sign-ins) have no app-managed password.
-  passwordHash  String?
-  name          String?
-  locale        Locale   @default(en)
+  passwordHash String?
+  name         String?
+  locale       Locale   @default(en)
   // Additive Clerk identity mapping. Nullable until each existing learner is
   // imported into Clerk; every essay/subscription/quota FK keeps pointing at
   // `id` (the CUID), never at this Clerk subject, so no foreign key needs to
   // be rewritten as part of the Clerk cutover.
-  clerkUserId   String?  @unique
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  clerkUserId  String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  subscriptions Subscription[]
-  essays        Essay[]
-  translationQuota TranslationQuota?
+  subscriptions           Subscription[]
+  essays                  Essay[]
+  exampleAnswers          ExampleAnswer[]
+  exampleGenerationQuota  ExampleGenerationQuota?
+  exampleGenerationLeases ExampleGenerationLease[]
+  translationQuota        TranslationQuota?
 }
 
 model Subscription {
-  id                   String              @id @default(cuid())
+  id                   String             @id @default(cuid())
   userId               String
-  user                 User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   // A customer can hold more than one subscription over time (or, in
   // principle, concurrently), so this is the indexed lookup key, not the
   // unique identity of the row — that's stripeSubscriptionId.
   stripeCustomerId     String
-  stripeSubscriptionId String              @unique
+  stripeSubscriptionId String             @unique
   stripePriceId        String?
-  status               SubscriptionStatus  @default(INCOMPLETE)
+  status               SubscriptionStatus @default(INCOMPLETE)
   currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean             @default(false)
+  cancelAtPeriodEnd    Boolean            @default(false)
   // Informational only — the last Stripe event's timestamp applied to this
   // row. Writes are serialized per-subscription (see the webhook handler),
   // so this is not used to gate whether a write is applied.
   lastStripeEventAt    DateTime?
-  createdAt            DateTime            @default(now())
-  updatedAt            DateTime            @updatedAt
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([userId])
   @@index([stripeCustomerId])
@@ -135,41 +138,86 @@ model Topic {
   externalRef String?     @unique
   createdAt   DateTime    @default(now())
 
-  essays    Essay[]
+  essays Essay[]
 
   @@index([taskType])
 }
 
 model Essay {
-  id          String      @id @default(cuid())
-  userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId     String?
-  topic       Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
-  taskType    TaskType
-  content     String
-  wordCount   Int         @default(0)
-  status      EssayStatus @default(DRAFT)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id        String      @id @default(cuid())
+  userId    String
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId   String?
+  topic     Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  taskType  TaskType
+  content   String
+  wordCount Int         @default(0)
+  status    EssayStatus @default(DRAFT)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
 
-  feedback    Feedback?
+  feedback Feedback?
 
   @@index([userId])
   @@index([topicId])
 }
 
 model Feedback {
-  id                String    @id @default(cuid())
-  essayId           String    @unique
-  essay             Essay     @relation(fields: [essayId], references: [id], onDelete: Cascade)
-  level             CefrLevel?
-  summary           String
-  grammarNotes      Json?
-  suggestions       Json?
-  translatedText    String?
-  meetsWordCount    Boolean   @default(false)
-  createdAt         DateTime  @default(now())
+  id             String     @id @default(cuid())
+  essayId        String     @unique
+  essay          Essay      @relation(fields: [essayId], references: [id], onDelete: Cascade)
+  level          CefrLevel?
+  summary        String
+  grammarNotes   Json?
+  suggestions    Json?
+  translatedText String?
+  meetsWordCount Boolean    @default(false)
+  createdAt      DateTime   @default(now())
+}
+
+/// A cached model answer is private to its learner. The hash avoids storing a
+/// custom prompt a second time while making repeat requests free of provider
+/// usage.
+model ExampleAnswer {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType  TaskType
+  level     String
+  topicHash String
+  content   String
+  provider  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, taskType, level, topicHash])
+  @@index([userId])
+}
+
+/// Limits fresh provider calls, while cache hits stay free. The route holds a
+/// transaction-scoped per-user lock before updating this row.
+model ExampleGenerationQuota {
+  userId            String   @id
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayStartedAt      DateTime
+  dailyRequestCount Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+/// A short-lived claim for a single model-answer cache key. It keeps rapid
+/// double-clicks or concurrent tabs from reserving two provider calls while
+/// the first response is still being generated.
+model ExampleGenerationLease {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType   TaskType
+  level      String
+  topicHash  String
+  claimToken String
+  expiresAt  DateTime
+
+  @@id([userId, taskType, level, topicHash])
+  @@index([expiresAt])
 }
 
 /// A durable, per-learner quota reservation for live Google translations.

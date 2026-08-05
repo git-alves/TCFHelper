@@ -241,6 +241,24 @@ describe("POST /api/essays/correct", () => {
     expect(parseMock).not.toHaveBeenCalled();
   });
 
+  it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "generated_topic_1",
+      taskType: "TASK_3",
+      source: "AI_GENERATED",
+      prompt: "Le télétravail généralisé\n\nDocument 1 :\n...\n\nDocument 2 :\n...",
+    });
+
+    const response = await post({
+      taskType: "TASK_3",
+      topicId: "generated_topic_1",
+      content: "Le télétravail présente des avantages et des inconvénients.",
+    });
+
+    expect(response.status).toBe(400);
+    expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
   it("does not accept a learner-supplied topic through the shared-bank ID path", async () => {
     findUniqueMock.mockResolvedValue({
       id: "private_topic",

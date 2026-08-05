@@ -35,6 +35,9 @@ gate yet — every logged-in user can reach `/dashboard`.
    - `CLERK_WEBHOOK_SIGNING_SECRET`: the Svix signing secret for the Clerk
      webhook endpoint. Required once the Clerk user-sync webhook is enabled.
    - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
+   - `GEMINI_API_KEY`: a free-tier Gemini API key used first for model
+     answers; `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_API_TOKEN` provide
+     the Cloudflare Workers AI fallback when Gemini reaches its free limit.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
      key (ends in `:fx`), used server-side for live draft translation. Free
      covers 500,000 characters/month, no billing details required. If unset,
@@ -97,6 +100,19 @@ returns a stable `RECENT_EXAM_NOT_PUBLISHED` code (HTTP 404) instead of the
 generic unavailable response used for an actual outage or a changed page
 structure, and the UI shows a matching “not published yet” message rather than
 its generic retry copy.
+
+## Seeded topics
+
+`npm run db:seed` loads a starter bank of original topics into `Topic`
+(`OFFICIAL_EXAM` source) — 11 per task, format-matched to the real exam
+structure (Task 3's are a title plus two contrasting `Document 1` /
+`Document 2` paragraphs) but not copied from any real exam.
+
+The dashboard keeps its recent-exam and custom-topic choices. Once a topic is
+selected, learners can generate a B2, C1, or C2 French model answer directly
+into the editor. The app caches answers privately per learner/topic/level and
+limits fresh generations per day. Gemini is tried first; Cloudflare Workers AI
+is used only when Gemini's free-tier limit is reached.
 
 ## Live translation
 
@@ -395,6 +411,7 @@ Either way, set these environment variables on the Vercel project (with
 `CLERK_WEBHOOK_SIGNING_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `ANTHROPIC_API_KEY`,
+`GEMINI_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_API_TOKEN`,
 `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
 `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 

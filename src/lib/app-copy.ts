@@ -40,6 +40,7 @@ export interface AppCopy {
     localeLabel: string;
     localeHelp: string;
     dashboard: string;
+    settings: string;
     signOut: string;
     logIn: string;
     signUp: string;
@@ -80,6 +81,14 @@ export interface AppCopy {
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
   };
+  settings: {
+    title: string;
+    appearanceHeading: string;
+    appearanceDescription: string;
+    themeLight: string;
+    themeDark: string;
+    themeSystem: string;
+  };
   workspace: {
     task: {
       heading: string;
@@ -110,6 +119,18 @@ export interface AppCopy {
       correcting: string;
       correctingStatus: string;
       genericCorrectionError: string;
+      exampleLevelLabel: string;
+      generateExample: string;
+      generatingExample: string;
+      generatingExampleStatus: string;
+      exampleRateLimitedError: string;
+      exampleDailyLimitError: string;
+      exampleUnavailableError: string;
+      exampleGenericError: string;
+      exampleProviderDisclosure: string;
+      copy: string;
+      copied: string;
+      copyFailed: string;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -136,6 +157,8 @@ export interface AppCopy {
       title: string;
       taskSwitchDescription: string;
       topicSwitchDescription: string;
+      exampleOverwriteDescription: string;
+      exampleOverwriteConfirm: string;
       confirm: string;
       cancel: string;
     };
@@ -154,6 +177,7 @@ export const APP_COPY = {
       localeLabel: "Application language",
       localeHelp: "Language used in the interface, feedback, and live translation panel",
       dashboard: "Dashboard",
+      settings: "Settings",
       signOut: "Sign out",
       logIn: "Log in",
       signUp: "Sign up",
@@ -196,6 +220,14 @@ export const APP_COPY = {
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
     },
+    settings: {
+      title: "Settings",
+      appearanceHeading: "Appearance",
+      appearanceDescription: "Choose how MyTCFLab looks on this device, including sign-in and sign-up.",
+      themeLight: "Light",
+      themeDark: "Dark",
+      themeSystem: "Match system",
+    },
     workspace: {
       task: {
         heading: "1. Choose a task",
@@ -227,6 +259,18 @@ export const APP_COPY = {
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
+        exampleLevelLabel: "Target level",
+        generateExample: "Generate example",
+        generatingExample: "Generating…",
+        generatingExampleStatus: "Generating an example response. This can take a moment.",
+        exampleRateLimitedError: "The example generator is busy. Please try again shortly.",
+        exampleDailyLimitError: "You've reached today's example limit. Please try again tomorrow.",
+        exampleUnavailableError: "The example generator isn't available right now.",
+        exampleGenericError: "We couldn't generate an example. Please try again.",
+        exampleProviderDisclosure: "Examples use Gemini's free tier, with Cloudflare Workers AI as a fallback.",
+        copy: "Copy text",
+        copied: "Copied!",
+        copyFailed: "Couldn't copy",
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -264,6 +308,8 @@ export const APP_COPY = {
         title: "Discard your current work?",
         taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
+        exampleOverwriteDescription: "Generating an example will replace your current draft.",
+        exampleOverwriteConfirm: "Replace draft",
         confirm: "Discard and switch",
         cancel: "Keep working",
       },
@@ -278,6 +324,7 @@ export const APP_COPY = {
       localeHelp:
         "Langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct",
       dashboard: "Tableau de bord",
+      settings: "Paramètres",
       signOut: "Se déconnecter",
       logIn: "Se connecter",
       signUp: "S’inscrire",
@@ -322,6 +369,15 @@ export const APP_COPY = {
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
     },
+    settings: {
+      title: "Paramètres",
+      appearanceHeading: "Apparence",
+      appearanceDescription:
+        "Choisissez l’apparence de MyTCFLab sur cet appareil, y compris la connexion et l’inscription.",
+      themeLight: "Clair",
+      themeDark: "Sombre",
+      themeSystem: "Système",
+    },
     workspace: {
       task: {
         heading: "1. Choisissez une tâche",
@@ -355,6 +411,18 @@ export const APP_COPY = {
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
+        exampleLevelLabel: "Niveau visé",
+        generateExample: "Générer un exemple",
+        generatingExample: "Génération en cours…",
+        generatingExampleStatus: "Génération d’un exemple de réponse. Cela peut prendre un instant.",
+        exampleRateLimitedError: "Le générateur d’exemples est occupé. Réessayez dans un instant.",
+        exampleDailyLimitError: "Vous avez atteint la limite d’exemples pour aujourd’hui. Réessayez demain.",
+        exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
+        exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
+        exampleProviderDisclosure: "Les exemples utilisent l’offre gratuite de Gemini, avec Cloudflare Workers AI en secours.",
+        copy: "Copier le texte",
+        copied: "Copié !",
+        copyFailed: "Impossible de copier",
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -393,6 +461,8 @@ export const APP_COPY = {
         title: "Supprimer votre travail actuel ?",
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
+        exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
+        exampleOverwriteConfirm: "Remplacer le brouillon",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
       },
@@ -407,6 +477,7 @@ export const APP_COPY = {
       localeHelp:
         "Idioma utilizado en la interfaz, los comentarios y el panel de traducción en tiempo real",
       dashboard: "Panel",
+      settings: "Configuración",
       signOut: "Cerrar sesión",
       logIn: "Iniciar sesión",
       signUp: "Crear cuenta",
@@ -451,6 +522,15 @@ export const APP_COPY = {
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
     },
+    settings: {
+      title: "Configuración",
+      appearanceHeading: "Apariencia",
+      appearanceDescription:
+        "Elige el aspecto de MyTCFLab en este dispositivo, incluidos el inicio de sesión y el registro.",
+      themeLight: "Claro",
+      themeDark: "Oscuro",
+      themeSystem: "Igual que el sistema",
+    },
     workspace: {
       task: {
         heading: "1. Elige una tarea",
@@ -484,6 +564,18 @@ export const APP_COPY = {
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
+        exampleLevelLabel: "Nivel objetivo",
+        generateExample: "Generar ejemplo",
+        generatingExample: "Generando…",
+        generatingExampleStatus: "Generando una respuesta de ejemplo. Esto puede tardar un momento.",
+        exampleRateLimitedError: "El generador de ejemplos está ocupado. Inténtalo de nuevo en un momento.",
+        exampleDailyLimitError: "Has alcanzado el límite de ejemplos de hoy. Inténtalo de nuevo mañana.",
+        exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
+        exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
+        exampleProviderDisclosure: "Los ejemplos usan el nivel gratuito de Gemini, con Cloudflare Workers AI como respaldo.",
+        copy: "Copiar texto",
+        copied: "¡Copiado!",
+        copyFailed: "No se pudo copiar",
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
@@ -522,6 +614,8 @@ export const APP_COPY = {
         title: "¿Descartar tu trabajo actual?",
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
+        exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
+        exampleOverwriteConfirm: "Reemplazar borrador",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
       },
@@ -536,6 +630,7 @@ export const APP_COPY = {
       localeHelp:
         "Idioma usado na interface, nos comentários e no painel de tradução em tempo real",
       dashboard: "Painel",
+      settings: "Configurações",
       signOut: "Sair",
       logIn: "Entrar",
       signUp: "Criar conta",
@@ -580,6 +675,15 @@ export const APP_COPY = {
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
     },
+    settings: {
+      title: "Configurações",
+      appearanceHeading: "Aparência",
+      appearanceDescription:
+        "Escolha a aparência do MyTCFLab neste dispositivo, incluindo o login e a criação de conta.",
+      themeLight: "Claro",
+      themeDark: "Escuro",
+      themeSystem: "Igual ao sistema",
+    },
     workspace: {
       task: {
         heading: "1. Escolha uma tarefa",
@@ -613,6 +717,18 @@ export const APP_COPY = {
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
+        exampleLevelLabel: "Nível desejado",
+        generateExample: "Gerar exemplo",
+        generatingExample: "Gerando…",
+        generatingExampleStatus: "Gerando uma resposta de exemplo. Isso pode levar um momento.",
+        exampleRateLimitedError: "O gerador de exemplos está ocupado. Tente novamente em instantes.",
+        exampleDailyLimitError: "Você atingiu o limite de exemplos de hoje. Tente novamente amanhã.",
+        exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
+        exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
+        exampleProviderDisclosure: "Os exemplos usam o nível gratuito do Gemini, com Cloudflare Workers AI como alternativa.",
+        copy: "Copiar texto",
+        copied: "Copiado!",
+        copyFailed: "Não foi possível copiar",
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
@@ -651,6 +767,8 @@ export const APP_COPY = {
         title: "Descartar seu trabalho atual?",
         taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
+        exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
+        exampleOverwriteConfirm: "Substituir rascunho",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
       },

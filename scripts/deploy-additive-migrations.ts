@@ -3,6 +3,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { PrismaClient } from "@prisma/client";
+import { AUTOMATIC_ADDITIVE_MIGRATIONS } from "../src/lib/approved-additive-migrations";
 
 type MigrationHistoryRow = {
   exists: boolean;
@@ -19,15 +20,6 @@ type AppliedMigrationRow = {
 // A newly-created database has no migration history, so applying the complete
 // history is safe: there is no previous application version or data to keep
 // compatible. Existing databases may only receive migrations named here.
-const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
-  "20260729130000_subscription_status_and_event_ordering",
-  "20260729140000_add_stripe_event_and_customer_index",
-  "20260731170000_add_recent_exam_topic_provenance",
-  "20260731200000_add_translation_quota",
-  "20260801140000_add_translation_fallback_circuit",
-  "20260801150000_add_user_clerk_id",
-]);
-
 const migrationsDirectory = join(process.cwd(), "prisma", "migrations");
 
 function listCommittedMigrations() {

@@ -25,9 +25,12 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic";
+type PendingSwitchKind = "task" | "topic" | "example";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
+type ExampleLevel = "B2" | "C1" | "C2";
+type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
+const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 
 function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
   if (!value || typeof value !== "object") return null;
@@ -85,12 +88,21 @@ export function WritingWorkspace() {
   // correction is pending, so the visible message must always use the copy
   // from the current render.
   const [hasCorrectionError, setHasCorrectionError] = useState(false);
+
+  const [exampleLevel, setExampleLevel] = useState<ExampleLevel>("B2");
+  const [isGeneratingExample, setIsGeneratingExample] = useState(false);
+  const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
   const feedbackRef = useRef<HTMLElement>(null);
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
+  const exampleRequestId = useRef(0);
+  const exampleAbortController = useRef<AbortController | null>(null);
 
   const [pendingSwitch, setPendingSwitch] = useState<{ kind: PendingSwitchKind; run: () => void } | null>(
     null
@@ -113,9 +125,11 @@ export function WritingWorkspace() {
   } | null>(null);
   const translationRequestId = useRef(0);
   const lastTranslatedRef = useRef<{ text: string; locale: typeof locale } | null>(null);
+  const suppressedTranslationForRef = useRef<string | null>(null);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
+  const isTopicLoading = isRecentTopicLoading;
   const activeTopicPrompt =
     topicMode === "recent"
       ? recentTopic?.prompt ?? ""
@@ -131,6 +145,13 @@ export function WritingWorkspace() {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
 
+  useEffect(() => {
+    return () => {
+      if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+      exampleAbortController.current?.abort();
+    };
+  }, []);
+
   // Debounced live translation of the draft into the app's display
   // language. Fires 800ms after the learner stops typing, skips re-sending
   // the same text/locale pair, and drops stale responses via requestId.
@@ -142,6 +163,11 @@ export function WritingWorkspace() {
       // resetDraftAndFeedback() — both already clear translation state
       // synchronously there. This just guards against a stale in-flight
       // request resolving after the fact.
+      translationRequestId.current += 1;
+      return;
+    }
+
+    if (suppressedTranslationForRef.current === trimmed) {
       translationRequestId.current += 1;
       return;
     }
@@ -243,12 +269,34 @@ export function WritingWorkspace() {
     };
   }, [content, locale]);
 
+  // A model answer invalidates stale feedback like a learner edit, but its
+  // first insertion deliberately skips the separate live-translation quota.
+  function applyDraftContent(value: string, { suppressTranslation = false } = {}) {
+    suppressedTranslationForRef.current = suppressTranslation ? value.trim() : null;
+    setContent(value);
+    setHasCorrectionError(false);
+    setTranslationError(null);
+    setTranslationErrorFor(null);
+    if (feedback) setFeedbackIsStale(true);
+    if (!value.trim()) {
+      translationRequestId.current += 1;
+      setTranslation("");
+      setTranslationProvider(null);
+      setTranslationFor(null);
+      setTranslationError(null);
+      setTranslationErrorFor(null);
+      setTranslationRequestFor(null);
+      lastTranslatedRef.current = null;
+    }
+  }
+
   function resetDraftAndFeedback() {
     setContent("");
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
     setHasCorrectionError(false);
+    setExampleError(null);
     translationRequestId.current += 1;
     setTranslation("");
     setTranslationProvider(null);
@@ -257,6 +305,7 @@ export function WritingWorkspace() {
     setTranslationErrorFor(null);
     setTranslationRequestFor(null);
     lastTranslatedRef.current = null;
+    suppressedTranslationForRef.current = null;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -264,6 +313,19 @@ export function WritingWorkspace() {
     // can start typing immediately after requesting a topic.
     recentTopicRequestId.current += 1;
     setIsRecentTopicLoading(false);
+  }
+
+  function cancelPendingExampleRequest() {
+    exampleRequestId.current += 1;
+    exampleAbortController.current?.abort();
+    exampleAbortController.current = null;
+    setIsGeneratingExample(false);
+    setExampleError(null);
+  }
+
+  function cancelPendingTopicRequests() {
+    cancelPendingRecentTopicRequest();
+    cancelPendingExampleRequest();
   }
 
   function hasUnsavedWork() {
@@ -292,11 +354,10 @@ export function WritingWorkspace() {
     runOrConfirm(
       "task",
       () => {
-        recentTopicRequestId.current += 1;
+        cancelPendingTopicRequests();
         setTaskType(next);
         setTopicMode(null);
         setRecentTopic(null);
-        setIsRecentTopicLoading(false);
         setRecentTopicError(null);
         setCustomTopic("");
         resetDraftAndFeedback();
@@ -306,7 +367,7 @@ export function WritingWorkspace() {
 
   function chooseCustomTopic() {
     if (topicMode === "custom") {
-      cancelPendingRecentTopicRequest();
+      cancelPendingTopicRequests();
       setRecentTopicError(null);
       customTopicRef.current?.focus();
       return;
@@ -315,8 +376,7 @@ export function WritingWorkspace() {
     runOrConfirm(
       "topic",
       () => {
-        recentTopicRequestId.current += 1;
-        setIsRecentTopicLoading(false);
+        cancelPendingTopicRequests();
         setRecentTopicError(null);
         setRecentTopic(null);
         setCustomTopic("");
@@ -336,6 +396,7 @@ export function WritingWorkspace() {
   }
 
   async function fetchRecentTopic(currentTaskType: TaskType) {
+    cancelPendingExampleRequest();
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
@@ -380,7 +441,7 @@ export function WritingWorkspace() {
   }
 
   async function handleCorrect() {
-    if (!taskType || !activeTopicPrompt || wordCount === 0 || isRecentTopicLoading) return;
+    if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading) return;
 
     const correctionLocale = locale;
 
@@ -418,6 +479,92 @@ export function WritingWorkspace() {
     } finally {
       setIsCorrecting(false);
     }
+  }
+
+  // A generated example replaces the whole draft, so an existing draft
+  // needs the same explicit confirmation as a destructive task/topic switch
+  // before it is overwritten.
+  function requestGenerateExample() {
+    if (!taskType || !activeTopicPrompt || isTopicLoading || isCorrecting || isGeneratingExample) return;
+
+    if (content.trim()) {
+      setPendingSwitch({ kind: "example", run: () => void generateExample() });
+      return;
+    }
+
+    void generateExample();
+  }
+
+  async function generateExample() {
+    if (!taskType || !activeTopicPrompt) return;
+
+    const topicContext =
+      topicMode === "recent" && recentTopic
+        ? { topicId: recentTopic.id }
+        : { topicPrompt: activeTopicPrompt };
+
+    const requestId = ++exampleRequestId.current;
+    const controller = new AbortController();
+    exampleAbortController.current?.abort();
+    exampleAbortController.current = controller;
+    setIsGeneratingExample(true);
+    setExampleError(null);
+    try {
+      const res = await fetch("/api/essays/example", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ taskType, level: exampleLevel, ...topicContext }),
+        signal: controller.signal,
+      });
+
+      if (requestId !== exampleRequestId.current) return;
+
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        const errorCode =
+          data && typeof data === "object" && "code" in data
+            ? (data as { code?: unknown }).code
+            : undefined;
+        if (requestId !== exampleRequestId.current) return;
+        setExampleError(
+          errorCode === "EXAMPLE_DAILY_LIMIT_REACHED"
+            ? "dailyLimit"
+            : errorCode === "EXAMPLE_RATE_LIMITED" || errorCode === "EXAMPLE_GENERATION_IN_PROGRESS"
+              ? "rateLimited"
+              : errorCode === "EXAMPLE_GENERATOR_UNAVAILABLE"
+                ? "unavailable"
+                : "generic",
+        );
+        return;
+      }
+
+      const data: { text: string } = await res.json();
+      if (requestId !== exampleRequestId.current) return;
+      applyDraftContent(data.text, { suppressTranslation: true });
+    } catch (error) {
+      if (requestId === exampleRequestId.current && !(error instanceof Error && error.name === "AbortError")) {
+        setExampleError("generic");
+      }
+    } finally {
+      if (requestId === exampleRequestId.current) {
+        exampleAbortController.current = null;
+        setIsGeneratingExample(false);
+      }
+    }
+  }
+
+  async function handleCopyContent() {
+    if (!content.trim()) return;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+
+    if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+    copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
   }
 
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
@@ -460,7 +607,7 @@ export function WritingWorkspace() {
               type="button"
               onClick={() => resetForTask(type)}
               aria-pressed={taskType === type}
-              disabled={isCorrecting}
+              disabled={isCorrecting || isGeneratingExample}
               className={`rounded-xl border px-4 py-3 text-left transition-colors ${
                 taskType === type
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -499,7 +646,7 @@ export function WritingWorkspace() {
                 onClick={() => getRecentTopic(taskType!)}
                 aria-pressed={topicMode === "recent"}
                 aria-busy={isRecentTopicLoading}
-                disabled={isCorrecting || isRecentTopicLoading}
+                disabled={isCorrecting || isTopicLoading || isGeneratingExample}
                 className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "recent"
                     ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -515,7 +662,7 @@ export function WritingWorkspace() {
                 type="button"
                 onClick={chooseCustomTopic}
                 aria-pressed={topicMode === "custom"}
-                disabled={isCorrecting}
+                disabled={isCorrecting || isGeneratingExample}
                 className={`rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "custom"
                     ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
@@ -578,7 +725,7 @@ export function WritingWorkspace() {
                   id="custom-topic"
                   value={customTopic}
                   onChange={(e) => {
-                    cancelPendingRecentTopicRequest();
+                    cancelPendingTopicRequests();
                     setCustomTopic(e.target.value);
                     setHasCorrectionError(false);
                     if (feedback) setFeedbackIsStale(true);
@@ -586,7 +733,7 @@ export function WritingWorkspace() {
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
                   rows={3}
                   maxLength={2000}
-                  disabled={isCorrecting || isRecentTopicLoading}
+                  disabled={isCorrecting || isTopicLoading}
                   className="w-full rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
                 />
               </div>
@@ -620,39 +767,66 @@ export function WritingWorkspace() {
               id="essay-content"
               value={content}
               onChange={(e) => {
-                cancelPendingRecentTopicRequest();
-                const value = e.target.value;
-                setContent(value);
-                setHasCorrectionError(false);
-                setTranslationError(null);
-                setTranslationErrorFor(null);
-                if (feedback) setFeedbackIsStale(true);
-                if (!value.trim()) {
-                  translationRequestId.current += 1;
-                  setTranslation("");
-                  setTranslationProvider(null);
-                  setTranslationFor(null);
-                  setTranslationError(null);
-                  setTranslationErrorFor(null);
-                  setTranslationRequestFor(null);
-                  lastTranslatedRef.current = null;
-                }
+                cancelPendingTopicRequests();
+                applyDraftContent(e.target.value);
               }}
               placeholder={copy.workspace.editor.frenchResponsePlaceholder}
               rows={14}
               maxLength={20000}
-              disabled={isCorrecting || isRecentTopicLoading}
+              disabled={isCorrecting || isTopicLoading || isGeneratingExample}
               aria-describedby="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
             />
-            <button
-              type="button"
-              onClick={handleCorrect}
-              disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isRecentTopicLoading}
-              className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
-            >
-              {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
-            </button>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleCorrect}
+                disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isTopicLoading || isGeneratingExample}
+                className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
+              >
+                {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
+              </button>
+
+              <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]">
+                <label htmlFor="example-level" className="sr-only">
+                  {copy.workspace.editor.exampleLevelLabel}
+                </label>
+                <select
+                  id="example-level"
+                  value={exampleLevel}
+                  onChange={(e) => setExampleLevel(e.target.value as ExampleLevel)}
+                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
+                  className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {EXAMPLE_LEVELS.map((level) => (
+                    <option key={level} value={level} className="text-black">
+                      {level}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={requestGenerateExample}
+                  disabled={!activeTopicPrompt || isCorrecting || isTopicLoading || isGeneratingExample}
+                  className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+                >
+                  {isGeneratingExample ? copy.workspace.editor.generatingExample : copy.workspace.editor.generateExample}
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCopyContent}
+                disabled={!content.trim()}
+                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {copyStatus === "copied"
+                  ? copy.workspace.editor.copied
+                  : copyStatus === "failed"
+                    ? copy.workspace.editor.copyFailed
+                    : copy.workspace.editor.copy}
+              </button>
+            </div>
             {isCorrecting && (
               <p role="status" className="sr-only">
                 {copy.workspace.editor.correctingStatus}
@@ -663,6 +837,25 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.genericCorrectionError}
               </p>
             )}
+            {isGeneratingExample && (
+              <p role="status" className="sr-only">
+                {copy.workspace.editor.generatingExampleStatus}
+              </p>
+            )}
+            {exampleError && (
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                {exampleError === "rateLimited"
+                  ? copy.workspace.editor.exampleRateLimitedError
+                  : exampleError === "dailyLimit"
+                    ? copy.workspace.editor.exampleDailyLimitError
+                  : exampleError === "unavailable"
+                    ? copy.workspace.editor.exampleUnavailableError
+                    : copy.workspace.editor.exampleGenericError}
+              </p>
+            )}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {copy.workspace.editor.exampleProviderDisclosure}
+            </p>
           </section>
 
           <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
@@ -822,9 +1015,15 @@ export function WritingWorkspace() {
             ? copy.workspace.dialog.taskSwitchDescription
             : pendingSwitch?.kind === "topic"
               ? copy.workspace.dialog.topicSwitchDescription
-              : ""
+              : pendingSwitch?.kind === "example"
+                ? copy.workspace.dialog.exampleOverwriteDescription
+                : ""
         }
-        confirmLabel={copy.workspace.dialog.confirm}
+        confirmLabel={
+          pendingSwitch?.kind === "example"
+            ? copy.workspace.dialog.exampleOverwriteConfirm
+            : copy.workspace.dialog.confirm
+        }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {
           const action = pendingSwitch;
