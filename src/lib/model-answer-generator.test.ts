@@ -6,16 +6,19 @@ const {
   GeminiRateLimitedErrorMock,
   GeminiNotConfiguredErrorMock,
   CloudflareNotConfiguredErrorMock,
+  CloudflareRateLimitedErrorMock,
 } = vi.hoisted(() => {
   class GeminiRateLimitedErrorMock extends Error {}
   class GeminiNotConfiguredErrorMock extends Error {}
   class CloudflareNotConfiguredErrorMock extends Error {}
+  class CloudflareRateLimitedErrorMock extends Error {}
   return {
     geminiMock: vi.fn(),
     cloudflareMock: vi.fn(),
     GeminiRateLimitedErrorMock,
     GeminiNotConfiguredErrorMock,
     CloudflareNotConfiguredErrorMock,
+    CloudflareRateLimitedErrorMock,
   };
 });
 
@@ -34,6 +37,7 @@ vi.mock("@/lib/cloudflare-ai", async (importOriginal) => {
     ...actual,
     generateModelAnswerWithCloudflare: cloudflareMock,
     CloudflareNotConfiguredError: CloudflareNotConfiguredErrorMock,
+    CloudflareRateLimitedError: CloudflareRateLimitedErrorMock,
   };
 });
 
@@ -89,9 +93,67 @@ describe("generatePreferredModelAnswer", () => {
     await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerRateLimitedError);
   });
 
-  it("rejects out-of-range provider output instead of filling the editor", async () => {
+  it("accepts an answer moderately outside the exact target range", async () => {
+    // TASK_2 targets 120-150 words; free-tier models routinely miss the
+    // exact target even when instructed, so a 100-word answer (within the
+    // tolerated 96-180 band) must not be rejected.
+    const closeEnoughAnswer = Array.from({ length: 100 }, (_, index) => `mot${index}`).join(" ");
+    geminiMock.mockResolvedValue(closeEnoughAnswer);
+
+    await expect(generatePreferredModelAnswer(params)).resolves.toEqual({
+      text: closeEnoughAnswer,
+      provider: "gemini",
+    });
+    expect(cloudflareMock).not.toHaveBeenCalled();
+  });
+
+  it("falls back to Cloudflare when Gemini's answer length is unusable", async () => {
     geminiMock.mockResolvedValue("trop court");
+    cloudflareMock.mockResolvedValue(validAnswer);
+
+    await expect(generatePreferredModelAnswer(params)).resolves.toEqual({
+      text: validAnswer,
+      provider: "cloudflare",
+    });
+  });
+
+  it("returns a rate-limit result when Cloudflare is limited after invalid Gemini output", async () => {
+    geminiMock.mockResolvedValue("trop court");
+    cloudflareMock.mockRejectedValue(new CloudflareRateLimitedErrorMock("limited"));
+
+    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerRateLimitedError);
+  });
+
+  it("keeps non-round task tolerance within 20 percent at both boundaries", async () => {
+    const nonRoundParams = {
+      ...params,
+      task: { ...params.task, minWords: 101, maxWords: 149 },
+    };
+    const atMinimum = Array.from({ length: 81 }, (_, index) => `mot${index}`).join(" ");
+    const atMaximum = Array.from({ length: 178 }, (_, index) => `mot${index}`).join(" ");
+    geminiMock.mockResolvedValueOnce(atMinimum).mockResolvedValueOnce(atMaximum);
+
+    await expect(generatePreferredModelAnswer(nonRoundParams)).resolves.toEqual({ text: atMinimum, provider: "gemini" });
+    await expect(generatePreferredModelAnswer(nonRoundParams)).resolves.toEqual({ text: atMaximum, provider: "gemini" });
+  });
+
+  it("rejects word counts just outside the inward-rounded tolerance", async () => {
+    const nonRoundParams = {
+      ...params,
+      task: { ...params.task, minWords: 101, maxWords: 149 },
+    };
+    const belowMinimum = Array.from({ length: 80 }, (_, index) => `mot${index}`).join(" ");
+    geminiMock.mockResolvedValue(belowMinimum);
+    cloudflareMock.mockResolvedValue(validAnswer);
+
+    await expect(generatePreferredModelAnswer(nonRoundParams)).resolves.toEqual({ text: validAnswer, provider: "cloudflare" });
+  });
+
+  it("rejects out-of-range provider output from both providers instead of filling the editor", async () => {
+    geminiMock.mockResolvedValue("trop court");
+    cloudflareMock.mockResolvedValue("aussi trop court");
 
     await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerInvalidOutputError);
+    expect(cloudflareMock).toHaveBeenCalled();
   });
 });

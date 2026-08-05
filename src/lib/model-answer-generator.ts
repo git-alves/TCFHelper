@@ -24,11 +24,22 @@ export function hasConfiguredModelAnswerProvider() {
   );
 }
 
+// Free-tier models frequently miss an exact word target by a modest margin
+// even when explicitly instructed, so a hard cutoff at the task's boundary
+// rejected usable answers far too often. This tolerance only catches
+// genuinely degenerate output (near-empty or wildly overlong), not ordinary
+// model imprecision.
+const LENGTH_TOLERANCE = 0.2;
+
 function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-  if (wordCount < params.task.minWords || wordCount > params.task.maxWords) {
+  // Round the bounds inward (not outward) so the tolerance never exceeds
+  // LENGTH_TOLERANCE for a non-round task range.
+  const minAllowed = Math.ceil(params.task.minWords * (1 - LENGTH_TOLERANCE));
+  const maxAllowed = Math.floor(params.task.maxWords * (1 + LENGTH_TOLERANCE));
+  if (wordCount < minAllowed || wordCount > maxAllowed) {
     throw new ModelAnswerInvalidOutputError(
-      `Model answer contains ${wordCount} words; expected ${params.task.minWords}-${params.task.maxWords}.`,
+      `Model answer contains ${wordCount} words; expected roughly ${params.task.minWords}-${params.task.maxWords}.`,
     );
   }
   return text;
@@ -37,17 +48,29 @@ function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
 export async function generatePreferredModelAnswer(
   params: GenerateModelAnswerParams,
 ): Promise<{ text: string; provider: ModelAnswerProvider }> {
-  let geminiFallbackReason: "rateLimited" | "notConfigured";
+  let geminiFallbackReason: "rateLimited" | "notConfigured" | "invalidOutput";
   try {
     return { text: validateAnswerLength(await generateModelAnswer(params), params), provider: "gemini" };
   } catch (error) {
     // Cloudflare is intentionally a narrow fallback: it protects the feature
-    // against Gemini's free-tier limit (or a missing Gemini setup) without
-    // masking ordinary Gemini outages as a second paid request path.
-    if (!(error instanceof GeminiRateLimitedError || error instanceof GeminiNotConfiguredError)) {
+    // against Gemini's free-tier limit, a missing Gemini setup, or a
+    // malformed response, without masking ordinary Gemini outages as a
+    // second paid request path.
+    if (
+      !(
+        error instanceof GeminiRateLimitedError ||
+        error instanceof GeminiNotConfiguredError ||
+        error instanceof ModelAnswerInvalidOutputError
+      )
+    ) {
       throw error;
     }
-    geminiFallbackReason = error instanceof GeminiRateLimitedError ? "rateLimited" : "notConfigured";
+    geminiFallbackReason =
+      error instanceof GeminiRateLimitedError
+        ? "rateLimited"
+        : error instanceof GeminiNotConfiguredError
+          ? "notConfigured"
+          : "invalidOutput";
   }
 
   try {
@@ -60,9 +83,16 @@ export async function generatePreferredModelAnswer(
       if (geminiFallbackReason === "rateLimited") {
         throw new ModelAnswerRateLimitedError("Gemini is rate limited and Cloudflare is not configured.");
       }
-      throw new ModelAnswerNotConfiguredError("No model-answer provider is configured.");
+      if (geminiFallbackReason === "notConfigured") {
+        throw new ModelAnswerNotConfiguredError("No model-answer provider is configured.");
+      }
+      throw new ModelAnswerInvalidOutputError("Gemini's answer was an unusable length and Cloudflare is not configured.");
     }
     if (error instanceof CloudflareRateLimitedError) {
+      // Cloudflare's own 429 is unambiguous and retryable regardless of why
+      // Gemini was skipped, so it always maps to the busy/rate-limit error,
+      // not the generic failure Gemini's invalid output would otherwise
+      // produce.
       throw new ModelAnswerRateLimitedError("All free model-answer providers are rate limited.");
     }
     throw error;

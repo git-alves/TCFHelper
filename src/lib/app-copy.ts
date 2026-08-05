@@ -127,7 +127,7 @@ export interface AppCopy {
       exampleDailyLimitError: string;
       exampleUnavailableError: string;
       exampleGenericError: string;
-      exampleProviderDisclosure: string;
+      exampleNeedsTopicWarning: string;
       copy: string;
       copied: string;
       copyFailed: string;
@@ -267,7 +267,8 @@ export const APP_COPY = {
         exampleDailyLimitError: "You've reached today's example limit. Please try again tomorrow.",
         exampleUnavailableError: "The example generator isn't available right now.",
         exampleGenericError: "We couldn't generate an example. Please try again.",
-        exampleProviderDisclosure: "Examples use Gemini's free tier, with Cloudflare Workers AI as a fallback.",
+        exampleNeedsTopicWarning:
+          "Choose a topic from recent exams or paste your own before generating an example.",
         copy: "Copy text",
         copied: "Copied!",
         copyFailed: "Couldn't copy",
@@ -419,7 +420,8 @@ export const APP_COPY = {
         exampleDailyLimitError: "Vous avez atteint la limite d’exemples pour aujourd’hui. Réessayez demain.",
         exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
         exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
-        exampleProviderDisclosure: "Les exemples utilisent l’offre gratuite de Gemini, avec Cloudflare Workers AI en secours.",
+        exampleNeedsTopicWarning:
+          "Choisissez un sujet d’examens récents ou collez le vôtre avant de générer un exemple.",
         copy: "Copier le texte",
         copied: "Copié !",
         copyFailed: "Impossible de copier",
@@ -572,7 +574,8 @@ export const APP_COPY = {
         exampleDailyLimitError: "Has alcanzado el límite de ejemplos de hoy. Inténtalo de nuevo mañana.",
         exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
         exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
-        exampleProviderDisclosure: "Los ejemplos usan el nivel gratuito de Gemini, con Cloudflare Workers AI como respaldo.",
+        exampleNeedsTopicWarning:
+          "Elige un tema de exámenes recientes o pega el tuyo antes de generar un ejemplo.",
         copy: "Copiar texto",
         copied: "¡Copiado!",
         copyFailed: "No se pudo copiar",
@@ -725,7 +728,8 @@ export const APP_COPY = {
         exampleDailyLimitError: "Você atingiu o limite de exemplos de hoje. Tente novamente amanhã.",
         exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
         exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
-        exampleProviderDisclosure: "Os exemplos usam o nível gratuito do Gemini, com Cloudflare Workers AI como alternativa.",
+        exampleNeedsTopicWarning:
+          "Escolha um tema de exames recentes ou cole o seu antes de gerar um exemplo.",
         copy: "Copiar texto",
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",

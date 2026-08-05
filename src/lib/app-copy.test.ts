@@ -88,7 +88,7 @@ describe("APP_COPY", () => {
         copy.workspace.editor.exampleDailyLimitError,
         copy.workspace.editor.exampleUnavailableError,
         copy.workspace.editor.exampleGenericError,
-        copy.workspace.editor.exampleProviderDisclosure,
+        copy.workspace.editor.exampleNeedsTopicWarning,
         copy.workspace.editor.copy,
         copy.workspace.editor.copied,
         copy.workspace.editor.copyFailed,

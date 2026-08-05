@@ -92,6 +92,7 @@ export function WritingWorkspace() {
   const [exampleLevel, setExampleLevel] = useState<ExampleLevel>("B2");
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
+  const [exampleNeedsTopic, setExampleNeedsTopic] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -297,6 +298,7 @@ export function WritingWorkspace() {
     setFeedbackIsStale(false);
     setHasCorrectionError(false);
     setExampleError(null);
+    setExampleNeedsTopic(false);
     translationRequestId.current += 1;
     setTranslation("");
     setTranslationProvider(null);
@@ -485,7 +487,19 @@ export function WritingWorkspace() {
   // needs the same explicit confirmation as a destructive task/topic switch
   // before it is overwritten.
   function requestGenerateExample() {
-    if (!taskType || !activeTopicPrompt || isTopicLoading || isCorrecting || isGeneratingExample) return;
+    if (!taskType || isTopicLoading || isCorrecting || isGeneratingExample) return;
+
+    // An example may only be generated for a topic the learner actually has
+    // in front of them: pulled from the recent-exam source, or their own
+    // pasted/typed prompt. There is no other trusted topic source. The
+    // prerequisite is shown as a focused status message without calling the
+    // API when the learner has not chosen one yet.
+    if ((topicMode !== "recent" && topicMode !== "custom") || !activeTopicPrompt) {
+      setExampleNeedsTopic(true);
+      return;
+    }
+
+    setExampleNeedsTopic(false);
 
     if (content.trim()) {
       setPendingSwitch({ kind: "example", run: () => void generateExample() });
@@ -509,6 +523,7 @@ export function WritingWorkspace() {
     exampleAbortController.current = controller;
     setIsGeneratingExample(true);
     setExampleError(null);
+    setExampleNeedsTopic(false);
     try {
       const res = await fetch("/api/essays/example", {
         method: "POST",
@@ -727,6 +742,7 @@ export function WritingWorkspace() {
                   onChange={(e) => {
                     cancelPendingTopicRequests();
                     setCustomTopic(e.target.value);
+                    if (e.target.value.trim()) setExampleNeedsTopic(false);
                     setHasCorrectionError(false);
                     if (feedback) setFeedbackIsStale(true);
                   }}
@@ -807,7 +823,7 @@ export function WritingWorkspace() {
                 <button
                   type="button"
                   onClick={requestGenerateExample}
-                  disabled={!activeTopicPrompt || isCorrecting || isTopicLoading || isGeneratingExample}
+                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
                   className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
                 >
                   {isGeneratingExample ? copy.workspace.editor.generatingExample : copy.workspace.editor.generateExample}
@@ -853,9 +869,11 @@ export function WritingWorkspace() {
                     : copy.workspace.editor.exampleGenericError}
               </p>
             )}
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              {copy.workspace.editor.exampleProviderDisclosure}
-            </p>
+            {exampleNeedsTopic && (
+              <p role="status" className="text-sm text-amber-600 dark:text-amber-400">
+                {copy.workspace.editor.exampleNeedsTopicWarning}
+              </p>
+            )}
           </section>
 
           <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
