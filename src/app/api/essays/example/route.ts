@@ -5,6 +5,8 @@ import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
+import { GeminiRequestError } from "@/lib/gemini";
+import { CloudflareRequestError } from "@/lib/cloudflare-ai";
 import {
   cacheExample,
   claimExampleGeneration,
@@ -14,6 +16,7 @@ import {
 } from "@/lib/example-answer-cache";
 import {
   hasConfiguredModelAnswerProvider,
+  ModelAnswerInvalidOutputError,
   ModelAnswerNotConfiguredError,
   ModelAnswerRateLimitedError,
   generatePreferredModelAnswer,
@@ -43,6 +46,17 @@ const requestSchema = z
       });
     }
   });
+
+// Maps a generation failure to a fixed, closed set of log labels. Only the
+// HTTP status (a small closed set of numbers) is included — never the
+// upstream provider's own free-text error message, which is not a trusted
+// value and could echo back request content.
+function classifyExampleGenerationFailure(error: unknown): string {
+  if (error instanceof ModelAnswerInvalidOutputError) return "invalid_output_length";
+  if (error instanceof GeminiRequestError) return `gemini_request_failed_${error.status}`;
+  if (error instanceof CloudflareRequestError) return `cloudflare_request_failed_${error.status}`;
+  return "provider_request_failed";
+}
 
 export async function POST(request: Request) {
   let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
@@ -196,9 +210,13 @@ export async function POST(request: Request) {
       );
     }
 
-    // Never log a provider/fetch error object: it can contain a request URL,
-    // custom topic text, or provider credentials.
-    console.error("Example generation failed");
+    // Log a fixed, closed classification rather than the upstream error's
+    // own message: an arbitrary provider error string is not a trusted
+    // value and must never be assumed safe to persist in logs. The HTTP
+    // status alone (a small closed set of numbers) is safe to include and
+    // is what actually distinguishes an auth/config problem from a
+    // transient upstream outage in the Vercel function log.
+    console.error("Example generation failed:", classifyExampleGenerationFailure(error));
     return NextResponse.json(
       { error: "Something went wrong while generating the example." },
       { status: 502, headers: NO_STORE_HEADERS },

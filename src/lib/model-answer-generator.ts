@@ -52,10 +52,12 @@ export async function generatePreferredModelAnswer(
   try {
     return { text: validateAnswerLength(await generateModelAnswer(params), params), provider: "gemini" };
   } catch (error) {
-    // Cloudflare is intentionally a narrow fallback: it protects the feature
-    // against Gemini's free-tier limit, a missing Gemini setup, or a
-    // malformed response, without masking ordinary Gemini outages as a
-    // second paid request path.
+    // Cloudflare is intentionally a narrow fallback, per product decision:
+    // it covers Gemini's free-tier limit, a missing Gemini setup, or an
+    // out-of-range answer, but an ordinary Gemini request failure (bad
+    // request, auth rejection, upstream outage) is not retried against a
+    // second provider — that would send the learner's prompt to Cloudflare
+    // and spend its quota even when the real problem is on Gemini's side.
     if (
       !(
         error instanceof GeminiRateLimitedError ||

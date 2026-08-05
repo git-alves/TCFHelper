@@ -42,6 +42,7 @@ vi.mock("@/lib/cloudflare-ai", async (importOriginal) => {
 });
 
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
+import { GeminiRequestError } from "@/lib/gemini";
 import {
   ModelAnswerInvalidOutputError,
   ModelAnswerRateLimitedError,
@@ -79,10 +80,14 @@ describe("generatePreferredModelAnswer", () => {
     await expect(generatePreferredModelAnswer(params)).resolves.toEqual({ text: validAnswer, provider: "cloudflare" });
   });
 
-  it("does not call Cloudflare for a non-limit Gemini failure", async () => {
-    geminiMock.mockRejectedValue(new Error("Gemini unavailable"));
+  it("does not call Cloudflare for an ordinary Gemini request failure", async () => {
+    // Product decision: Cloudflare only covers Gemini's rate limit, a
+    // missing Gemini setup, or an out-of-range answer. An ordinary request
+    // failure (bad request, auth rejection, upstream outage) must not spend
+    // Cloudflare's quota or send the learner's prompt to a second provider.
+    geminiMock.mockRejectedValue(new GeminiRequestError(400));
 
-    await expect(generatePreferredModelAnswer(params)).rejects.toThrow("Gemini unavailable");
+    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(GeminiRequestError);
     expect(cloudflareMock).not.toHaveBeenCalled();
   });
 
