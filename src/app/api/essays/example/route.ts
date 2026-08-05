@@ -12,6 +12,7 @@ import {
   claimExampleGeneration,
   findCachedExample,
   hashExampleTopic,
+  refundExampleGenerationLease,
   releaseExampleGenerationLease,
 } from "@/lib/example-answer-cache";
 import {
@@ -193,7 +194,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ text: generated.text, cached: false }, { headers: NO_STORE_HEADERS });
     }
   } catch (error) {
-    await releaseExampleGenerationLease(user.id, taskType, typedLevel, topicHash, claim.claimToken).catch(() => {
+    // The provider call itself failed, so the learner received nothing for
+    // the slot they reserved — refund it, unlike the cache-write-failure
+    // branch above, which already delivered a real answer.
+    await refundExampleGenerationLease(user.id, taskType, typedLevel, topicHash, claim.claimToken).catch(() => {
       console.error("Example generation lease cleanup failed");
     });
     if (error instanceof ModelAnswerNotConfiguredError) {

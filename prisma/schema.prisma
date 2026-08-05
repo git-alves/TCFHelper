@@ -208,13 +208,22 @@ model ExampleGenerationQuota {
 /// double-clicks or concurrent tabs from reserving two provider calls while
 /// the first response is still being generated.
 model ExampleGenerationLease {
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  taskType   TaskType
-  level      String
-  topicHash  String
-  claimToken String
-  expiresAt  DateTime
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType     TaskType
+  level        String
+  topicHash    String
+  claimToken   String
+  // The exact UTC day this reservation's slot was counted against. A
+  // refund must read this back rather than compute "today" itself, since a
+  // request that straddles UTC midnight would otherwise refund the wrong
+  // day's count. The default is a genuine UTC-midnight value, kept
+  // permanently (not dropped after backfill) so a lease row written by a
+  // still-live previous app version during an additive-migration rollout
+  // — which does not know about this column — stays correct rather than
+  // merely satisfying NOT NULL.
+  dayStartedAt DateTime @default(dbgenerated("date_trunc('day', now() AT TIME ZONE 'UTC')"))
+  expiresAt    DateTime
 
   @@id([userId, taskType, level, topicHash])
   @@index([expiresAt])

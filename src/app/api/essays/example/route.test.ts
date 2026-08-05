@@ -9,6 +9,7 @@ const {
   claimExampleGenerationMock,
   cacheExampleMock,
   releaseExampleGenerationLeaseMock,
+  refundExampleGenerationLeaseMock,
   generatePreferredModelAnswerMock,
   hasConfiguredModelAnswerProviderMock,
   ModelAnswerNotConfiguredErrorMock,
@@ -28,6 +29,7 @@ const {
     claimExampleGenerationMock: vi.fn(),
     cacheExampleMock: vi.fn(),
     releaseExampleGenerationLeaseMock: vi.fn(),
+    refundExampleGenerationLeaseMock: vi.fn(),
     generatePreferredModelAnswerMock: vi.fn(),
     hasConfiguredModelAnswerProviderMock: vi.fn(),
     ModelAnswerNotConfiguredErrorMock,
@@ -47,6 +49,7 @@ vi.mock("@/lib/example-answer-cache", () => ({
   claimExampleGeneration: claimExampleGenerationMock,
   cacheExample: cacheExampleMock,
   releaseExampleGenerationLease: releaseExampleGenerationLeaseMock,
+  refundExampleGenerationLease: refundExampleGenerationLeaseMock,
 }));
 vi.mock("@/lib/model-answer-generator", () => ({
   generatePreferredModelAnswer: generatePreferredModelAnswerMock,
@@ -67,6 +70,7 @@ beforeEach(() => {
   claimExampleGenerationMock.mockReset();
   cacheExampleMock.mockReset();
   releaseExampleGenerationLeaseMock.mockReset();
+  refundExampleGenerationLeaseMock.mockReset();
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredModelAnswerProviderMock.mockReset();
 
@@ -76,6 +80,7 @@ beforeEach(() => {
   generatePreferredModelAnswerMock.mockResolvedValue({ text: "Un exemple de réponse.", provider: "gemini" });
   cacheExampleMock.mockResolvedValue({ content: "Un exemple de réponse." });
   releaseExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
+  refundExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   hasConfiguredModelAnswerProviderMock.mockReturnValue(true);
 });
 
@@ -197,17 +202,20 @@ describe("POST /api/essays/example", () => {
     expect(claimExampleGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("still returns a generated answer when caching it fails", async () => {
+  it("still returns a generated answer when caching it fails, without refunding the spent slot", async () => {
     cacheExampleMock.mockRejectedValue(new Error("database unavailable"));
 
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ text: "Un exemple de réponse.", cached: false });
+    // The learner received a real answer for their reserved slot, so it must
+    // still count — only the lease is cleaned up, never refunded.
     expect(releaseExampleGenerationLeaseMock).toHaveBeenCalled();
+    expect(refundExampleGenerationLeaseMock).not.toHaveBeenCalled();
   });
 
-  it("returns stable errors when both providers cannot serve a request", async () => {
+  it("returns stable errors and refunds the slot when both providers cannot serve a request", async () => {
     generatePreferredModelAnswerMock.mockRejectedValue(new ModelAnswerRateLimitedErrorMock("limited"));
     const limited = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
     expect(limited.status).toBe(429);
@@ -215,7 +223,10 @@ describe("POST /api/essays/example", () => {
     generatePreferredModelAnswerMock.mockRejectedValue(new ModelAnswerNotConfiguredErrorMock("missing"));
     const unavailable = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
     expect(unavailable.status).toBe(503);
-    expect(releaseExampleGenerationLeaseMock).toHaveBeenCalled();
+    // The learner received nothing for either attempt, so both must refund
+    // the slot they reserved rather than merely clean up the lease.
+    expect(refundExampleGenerationLeaseMock).toHaveBeenCalledTimes(2);
+    expect(releaseExampleGenerationLeaseMock).not.toHaveBeenCalled();
   });
 
   describe("failure log classification", () => {
