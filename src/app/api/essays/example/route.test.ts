@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { GeminiRequestError } from "@/lib/gemini";
 
 const {
   getCurrentAppUserMock,
@@ -12,10 +13,12 @@ const {
   hasConfiguredModelAnswerProviderMock,
   ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedErrorMock,
+  ModelAnswerInvalidOutputErrorMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   class ModelAnswerNotConfiguredErrorMock extends Error {}
   class ModelAnswerRateLimitedErrorMock extends Error {}
+  class ModelAnswerInvalidOutputErrorMock extends Error {}
 
   return {
     getCurrentAppUserMock: vi.fn(),
@@ -29,6 +32,7 @@ const {
     hasConfiguredModelAnswerProviderMock: vi.fn(),
     ModelAnswerNotConfiguredErrorMock,
     ModelAnswerRateLimitedErrorMock,
+    ModelAnswerInvalidOutputErrorMock,
   };
 });
 
@@ -49,6 +53,7 @@ vi.mock("@/lib/model-answer-generator", () => ({
   hasConfiguredModelAnswerProvider: hasConfiguredModelAnswerProviderMock,
   ModelAnswerNotConfiguredError: ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedError: ModelAnswerRateLimitedErrorMock,
+  ModelAnswerInvalidOutputError: ModelAnswerInvalidOutputErrorMock,
 }));
 
 const { POST } = await import("./route");
@@ -211,5 +216,39 @@ describe("POST /api/essays/example", () => {
     const unavailable = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
     expect(unavailable.status).toBe(503);
     expect(releaseExampleGenerationLeaseMock).toHaveBeenCalled();
+  });
+
+  describe("failure log classification", () => {
+    let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      consoleErrorSpy.mockRestore();
+    });
+
+    it("logs a fixed status-based label for a real GeminiRequestError", async () => {
+      // GeminiRequestError takes only a status — there is no message
+      // parameter to construct a sentinel with; see gemini.test.ts for the
+      // fetch-level proof that an upstream error payload never survives
+      // into this error at all.
+      generatePreferredModelAnswerMock.mockRejectedValue(new GeminiRequestError(400));
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "gemini_request_failed_400");
+    });
+
+    it("logs a fixed label for an unusable-length answer", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(new ModelAnswerInvalidOutputErrorMock("12 words"));
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "invalid_output_length");
+    });
   });
 });

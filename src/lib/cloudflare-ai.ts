@@ -7,6 +7,16 @@ const REQUEST_TIMEOUT_MS = 20_000;
 export class CloudflareNotConfiguredError extends Error {}
 export class CloudflareRateLimitedError extends Error {}
 
+/** Any other Cloudflare failure. Accepts only the status, never a message —
+ * see GeminiRequestError for why that must be structural, not conventional. */
+export class CloudflareRequestError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`Cloudflare Workers AI request failed (${status}).`);
+    this.status = status;
+  }
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -62,12 +72,12 @@ export async function generateModelAnswerWithCloudflare(
 
   const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(`Cloudflare Workers AI request failed (${response.status}).`);
+    throw new CloudflareRequestError(response.status);
   }
 
   const text = extractText(payload).trim();
   if (!text) {
-    throw new Error("Cloudflare Workers AI response contained no text.");
+    throw new CloudflareRequestError(response.status);
   }
 
   return text;

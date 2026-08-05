@@ -16,6 +16,22 @@ export type ExampleCefrLevel = "B2" | "C1" | "C2";
 export class GeminiNotConfiguredError extends Error {}
 export class GeminiRateLimitedError extends Error {}
 
+/**
+ * Any other Gemini failure (bad request, auth rejection, upstream outage, or
+ * an unparseable response). The constructor accepts only the HTTP status —
+ * never a message — and builds its own fixed text internally, so it is
+ * structurally impossible for a call site to embed Google's own error text
+ * (which could echo back part of the request) into this error, now or in
+ * the future.
+ */
+export class GeminiRequestError extends Error {
+  readonly status: number;
+  constructor(status: number) {
+    super(`Gemini request failed (${status}).`);
+    this.status = status;
+  }
+}
+
 export interface GenerateModelAnswerParams {
   task: TaskDefinition;
   level: ExampleCefrLevel;
@@ -77,6 +93,9 @@ export async function generateModelAnswer(params: GenerateModelAnswerParams): Pr
 
   const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 
+  // The key is sent only via the x-goog-api-key header, never as a ?key=
+  // query parameter: a URL-embedded secret is far more likely to end up in
+  // an access log or proxy trace than a header is.
   const response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
@@ -95,16 +114,12 @@ export async function generateModelAnswer(params: GenerateModelAnswerParams): Pr
   const payload: unknown = await response.json().catch(() => null);
 
   if (!response.ok) {
-    const message =
-      isRecord(payload) && isRecord(payload.error) && typeof payload.error.message === "string"
-        ? payload.error.message
-        : undefined;
-    throw new Error(`Gemini request failed (${response.status})${message ? `: ${message}` : ""}`);
+    throw new GeminiRequestError(response.status);
   }
 
   const text = extractText(payload).trim();
   if (!text) {
-    throw new Error("Gemini response contained no text.");
+    throw new GeminiRequestError(response.status);
   }
 
   return text;

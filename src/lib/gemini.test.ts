@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
-import { GeminiNotConfiguredError, GeminiRateLimitedError, generateModelAnswer } from "./gemini";
+import { GeminiNotConfiguredError, GeminiRateLimitedError, GeminiRequestError, generateModelAnswer } from "./gemini";
 
 const originalFetch = global.fetch;
 const originalApiKey = process.env.GEMINI_API_KEY;
@@ -64,6 +64,10 @@ describe("generateModelAnswer", () => {
         body: expect.stringContaining('"maxOutputTokens":512'),
       }),
     );
+    // The key must never be sent in the URL: query strings are far more
+    // likely to be logged by an access log or proxy than a header is.
+    const [calledUrl] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(calledUrl)).not.toContain("test-key");
   });
 
   it("throws GeminiRateLimitedError on a 429 response", async () => {
@@ -78,9 +82,27 @@ describe("generateModelAnswer", () => {
     await expect(generateModelAnswer(params)).rejects.toThrow(/Gemini request failed \(500\)/);
   });
 
-  it("throws when the response contains no usable text", async () => {
+  it("carries only the HTTP status, never Google's own error message", async () => {
+    const sentinelUpstreamMessage = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+    mockFetchOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: sentinelUpstreamMessage } }),
+    });
+
+    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(400);
+    expect((error as GeminiRequestError).message).not.toContain(sentinelUpstreamMessage);
+  });
+
+  it("throws GeminiRequestError when the response contains no usable text", async () => {
     mockFetchOnce({ ok: true, status: 200, json: async () => ({ candidates: [] }) });
 
-    await expect(generateModelAnswer(params)).rejects.toThrow(/no text/);
+    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(200);
   });
 });
