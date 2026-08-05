@@ -56,6 +56,8 @@ describe("APP_COPY", () => {
         copy.settings.themeLight,
         copy.settings.themeDark,
         copy.settings.themeSystem,
+        copy.settings.helpHeading,
+        copy.settings.helpDescription,
         copy.workspace.task.heading,
         copy.workspace.task.targetLength({ minWords: 60, maxWords: 120 }),
         copy.workspace.topic.heading,
