@@ -196,12 +196,25 @@ model ExampleAnswer {
 /// Limits fresh provider calls, while cache hits stay free. The route holds a
 /// transaction-scoped per-user lock before updating this row.
 model ExampleGenerationQuota {
-  userId            String   @id
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId            String    @id
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   dayStartedAt      DateTime
-  dailyRequestCount Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  dailyRequestCount Int       @default(0)
+  // Refunding a failed attempt (see ExampleGenerationLease) means the daily
+  // count alone no longer bounds how often a persistently failing provider
+  // can be called — every failure is refunded, so the count never climbs.
+  // This short, separate cooldown between attempts (successful or not)
+  // caps that call rate without limiting genuinely successful usage.
+  lastAttemptAt     DateTime?
+  // Counts every claimed attempt for the day, successful or not, and is
+  // never decremented on refund (unlike dailyRequestCount) — it exists
+  // specifically so a persistently failing provider cannot be hammered an
+  // unbounded number of times per day just because every failure refunds
+  // dailyRequestCount back to zero. The cooldown above only limits burst
+  // rate; this is the durable per-day cap.
+  dailyAttemptCount Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 }
 
 /// A short-lived claim for a single model-answer cache key. It keeps rapid

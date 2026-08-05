@@ -10,6 +10,20 @@ const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
 // timeout. Keep the claim longer than that complete chain so a slow but valid
 // fallback cannot lose ownership and trigger a duplicate provider call.
 const LEASE_DURATION_MS = 60_000;
+// A refunded failure never raises the daily count, so that count alone no
+// longer bounds how often a persistently failing provider gets called. This
+// cooldown between claim attempts (for any topic) is what actually caps the
+// call rate during an outage; it is not tied to success or failure, so it
+// stays simple to reason about and only ever costs a few seconds of
+// legitimate back-to-back use.
+const CLAIM_COOLDOWN_MS = 10_000;
+// A refunded failure never raises dailyRequestCount, so it alone cannot cap
+// how many times a persistently failing provider gets called in a day — the
+// cooldown above only bounds the burst rate, not the total. This cap is
+// checked against dailyAttemptCount, a counter that rises on every claim and
+// is never refunded, so it durably bounds total daily attempts (successful
+// or not) independent of the cooldown and independent of refunds.
+const DAILY_ATTEMPT_CAP = 15;
 
 export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {
   return createHash("sha256")
@@ -29,7 +43,8 @@ export type ExampleGenerationClaim =
   | { kind: "claimed"; claimToken: string }
   | { kind: "cached"; content: string }
   | { kind: "dailyLimit"; resetAt: Date }
-  | { kind: "inProgress"; retryAt: Date };
+  | { kind: "inProgress"; retryAt: Date }
+  | { kind: "cooldown"; retryAt: Date };
 
 /** A normal cache read lets a saved answer work even if all providers are down. */
 export async function findCachedExample(
@@ -85,9 +100,25 @@ export async function claimExampleGeneration(
       // above: a long wait here must never let a stale pre-wait timestamp
       // compute the wrong UTC day for the reservation.
       now = new Date();
-      const dayStartedAt = startOfUtcDay(now);
       const existing = await tx.exampleGenerationQuota.findUnique({ where: { userId } });
+
+      if (existing?.lastAttemptAt) {
+        const cooldownEndsAt = new Date(existing.lastAttemptAt.getTime() + CLAIM_COOLDOWN_MS);
+        if (cooldownEndsAt > now) {
+          return { kind: "cooldown", retryAt: cooldownEndsAt };
+        }
+      }
+
+      const dayStartedAt = startOfUtcDay(now);
       const continuingDay = existing?.dayStartedAt.getTime() === dayStartedAt.getTime();
+
+      // Checked before, and independent of, the refundable count below: a
+      // string of refunded failures must not let this claim through forever.
+      const dailyAttemptCount = (continuingDay ? existing.dailyAttemptCount : 0) + 1;
+      if (dailyAttemptCount > DAILY_ATTEMPT_CAP) {
+        return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
+      }
+
       const dailyRequestCount = (continuingDay ? existing.dailyRequestCount : 0) + 1;
       if (dailyRequestCount > FRESH_EXAMPLES_PER_DAY) {
         return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
@@ -95,8 +126,8 @@ export async function claimExampleGeneration(
 
       await tx.exampleGenerationQuota.upsert({
         where: { userId },
-        create: { userId, dayStartedAt, dailyRequestCount },
-        update: { dayStartedAt, dailyRequestCount },
+        create: { userId, dayStartedAt, dailyRequestCount, dailyAttemptCount, lastAttemptAt: now },
+        update: { dayStartedAt, dailyRequestCount, dailyAttemptCount, lastAttemptAt: now },
       });
       const claimToken = randomUUID();
       await tx.exampleGenerationLease.upsert({

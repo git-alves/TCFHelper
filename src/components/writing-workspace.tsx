@@ -546,7 +546,7 @@ export function WritingWorkspace() {
             ? "dailyLimit"
             : errorCode === "EXAMPLE_RATE_LIMITED" || errorCode === "EXAMPLE_GENERATION_IN_PROGRESS"
               ? "rateLimited"
-              : errorCode === "EXAMPLE_GENERATOR_UNAVAILABLE"
+              : errorCode === "EXAMPLE_GENERATOR_UNAVAILABLE" || errorCode === "EXAMPLE_CACHE_UNAVAILABLE"
                 ? "unavailable"
                 : "generic",
         );

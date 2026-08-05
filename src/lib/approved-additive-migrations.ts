@@ -10,4 +10,6 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260801150000_add_user_clerk_id",
   "20260804180000_add_example_answer_cache_and_quota",
   "20260805220000_add_example_generation_lease_day",
+  "20260806000000_add_example_generation_cooldown",
+  "20260806010000_add_example_generation_attempt_cap",
 ]);

@@ -185,4 +185,131 @@ describe("claimExampleGeneration", () => {
 
     vi.useRealTimers();
   });
+
+  it("records the attempt timestamp so a refunded failure still bounds the retry rate", async () => {
+    await claimExampleGeneration(...cacheKey);
+
+    expect(quotaUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ lastAttemptAt: expect.any(Date) }),
+        update: expect.objectContaining({ lastAttemptAt: expect.any(Date) }),
+      }),
+    );
+  });
+
+  it("rejects a claim within the cooldown window without spending a daily slot", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:00:05.000Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      dailyRequestCount: 1,
+      dailyAttemptCount: 1,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+
+    const result = await claimExampleGeneration(...cacheKey);
+
+    expect(result).toEqual({ kind: "cooldown", retryAt: new Date("2026-08-05T12:00:10.000Z") });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(leaseUpsertMock).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("allows a claim once the cooldown window has passed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:00:10.001Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      dailyRequestCount: 1,
+      dailyAttemptCount: 1,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+
+    const result = await claimExampleGeneration(...cacheKey);
+
+    expect(result).toEqual(expect.objectContaining({ kind: "claimed" }));
+    expect(quotaUpsertMock).toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("blocks further claims once the daily attempt cap is reached, even though every attempt was refunded", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:01:00.000Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      // A refunded failure keeps dailyRequestCount at 0 forever, so only
+      // dailyAttemptCount (never refunded) can be what stops this claim.
+      dailyRequestCount: 0,
+      dailyAttemptCount: 15,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+
+    const result = await claimExampleGeneration(...cacheKey);
+
+    expect(result).toEqual({ kind: "dailyLimit", resetAt: new Date("2026-08-06T00:00:00.000Z") });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(leaseUpsertMock).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("persists the incremented attempt count, distinct from and independent of the refundable request count", async () => {
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      dailyRequestCount: 0,
+      dailyAttemptCount: 4,
+      lastAttemptAt: new Date("2026-08-05T11:00:00.000Z"),
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:00:00.000Z"));
+
+    await claimExampleGeneration(...cacheKey);
+
+    expect(quotaUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ dailyAttemptCount: 5 }),
+        update: expect.objectContaining({ dailyAttemptCount: 5 }),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it("resets the attempt cap on a new UTC day", async () => {
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-04T00:00:00.000Z"),
+      dailyRequestCount: 0,
+      dailyAttemptCount: 15,
+      lastAttemptAt: new Date("2026-08-04T23:59:00.000Z"),
+    });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T00:00:01.000Z"));
+
+    const result = await claimExampleGeneration(...cacheKey);
+
+    expect(result).toEqual(expect.objectContaining({ kind: "claimed" }));
+    expect(quotaUpsertMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ dailyAttemptCount: 1 }),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+});
+
+describe("refundExampleGenerationLease and the durable attempt cap", () => {
+  it("never touches dailyAttemptCount, only dailyRequestCount", async () => {
+    leaseFindMock.mockResolvedValue({ claimToken: "owner_1", dayStartedAt: reservationDay });
+
+    await refundExampleGenerationLease(...cacheKey, "owner_1");
+
+    expect(quotaUpdateManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { dailyRequestCount: { decrement: 1 } } }),
+    );
+    const updateManyCall = quotaUpdateManyMock.mock.calls[0][0];
+    expect(updateManyCall.data).not.toHaveProperty("dailyAttemptCount");
+  });
 });

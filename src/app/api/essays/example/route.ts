@@ -5,8 +5,8 @@ import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
-import { GeminiRequestError } from "@/lib/gemini";
-import { CloudflareRequestError } from "@/lib/cloudflare-ai";
+import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
+import { CloudflareRequestError, CloudflareTransportError } from "@/lib/cloudflare-ai";
 import {
   cacheExample,
   claimExampleGeneration,
@@ -56,6 +56,8 @@ function classifyExampleGenerationFailure(error: unknown): string {
   if (error instanceof ModelAnswerInvalidOutputError) return "invalid_output_length";
   if (error instanceof GeminiRequestError) return `gemini_request_failed_${error.status}`;
   if (error instanceof CloudflareRequestError) return `cloudflare_request_failed_${error.status}`;
+  if (error instanceof GeminiTransportError) return "gemini_transport_failed";
+  if (error instanceof CloudflareTransportError) return "cloudflare_transport_failed";
   return "provider_request_failed";
 }
 
@@ -151,6 +153,23 @@ export async function POST(request: Request) {
         retryAt: claim.retryAt.toISOString(),
       },
       { status: 409, headers: { ...NO_STORE_HEADERS, "Retry-After": "5" } },
+    );
+  }
+
+  if (claim.kind === "cooldown") {
+    return NextResponse.json(
+      {
+        error: "The example generator is busy. Please try again shortly.",
+        code: "EXAMPLE_RATE_LIMITED",
+        retryAt: claim.retryAt.toISOString(),
+      },
+      {
+        status: 429,
+        headers: {
+          ...NO_STORE_HEADERS,
+          "Retry-After": String(Math.max(1, Math.ceil((claim.retryAt.getTime() - Date.now()) / 1000))),
+        },
+      },
     );
   }
 
