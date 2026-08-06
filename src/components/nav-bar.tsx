@@ -4,6 +4,17 @@ import Link from "next/link";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="2.5" y="11.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="11.5" width="5" height="5" rx="1.25" />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg
@@ -52,9 +63,6 @@ export function NavBar() {
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           <Show when="signed-in">
             <>
-              <Link href="/dashboard" className="px-1 hover:underline">
-                {copy.nav.dashboard}
-              </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
                * while a direct visit or refresh still renders the full page. */}
@@ -65,6 +73,14 @@ export function NavBar() {
                 className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]"
               >
                 <SettingsIcon />
+              </Link>
+              <Link
+                href="/dashboard"
+                title={copy.nav.dashboard}
+                aria-label={copy.nav.dashboard}
+                className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]"
+              >
+                <DashboardIcon />
               </Link>
               <UserButton />
             </>

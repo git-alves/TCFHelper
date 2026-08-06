@@ -25,7 +25,13 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
     // triggered the modal (the nav icon) on close — a background page must
     // never retain keyboard focus behind an open, or just-closed, modal.
     const previouslyFocused = document.activeElement as HTMLElement | null;
-    dialogRef.current?.focus();
+    const initialFocusable = dialogRef.current
+      ? Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      : [];
+    // Focus the first real control, not the dialog container itself: the
+    // container is only a Tab boundary, so starting there makes Shift+Tab's
+    // very first press match neither boundary and escape to the page behind.
+    (initialFocusable[0] ?? dialogRef.current)?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -35,7 +41,10 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
 
       if (event.key !== "Tab" || !dialogRef.current) return;
       const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
-      if (focusable.length === 0) return;
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
 
       const first = focusable[0];
       const last = focusable[focusable.length - 1];

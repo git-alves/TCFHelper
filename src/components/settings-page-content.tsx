@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
-import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
+import { AccountUnavailableMessage } from "@/components/account-unavailable-message";
 import { SettingsForm } from "@/components/settings-form";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { resolveSettingsProfile } from "@/lib/settings-profile";
@@ -14,7 +14,7 @@ export async function SettingsPageContent() {
     user = await getCurrentAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
-      return <DashboardAccountUnavailable />;
+      return <AccountUnavailableMessage />;
     }
     throw error;
   }
