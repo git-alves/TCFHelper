@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GeminiRequestError } from "@/lib/gemini";
+import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
+import { CloudflareTransportError } from "@/lib/cloudflare-ai";
 
 const {
   getCurrentAppUserMock,
@@ -193,6 +194,19 @@ describe("POST /api/essays/example", () => {
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
   });
 
+  it("does not call a provider when the per-user attempt cooldown is still active", async () => {
+    // This bounds the upstream call rate during a persistent failure, since
+    // every refunded failure keeps the daily count from ever climbing.
+    claimExampleGenerationMock.mockResolvedValue({ kind: "cooldown", retryAt: new Date("2026-08-05T12:00:10.000Z") });
+
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ code: "EXAMPLE_RATE_LIMITED" });
+    expect(response.headers.get("Retry-After")).toBeTruthy();
+    expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
+  });
+
   it("does not reserve a fresh call when no free provider is configured", async () => {
     hasConfiguredModelAnswerProviderMock.mockReturnValue(false);
 
@@ -260,6 +274,24 @@ describe("POST /api/essays/example", () => {
 
       expect(response.status).toBe(502);
       expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "invalid_output_length");
+    });
+
+    it("distinguishes a Gemini transport failure from a status-based one, so a network outage stays diagnosable", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(new GeminiTransportError());
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "gemini_transport_failed");
+    });
+
+    it("distinguishes a Cloudflare transport failure from a status-based one", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(new CloudflareTransportError());
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "cloudflare_transport_failed");
     });
   });
 });

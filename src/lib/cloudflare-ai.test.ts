@@ -3,6 +3,8 @@ import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import {
   CloudflareNotConfiguredError,
   CloudflareRateLimitedError,
+  CloudflareRequestError,
+  CloudflareTransportError,
   generateModelAnswerWithCloudflare,
 } from "./cloudflare-ai";
 
@@ -60,5 +62,41 @@ describe("generateModelAnswerWithCloudflare", () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({}) } as Response);
 
     await expect(generateModelAnswerWithCloudflare(params)).rejects.toBeInstanceOf(CloudflareRateLimitedError);
+  });
+
+  it("throws CloudflareTransportError, distinct from a status-based failure, when fetch itself fails", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(generateModelAnswerWithCloudflare(params)).rejects.toBeInstanceOf(CloudflareTransportError);
+  });
+
+  it("throws CloudflareRequestError, not CloudflareTransportError, when a 200 response body is malformed JSON", async () => {
+    const json = async (): Promise<unknown> => {
+      throw new SyntaxError("Unexpected end of JSON input");
+    };
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    expect((error as CloudflareRequestError).status).toBe(200);
+  });
+
+  it("throws CloudflareTransportError, not CloudflareRequestError, when the response body stream fails to read after a 200 status", async () => {
+    const json = async (): Promise<unknown> => {
+      throw new TypeError("terminated");
+    };
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json } as Response);
+
+    await expect(generateModelAnswerWithCloudflare(params)).rejects.toBeInstanceOf(CloudflareTransportError);
+  });
+
+  it("never calls response.json() on a non-OK response", async () => {
+    const jsonMock = vi.fn();
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: jsonMock } as unknown as Response);
+
+    await generateModelAnswerWithCloudflare(params).catch(() => {});
+
+    expect(jsonMock).not.toHaveBeenCalled();
   });
 });

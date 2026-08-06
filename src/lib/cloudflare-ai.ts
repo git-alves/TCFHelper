@@ -17,6 +17,14 @@ export class CloudflareRequestError extends Error {
   }
 }
 
+/** The request never reached Cloudflare or never got a response at all. See
+ * GeminiTransportError for why there is no status to report. */
+export class CloudflareTransportError extends Error {
+  constructor() {
+    super("Cloudflare Workers AI request could not be completed.");
+  }
+}
+
 type JsonRecord = Record<string, unknown>;
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -48,31 +56,49 @@ export async function generateModelAnswerWithCloudflare(
   }
 
   const model = process.env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CLOUDFLARE_MODEL;
-  const response = await fetch(
-    `${CLOUDFLARE_API_BASE}/${encodeURIComponent(accountId)}/ai/run/${model}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken}`,
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUDFLARE_API_BASE}/${encodeURIComponent(accountId)}/ai/run/${model}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiToken}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: buildExamplePrompt(params) }],
+          temperature: 0.7,
+          max_completion_tokens: 512,
+        }),
+        cache: "no-store",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       },
-      body: JSON.stringify({
-        messages: [{ role: "user", content: buildExamplePrompt(params) }],
-        temperature: 0.7,
-        max_completion_tokens: 512,
-      }),
-      cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    },
-  );
+    );
+  } catch {
+    throw new CloudflareTransportError();
+  }
 
   if (response.status === 429) {
     throw new CloudflareRateLimitedError("Cloudflare Workers AI free-tier limit reached.");
   }
 
-  const payload: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     throw new CloudflareRequestError(response.status);
+  }
+
+  // See gemini.ts's generateModelAnswer for why a body-read failure must be
+  // split from a status-based one: a SyntaxError means the body was fully
+  // read but wasn't valid JSON; anything else means it was never read at
+  // all, which is a transport failure.
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new CloudflareRequestError(response.status);
+    }
+    throw new CloudflareTransportError();
   }
 
   const text = extractText(payload).trim();

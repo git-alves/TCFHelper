@@ -32,6 +32,17 @@ export class GeminiRequestError extends Error {
   }
 }
 
+/**
+ * The request never reached Gemini or never got a response at all (network
+ * failure, DNS failure, or the request timeout) — there is no HTTP status to
+ * report. A fixed message only, for the same reason as GeminiRequestError.
+ */
+export class GeminiTransportError extends Error {
+  constructor() {
+    super("Gemini request could not be completed.");
+  }
+}
+
 export interface GenerateModelAnswerParams {
   task: TaskDefinition;
   level: ExampleCefrLevel;
@@ -96,25 +107,44 @@ export async function generateModelAnswer(params: GenerateModelAnswerParams): Pr
   // The key is sent only via the x-goog-api-key header, never as a ?key=
   // query parameter: a URL-embedded secret is far more likely to end up in
   // an access log or proxy trace than a header is.
-  const response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 512 },
-    }),
-    cache: "no-store",
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 512 },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new GeminiTransportError();
+  }
 
   if (response.status === 429) {
     throw new GeminiRateLimitedError("Gemini free-tier rate limit reached.");
   }
 
-  const payload: unknown = await response.json().catch(() => null);
-
   if (!response.ok) {
     throw new GeminiRequestError(response.status);
+  }
+
+  // A response object alone only proves the headers arrived; reading the
+  // body can still fail (a dropped connection or the timeout firing mid
+  // stream). A SyntaxError means the body was fully read but wasn't valid
+  // JSON — a request-level problem, same as any other unusable response.
+  // Anything else means the body was never actually read — a transport
+  // failure, not a status-based one.
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new GeminiRequestError(response.status);
+    }
+    throw new GeminiTransportError();
   }
 
   const text = extractText(payload).trim();

@@ -88,6 +88,8 @@ export interface AppCopy {
     themeLight: string;
     themeDark: string;
     themeSystem: string;
+    helpHeading: string;
+    helpDescription: string;
   };
   workspace: {
     task: {
@@ -227,6 +229,8 @@ export const APP_COPY = {
       themeLight: "Light",
       themeDark: "Dark",
       themeSystem: "Match system",
+      helpHeading: "Help & support",
+      helpDescription: "Have a question or found a problem? Reach out and we'll help.",
     },
     workspace: {
       task: {
@@ -378,6 +382,8 @@ export const APP_COPY = {
       themeLight: "Clair",
       themeDark: "Sombre",
       themeSystem: "Système",
+      helpHeading: "Aide et assistance",
+      helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
     },
     workspace: {
       task: {
@@ -532,6 +538,8 @@ export const APP_COPY = {
       themeLight: "Claro",
       themeDark: "Oscuro",
       themeSystem: "Igual que el sistema",
+      helpHeading: "Ayuda y soporte",
+      helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
     workspace: {
       task: {
@@ -686,6 +694,8 @@ export const APP_COPY = {
       themeLight: "Claro",
       themeDark: "Escuro",
       themeSystem: "Igual ao sistema",
+      helpHeading: "Ajuda e suporte",
+      helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
     },
     workspace: {
       task: {

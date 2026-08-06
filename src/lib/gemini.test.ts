@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
-import { GeminiNotConfiguredError, GeminiRateLimitedError, GeminiRequestError, generateModelAnswer } from "./gemini";
+import {
+  GeminiNotConfiguredError,
+  GeminiRateLimitedError,
+  GeminiRequestError,
+  GeminiTransportError,
+  generateModelAnswer,
+} from "./gemini";
 
 const originalFetch = global.fetch;
 const originalApiKey = process.env.GEMINI_API_KEY;
@@ -104,5 +110,35 @@ describe("generateModelAnswer", () => {
 
     expect(error).toBeInstanceOf(GeminiRequestError);
     expect((error as GeminiRequestError).status).toBe(200);
+  });
+
+  it("throws GeminiTransportError, distinct from GeminiRequestError, when fetch itself fails", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(generateModelAnswer(params)).rejects.toBeInstanceOf(GeminiTransportError);
+  });
+
+  it("throws GeminiRequestError, not GeminiTransportError, when a 200 response body is malformed JSON", async () => {
+    mockFetchOnce({ ok: true, status: 200, json: async () => { throw new SyntaxError("Unexpected end of JSON input"); } });
+
+    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(200);
+  });
+
+  it("throws GeminiTransportError, not GeminiRequestError, when the response body stream fails to read after a 200 status", async () => {
+    mockFetchOnce({ ok: true, status: 200, json: async () => { throw new TypeError("terminated"); } });
+
+    await expect(generateModelAnswer(params)).rejects.toBeInstanceOf(GeminiTransportError);
+  });
+
+  it("never calls response.json() on a non-OK response", async () => {
+    const jsonMock = vi.fn();
+    mockFetchOnce({ ok: false, status: 500, json: jsonMock });
+
+    await generateModelAnswer(params).catch(() => {});
+
+    expect(jsonMock).not.toHaveBeenCalled();
   });
 });
