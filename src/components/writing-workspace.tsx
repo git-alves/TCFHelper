@@ -106,6 +106,7 @@ export function WritingWorkspace() {
   const recentTopicRequestId = useRef(0);
   const exampleRequestId = useRef(0);
   const exampleAbortController = useRef<AbortController | null>(null);
+  const correctionRequestId = useRef(0);
 
   const [pendingSwitch, setPendingSwitch] = useState<{ kind: PendingSwitchKind; run: () => void } | null>(
     null
@@ -332,6 +333,14 @@ export function WritingWorkspace() {
     cancelPendingExampleRequest();
   }
 
+  // Cancels an in-flight correction request without touching feedback/error
+  // state — used when the workspace itself is being discarded (e.g. the
+  // dashboard reset) rather than when a correction genuinely finishes.
+  function cancelPendingCorrection() {
+    correctionRequestId.current += 1;
+    setIsCorrecting(false);
+  }
+
   function hasUnsavedWork() {
     return Boolean(
       content.trim() ||
@@ -354,6 +363,7 @@ export function WritingWorkspace() {
 
   function applyTaskReset(next: TaskType | null) {
     cancelPendingTopicRequests();
+    cancelPendingCorrection();
     setTaskType(next);
     setTopicMode(null);
     setRecentTopic(null);
@@ -480,6 +490,7 @@ export function WritingWorkspace() {
         ? { topicId: recentTopic.id }
         : { topicPrompt: activeTopicPrompt };
 
+    const requestId = ++correctionRequestId.current;
     setIsCorrecting(true);
     setHasCorrectionError(false);
     setFeedback(null);
@@ -502,12 +513,16 @@ export function WritingWorkspace() {
       }
 
       const data: { feedback: EssayFeedback } = await res.json();
+      // The workspace may have been reset (task switch, dashboard discard)
+      // while this request was in flight — a stale response must never
+      // write feedback into whatever the learner has moved on to.
+      if (requestId !== correctionRequestId.current) return;
       setFeedback(data.feedback);
       setFeedbackLocale(correctionLocale);
     } catch {
-      setHasCorrectionError(true);
+      if (requestId === correctionRequestId.current) setHasCorrectionError(true);
     } finally {
-      setIsCorrecting(false);
+      if (requestId === correctionRequestId.current) setIsCorrecting(false);
     }
   }
 
