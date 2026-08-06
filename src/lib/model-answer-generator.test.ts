@@ -175,4 +175,35 @@ describe("generatePreferredModelAnswer", () => {
     expect((error as ModelAnswerBothProvidersFailedError).geminiReason).toBe("rateLimited");
     expect((error as ModelAnswerBothProvidersFailedError).cloudflareError).toBe(cloudflareError);
   });
+
+  it("wraps a generic Cloudflare failure with 'notConfigured' when Gemini itself was never set up", async () => {
+    geminiMock.mockRejectedValue(new GeminiNotConfiguredErrorMock("missing"));
+    cloudflareMock.mockRejectedValue(new CloudflareRequestError(500));
+
+    const error: unknown = await generatePreferredModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ModelAnswerBothProvidersFailedError);
+    expect((error as ModelAnswerBothProvidersFailedError).geminiReason).toBe("notConfigured");
+  });
+
+  it("wraps a generic Cloudflare failure with 'invalidOutput' when Gemini's own answer was unusable", async () => {
+    geminiMock.mockResolvedValue("trop court");
+    cloudflareMock.mockRejectedValue(new CloudflareRequestError(403));
+
+    const error: unknown = await generatePreferredModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ModelAnswerBothProvidersFailedError);
+    expect((error as ModelAnswerBothProvidersFailedError).geminiReason).toBe("invalidOutput");
+  });
+
+  it("never carries upstream error text on the wrapper itself, only the fixed reason and the original error object", async () => {
+    const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+    geminiMock.mockRejectedValue(new GeminiRateLimitedErrorMock(sentinel));
+    cloudflareMock.mockRejectedValue(new Error(sentinel));
+
+    const error: unknown = await generatePreferredModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ModelAnswerBothProvidersFailedError);
+    expect((error as Error).message).not.toContain(sentinel);
+  });
 });

@@ -319,5 +319,25 @@ describe("POST /api/essays/example", () => {
         "gemini_rateLimited_then_cloudflare_request_failed_401",
       );
     });
+
+    it("never lets the wrapped Cloudflare error's own text reach the log, even when it isn't a recognized error type", async () => {
+      const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock("notConfigured", new Error(sentinel)),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Example generation failed:",
+        "gemini_notConfigured_then_provider_request_failed",
+      );
+      for (const call of consoleErrorSpy.mock.calls) {
+        for (const arg of call) {
+          expect(String(arg)).not.toContain(sentinel);
+        }
+      }
+    });
   });
 });
