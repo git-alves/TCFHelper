@@ -11,7 +11,7 @@ export default async function InterceptedSettingsModal() {
   const copy = getAppCopy(locale);
 
   return (
-    <Modal closeLabel={copy.common.close}>
+    <Modal closeLabel={copy.common.close} ariaLabel={copy.settings.title}>
       <SettingsPageContent />
     </Modal>
   );

@@ -1,26 +1,60 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   children: ReactNode;
   closeLabel: string;
+  ariaLabel: string;
 }
+
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // Backs the intercepted-route modal pattern (see app/@settings): closing
 // always goes through router.back() so the URL and browser history stay in
 // sync with what's actually on screen, per Next's parallel + intercepting
 // routes convention for modals.
-export function Modal({ children, closeLabel }: ModalProps) {
+export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
   const router = useRouter();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Move focus into the dialog on open, and give it back to whatever
+    // triggered the modal (the nav icon) on close — a background page must
+    // never retain keyboard focus behind an open, or just-closed, modal.
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    dialogRef.current?.focus();
+
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") router.back();
+      if (event.key === "Escape") {
+        router.back();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
+
     document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      previouslyFocused?.focus();
+    };
   }, [router]);
 
   return (
@@ -29,10 +63,13 @@ export function Modal({ children, closeLabel }: ModalProps) {
       onClick={() => router.back()}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        aria-label={ariaLabel}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-2xl rounded-2xl border border-black/[.08] bg-background p-6 shadow-xl dark:border-white/[.145] sm:p-8"
+        className="w-full max-w-2xl rounded-2xl border border-black/[.08] bg-background p-6 shadow-xl outline-none dark:border-white/[.145] sm:p-8"
       >
         <div className="flex justify-end">
           <button
