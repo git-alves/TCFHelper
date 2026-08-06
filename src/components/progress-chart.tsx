@@ -107,9 +107,16 @@ export function ProgressChart({ points }: ProgressChartProps) {
 
       {/* Scrolls horizontally instead of shrinking below a legible size: a
        * viewBox-scaled SVG stretched to a narrow phone's width would make
-       * the axis/legend text too small to read rather than just narrower. */}
+       * the axis/legend text too small to read rather than just narrower.
+       * The minimum width matches CHART_WIDTH exactly so the SVG is never
+       * scaled below 1:1 -- an 11-unit label stays at least 11 CSS px. */}
       <div className="-mx-1 overflow-x-auto px-1">
-        <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} aria-hidden="true" className="w-full min-w-[480px]">
+        <svg
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          aria-hidden="true"
+          className="w-full"
+          style={{ minWidth: CHART_WIDTH }}
+        >
           {CEFR_LEVELS.map((level, i) => {
             const y = yFor(i + 1);
             return (
