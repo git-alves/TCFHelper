@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import type { MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
@@ -46,22 +45,24 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
-// The same filled/outlined pill styles the Tasks and Dashboard controls used
-// before they moved here from in-page buttons.
+// Follows the theme instead of inverting it: bg-background/text-foreground
+// (light pill in light mode, dark pill in dark mode), not the reverse.
 const TASKS_BUTTON_CLASS =
-  "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
+  "shrink-0 rounded-full border border-black/[.15] bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]";
 const DASHBOARD_BUTTON_CLASS =
   "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
 export function NavBar() {
   const copy = useAppCopy();
-  const pathname = usePathname();
-  const { requestNavigation, isNavigationBusy } = useDashboardNavGuard();
+  const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
 
-  // Toggles between the two screens: on /tasks, this offers Dashboard; on
-  // /dashboard (or anywhere else), it offers Tasks. Segment-safe so a future
-  // route like /tasksomething can't false-match.
-  const onTasks = pathname === "/tasks" || (pathname?.startsWith("/tasks/") ?? false);
+  // Toggles between the two screens: while the workspace is mounted, this
+  // offers Dashboard; otherwise it offers Tasks. Driven by whether the
+  // workspace is actually mounted, not the URL: opening Settings from
+  // /tasks intercepts the route and changes the URL to /settings while
+  // /tasks stays mounted behind the modal, so usePathname() would wrongly
+  // flip this to "Tasks" the moment Settings opens.
+  const onTasks = isWorkspaceMounted;
 
   function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0) return;
