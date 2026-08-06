@@ -38,6 +38,7 @@ export interface AppCopy {
     close: string;
   };
   nav: {
+    dashboard: string;
     settings: string;
     logIn: string;
   };
@@ -155,6 +156,7 @@ export interface AppCopy {
       title: string;
       taskSwitchDescription: string;
       topicSwitchDescription: string;
+      dashboardSwitchDescription: string;
       exampleOverwriteDescription: string;
       exampleOverwriteConfirm: string;
       confirm: string;
@@ -173,6 +175,7 @@ export const APP_COPY = {
       close: "Close",
     },
     nav: {
+      dashboard: "Dashboard",
       settings: "Settings",
       logIn: "Log in",
     },
@@ -305,6 +308,7 @@ export const APP_COPY = {
         title: "Discard your current work?",
         taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
+        dashboardSwitchDescription: "Going to the dashboard will discard your current topic, draft, and feedback.",
         exampleOverwriteDescription: "Generating an example will replace your current draft.",
         exampleOverwriteConfirm: "Replace draft",
         confirm: "Discard and switch",
@@ -318,6 +322,7 @@ export const APP_COPY = {
       close: "Fermer",
     },
     nav: {
+      dashboard: "Tableau de bord",
       settings: "Paramètres",
       logIn: "Se connecter",
     },
@@ -456,6 +461,8 @@ export const APP_COPY = {
         title: "Supprimer votre travail actuel ?",
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
+        dashboardSwitchDescription:
+          "Accéder au tableau de bord supprimera votre sujet, brouillon et commentaires actuels.",
         exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
         exampleOverwriteConfirm: "Remplacer le brouillon",
         confirm: "Supprimer et changer",
@@ -469,6 +476,7 @@ export const APP_COPY = {
       close: "Cerrar",
     },
     nav: {
+      dashboard: "Panel",
       settings: "Configuración",
       logIn: "Iniciar sesión",
     },
@@ -607,6 +615,8 @@ export const APP_COPY = {
         title: "¿Descartar tu trabajo actual?",
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
+        dashboardSwitchDescription:
+          "Al ir al panel se descartarán el tema, el borrador y los comentarios actuales.",
         exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
         exampleOverwriteConfirm: "Reemplazar borrador",
         confirm: "Descartar y cambiar",
@@ -620,6 +630,7 @@ export const APP_COPY = {
       close: "Fechar",
     },
     nav: {
+      dashboard: "Painel",
       settings: "Configurações",
       logIn: "Entrar",
     },
@@ -758,6 +769,7 @@ export const APP_COPY = {
         title: "Descartar seu trabalho atual?",
         taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
+        dashboardSwitchDescription: "Ir para o painel descartará o tema, o rascunho e os comentários atuais.",
         exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
         exampleOverwriteConfirm: "Substituir rascunho",
         confirm: "Descartar e trocar",

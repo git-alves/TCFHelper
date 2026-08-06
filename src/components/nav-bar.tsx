@@ -1,8 +1,21 @@
 "use client";
 
 import Link from "next/link";
+import type { MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="2.5" y="11.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="11.5" width="5" height="5" rx="1.25" />
+    </svg>
+  );
+}
 
 function SettingsIcon() {
   return (
@@ -42,6 +55,19 @@ function AccountIcon() {
 
 export function NavBar() {
   const copy = useAppCopy();
+  const { requestNavigation } = useDashboardNavGuard();
+
+  // The workspace registers a guard while /dashboard is mounted (see
+  // DashboardNavGuardProvider). When one is registered, clicking Dashboard
+  // there means "reset the workspace," which needs its own confirmation
+  // rather than a real navigation, so this only lets the Link through when
+  // there's nothing to guard (any other page, or an unmodified click that
+  // should still support ctrl/cmd-click to open in a new tab).
+  function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (requestNavigation()) event.preventDefault();
+  }
 
   return (
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
@@ -52,6 +78,15 @@ export function NavBar() {
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           <Show when="signed-in">
             <>
+              <Link
+                href="/dashboard"
+                onClick={handleDashboardClick}
+                title={copy.nav.dashboard}
+                aria-label={copy.nav.dashboard}
+                className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]"
+              >
+                <DashboardIcon />
+              </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
                * while a direct visit or refresh still renders the full page. */}

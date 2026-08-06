@@ -12,6 +12,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 
 interface RecentExamTopic {
@@ -25,7 +26,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type ExampleLevel = "B2" | "C1" | "C2";
@@ -68,6 +69,7 @@ function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
 export function WritingWorkspace() {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
+  const { register: registerDashboardNavGuard } = useDashboardNavGuard();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -350,22 +352,48 @@ export function WritingWorkspace() {
     setPendingSwitch({ kind, run });
   }
 
+  function applyTaskReset(next: TaskType | null) {
+    cancelPendingTopicRequests();
+    setTaskType(next);
+    setTopicMode(null);
+    setRecentTopic(null);
+    setRecentTopicError(null);
+    setCustomTopic("");
+    resetDraftAndFeedback();
+  }
+
   function resetForTask(next: TaskType) {
     if (next === taskType) return;
 
-    runOrConfirm(
-      "task",
-      () => {
-        cancelPendingTopicRequests();
-        setTaskType(next);
-        setTopicMode(null);
-        setRecentTopic(null);
-        setRecentTopicError(null);
-        setCustomTopic("");
-        resetDraftAndFeedback();
-      },
-    );
+    runOrConfirm("task", () => applyTaskReset(next));
   }
+
+  // Registered with DashboardNavGuardProvider so the nav bar's Dashboard
+  // link can defer to this instead of navigating: /dashboard already *is*
+  // this workspace, so "going to the dashboard" while it's mounted means
+  // resetting back to the empty task-picker screen, guarded the same way a
+  // task/topic switch is.
+  function resetToDashboardStart() {
+    if (!taskType && topicMode === null) return;
+
+    runOrConfirm("dashboard", () => applyTaskReset(null));
+  }
+
+  // A ref instead of a `[registerDashboardNavGuard]`-only dependency: the
+  // registered callback must always see the latest state (taskType,
+  // topicMode, unsaved content), not whatever it closed over when the
+  // effect last ran, so the effect below registers a stable wrapper once
+  // and this ref is what actually gets called. Updated in its own effect,
+  // never during render, per the rules of hooks.
+  const resetToDashboardStartRef = useRef(resetToDashboardStart);
+  useEffect(() => {
+    resetToDashboardStartRef.current = resetToDashboardStart;
+  });
+
+  useEffect(() => {
+    registerDashboardNavGuard(() => resetToDashboardStartRef.current());
+    return () => registerDashboardNavGuard(null);
+  }, [registerDashboardNavGuard]);
 
   function chooseCustomTopic() {
     if (topicMode === "custom") {
@@ -1034,7 +1062,9 @@ export function WritingWorkspace() {
               ? copy.workspace.dialog.topicSwitchDescription
               : pendingSwitch?.kind === "example"
                 ? copy.workspace.dialog.exampleOverwriteDescription
-                : ""
+                : pendingSwitch?.kind === "dashboard"
+                  ? copy.workspace.dialog.dashboardSwitchDescription
+                  : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"

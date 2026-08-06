@@ -16,6 +16,7 @@ describe("APP_COPY", () => {
       const renderedCopy = [
         copy.common.cancel,
         copy.common.close,
+        copy.nav.dashboard,
         copy.nav.settings,
         copy.nav.logIn,
         copy.home.title,
@@ -113,6 +114,7 @@ describe("APP_COPY", () => {
         copy.workspace.dialog.title,
         copy.workspace.dialog.taskSwitchDescription,
         copy.workspace.dialog.topicSwitchDescription,
+        copy.workspace.dialog.dashboardSwitchDescription,
         copy.workspace.dialog.exampleOverwriteDescription,
         copy.workspace.dialog.exampleOverwriteConfirm,
         copy.workspace.dialog.confirm,
