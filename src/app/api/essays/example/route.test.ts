@@ -320,6 +320,55 @@ describe("POST /api/essays/example", () => {
       );
     });
 
+    it("includes Cloudflare's safe payload-shape diagnostic in the combined log when present", async () => {
+      // The second constructor argument is the raw payload, not a
+      // pre-formatted string — CloudflareRequestError builds the diagnostic
+      // internally so no caller can ever pass arbitrary text through it.
+      const rawCloudflarePayload = {
+        result: { choices: [{ message: {}, finish_reason: "length" }] },
+      };
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock(
+          "invalidOutput",
+          new CloudflareRequestError(200, rawCloudflarePayload),
+        ),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      const [, loggedLabel] = consoleErrorSpy.mock.calls[0];
+      expect(loggedLabel).toContain("gemini_invalidOutput_then_cloudflare_request_failed_200");
+      expect(loggedLabel).toContain("message_content=missing");
+      expect(loggedLabel).toContain("finish_reason=length");
+    });
+
+    it("never lets an arbitrary raw Cloudflare payload's text reach the log, end to end through the route", async () => {
+      const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+      // A real CloudflareRequestError built from a malicious raw payload —
+      // proving the route's log stays safe even when the payload itself
+      // isn't, not just that a pre-sanitized string was passed in.
+      const maliciousPayload = {
+        success: sentinel,
+        result: {
+          response: sentinel,
+          choices: [{ message: { content: sentinel, reasoning_content: sentinel }, finish_reason: sentinel }],
+        },
+      };
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock("rateLimited", new CloudflareRequestError(200, maliciousPayload)),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      for (const call of consoleErrorSpy.mock.calls) {
+        for (const arg of call) {
+          expect(String(arg)).not.toContain(sentinel);
+        }
+      }
+    });
+
     it("never lets the wrapped Cloudflare error's own text reach the log, even when it isn't a recognized error type", async () => {
       const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
       generatePreferredModelAnswerMock.mockRejectedValue(

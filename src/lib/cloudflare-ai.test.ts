@@ -42,6 +42,21 @@ describe("generateModelAnswerWithCloudflare", () => {
     );
   });
 
+  it("constrains reasoning effort, so a reasoning model doesn't spend the whole completion budget on hidden reasoning", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { response: "Réponse simple." } }),
+    } as Response);
+
+    await generateModelAnswerWithCloudflare(params);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ body: expect.stringContaining('"reasoning_effort":"low"') }),
+    );
+  });
+
   it("accepts the direct endpoint's simple response field", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -50,6 +65,18 @@ describe("generateModelAnswerWithCloudflare", () => {
     } as Response);
 
     await expect(generateModelAnswerWithCloudflare(params)).resolves.toBe("Réponse simple.");
+  });
+
+  it("falls through to choices when response is blank, instead of discarding real content next to it", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        result: { response: "   ", choices: [{ message: { content: "usable answer" } }] },
+      }),
+    } as Response);
+
+    await expect(generateModelAnswerWithCloudflare(params)).resolves.toBe("usable answer");
   });
 
   it("fails closed without both Cloudflare credentials", async () => {
@@ -98,5 +125,74 @@ describe("generateModelAnswerWithCloudflare", () => {
     await generateModelAnswerWithCloudflare(params).catch(() => {});
 
     expect(jsonMock).not.toHaveBeenCalled();
+  });
+
+  it("attaches a safe, structural payload-shape diagnostic when a 200 response has no usable text", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        success: true,
+        errors: [],
+        result: {
+          choices: [{ message: { role: "assistant" }, finish_reason: "length" }],
+        },
+      }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    const shape = (error as CloudflareRequestError).payloadShape;
+    expect(shape).toContain("message_content=missing");
+    expect(shape).toContain("finish_reason=length");
+  });
+
+  it("distinguishes an empty/whitespace text field from a genuinely missing one", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { choices: [{ message: { content: "   " } }] } }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    expect((error as CloudflareRequestError).payloadShape).toContain("message_content=empty");
+  });
+
+  it("never puts the response's own text in the payload-shape diagnostic", async () => {
+    const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        result: { choices: [{ message: { content: 12345 }, finish_reason: sentinel }] },
+      }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    // finish_reason is a real string here, so only the whitelist -- not a
+    // typeof check -- is what keeps an unrecognized value from passing
+    // through verbatim.
+    expect((error as CloudflareRequestError).payloadShape).not.toContain(sentinel);
+  });
+
+  it("never puts an arbitrary success value in the payload-shape diagnostic", async () => {
+    const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: sentinel, result: { choices: [] } }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    const shape = (error as CloudflareRequestError).payloadShape;
+    expect(shape).not.toContain(sentinel);
+    expect(shape).toContain("success=not_boolean");
   });
 });
