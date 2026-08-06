@@ -16,6 +16,26 @@ export class ModelAnswerNotConfiguredError extends Error {}
 export class ModelAnswerRateLimitedError extends Error {}
 export class ModelAnswerInvalidOutputError extends Error {}
 
+export type GeminiFallbackReason = "rateLimited" | "notConfigured" | "invalidOutput";
+
+/**
+ * Thrown when Cloudflare's failure isn't already covered by a more specific
+ * ModelAnswer* error above. Carries why Gemini was skipped in the first
+ * place (a fixed, closed-set reason — never free text) alongside Cloudflare's
+ * own error, so a caller logging this can report both provider failures in
+ * one line instead of only ever seeing Cloudflare's, which was otherwise the
+ * only piece of the failure the caller had any visibility into.
+ */
+export class ModelAnswerBothProvidersFailedError extends Error {
+  readonly geminiReason: GeminiFallbackReason;
+  readonly cloudflareError: unknown;
+  constructor(geminiReason: GeminiFallbackReason, cloudflareError: unknown) {
+    super("Both Gemini and Cloudflare failed to produce a model answer.");
+    this.geminiReason = geminiReason;
+    this.cloudflareError = cloudflareError;
+  }
+}
+
 /** True when at least one free-tier provider can be called without charging quota. */
 export function hasConfiguredModelAnswerProvider() {
   return Boolean(
@@ -48,7 +68,7 @@ function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
 export async function generatePreferredModelAnswer(
   params: GenerateModelAnswerParams,
 ): Promise<{ text: string; provider: ModelAnswerProvider }> {
-  let geminiFallbackReason: "rateLimited" | "notConfigured" | "invalidOutput";
+  let geminiFallbackReason: GeminiFallbackReason;
   try {
     return { text: validateAnswerLength(await generateModelAnswer(params), params), provider: "gemini" };
   } catch (error) {
@@ -97,6 +117,13 @@ export async function generatePreferredModelAnswer(
       // produce.
       throw new ModelAnswerRateLimitedError("All free model-answer providers are rate limited.");
     }
-    throw error;
+    if (error instanceof ModelAnswerInvalidOutputError) {
+      // Cloudflare's own answer failed validateAnswerLength above -- already
+      // a specific, dedicated classification in its own right, not a
+      // generic Cloudflare request failure to wrap with why Gemini was
+      // skipped.
+      throw error;
+    }
+    throw new ModelAnswerBothProvidersFailedError(geminiFallbackReason, error);
   }
 }

@@ -17,6 +17,7 @@ import {
 } from "@/lib/example-answer-cache";
 import {
   hasConfiguredModelAnswerProvider,
+  ModelAnswerBothProvidersFailedError,
   ModelAnswerInvalidOutputError,
   ModelAnswerNotConfiguredError,
   ModelAnswerRateLimitedError,
@@ -58,6 +59,13 @@ function classifyExampleGenerationFailure(error: unknown): string {
   if (error instanceof CloudflareRequestError) return `cloudflare_request_failed_${error.status}`;
   if (error instanceof GeminiTransportError) return "gemini_transport_failed";
   if (error instanceof CloudflareTransportError) return "cloudflare_transport_failed";
+  // Only reachable when Cloudflare's own failure isn't one of the cases
+  // above with a dedicated user-facing error (see ModelAnswerBothProvidersFailedError):
+  // both providers failed, and this is the only place that knows why Gemini
+  // was skipped in the first place, not just Cloudflare's own failure.
+  if (error instanceof ModelAnswerBothProvidersFailedError) {
+    return `gemini_${error.geminiReason}_then_${classifyExampleGenerationFailure(error.cloudflareError)}`;
+  }
   return "provider_request_failed";
 }
 
