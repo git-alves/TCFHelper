@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const copy = getAppCopy(locale);
   return {
     title: "MyTCFLab",
-    description: `${copy.home.description} ${copy.home.translationDisclosure}`,
+    description: copy.home.description,
   };
 }
 

@@ -20,7 +20,6 @@ describe("APP_COPY", () => {
         copy.nav.logIn,
         copy.home.title,
         copy.home.description,
-        copy.home.translationDisclosure,
         copy.home.goToDashboard,
         copy.home.getStarted,
         copy.login.title,
