@@ -19,7 +19,9 @@
 - No subscription, checkout, entitlement, or billing gate. Clerk authentication
   exists only to establish learner ownership of persisted work; it is not a
   retention or monetization feature in this phase.
-- No learner progress dashboard, feedback history UI, saved drafts, analytics dashboard, sharing, or notifications.
+- No feedback history UI, saved drafts, sharing, or notifications. (A learner
+  progress/CEFR-trend dashboard was originally excluded here too, but was
+  added after Phase 1 shipped — see `/dashboard` and `src/lib/essay-progress.ts`.)
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
 - No automatic topic generation or broad historical search. A recent-exam topic must match the selected task and come from the current month, except for one prior-month retry when the current WordPress page is genuinely not yet published; custom prompts remain learner supplied.
 - No translation spending cap of any kind — DeepL API Free has no billing to cap. The systemic risk it carries instead is reliability/availability of its unofficial backup, which the project-wide fallback circuit breaker addresses (see below), not a cost control.

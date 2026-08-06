@@ -9,7 +9,7 @@ Phase 1 is the core writing loop. Its purpose is to validate feedback quality
 before the product invests in retention or monetization features. See the
 [Phase 1 validation spec](docs/phase-1-core-writing-loop.md) for the job to
 be done, success gate, and deliberately excluded scope. There is no billing
-gate yet — every logged-in user can reach `/dashboard`.
+gate yet — every logged-in user can reach `/tasks`.
 
 ## Stack
 
@@ -73,12 +73,13 @@ gate yet — every logged-in user can reach `/dashboard`.
    ```
 
    Visit `http://localhost:3000`. Sign up at `/signup`, which uses Clerk's
-   prebuilt flow and redirects to `/dashboard`. Enable Google in the Clerk
-   dashboard to show it as a sign-in option.
+   prebuilt flow and redirects to `/tasks`. Signing back in redirects to
+   `/dashboard`, a CEFR-level progress graph built from correction history.
+   Enable Google in the Clerk dashboard to show it as a sign-in option.
 
 ## Recent-exam topics
 
-The dashboard has two topic choices: **Get a topic from recent exams** and
+The Tasks screen (`/tasks`) has two topic choices: **Get a topic from recent exams** and
 **Write or paste my own topic**. The first choice is a server-side integration
 with the authorised recent-exam source. It derives the current French
 month/year URL, verifies that the page is for that month, and returns only the
@@ -108,7 +109,7 @@ its generic retry copy.
 structure (Task 3's are a title plus two contrasting `Document 1` /
 `Document 2` paragraphs) but not copied from any real exam.
 
-The dashboard keeps its recent-exam and custom-topic choices. Once a topic is
+The Tasks screen keeps its recent-exam and custom-topic choices. Once a topic is
 selected, learners can generate a B2, C1, or C2 French model answer directly
 into the editor. The app caches answers privately per learner/topic/level and
 limits fresh generations per day. Gemini is tried first; Cloudflare Workers AI
