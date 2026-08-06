@@ -650,7 +650,15 @@ export function WritingWorkspace() {
 
   function handleClearDraft() {
     if (!content.trim()) return;
-    runOrConfirm("clear", () => resetDraftAndFeedback());
+    runOrConfirm("clear", () => {
+      // A correction or example request already in flight must not be able
+      // to write into the workspace after it's been cleared -- a late
+      // correction would restore feedback, and a late example would
+      // repopulate the content the learner just discarded.
+      cancelPendingCorrection();
+      cancelPendingExampleRequest();
+      resetDraftAndFeedback();
+    });
   }
 
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
@@ -917,7 +925,7 @@ export function WritingWorkspace() {
               <button
                 type="button"
                 onClick={handleClearDraft}
-                disabled={!content.trim()}
+                disabled={!content.trim() || isCorrecting || isGeneratingExample}
                 className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
                 {copy.workspace.editor.clear}
