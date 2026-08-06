@@ -899,7 +899,6 @@ export function WritingWorkspace() {
             {locale !== "fr" && visibleTranslation && translationProvider && (
               <TranslationProviderNotice
                 provider={translationProvider}
-                deeplNotice={copy.workspace.translation.deeplNotice}
                 unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
               />
             )}

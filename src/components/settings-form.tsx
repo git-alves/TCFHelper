@@ -46,7 +46,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.appearanceDescription}
           </p>
         </div>
-        <div role="radiogroup" aria-labelledby="appearance-heading" className="grid gap-3 sm:grid-cols-3">
+        <div role="radiogroup" aria-labelledby="appearance-heading" className="flex flex-col gap-2">
           {APP_THEMES.map((option) => (
             <button
               key={option}
@@ -54,7 +54,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
               role="radio"
               aria-checked={theme === option}
               onClick={() => setTheme(option)}
-              className={`rounded-xl border p-4 text-left transition-colors ${
+              className={`rounded-xl border px-4 py-2.5 text-left transition-colors ${
                 theme === option
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
                   : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
@@ -75,7 +75,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.languageDescription}
           </p>
         </div>
-        <div role="radiogroup" aria-labelledby="language-heading" className="grid gap-3 sm:grid-cols-2">
+        <div role="radiogroup" aria-labelledby="language-heading" className="flex flex-col gap-2">
           {APP_LOCALES.map((code) => (
             <button
               key={code}
@@ -83,7 +83,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
               role="radio"
               aria-checked={locale === code}
               onClick={() => setLocale(code)}
-              className={`rounded-xl border p-4 text-left transition-colors ${
+              className={`rounded-xl border px-4 py-2.5 text-left transition-colors ${
                 locale === code
                   ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
                   : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"

@@ -18,9 +18,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
       <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
         {copy.home.description}
       </p>
-      <p className="max-w-md text-sm text-zinc-500 dark:text-zinc-400">
-        {copy.home.translationDisclosure}
-      </p>
       <Link
         href={isAuthenticated ? "/dashboard" : "/signup"}
         className="rounded-full bg-foreground px-6 py-3 text-base font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"

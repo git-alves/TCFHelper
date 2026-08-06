@@ -38,14 +38,12 @@ export interface AppCopy {
     close: string;
   };
   nav: {
-    dashboard: string;
     settings: string;
     logIn: string;
   };
   home: {
     title: string;
     description: string;
-    translationDisclosure: string;
     goToDashboard: string;
     getStarted: string;
   };
@@ -141,7 +139,6 @@ export interface AppCopy {
       rateLimitedError: string;
       monthlyQuotaError: string;
       tooLong: (values: TranslationLimitValues) => string;
-      deeplNotice: string;
       unofficialFallbackNotice: string;
     };
     feedback: {
@@ -176,7 +173,6 @@ export const APP_COPY = {
       close: "Close",
     },
     nav: {
-      dashboard: "Dashboard",
       settings: "Settings",
       logIn: "Log in",
     },
@@ -184,7 +180,6 @@ export const APP_COPY = {
       title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
       description:
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
-      translationDisclosure: "Live French draft translations are powered by DeepL.",
       goToDashboard: "Go to dashboard",
       getStarted: "Get started",
     },
@@ -285,7 +280,6 @@ export const APP_COPY = {
           "You’ve reached this month’s live translation limit. Please try again next month.",
         tooLong: ({ maxCharacters }) =>
           `Live translation is available for drafts up to ${maxCharacters} characters. This draft is longer — submit it for correction to see full feedback.`,
-        deeplNotice: "Translations powered by DeepL.",
         unofficialFallbackNotice:
           "This translation used an unofficial backup method, not the DeepL API. It may be less accurate and can be briefly unavailable.",
       },
@@ -324,7 +318,6 @@ export const APP_COPY = {
       close: "Fermer",
     },
     nav: {
-      dashboard: "Tableau de bord",
       settings: "Paramètres",
       logIn: "Se connecter",
     },
@@ -332,8 +325,6 @@ export const APP_COPY = {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
       description:
         "Entraînez-vous aux tâches 1, 2 et 3, puis recevez en quelques secondes des commentaires sur la grammaire, le vocabulaire et votre niveau du CECRL.",
-      translationDisclosure:
-        "Les traductions en direct des brouillons en français sont fournies par DeepL.",
       goToDashboard: "Accéder au tableau de bord",
       getStarted: "Commencer",
     },
@@ -439,7 +430,6 @@ export const APP_COPY = {
           "Vous avez atteint la limite mensuelle de traduction en direct. Réessayez le mois prochain.",
         tooLong: ({ maxCharacters }) =>
           `La traduction en direct est disponible pour les brouillons de ${maxCharacters} caractères maximum. Ce brouillon est plus long : soumettez-le pour obtenir des commentaires complets.`,
-        deeplNotice: "Traductions fournies par DeepL.",
         unofficialFallbackNotice:
           "Cette traduction provient d’une méthode de secours non officielle, pas de l’API DeepL. Elle peut être moins précise et parfois indisponible.",
       },
@@ -479,7 +469,6 @@ export const APP_COPY = {
       close: "Cerrar",
     },
     nav: {
-      dashboard: "Panel",
       settings: "Configuración",
       logIn: "Iniciar sesión",
     },
@@ -487,8 +476,6 @@ export const APP_COPY = {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
       description:
         "Practica las tareas 1, 2 y 3 y recibe en segundos comentarios sobre gramática, vocabulario y nivel MCER.",
-      translationDisclosure:
-        "Las traducciones en directo de los borradores en francés funcionan con DeepL.",
       goToDashboard: "Ir al panel",
       getStarted: "Empezar",
     },
@@ -594,7 +581,6 @@ export const APP_COPY = {
           "Has alcanzado el límite mensual de traducción en tiempo real. Inténtalo de nuevo el próximo mes.",
         tooLong: ({ maxCharacters }) =>
           `La traducción en tiempo real está disponible para borradores de hasta ${maxCharacters} caracteres. Este borrador es más largo; envíalo para corregirlo y recibir comentarios completos.`,
-        deeplNotice: "Traducciones proporcionadas por DeepL.",
         unofficialFallbackNotice:
           "Esta traducción se obtuvo mediante un método de respaldo no oficial, no la API de DeepL. Puede ser menos precisa y no estar disponible en ocasiones.",
       },
@@ -634,7 +620,6 @@ export const APP_COPY = {
       close: "Fechar",
     },
     nav: {
-      dashboard: "Painel",
       settings: "Configurações",
       logIn: "Entrar",
     },
@@ -642,8 +627,6 @@ export const APP_COPY = {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",
       description:
         "Pratique as tarefas 1, 2 e 3 e receba em segundos comentários sobre gramática, vocabulário e nível do QECR.",
-      translationDisclosure:
-        "As traduções ao vivo de rascunhos em francês são fornecidas pelo DeepL.",
       goToDashboard: "Ir para o painel",
       getStarted: "Começar",
     },
@@ -749,7 +732,6 @@ export const APP_COPY = {
           "Você atingiu o limite mensal de tradução em tempo real. Tente novamente no próximo mês.",
         tooLong: ({ maxCharacters }) =>
           `A tradução em tempo real está disponível para rascunhos de até ${maxCharacters} caracteres. Este rascunho é maior; envie-o para correção e receba comentários completos.`,
-        deeplNotice: "Traduções fornecidas pelo DeepL.",
         unofficialFallbackNotice:
           "Esta tradução usou um método de backup não oficial, não a API do DeepL. Ela pode ser menos precisa e ficar indisponível ocasionalmente.",
       },

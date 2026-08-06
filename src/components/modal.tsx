@@ -78,7 +78,7 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
         aria-label={ariaLabel}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-2xl rounded-2xl border border-black/[.08] bg-background p-6 shadow-xl outline-none dark:border-white/[.145] sm:p-8"
+        className="w-full max-w-md rounded-2xl border border-black/[.08] bg-background p-6 shadow-xl outline-none dark:border-white/[.145]"
       >
         <div className="flex justify-end">
           <button
