@@ -242,7 +242,7 @@ describe("claimExampleGeneration", () => {
       // A refunded failure keeps dailyRequestCount at 0 forever, so only
       // dailyAttemptCount (never refunded) can be what stops this claim.
       dailyRequestCount: 0,
-      dailyAttemptCount: 15,
+      dailyAttemptCount: 1000,
       lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
     });
 
