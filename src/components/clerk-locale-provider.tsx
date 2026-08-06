@@ -26,8 +26,10 @@ export function ClerkLocaleProvider({ children }: { children: ReactNode }) {
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/signup"
+      // Returning learners land on their progress; a brand-new account has
+      // none yet, so it goes straight to starting a task instead.
       signInFallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/dashboard"
+      signUpFallbackRedirectUrl="/tasks"
       afterSignOutUrl="/"
       localization={CLERK_LOCALIZATIONS[locale]}
       // @clerk/themes' prebuilt themes are spread directly into `appearance`

@@ -38,6 +38,8 @@ export interface AppCopy {
     close: string;
   };
   nav: {
+    dashboard: string;
+    tasks: string;
     settings: string;
     logIn: string;
   };
@@ -75,6 +77,13 @@ export interface AppCopy {
     welcome: (name: string) => string;
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
+    chartTitle: string;
+    chartCaption: (values: { count: number }) => string;
+    emptyTitle: string;
+    emptyDescription: string;
+    taskLegend: (values: { number: number }) => string;
+    levelAxisLabel: string;
+    attemptAxisLabel: string;
   };
   settings: {
     title: string;
@@ -155,6 +164,7 @@ export interface AppCopy {
       title: string;
       taskSwitchDescription: string;
       topicSwitchDescription: string;
+      dashboardSwitchDescription: string;
       exampleOverwriteDescription: string;
       exampleOverwriteConfirm: string;
       confirm: string;
@@ -173,6 +183,8 @@ export const APP_COPY = {
       close: "Close",
     },
     nav: {
+      dashboard: "Dashboard",
+      tasks: "Tasks",
       settings: "Settings",
       logIn: "Log in",
     },
@@ -208,10 +220,17 @@ export const APP_COPY = {
       logIn: "Log in",
     },
     dashboard: {
-      welcome: (name) => `Welcome, ${name}`,
+      welcome: (name) => `Welcome back, ${name}`,
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
+      chartTitle: "Score trend",
+      chartCaption: ({ count }) => `Last ${count} attempts per task`,
+      emptyTitle: "No corrected essays yet",
+      emptyDescription: "Complete a task and get it corrected to start tracking your CEFR level over time.",
+      taskLegend: ({ number }) => `Task ${number}`,
+      levelAxisLabel: "CEFR level",
+      attemptAxisLabel: "Attempt",
     },
     settings: {
       title: "Settings",
@@ -304,6 +323,7 @@ export const APP_COPY = {
       dialog: {
         title: "Discard your current work?",
         taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
+        dashboardSwitchDescription: "Going to the dashboard will discard your current topic, draft, and feedback.",
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
         exampleOverwriteDescription: "Generating an example will replace your current draft.",
         exampleOverwriteConfirm: "Replace draft",
@@ -318,6 +338,8 @@ export const APP_COPY = {
       close: "Fermer",
     },
     nav: {
+      dashboard: "Tableau de bord",
+      tasks: "Tâches",
       settings: "Paramètres",
       logIn: "Se connecter",
     },
@@ -354,10 +376,18 @@ export const APP_COPY = {
       logIn: "Se connecter",
     },
     dashboard: {
-      welcome: (name) => `Bienvenue, ${name}`,
+      welcome: (name) => `Content de vous revoir, ${name}`,
       accountUnavailableTitle: "Votre compte doit être finalisé",
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
+      chartTitle: "Évolution du niveau",
+      chartCaption: ({ count }) => `${count} dernières tentatives par tâche`,
+      emptyTitle: "Aucune rédaction corrigée pour le moment",
+      emptyDescription:
+        "Terminez une tâche et faites-la corriger pour suivre l’évolution de votre niveau du CECRL dans le temps.",
+      taskLegend: ({ number }) => `Tâche ${number}`,
+      levelAxisLabel: "Niveau du CECRL",
+      attemptAxisLabel: "Tentative",
     },
     settings: {
       title: "Paramètres",
@@ -455,6 +485,8 @@ export const APP_COPY = {
       dialog: {
         title: "Supprimer votre travail actuel ?",
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
+        dashboardSwitchDescription:
+          "Accéder au tableau de bord supprimera votre sujet, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
         exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
         exampleOverwriteConfirm: "Remplacer le brouillon",
@@ -469,6 +501,8 @@ export const APP_COPY = {
       close: "Cerrar",
     },
     nav: {
+      dashboard: "Panel",
+      tasks: "Tareas",
       settings: "Configuración",
       logIn: "Iniciar sesión",
     },
@@ -505,10 +539,17 @@ export const APP_COPY = {
       logIn: "Iniciar sesión",
     },
     dashboard: {
-      welcome: (name) => `Te damos la bienvenida, ${name}`,
+      welcome: (name) => `Bienvenido de nuevo, ${name}`,
       accountUnavailableTitle: "Tu cuenta necesita configurarse",
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
+      chartTitle: "Evolución del nivel",
+      chartCaption: ({ count }) => `Últimos ${count} intentos por tarea`,
+      emptyTitle: "Todavía no hay redacciones corregidas",
+      emptyDescription: "Completa una tarea y corrígela para empezar a seguir tu nivel MCER a lo largo del tiempo.",
+      taskLegend: ({ number }) => `Tarea ${number}`,
+      levelAxisLabel: "Nivel MCER",
+      attemptAxisLabel: "Intento",
     },
     settings: {
       title: "Configuración",
@@ -606,6 +647,8 @@ export const APP_COPY = {
       dialog: {
         title: "¿Descartar tu trabajo actual?",
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
+        dashboardSwitchDescription:
+          "Al ir al panel se descartarán el tema, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
         exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
         exampleOverwriteConfirm: "Reemplazar borrador",
@@ -620,6 +663,8 @@ export const APP_COPY = {
       close: "Fechar",
     },
     nav: {
+      dashboard: "Painel",
+      tasks: "Tarefas",
       settings: "Configurações",
       logIn: "Entrar",
     },
@@ -656,10 +701,17 @@ export const APP_COPY = {
       logIn: "Entrar",
     },
     dashboard: {
-      welcome: (name) => `Boas-vindas, ${name}`,
+      welcome: (name) => `Bem-vindo de volta, ${name}`,
       accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
+      chartTitle: "Evolução do nível",
+      chartCaption: ({ count }) => `Últimas ${count} tentativas por tarefa`,
+      emptyTitle: "Ainda não há redações corrigidas",
+      emptyDescription: "Conclua uma tarefa e a corrija para começar a acompanhar seu nível do QECR ao longo do tempo.",
+      taskLegend: ({ number }) => `Tarefa ${number}`,
+      levelAxisLabel: "Nível do QECR",
+      attemptAxisLabel: "Tentativa",
     },
     settings: {
       title: "Configurações",
@@ -757,6 +809,7 @@ export const APP_COPY = {
       dialog: {
         title: "Descartar seu trabalho atual?",
         taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
+        dashboardSwitchDescription: "Ir para o painel descartará o tema, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
         exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
         exampleOverwriteConfirm: "Substituir rascunho",

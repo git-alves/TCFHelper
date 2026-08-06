@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
@@ -25,7 +26,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type ExampleLevel = "B2" | "C1" | "C2";
@@ -68,6 +69,7 @@ function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
 export function WritingWorkspace() {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
+  const router = useRouter();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -104,6 +106,7 @@ export function WritingWorkspace() {
   const recentTopicRequestId = useRef(0);
   const exampleRequestId = useRef(0);
   const exampleAbortController = useRef<AbortController | null>(null);
+  const correctionRequestId = useRef(0);
 
   const [pendingSwitch, setPendingSwitch] = useState<{ kind: PendingSwitchKind; run: () => void } | null>(
     null
@@ -330,6 +333,15 @@ export function WritingWorkspace() {
     cancelPendingExampleRequest();
   }
 
+  // Cancels an in-flight correction request without touching feedback/error
+  // state — used when the workspace is being reset (a task switch) so a
+  // response that resolves after the reset can never write into it, and so
+  // a stale "Correcting…" status never lingers on the reset workspace.
+  function cancelPendingCorrection() {
+    correctionRequestId.current += 1;
+    setIsCorrecting(false);
+  }
+
   function hasUnsavedWork() {
     return Boolean(
       content.trim() ||
@@ -357,6 +369,7 @@ export function WritingWorkspace() {
       "task",
       () => {
         cancelPendingTopicRequests();
+        cancelPendingCorrection();
         setTaskType(next);
         setTopicMode(null);
         setRecentTopic(null);
@@ -365,6 +378,15 @@ export function WritingWorkspace() {
         resetDraftAndFeedback();
       },
     );
+  }
+
+  // Unlike resetForTask, confirming here navigates away (this workspace
+  // lives at /tasks; the dashboard is a separate page) rather than resetting
+  // in place, so there's nothing to explicitly clear — the whole component
+  // unmounts. cancelPendingCorrection above still protects the in-place
+  // resets (task switches) that stay on this page.
+  function goToDashboard() {
+    runOrConfirm("dashboard", () => router.push("/dashboard"));
   }
 
   function chooseCustomTopic() {
@@ -452,6 +474,7 @@ export function WritingWorkspace() {
         ? { topicId: recentTopic.id }
         : { topicPrompt: activeTopicPrompt };
 
+    const requestId = ++correctionRequestId.current;
     setIsCorrecting(true);
     setHasCorrectionError(false);
     setFeedback(null);
@@ -474,12 +497,16 @@ export function WritingWorkspace() {
       }
 
       const data: { feedback: EssayFeedback } = await res.json();
+      // The workspace may have been reset (a task switch) while this
+      // request was in flight — a stale response must never write feedback
+      // into whatever the learner has moved on to.
+      if (requestId !== correctionRequestId.current) return;
       setFeedback(data.feedback);
       setFeedbackLocale(correctionLocale);
     } catch {
-      setHasCorrectionError(true);
+      if (requestId === correctionRequestId.current) setHasCorrectionError(true);
     } finally {
-      setIsCorrecting(false);
+      if (requestId === correctionRequestId.current) setIsCorrecting(false);
     }
   }
 
@@ -611,6 +638,16 @@ export function WritingWorkspace() {
 
   return (
     <div className="flex w-full flex-col gap-8">
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={goToDashboard}
+          className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+        >
+          {copy.nav.dashboard}
+        </button>
+      </div>
+
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           {copy.workspace.task.heading}
@@ -1034,7 +1071,9 @@ export function WritingWorkspace() {
               ? copy.workspace.dialog.topicSwitchDescription
               : pendingSwitch?.kind === "example"
                 ? copy.workspace.dialog.exampleOverwriteDescription
-                : ""
+                : pendingSwitch?.kind === "dashboard"
+                  ? copy.workspace.dialog.dashboardSwitchDescription
+                  : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"
