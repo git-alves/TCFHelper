@@ -134,6 +134,13 @@ export async function generateModelAnswerWithCloudflare(
   }
 
   const model = process.env.CLOUDFLARE_AI_MODEL?.trim() || DEFAULT_CLOUDFLARE_MODEL;
+  // chat_template_kwargs.enable_thinking is GLM's own native reasoning
+  // toggle, not a standard field every model accepts -- a CLOUDFLARE_AI_MODEL
+  // override to a different model (e.g. Llama, whose own schema has no such
+  // option) must not receive it; some models reject an unrecognized
+  // template argument outright. reasoning_effort is the generic OpenAI-style
+  // convention and stays unconditional, unlike this one.
+  const isDefaultReasoningModel = model === DEFAULT_CLOUDFLARE_MODEL;
   let response: Response;
   try {
     response = await fetch(
@@ -148,12 +155,12 @@ export async function generateModelAnswerWithCloudflare(
           messages: [{ role: "user", content: buildExamplePrompt(params) }],
           temperature: 0.7,
           max_completion_tokens: 512,
-          // The default model is a reasoning model; without this, it can
-          // spend its entire completion budget on hidden reasoning tokens
-          // and return no usable final content at all. "low" is the value
-          // documented as universally supported across reasoning models
-          // (unlike newer additions such as "minimal", not guaranteed here).
+          // reasoning_effort alone was confirmed insufficient in
+          // production: the model still spent the whole completion budget
+          // on reasoning_content and got cut off (finish_reason "length")
+          // before ever writing the final answer.
           reasoning_effort: "low",
+          ...(isDefaultReasoningModel ? { chat_template_kwargs: { enable_thinking: false } } : {}),
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
