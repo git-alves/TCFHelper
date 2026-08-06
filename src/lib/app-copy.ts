@@ -42,6 +42,7 @@ export interface AppCopy {
     tasks: string;
     settings: string;
     logIn: string;
+    closeSettingsFirst: string;
   };
   home: {
     title: string;
@@ -187,6 +188,7 @@ export const APP_COPY = {
       tasks: "Tasks",
       settings: "Settings",
       logIn: "Log in",
+      closeSettingsFirst: "Close Settings first",
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
@@ -342,6 +344,7 @@ export const APP_COPY = {
       tasks: "Tâches",
       settings: "Paramètres",
       logIn: "Se connecter",
+      closeSettingsFirst: "Fermez d’abord les paramètres",
     },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
@@ -505,6 +508,7 @@ export const APP_COPY = {
       tasks: "Tareas",
       settings: "Configuración",
       logIn: "Iniciar sesión",
+      closeSettingsFirst: "Cierra primero la configuración",
     },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
@@ -667,6 +671,7 @@ export const APP_COPY = {
       tasks: "Tarefas",
       settings: "Configurações",
       logIn: "Entrar",
+      closeSettingsFirst: "Feche as configurações primeiro",
     },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",

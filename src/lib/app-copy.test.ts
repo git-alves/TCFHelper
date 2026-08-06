@@ -20,6 +20,7 @@ describe("APP_COPY", () => {
         copy.nav.tasks,
         copy.nav.settings,
         copy.nav.logIn,
+        copy.nav.closeSettingsFirst,
         copy.home.title,
         copy.home.description,
         copy.home.goToDashboard,

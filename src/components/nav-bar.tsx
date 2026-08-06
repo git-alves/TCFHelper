@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import type { MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
@@ -54,6 +55,7 @@ const DASHBOARD_BUTTON_CLASS =
 
 export function NavBar() {
   const copy = useAppCopy();
+  const pathname = usePathname();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
 
   // Toggles between the two screens: while the workspace is mounted, this
@@ -63,6 +65,19 @@ export function NavBar() {
   // /tasks stays mounted behind the modal, so usePathname() would wrongly
   // flip this to "Tasks" the moment Settings opens.
   const onTasks = isWorkspaceMounted;
+
+  // Settings sets the URL to exactly /settings while its own modal is open
+  // (and only then), so — unlike the workspace-mounted check above — the
+  // pathname genuinely is the right signal here. Clicking Dashboard while
+  // Settings is open would open the workspace's own discard-confirmation
+  // dialog underneath the still-mounted Settings modal: same z-index, later
+  // in the DOM, so Settings would cover it and both dialogs' focus traps
+  // would compete. Blocking the click instead of racing the two modals.
+  const isSettingsOpen = pathname === "/settings";
+  const isDashboardBlocked = isNavigationBusy || isSettingsOpen;
+  const dashboardBlockedReason = isNavigationBusy
+    ? copy.workspace.editor.correctingStatus
+    : copy.nav.closeSettingsFirst;
 
   function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0) return;
@@ -81,14 +96,16 @@ export function NavBar() {
             <>
               {onTasks ? (
                 // A correction the server already received can't be
-                // recalled by leaving the page, so this is a real disabled
-                // control (not just a styled one) while it's in flight.
-                isNavigationBusy ? (
+                // recalled by leaving the page, or the Settings modal
+                // covering the workspace's own confirmation dialog, are
+                // both real reasons to make this a genuinely disabled
+                // control rather than just a styled one.
+                isDashboardBlocked ? (
                   <button
                     type="button"
                     disabled
-                    title={copy.workspace.editor.correctingStatus}
-                    aria-label={`${copy.nav.dashboard} — ${copy.workspace.editor.correctingStatus}`}
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
                     className={DASHBOARD_BUTTON_CLASS}
                   >
                     {copy.nav.dashboard}
