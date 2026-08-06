@@ -141,4 +141,35 @@ describe("generateModelAnswer", () => {
 
     expect(jsonMock).not.toHaveBeenCalled();
   });
+
+  it("includes the title/summary/opinion structure only for Task 3, whose topic is two opposing documents", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({ ...params, task: TASK_INSTRUCTIONS.TASK_3 });
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).toContain("Summary (40-60 words)");
+    expect(promptText).toContain("Opinion (80-120 words)");
+  });
+
+  it("omits the Task 3 document-synthesis structure for other tasks", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).not.toContain("Summary (40-60 words)");
+  });
 });
