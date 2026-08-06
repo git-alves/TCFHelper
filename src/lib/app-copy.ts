@@ -224,7 +224,7 @@ export const APP_COPY = {
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
-      chartTitle: "Score trend",
+      chartTitle: "Estimated CEFR trend",
       chartCaption: ({ count }) => `Last ${count} attempts per task`,
       emptyTitle: "No corrected essays yet",
       emptyDescription: "Complete a task and get it corrected to start tracking your CEFR level over time.",

@@ -1,7 +1,8 @@
 "use client";
 
-import { useAppCopy } from "@/components/app-locale-provider";
-import { groupEssayProgressByTask, type EssayProgressPoint } from "@/lib/essay-progress";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
+import { APP_LOCALE_INTL_TAGS } from "@/lib/app-locale";
+import { groupEssayProgressByTask, type EssayProgressPoint, type EssayProgressSeries } from "@/lib/essay-progress-chart";
 
 interface ProgressChartProps {
   points: EssayProgressPoint[];
@@ -11,10 +12,16 @@ interface ProgressChartProps {
 // only the most recent ones per task are plotted.
 const MAX_ATTEMPTS_PER_TASK = 8;
 const CEFR_LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"] as const;
-const TASK_COLORS: Record<string, string> = {
-  TASK_1: "#3b82f6",
-  TASK_2: "#ef4444",
-  TASK_3: "#22c55e",
+
+// Each task line and marker is distinguished by shape and dash pattern as
+// well as color, and all three colors meet the 3:1 non-text contrast
+// minimum against this chart's white/near-black backgrounds -- a learner
+// with color-vision deficiency, or a low-vision learner relying on
+// contrast, must still be able to tell the three lines apart.
+const TASK_STYLES: Record<string, { color: string; dashArray?: string; marker: "circle" | "square" | "diamond" }> = {
+  TASK_1: { color: "#2563eb", marker: "circle" },
+  TASK_2: { color: "#dc2626", dashArray: "6 3", marker: "square" },
+  TASK_3: { color: "#15803d", dashArray: "2 3", marker: "diamond" },
 };
 
 const CHART_WIDTH = 640;
@@ -22,6 +29,7 @@ const CHART_HEIGHT = 260;
 const PADDING = { top: 16, right: 16, bottom: 28, left: 32 };
 const PLOT_WIDTH = CHART_WIDTH - PADDING.left - PADDING.right;
 const PLOT_HEIGHT = CHART_HEIGHT - PADDING.top - PADDING.bottom;
+const MARKER_SIZE = 4;
 
 function xFor(index: number, maxAttempts: number) {
   if (maxAttempts <= 1) return PADDING.left + PLOT_WIDTH / 2;
@@ -31,6 +39,51 @@ function xFor(index: number, maxAttempts: number) {
 // Rank 1 (A1) plots at the bottom, rank 6 (C2) at the top.
 function yFor(rank: number) {
   return PADDING.top + (1 - (rank - 1) / (CEFR_LEVELS.length - 1)) * PLOT_HEIGHT;
+}
+
+function Marker({ shape, x, y, color }: { shape: "circle" | "square" | "diamond"; x: number; y: number; color: string }) {
+  if (shape === "square") {
+    return <rect x={x - MARKER_SIZE} y={y - MARKER_SIZE} width={MARKER_SIZE * 2} height={MARKER_SIZE * 2} fill={color} />;
+  }
+  if (shape === "diamond") {
+    const d = MARKER_SIZE * 1.2;
+    return <polygon points={`${x},${y - d} ${x + d},${y} ${x},${y + d} ${x - d},${y}`} fill={color} />;
+  }
+  return <circle cx={x} cy={y} r={MARKER_SIZE} fill={color} />;
+}
+
+function ProgressDataTable({ series }: { series: EssayProgressSeries[] }) {
+  const copy = useAppCopy();
+  const { locale } = useAppLocale();
+  const dateFormatter = new Intl.DateTimeFormat(APP_LOCALE_INTL_TAGS[locale], { dateStyle: "medium" });
+
+  // The visual chart is decorative (aria-hidden below); this is the actual
+  // data assistive technology reads, since color/position alone can't
+  // convey a line chart's values.
+  return (
+    <table className="sr-only">
+      <caption>{copy.dashboard.chartTitle}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{copy.dashboard.attemptAxisLabel}</th>
+          <th scope="col">{copy.dashboard.levelAxisLabel}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {series.map((task) =>
+          task.attempts.map((point, i) => (
+            <tr key={point.id}>
+              <td>
+                {copy.dashboard.taskLegend({ number: task.number })} — {dateFormatter.format(new Date(point.assessedAt))}{" "}
+                (#{i + 1})
+              </td>
+              <td>{point.cefrLevel}</td>
+            </tr>
+          )),
+        )}
+      </tbody>
+    </table>
+  );
 }
 
 export function ProgressChart({ points }: ProgressChartProps) {
@@ -50,12 +103,9 @@ export function ProgressChart({ points }: ProgressChartProps) {
 
   return (
     <div>
-      <svg
-        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
-        role="img"
-        aria-label={copy.dashboard.chartTitle}
-        className="w-full"
-      >
+      <ProgressDataTable series={series} />
+
+      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} aria-hidden="true" className="w-full">
         {CEFR_LEVELS.map((level, i) => {
           const y = yFor(i + 1);
           return (
@@ -89,25 +139,31 @@ export function ProgressChart({ points }: ProgressChartProps) {
           </text>
         ))}
 
-        {series.map((task) => (
-          <g key={task.taskType}>
-            <polyline
-              fill="none"
-              stroke={TASK_COLORS[task.taskType]}
-              strokeWidth={2}
-              points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank)}`).join(" ")}
-            />
-            {task.attempts.map((point, i) => (
-              <circle key={point.id} cx={xFor(i, maxAttempts)} cy={yFor(point.cefrRank)} r={4} fill={TASK_COLORS[task.taskType]} />
-            ))}
-          </g>
-        ))}
+        {series.map((task) => {
+          const style = TASK_STYLES[task.taskType];
+          return (
+            <g key={task.taskType}>
+              <polyline
+                fill="none"
+                stroke={style.color}
+                strokeWidth={2}
+                strokeDasharray={style.dashArray}
+                points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank)}`).join(" ")}
+              />
+              {task.attempts.map((point, i) => (
+                <Marker key={point.id} shape={style.marker} x={xFor(i, maxAttempts)} y={yFor(point.cefrRank)} color={style.color} />
+              ))}
+            </g>
+          );
+        })}
       </svg>
 
       <div className="mt-3 flex flex-wrap gap-4 text-sm">
         {series.map((task) => (
           <span key={task.taskType} className="flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: TASK_COLORS[task.taskType] }} />
+            <svg width="12" height="12" aria-hidden="true">
+              <Marker shape={TASK_STYLES[task.taskType].marker} x={6} y={6} color={TASK_STYLES[task.taskType].color} />
+            </svg>
             {copy.dashboard.taskLegend({ number: task.number })}
           </span>
         ))}

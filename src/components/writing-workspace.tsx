@@ -642,7 +642,9 @@ export function WritingWorkspace() {
         <button
           type="button"
           onClick={goToDashboard}
-          className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+          disabled={isCorrecting}
+          title={isCorrecting ? copy.workspace.editor.correctingStatus : undefined}
+          className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]"
         >
           {copy.nav.dashboard}
         </button>
