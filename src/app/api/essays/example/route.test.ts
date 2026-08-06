@@ -169,6 +169,17 @@ describe("POST /api/essays/example", () => {
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
   });
 
+  it("logs which provider generated a successful answer, so that's answerable after the fact", async () => {
+    const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    generatePreferredModelAnswerMock.mockResolvedValue({ text: "Un exemple de réponse.", provider: "cloudflare" });
+
+    const response = await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
+
+    expect(response.status).toBe(200);
+    expect(consoleLogSpy).toHaveBeenCalledWith("Example generated:", "cloudflare");
+    consoleLogSpy.mockRestore();
+  });
+
   it("claims a cache miss once and caches the provider response", async () => {
     const response = await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
 

@@ -196,6 +196,11 @@ export async function POST(request: Request) {
 
   try {
     const generated = await generatePreferredModelAnswer({ task, level: typedLevel, topicPrompt: resolvedTopicPrompt });
+    // The provider name alone (a fixed "gemini" | "cloudflare") is the only
+    // thing logged on success, matching the failure path's safe-classification
+    // convention -- otherwise there is no way to tell, after the fact,
+    // whether a given generation used the primary provider or the fallback.
+    console.log("Example generated:", generated.provider);
     try {
       const saved = await cacheExample(
         user.id,
