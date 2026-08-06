@@ -7,25 +7,6 @@ import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 
-function DashboardIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5" aria-hidden="true">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 15.5V8.5M9 15.5v-11M14.5 15.5v-5" />
-    </svg>
-  );
-}
-
-function TasksIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
-      <rect x="2.5" y="2.5" width="5" height="5" rx="1.25" />
-      <rect x="11.5" y="2.5" width="5" height="5" rx="1.25" />
-      <rect x="2.5" y="11.5" width="5" height="5" rx="1.25" />
-      <rect x="11.5" y="11.5" width="5" height="5" rx="1.25" />
-    </svg>
-  );
-}
-
 function SettingsIcon() {
   return (
     <svg
@@ -65,6 +46,13 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
+// The same filled/outlined pill styles the Tasks and Dashboard controls used
+// before they moved here from in-page buttons.
+const TASKS_BUTTON_CLASS =
+  "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
+const DASHBOARD_BUTTON_CLASS =
+  "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
+
 export function NavBar() {
   const copy = useAppCopy();
   const pathname = usePathname();
@@ -100,24 +88,18 @@ export function NavBar() {
                     disabled
                     title={copy.workspace.editor.correctingStatus}
                     aria-label={`${copy.nav.dashboard} — ${copy.workspace.editor.correctingStatus}`}
-                    className={`${ICON_BUTTON_CLASS} cursor-not-allowed opacity-50 hover:bg-transparent`}
+                    className={DASHBOARD_BUTTON_CLASS}
                   >
-                    <DashboardIcon />
+                    {copy.nav.dashboard}
                   </button>
                 ) : (
-                  <Link
-                    href="/dashboard"
-                    onClick={handleDashboardClick}
-                    title={copy.nav.dashboard}
-                    aria-label={copy.nav.dashboard}
-                    className={ICON_BUTTON_CLASS}
-                  >
-                    <DashboardIcon />
+                  <Link href="/dashboard" onClick={handleDashboardClick} className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.dashboard}
                   </Link>
                 )
               ) : (
-                <Link href="/tasks" title={copy.nav.tasks} aria-label={copy.nav.tasks} className={ICON_BUTTON_CLASS}>
-                  <TasksIcon />
+                <Link href="/tasks" className={TASKS_BUTTON_CLASS}>
+                  {copy.nav.tasks}
                 </Link>
               )}
               {/* A plain Link (not a button/onClick) so the intercepted route
