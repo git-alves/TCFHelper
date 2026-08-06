@@ -23,8 +23,8 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
   };
 
   return (
-    <div className="flex flex-col gap-8">
-      <h1 className="text-2xl font-semibold tracking-tight">{copy.settings.title}</h1>
+    <div className="flex flex-col gap-6">
+      <h1 className="text-lg font-semibold tracking-tight">{copy.settings.title}</h1>
 
       <div className="flex items-center gap-4">
         {avatarUrl && (
@@ -37,7 +37,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
         </div>
       </div>
 
-      <section className="flex flex-col gap-3" aria-labelledby="appearance-heading">
+      <section className="flex flex-col gap-2" aria-labelledby="appearance-heading">
         <div>
           <h2 id="appearance-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             {copy.settings.appearanceHeading}
@@ -46,27 +46,21 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.appearanceDescription}
           </p>
         </div>
-        <div role="radiogroup" aria-labelledby="appearance-heading" className="flex flex-col gap-2">
+        <select
+          aria-labelledby="appearance-heading"
+          value={theme}
+          onChange={(event) => setTheme(event.target.value as AppTheme)}
+          className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
+        >
           {APP_THEMES.map((option) => (
-            <button
-              key={option}
-              type="button"
-              role="radio"
-              aria-checked={theme === option}
-              onClick={() => setTheme(option)}
-              className={`rounded-xl border px-4 py-2.5 text-left transition-colors ${
-                theme === option
-                  ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
-                  : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
-              }`}
-            >
-              <span className="block font-medium">{themeLabels[option]}</span>
-            </button>
+            <option key={option} value={option} className="text-black">
+              {themeLabels[option]}
+            </option>
           ))}
-        </div>
+        </select>
       </section>
 
-      <section className="flex flex-col gap-3" aria-labelledby="language-heading">
+      <section className="flex flex-col gap-2" aria-labelledby="language-heading">
         <div>
           <h2 id="language-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             {copy.settings.languageHeading}
@@ -75,24 +69,18 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.languageDescription}
           </p>
         </div>
-        <div role="radiogroup" aria-labelledby="language-heading" className="flex flex-col gap-2">
+        <select
+          aria-labelledby="language-heading"
+          value={locale}
+          onChange={(event) => setLocale(event.target.value as typeof locale)}
+          className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
+        >
           {APP_LOCALES.map((code) => (
-            <button
-              key={code}
-              type="button"
-              role="radio"
-              aria-checked={locale === code}
-              onClick={() => setLocale(code)}
-              className={`rounded-xl border px-4 py-2.5 text-left transition-colors ${
-                locale === code
-                  ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
-                  : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
-              }`}
-            >
-              <span className="block font-medium">{APP_LOCALE_LABELS[code]}</span>
-            </button>
+            <option key={code} value={code} className="text-black">
+              {APP_LOCALE_LABELS[code]}
+            </option>
           ))}
-        </div>
+        </select>
       </section>
 
       <section className="flex flex-col gap-2" aria-labelledby="help-heading">

@@ -67,10 +67,7 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
   }, [router]);
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 px-4 py-10 sm:items-center"
-      onClick={() => router.back()}
-    >
+    <div className="fixed inset-0 z-50 bg-black/20" onClick={() => router.back()}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -78,7 +75,7 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
         aria-label={ariaLabel}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-black/[.08] bg-background p-6 shadow-xl outline-none dark:border-white/[.145]"
+        className="absolute right-4 top-[4.25rem] max-h-[calc(100vh-5.5rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-2xl border border-black/[.08] bg-background p-5 shadow-xl outline-none dark:border-white/[.145] sm:right-6 lg:right-8"
       >
         <div className="flex justify-end">
           <button
