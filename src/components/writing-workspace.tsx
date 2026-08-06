@@ -13,6 +13,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 
 interface RecentExamTopic {
@@ -70,6 +71,7 @@ export function WritingWorkspace() {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
   const router = useRouter();
+  const { register: registerDashboardNavGuard, setNavigationBusy } = useDashboardNavGuard();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -389,6 +391,30 @@ export function WritingWorkspace() {
     runOrConfirm("dashboard", () => router.push("/dashboard"));
   }
 
+  // A ref instead of a `[registerDashboardNavGuard]`-only dependency: the
+  // registered callback must always see the latest state (taskType,
+  // topicMode, unsaved content), not whatever it closed over when the
+  // effect last ran, so the effect below registers a stable wrapper once
+  // and this ref is what actually gets called. Updated in its own effect,
+  // never during render, per the rules of hooks.
+  const goToDashboardRef = useRef(goToDashboard);
+  useEffect(() => {
+    goToDashboardRef.current = goToDashboard;
+  });
+
+  useEffect(() => {
+    registerDashboardNavGuard(() => goToDashboardRef.current());
+    return () => registerDashboardNavGuard(null);
+  }, [registerDashboardNavGuard]);
+
+  // The nav bar's Dashboard control lives outside this component; it can
+  // only know a correction the server will persist regardless is in flight
+  // through this shared flag, not through local isCorrecting state.
+  useEffect(() => {
+    setNavigationBusy(isCorrecting);
+    return () => setNavigationBusy(false);
+  }, [isCorrecting, setNavigationBusy]);
+
   function chooseCustomTopic() {
     if (topicMode === "custom") {
       cancelPendingTopicRequests();
@@ -638,17 +664,6 @@ export function WritingWorkspace() {
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={goToDashboard}
-          disabled={isCorrecting}
-          title={isCorrecting ? copy.workspace.editor.correctingStatus : undefined}
-          className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]"
-        >
-          {copy.nav.dashboard}
-        </button>
-      </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">

@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
+import { DashboardNavGuardProvider } from "@/components/dashboard-nav-guard";
 import { NavBar } from "@/components/nav-bar";
 import { getAppCopy } from "@/lib/app-copy";
 import { getRequestLocale } from "@/lib/request-locale";
@@ -55,9 +56,11 @@ export default async function RootLayout({
         <AppThemeProvider>
           <AppLocaleProvider initialLocale={locale}>
             <ClerkLocaleProvider>
-              <NavBar />
-              <div className="flex flex-1 flex-col">{children}</div>
-              {settings}
+              <DashboardNavGuardProvider>
+                <NavBar />
+                <div className="flex flex-1 flex-col">{children}</div>
+                {settings}
+              </DashboardNavGuardProvider>
             </ClerkLocaleProvider>
           </AppLocaleProvider>
         </AppThemeProvider>
