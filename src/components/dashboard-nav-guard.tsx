@@ -14,6 +14,12 @@ interface DashboardNavGuardContextValue {
    * away from an already-submitted, unabortable request. */
   isNavigationBusy: boolean;
   setNavigationBusy: (busy: boolean) => void;
+  /** True exactly while the workspace is mounted -- i.e. a guard is
+   * registered. The nav bar uses this, not the URL, to decide which control
+   * to show: opening Settings from /tasks intercepts the route and updates
+   * the URL to /settings while /tasks (and the workspace under it) stays
+   * mounted behind the modal, so usePathname() alone would misreport it. */
+  isWorkspaceMounted: boolean;
 }
 
 const DashboardNavGuardContext = createContext<DashboardNavGuardContextValue | null>(null);
@@ -28,9 +34,11 @@ const DashboardNavGuardContext = createContext<DashboardNavGuardContextValue | n
 export function DashboardNavGuardProvider({ children }: { children: ReactNode }) {
   const guardRef = useRef<DashboardNavGuard | null>(null);
   const [isNavigationBusy, setNavigationBusy] = useState(false);
+  const [isWorkspaceMounted, setIsWorkspaceMounted] = useState(false);
 
   const register = useCallback((guard: DashboardNavGuard | null) => {
     guardRef.current = guard;
+    setIsWorkspaceMounted(guard !== null);
   }, []);
 
   const requestNavigation = useCallback(() => {
@@ -40,8 +48,8 @@ export function DashboardNavGuardProvider({ children }: { children: ReactNode })
   }, []);
 
   const value = useMemo(
-    () => ({ register, requestNavigation, isNavigationBusy, setNavigationBusy }),
-    [register, requestNavigation, isNavigationBusy],
+    () => ({ register, requestNavigation, isNavigationBusy, setNavigationBusy, isWorkspaceMounted }),
+    [register, requestNavigation, isNavigationBusy, isWorkspaceMounted],
   );
 
   return <DashboardNavGuardContext.Provider value={value}>{children}</DashboardNavGuardContext.Provider>;

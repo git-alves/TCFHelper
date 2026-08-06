@@ -46,22 +46,38 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
-// The same filled/outlined pill styles the Tasks and Dashboard controls used
-// before they moved here from in-page buttons.
+// Follows the theme instead of inverting it: bg-background/text-foreground
+// (light pill in light mode, dark pill in dark mode), not the reverse.
 const TASKS_BUTTON_CLASS =
-  "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
+  "shrink-0 rounded-full border border-black/[.15] bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]";
 const DASHBOARD_BUTTON_CLASS =
   "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
 export function NavBar() {
   const copy = useAppCopy();
   const pathname = usePathname();
-  const { requestNavigation, isNavigationBusy } = useDashboardNavGuard();
+  const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
 
-  // Toggles between the two screens: on /tasks, this offers Dashboard; on
-  // /dashboard (or anywhere else), it offers Tasks. Segment-safe so a future
-  // route like /tasksomething can't false-match.
-  const onTasks = pathname === "/tasks" || (pathname?.startsWith("/tasks/") ?? false);
+  // Toggles between the two screens: while the workspace is mounted, this
+  // offers Dashboard; otherwise it offers Tasks. Driven by whether the
+  // workspace is actually mounted, not the URL: opening Settings from
+  // /tasks intercepts the route and changes the URL to /settings while
+  // /tasks stays mounted behind the modal, so usePathname() would wrongly
+  // flip this to "Tasks" the moment Settings opens.
+  const onTasks = isWorkspaceMounted;
+
+  // Settings sets the URL to exactly /settings while its own modal is open
+  // (and only then), so — unlike the workspace-mounted check above — the
+  // pathname genuinely is the right signal here. Clicking Dashboard while
+  // Settings is open would open the workspace's own discard-confirmation
+  // dialog underneath the still-mounted Settings modal: same z-index, later
+  // in the DOM, so Settings would cover it and both dialogs' focus traps
+  // would compete. Blocking the click instead of racing the two modals.
+  const isSettingsOpen = pathname === "/settings";
+  const isDashboardBlocked = isNavigationBusy || isSettingsOpen;
+  const dashboardBlockedReason = isNavigationBusy
+    ? copy.workspace.editor.correctingStatus
+    : copy.nav.closeSettingsFirst;
 
   function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0) return;
@@ -80,14 +96,16 @@ export function NavBar() {
             <>
               {onTasks ? (
                 // A correction the server already received can't be
-                // recalled by leaving the page, so this is a real disabled
-                // control (not just a styled one) while it's in flight.
-                isNavigationBusy ? (
+                // recalled by leaving the page, or the Settings modal
+                // covering the workspace's own confirmation dialog, are
+                // both real reasons to make this a genuinely disabled
+                // control rather than just a styled one.
+                isDashboardBlocked ? (
                   <button
                     type="button"
                     disabled
-                    title={copy.workspace.editor.correctingStatus}
-                    aria-label={`${copy.nav.dashboard} — ${copy.workspace.editor.correctingStatus}`}
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
                     className={DASHBOARD_BUTTON_CLASS}
                   >
                     {copy.nav.dashboard}
