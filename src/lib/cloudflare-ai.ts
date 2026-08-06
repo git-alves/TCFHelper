@@ -148,12 +148,15 @@ export async function generateModelAnswerWithCloudflare(
           messages: [{ role: "user", content: buildExamplePrompt(params) }],
           temperature: 0.7,
           max_completion_tokens: 512,
-          // The default model is a reasoning model; without this, it can
-          // spend its entire completion budget on hidden reasoning tokens
-          // and return no usable final content at all. "low" is the value
-          // documented as universally supported across reasoning models
-          // (unlike newer additions such as "minimal", not guaranteed here).
+          // reasoning_effort alone was confirmed insufficient in production:
+          // the model still spent the whole completion budget on
+          // reasoning_content and got cut off (finish_reason "length")
+          // before ever writing the final answer. GLM models have their own
+          // native thinking toggle, distinct from the generic
+          // reasoning_effort convention -- this is what actually turns
+          // reasoning off rather than merely constraining its effort.
           reasoning_effort: "low",
+          chat_template_kwargs: { enable_thinking: false },
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

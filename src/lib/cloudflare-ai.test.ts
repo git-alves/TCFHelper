@@ -57,6 +57,23 @@ describe("generateModelAnswerWithCloudflare", () => {
     );
   });
 
+  it("disables GLM's native thinking mode, not just the generic reasoning_effort hint", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { response: "Réponse simple." } }),
+    } as Response);
+
+    await generateModelAnswerWithCloudflare(params);
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        body: expect.stringContaining('"chat_template_kwargs":{"enable_thinking":false}'),
+      }),
+    );
+  });
+
   it("accepts the direct endpoint's simple response field", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
