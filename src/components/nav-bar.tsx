@@ -66,10 +66,11 @@ export function NavBar() {
   // flip this to "Tasks" the moment Settings opens.
   const onTasks = isWorkspaceMounted;
 
-  // Settings sets the URL to exactly /settings while its own modal is open
-  // (and only then), so — unlike the workspace-mounted check above — the
-  // pathname genuinely is the right signal here. Clicking Dashboard while
-  // Settings is open would open the workspace's own discard-confirmation
+  // /settings is the URL both for the full Settings page and for its
+  // intercepted-route modal over another page; this check only matters in
+  // the latter case, when onTasks is also true (the full page never has a
+  // mounted workspace to show Dashboard for in the first place). There,
+  // clicking Dashboard would open the workspace's own discard-confirmation
   // dialog underneath the still-mounted Settings modal: same z-index, later
   // in the DOM, so Settings would cover it and both dialogs' focus traps
   // would compete. Blocking the click instead of racing the two modals.
