@@ -142,20 +142,32 @@ describe("generateModelAnswer", () => {
     expect(jsonMock).not.toHaveBeenCalled();
   });
 
-  it("includes the title/summary/opinion structure only for Task 3, whose topic is two opposing documents", async () => {
+  const taskThreeTopicWithDocuments =
+    "Faut-il interdire les téléphones portables à l'école ?\n\n" +
+    "Document 1 :\nLes téléphones distraient les élèves.\n\n" +
+    "Document 2 :\nLes téléphones sont des outils pédagogiques utiles.";
+
+  it("includes the title/summary/opinion structure for a Task 3 topic that has real Document 1/2 sections", async () => {
     mockFetchOnce({
       ok: true,
       status: 200,
       json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
     });
 
-    await generateModelAnswer({ ...params, task: TASK_INSTRUCTIONS.TASK_3 });
+    await generateModelAnswer({
+      ...params,
+      task: TASK_INSTRUCTIONS.TASK_3,
+      topicPrompt: taskThreeTopicWithDocuments,
+    });
 
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
     expect(promptText).toContain("Summary (40-60 words)");
     expect(promptText).toContain("Opinion (80-120 words)");
+    // The title counts toward the same total the validator measures -- the
+    // prompt must not claim otherwise.
+    expect(promptText).not.toContain("not counted");
   });
 
   it("omits the Task 3 document-synthesis structure for other tasks", async () => {
@@ -166,6 +178,25 @@ describe("generateModelAnswer", () => {
     });
 
     await generateModelAnswer(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).not.toContain("Summary (40-60 words)");
+  });
+
+  it("omits the Task 3 document-synthesis structure for a custom topic without real source documents, so the model isn't pushed to invent viewpoints", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({
+      ...params,
+      task: TASK_INSTRUCTIONS.TASK_3,
+      topicPrompt: "Le télétravail devrait-il être généralisé ?",
+    });
 
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
