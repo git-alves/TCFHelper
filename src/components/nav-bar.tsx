@@ -71,8 +71,9 @@ export function NavBar() {
   const { requestNavigation, isNavigationBusy } = useDashboardNavGuard();
 
   // Toggles between the two screens: on /tasks, this offers Dashboard; on
-  // /dashboard (or anywhere else), it offers Tasks.
-  const onTasks = pathname?.startsWith("/tasks") ?? false;
+  // /dashboard (or anywhere else), it offers Tasks. Segment-safe so a future
+  // route like /tasksomething can't false-match.
+  const onTasks = pathname === "/tasks" || (pathname?.startsWith("/tasks/") ?? false);
 
   function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
     if (event.defaultPrevented || event.button !== 0) return;
@@ -98,7 +99,7 @@ export function NavBar() {
                     type="button"
                     disabled
                     title={copy.workspace.editor.correctingStatus}
-                    aria-label={copy.nav.dashboard}
+                    aria-label={`${copy.nav.dashboard} — ${copy.workspace.editor.correctingStatus}`}
                     className={`${ICON_BUTTON_CLASS} cursor-not-allowed opacity-50 hover:bg-transparent`}
                   >
                     <DashboardIcon />
