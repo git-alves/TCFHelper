@@ -109,8 +109,13 @@ function extractText(payload: unknown): string {
 
   // Workers AI's direct /ai/run endpoint wraps chat-completion output in a
   // result envelope. Some models use the simpler `response` field instead,
-  // so support both documented shapes.
-  if (typeof payload.result.response === "string") return payload.result.response;
+  // so support both documented shapes. A blank `response` must fall through
+  // to `choices` rather than winning by presence alone -- otherwise a
+  // model that always includes an empty `response` field alongside real
+  // content in `choices` would have that real answer discarded.
+  if (typeof payload.result.response === "string" && payload.result.response.trim()) {
+    return payload.result.response;
+  }
   const choices = payload.result.choices;
   if (!Array.isArray(choices) || choices.length === 0) return "";
   const first = choices[0];

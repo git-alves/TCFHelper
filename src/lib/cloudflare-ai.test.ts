@@ -67,6 +67,18 @@ describe("generateModelAnswerWithCloudflare", () => {
     await expect(generateModelAnswerWithCloudflare(params)).resolves.toBe("Réponse simple.");
   });
 
+  it("falls through to choices when response is blank, instead of discarding real content next to it", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        result: { response: "   ", choices: [{ message: { content: "usable answer" } }] },
+      }),
+    } as Response);
+
+    await expect(generateModelAnswerWithCloudflare(params)).resolves.toBe("usable answer");
+  });
+
   it("fails closed without both Cloudflare credentials", async () => {
     delete process.env.CLOUDFLARE_AI_API_TOKEN;
 
