@@ -1,4 +1,4 @@
-import type { TaskDefinition } from "@/lib/tcf-tasks";
+import { TASK_INSTRUCTIONS, type TaskDefinition } from "@/lib/tcf-tasks";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Google AI Studio's free tier (no credit card, no billing) — kept
@@ -9,7 +9,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-04";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-06";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -61,18 +61,39 @@ const LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
   C2: "a highly nuanced, idiomatic response with sophisticated structure, subtle register control, and a near-native command of complex grammar and vocabulary.",
 };
 
+// Task 3's own two source documents (see parseTaskThree in
+// recent-exam-topics.ts, which formats every Task 3 topicPrompt as a title
+// followed by "Document 1 :" / "Document 2 :" sections) present opposing
+// viewpoints that the real exam requires synthesizing before arguing a
+// personal position — a fixed three-part shape, not just a longer essay.
+const TASK_THREE_STRUCTURE =
+  "This topic presents two source documents with opposing viewpoints on a social issue. Structure the " +
+  "response in exactly three parts, in this order:\n" +
+  "1. Title: a short, catchy title introducing the social issue (not counted toward the word range " +
+  "below).\n" +
+  "2. Summary (40-60 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
+  "without giving a personal opinion. Use contrasting connectors, e.g. \"D'un côté... d'un autre côté\", " +
+  "\"Le premier document souligne que... tandis que le second met en avant...\".\n" +
+  "3. Opinion (80-120 words): clearly state a personal position, e.g. \"Je pense que\", \"À mon avis\", " +
+  "\"Je suis convaincu(e) que\", and defend it with specific arguments and examples. Even while taking a " +
+  "position, keep the stance nuanced, as is typical at B2 level.\n" +
+  "Separate the title, the summary, and the opinion each with a blank line.";
+
 export function buildExamplePrompt({ task, level, topicPrompt }: GenerateModelAnswerParams): string {
+  const isTaskThree = task.label === TASK_INSTRUCTIONS.TASK_3.label;
   return (
     "You are a TCF (Test de Connaissance du Français) examiner writing a model answer for a learner to " +
     "study.\n" +
     `Task: ${task.label} - ${task.title}\n` +
     `Instructions: ${task.description}\n` +
     `Required length: ${task.minWords}-${task.maxWords} words.\n` +
+    (isTaskThree ? `${TASK_THREE_STRUCTURE}\n` : "") +
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
     `authentically demonstrate CEFR level ${level}: ${LEVEL_DESCRIPTIONS[level]}\n` +
-    "Stay within the required word range. Return only the French response text itself — no title, no " +
-    "explanation, no markdown formatting."
+    "Stay within the required word range. Return only the French response text itself" +
+    (isTaskThree ? ", formatted exactly as described above" : " — no title, no explanation") +
+    ", no markdown formatting."
   );
 }
 
