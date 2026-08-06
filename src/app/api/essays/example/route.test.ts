@@ -320,6 +320,23 @@ describe("POST /api/essays/example", () => {
       );
     });
 
+    it("includes Cloudflare's safe payload-shape diagnostic in the combined log when present", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock(
+          "invalidOutput",
+          new CloudflareRequestError(200, "has_message_content=false finish_reason=length"),
+        ),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Example generation failed:",
+        "gemini_invalidOutput_then_cloudflare_request_failed_200 [has_message_content=false finish_reason=length]",
+      );
+    });
+
     it("never lets the wrapped Cloudflare error's own text reach the log, even when it isn't a recognized error type", async () => {
       const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
       generatePreferredModelAnswerMock.mockRejectedValue(

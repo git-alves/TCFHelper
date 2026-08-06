@@ -56,7 +56,9 @@ const requestSchema = z
 function classifyExampleGenerationFailure(error: unknown): string {
   if (error instanceof ModelAnswerInvalidOutputError) return "invalid_output_length";
   if (error instanceof GeminiRequestError) return `gemini_request_failed_${error.status}`;
-  if (error instanceof CloudflareRequestError) return `cloudflare_request_failed_${error.status}`;
+  if (error instanceof CloudflareRequestError) {
+    return `cloudflare_request_failed_${error.status}${error.payloadShape ? ` [${error.payloadShape}]` : ""}`;
+  }
   if (error instanceof GeminiTransportError) return "gemini_transport_failed";
   if (error instanceof CloudflareTransportError) return "cloudflare_transport_failed";
   // Only reachable when Cloudflare's own failure isn't one of the cases
