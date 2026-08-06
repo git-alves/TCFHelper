@@ -15,13 +15,10 @@ describe("APP_COPY", () => {
 
       const renderedCopy = [
         copy.common.cancel,
-        copy.nav.localeLabel,
-        copy.nav.localeHelp,
+        copy.common.close,
         copy.nav.dashboard,
         copy.nav.settings,
-        copy.nav.signOut,
         copy.nav.logIn,
-        copy.nav.signUp,
         copy.home.title,
         copy.home.description,
         copy.home.translationDisclosure,
@@ -56,6 +53,8 @@ describe("APP_COPY", () => {
         copy.settings.themeLight,
         copy.settings.themeDark,
         copy.settings.themeSystem,
+        copy.settings.languageHeading,
+        copy.settings.languageDescription,
         copy.settings.helpHeading,
         copy.settings.helpDescription,
         copy.workspace.task.heading,

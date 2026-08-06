@@ -35,15 +35,12 @@ interface ErrorCountValues {
 export interface AppCopy {
   common: {
     cancel: string;
+    close: string;
   };
   nav: {
-    localeLabel: string;
-    localeHelp: string;
     dashboard: string;
     settings: string;
-    signOut: string;
     logIn: string;
-    signUp: string;
   };
   home: {
     title: string;
@@ -88,6 +85,8 @@ export interface AppCopy {
     themeLight: string;
     themeDark: string;
     themeSystem: string;
+    languageHeading: string;
+    languageDescription: string;
     helpHeading: string;
     helpDescription: string;
   };
@@ -174,15 +173,12 @@ export const APP_COPY = {
   en: {
     common: {
       cancel: "Cancel",
+      close: "Close",
     },
     nav: {
-      localeLabel: "Application language",
-      localeHelp: "Language used in the interface, feedback, and live translation panel",
       dashboard: "Dashboard",
       settings: "Settings",
-      signOut: "Sign out",
       logIn: "Log in",
-      signUp: "Sign up",
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
@@ -229,6 +225,8 @@ export const APP_COPY = {
       themeLight: "Light",
       themeDark: "Dark",
       themeSystem: "Match system",
+      languageHeading: "Language",
+      languageDescription: "Choose the language used across the interface, feedback, and live translation panel.",
       helpHeading: "Help & support",
       helpDescription: "Have a question or found a problem? Reach out and we'll help.",
     },
@@ -323,16 +321,12 @@ export const APP_COPY = {
   fr: {
     common: {
       cancel: "Annuler",
+      close: "Fermer",
     },
     nav: {
-      localeLabel: "Langue de l’application",
-      localeHelp:
-        "Langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct",
       dashboard: "Tableau de bord",
       settings: "Paramètres",
-      signOut: "Se déconnecter",
       logIn: "Se connecter",
-      signUp: "S’inscrire",
     },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
@@ -382,6 +376,9 @@ export const APP_COPY = {
       themeLight: "Clair",
       themeDark: "Sombre",
       themeSystem: "Système",
+      languageHeading: "Langue",
+      languageDescription:
+        "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct.",
       helpHeading: "Aide et assistance",
       helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
     },
@@ -479,16 +476,12 @@ export const APP_COPY = {
   es: {
     common: {
       cancel: "Cancelar",
+      close: "Cerrar",
     },
     nav: {
-      localeLabel: "Idioma de la aplicación",
-      localeHelp:
-        "Idioma utilizado en la interfaz, los comentarios y el panel de traducción en tiempo real",
       dashboard: "Panel",
       settings: "Configuración",
-      signOut: "Cerrar sesión",
       logIn: "Iniciar sesión",
-      signUp: "Crear cuenta",
     },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
@@ -538,6 +531,9 @@ export const APP_COPY = {
       themeLight: "Claro",
       themeDark: "Oscuro",
       themeSystem: "Igual que el sistema",
+      languageHeading: "Idioma",
+      languageDescription:
+        "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción en tiempo real.",
       helpHeading: "Ayuda y soporte",
       helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
@@ -635,16 +631,12 @@ export const APP_COPY = {
   pt: {
     common: {
       cancel: "Cancelar",
+      close: "Fechar",
     },
     nav: {
-      localeLabel: "Idioma do aplicativo",
-      localeHelp:
-        "Idioma usado na interface, nos comentários e no painel de tradução em tempo real",
       dashboard: "Painel",
       settings: "Configurações",
-      signOut: "Sair",
       logIn: "Entrar",
-      signUp: "Criar conta",
     },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",
@@ -694,6 +686,9 @@ export const APP_COPY = {
       themeLight: "Claro",
       themeDark: "Escuro",
       themeSystem: "Igual ao sistema",
+      languageHeading: "Idioma",
+      languageDescription:
+        "Escolha o idioma usado na interface, nos comentários e no painel de tradução em tempo real.",
       helpHeading: "Ajuda e suporte",
       helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
     },

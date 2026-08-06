@@ -1,7 +1,8 @@
 "use client";
 
-import { useAppCopy } from "@/components/app-locale-provider";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useAppTheme } from "@/components/app-theme-provider";
+import { APP_LOCALES, APP_LOCALE_LABELS } from "@/lib/app-locale";
 import { APP_THEMES, type AppTheme } from "@/lib/app-theme";
 
 interface SettingsFormProps {
@@ -13,6 +14,7 @@ interface SettingsFormProps {
 export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
   const copy = useAppCopy();
   const { theme, setTheme } = useAppTheme();
+  const { locale, setLocale } = useAppLocale();
 
   const themeLabels: Record<AppTheme, string> = {
     light: copy.settings.themeLight,
@@ -59,6 +61,35 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
               }`}
             >
               <span className="block font-medium">{themeLabels[option]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3" aria-labelledby="language-heading">
+        <div>
+          <h2 id="language-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            {copy.settings.languageHeading}
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            {copy.settings.languageDescription}
+          </p>
+        </div>
+        <div role="radiogroup" aria-labelledby="language-heading" className="grid gap-3 sm:grid-cols-2">
+          {APP_LOCALES.map((code) => (
+            <button
+              key={code}
+              type="button"
+              role="radio"
+              aria-checked={locale === code}
+              onClick={() => setLocale(code)}
+              className={`rounded-xl border p-4 text-left transition-colors ${
+                locale === code
+                  ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                  : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
+              }`}
+            >
+              <span className="block font-medium">{APP_LOCALE_LABELS[code]}</span>
             </button>
           ))}
         </div>

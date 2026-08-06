@@ -30,8 +30,10 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({
   children,
+  settings,
 }: Readonly<{
   children: React.ReactNode;
+  settings: React.ReactNode;
 }>) {
   const locale = await getRequestLocale();
 
@@ -55,6 +57,7 @@ export default async function RootLayout({
             <ClerkLocaleProvider>
               <NavBar />
               <div className="flex flex-1 flex-col">{children}</div>
+              {settings}
             </ClerkLocaleProvider>
           </AppLocaleProvider>
         </AppThemeProvider>
