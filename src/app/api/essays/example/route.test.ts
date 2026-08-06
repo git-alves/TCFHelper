@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
-import { CloudflareTransportError } from "@/lib/cloudflare-ai";
+import { CloudflareRequestError, CloudflareTransportError } from "@/lib/cloudflare-ai";
 
 const {
   getCurrentAppUserMock,
@@ -16,11 +16,21 @@ const {
   ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputErrorMock,
+  ModelAnswerBothProvidersFailedErrorMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   class ModelAnswerNotConfiguredErrorMock extends Error {}
   class ModelAnswerRateLimitedErrorMock extends Error {}
   class ModelAnswerInvalidOutputErrorMock extends Error {}
+  class ModelAnswerBothProvidersFailedErrorMock extends Error {
+    geminiReason: string;
+    cloudflareError: unknown;
+    constructor(geminiReason: string, cloudflareError: unknown) {
+      super("Both Gemini and Cloudflare failed to produce a model answer.");
+      this.geminiReason = geminiReason;
+      this.cloudflareError = cloudflareError;
+    }
+  }
 
   return {
     getCurrentAppUserMock: vi.fn(),
@@ -36,6 +46,7 @@ const {
     ModelAnswerNotConfiguredErrorMock,
     ModelAnswerRateLimitedErrorMock,
     ModelAnswerInvalidOutputErrorMock,
+    ModelAnswerBothProvidersFailedErrorMock,
   };
 });
 
@@ -58,6 +69,7 @@ vi.mock("@/lib/model-answer-generator", () => ({
   ModelAnswerNotConfiguredError: ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedError: ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputError: ModelAnswerInvalidOutputErrorMock,
+  ModelAnswerBothProvidersFailedError: ModelAnswerBothProvidersFailedErrorMock,
 }));
 
 const { POST } = await import("./route");
@@ -292,6 +304,40 @@ describe("POST /api/essays/example", () => {
 
       expect(response.status).toBe(502);
       expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "cloudflare_transport_failed");
+    });
+
+    it("logs why Gemini was skipped alongside Cloudflare's own failure, not just Cloudflare's", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock("rateLimited", new CloudflareRequestError(401)),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Example generation failed:",
+        "gemini_rateLimited_then_cloudflare_request_failed_401",
+      );
+    });
+
+    it("never lets the wrapped Cloudflare error's own text reach the log, even when it isn't a recognized error type", async () => {
+      const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+      generatePreferredModelAnswerMock.mockRejectedValue(
+        new ModelAnswerBothProvidersFailedErrorMock("notConfigured", new Error(sentinel)),
+      );
+
+      const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+      expect(response.status).toBe(502);
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        "Example generation failed:",
+        "gemini_notConfigured_then_provider_request_failed",
+      );
+      for (const call of consoleErrorSpy.mock.calls) {
+        for (const arg of call) {
+          expect(String(arg)).not.toContain(sentinel);
+        }
+      }
     });
   });
 });
