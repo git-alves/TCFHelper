@@ -27,7 +27,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example" | "dashboard";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "clear";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type ExampleLevel = "B2" | "C1" | "C2";
@@ -648,6 +648,11 @@ export function WritingWorkspace() {
     copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
   }
 
+  function handleClearDraft() {
+    if (!content.trim()) return;
+    runOrConfirm("clear", () => resetDraftAndFeedback());
+  }
+
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
   const trimmedContent = content.trim();
   const isDraftTooLongToTranslate =
@@ -909,6 +914,14 @@ export function WritingWorkspace() {
                     ? copy.workspace.editor.copyFailed
                     : copy.workspace.editor.copy}
               </button>
+              <button
+                type="button"
+                onClick={handleClearDraft}
+                disabled={!content.trim()}
+                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {copy.workspace.editor.clear}
+              </button>
             </div>
             {isCorrecting && (
               <p role="status" className="sr-only">
@@ -1103,12 +1116,16 @@ export function WritingWorkspace() {
                 ? copy.workspace.dialog.exampleOverwriteDescription
                 : pendingSwitch?.kind === "dashboard"
                   ? copy.workspace.dialog.dashboardSwitchDescription
-                  : ""
+                  : pendingSwitch?.kind === "clear"
+                    ? copy.workspace.dialog.clearDraftDescription
+                    : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"
             ? copy.workspace.dialog.exampleOverwriteConfirm
-            : copy.workspace.dialog.confirm
+            : pendingSwitch?.kind === "clear"
+              ? copy.workspace.dialog.clearDraftConfirm
+              : copy.workspace.dialog.confirm
         }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {

@@ -101,6 +101,7 @@ describe("APP_COPY", () => {
         copy.workspace.editor.copy,
         copy.workspace.editor.copied,
         copy.workspace.editor.copyFailed,
+        copy.workspace.editor.clear,
         copy.workspace.translation.heading({ language: "English" }),
         copy.workspace.translation.inProgress,
         copy.workspace.translation.empty,
@@ -126,6 +127,8 @@ describe("APP_COPY", () => {
         copy.workspace.dialog.dashboardSwitchDescription,
         copy.workspace.dialog.exampleOverwriteDescription,
         copy.workspace.dialog.exampleOverwriteConfirm,
+        copy.workspace.dialog.clearDraftDescription,
+        copy.workspace.dialog.clearDraftConfirm,
         copy.workspace.dialog.confirm,
         copy.workspace.dialog.cancel,
       ];

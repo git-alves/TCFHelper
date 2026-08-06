@@ -140,6 +140,7 @@ export interface AppCopy {
       copy: string;
       copied: string;
       copyFailed: string;
+      clear: string;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -168,6 +169,8 @@ export interface AppCopy {
       dashboardSwitchDescription: string;
       exampleOverwriteDescription: string;
       exampleOverwriteConfirm: string;
+      clearDraftDescription: string;
+      clearDraftConfirm: string;
       confirm: string;
       cancel: string;
     };
@@ -290,6 +293,7 @@ export const APP_COPY = {
         copy: "Copy text",
         copied: "Copied!",
         copyFailed: "Couldn't copy",
+        clear: "Clear text",
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -329,6 +333,8 @@ export const APP_COPY = {
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
         exampleOverwriteDescription: "Generating an example will replace your current draft.",
         exampleOverwriteConfirm: "Replace draft",
+        clearDraftDescription: "Clearing will discard your current draft and feedback.",
+        clearDraftConfirm: "Clear text",
         confirm: "Discard and switch",
         cancel: "Keep working",
       },
@@ -452,6 +458,7 @@ export const APP_COPY = {
         copy: "Copier le texte",
         copied: "Copié !",
         copyFailed: "Impossible de copier",
+        clear: "Effacer le texte",
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -493,6 +500,8 @@ export const APP_COPY = {
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
         exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
         exampleOverwriteConfirm: "Remplacer le brouillon",
+        clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
+        clearDraftConfirm: "Effacer le texte",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
       },
@@ -615,6 +624,7 @@ export const APP_COPY = {
         copy: "Copiar texto",
         copied: "¡Copiado!",
         copyFailed: "No se pudo copiar",
+        clear: "Borrar texto",
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
@@ -656,6 +666,8 @@ export const APP_COPY = {
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
         exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
         exampleOverwriteConfirm: "Reemplazar borrador",
+        clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
+        clearDraftConfirm: "Borrar texto",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
       },
@@ -778,6 +790,7 @@ export const APP_COPY = {
         copy: "Copiar texto",
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",
+        clear: "Limpar texto",
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
@@ -818,6 +831,8 @@ export const APP_COPY = {
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
         exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
         exampleOverwriteConfirm: "Substituir rascunho",
+        clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",
+        clearDraftConfirm: "Limpar texto",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
       },
