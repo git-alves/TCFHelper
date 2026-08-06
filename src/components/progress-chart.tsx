@@ -105,58 +105,70 @@ export function ProgressChart({ points }: ProgressChartProps) {
     <div>
       <ProgressDataTable series={series} />
 
-      <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} aria-hidden="true" className="w-full">
-        {CEFR_LEVELS.map((level, i) => {
-          const y = yFor(i + 1);
-          return (
-            <g key={level}>
-              <line
-                x1={PADDING.left}
-                x2={CHART_WIDTH - PADDING.right}
-                y1={y}
-                y2={y}
-                stroke="currentColor"
-                strokeOpacity={0.1}
-              />
-              <text x={PADDING.left - 8} y={y} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="currentColor" opacity={0.6}>
-                {level}
-              </text>
-            </g>
-          );
-        })}
+      {/* Scrolls horizontally instead of shrinking below a legible size: a
+       * viewBox-scaled SVG stretched to a narrow phone's width would make
+       * the axis/legend text too small to read rather than just narrower.
+       * The minimum width matches CHART_WIDTH exactly so the SVG is never
+       * scaled below 1:1 -- an 11-unit label stays at least 11 CSS px. */}
+      <div className="-mx-1 overflow-x-auto px-1">
+        <svg
+          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          aria-hidden="true"
+          className="w-full"
+          style={{ minWidth: CHART_WIDTH }}
+        >
+          {CEFR_LEVELS.map((level, i) => {
+            const y = yFor(i + 1);
+            return (
+              <g key={level}>
+                <line
+                  x1={PADDING.left}
+                  x2={CHART_WIDTH - PADDING.right}
+                  y1={y}
+                  y2={y}
+                  stroke="currentColor"
+                  strokeOpacity={0.1}
+                />
+                <text x={PADDING.left - 8} y={y} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="currentColor" opacity={0.6}>
+                  {level}
+                </text>
+              </g>
+            );
+          })}
 
-        {Array.from({ length: maxAttempts }, (_, i) => (
-          <text
-            key={i}
-            x={xFor(i, maxAttempts)}
-            y={CHART_HEIGHT - PADDING.bottom + 16}
-            textAnchor="middle"
-            fontSize={11}
-            fill="currentColor"
-            opacity={0.6}
-          >
-            {i + 1}
-          </text>
-        ))}
+          {Array.from({ length: maxAttempts }, (_, i) => (
+            <text
+              key={i}
+              x={xFor(i, maxAttempts)}
+              y={CHART_HEIGHT - PADDING.bottom + 16}
+              textAnchor="middle"
+              fontSize={11}
+              fill="currentColor"
+              opacity={0.6}
+            >
+              {i + 1}
+            </text>
+          ))}
 
-        {series.map((task) => {
-          const style = TASK_STYLES[task.taskType];
-          return (
-            <g key={task.taskType}>
-              <polyline
-                fill="none"
-                stroke={style.color}
-                strokeWidth={2}
-                strokeDasharray={style.dashArray}
-                points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank)}`).join(" ")}
-              />
-              {task.attempts.map((point, i) => (
-                <Marker key={point.id} shape={style.marker} x={xFor(i, maxAttempts)} y={yFor(point.cefrRank)} color={style.color} />
-              ))}
-            </g>
-          );
-        })}
-      </svg>
+          {series.map((task) => {
+            const style = TASK_STYLES[task.taskType];
+            return (
+              <g key={task.taskType}>
+                <polyline
+                  fill="none"
+                  stroke={style.color}
+                  strokeWidth={2}
+                  strokeDasharray={style.dashArray}
+                  points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank)}`).join(" ")}
+                />
+                {task.attempts.map((point, i) => (
+                  <Marker key={point.id} shape={style.marker} x={xFor(i, maxAttempts)} y={yFor(point.cefrRank)} color={style.color} />
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
 
       <div className="mt-3 flex flex-wrap gap-4 text-sm">
         {series.map((task) => (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 
 interface RecentExamTopic {
@@ -70,6 +71,7 @@ export function WritingWorkspace() {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
   const router = useRouter();
+  const { register: registerDashboardNavGuard, setNavigationBusy } = useDashboardNavGuard();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -385,9 +387,46 @@ export function WritingWorkspace() {
   // in place, so there's nothing to explicitly clear — the whole component
   // unmounts. cancelPendingCorrection above still protects the in-place
   // resets (task switches) that stay on this page.
+  //
+  // The isCorrecting check is a defensive backstop, not the primary guard:
+  // the nav bar's disabled rendering can lag one paint behind isCorrecting
+  // becoming true (it learns about it through the busy flag published
+  // below), so this refuses to act even if a click slips through during
+  // that window rather than relying solely on the button being disabled.
   function goToDashboard() {
+    if (isCorrecting) return;
     runOrConfirm("dashboard", () => router.push("/dashboard"));
   }
+
+  // A ref instead of a `[registerDashboardNavGuard]`-only dependency: the
+  // registered callback must always see the latest state (taskType,
+  // topicMode, unsaved content), not whatever it closed over when the
+  // effect last ran, so the effect below registers a stable wrapper once
+  // and this ref is what actually gets called. Published with
+  // useLayoutEffect, not useEffect: a passive effect can still be pending
+  // when a nav-bar click fires (e.g. immediately after typing a draft),
+  // leaving the ref pointing at a stale closure that would wrongly treat
+  // the workspace as empty and skip the discard confirmation.
+  const goToDashboardRef = useRef(goToDashboard);
+  useLayoutEffect(() => {
+    goToDashboardRef.current = goToDashboard;
+  });
+
+  useEffect(() => {
+    registerDashboardNavGuard(() => goToDashboardRef.current());
+    return () => registerDashboardNavGuard(null);
+  }, [registerDashboardNavGuard]);
+
+  // The nav bar's Dashboard control lives outside this component; it can
+  // only know a correction the server will persist regardless is in flight
+  // through this shared flag, not through local isCorrecting state. Also
+  // published with useLayoutEffect so the disabled state can never render a
+  // paint behind isCorrecting becoming true — see goToDashboard's own
+  // defensive check above for the case where a click still slips through.
+  useLayoutEffect(() => {
+    setNavigationBusy(isCorrecting);
+    return () => setNavigationBusy(false);
+  }, [isCorrecting, setNavigationBusy]);
 
   function chooseCustomTopic() {
     if (topicMode === "custom") {
@@ -638,17 +677,6 @@ export function WritingWorkspace() {
 
   return (
     <div className="flex w-full flex-col gap-8">
-      <div className="flex justify-end">
-        <button
-          type="button"
-          onClick={goToDashboard}
-          disabled={isCorrecting}
-          title={isCorrecting ? copy.workspace.editor.correctingStatus : undefined}
-          className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]"
-        >
-          {copy.nav.dashboard}
-        </button>
-      </div>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">

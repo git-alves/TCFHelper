@@ -1,8 +1,30 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import type { MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+
+function DashboardIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.5 15.5V8.5M9 15.5v-11M14.5 15.5v-5" />
+    </svg>
+  );
+}
+
+function TasksIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="2.5" width="5" height="5" rx="1.25" />
+      <rect x="2.5" y="11.5" width="5" height="5" rx="1.25" />
+      <rect x="11.5" y="11.5" width="5" height="5" rx="1.25" />
+    </svg>
+  );
+}
 
 function SettingsIcon() {
   return (
@@ -40,8 +62,24 @@ function AccountIcon() {
   );
 }
 
+const ICON_BUTTON_CLASS =
+  "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
+
 export function NavBar() {
   const copy = useAppCopy();
+  const pathname = usePathname();
+  const { requestNavigation, isNavigationBusy } = useDashboardNavGuard();
+
+  // Toggles between the two screens: on /tasks, this offers Dashboard; on
+  // /dashboard (or anywhere else), it offers Tasks. Segment-safe so a future
+  // route like /tasksomething can't false-match.
+  const onTasks = pathname === "/tasks" || (pathname?.startsWith("/tasks/") ?? false);
+
+  function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (requestNavigation()) event.preventDefault();
+  }
 
   return (
     <header className="border-b border-black/[.08] dark:border-white/[.145]">
@@ -52,6 +90,36 @@ export function NavBar() {
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           <Show when="signed-in">
             <>
+              {onTasks ? (
+                // A correction the server already received can't be
+                // recalled by leaving the page, so this is a real disabled
+                // control (not just a styled one) while it's in flight.
+                isNavigationBusy ? (
+                  <button
+                    type="button"
+                    disabled
+                    title={copy.workspace.editor.correctingStatus}
+                    aria-label={`${copy.nav.dashboard} — ${copy.workspace.editor.correctingStatus}`}
+                    className={`${ICON_BUTTON_CLASS} cursor-not-allowed opacity-50 hover:bg-transparent`}
+                  >
+                    <DashboardIcon />
+                  </button>
+                ) : (
+                  <Link
+                    href="/dashboard"
+                    onClick={handleDashboardClick}
+                    title={copy.nav.dashboard}
+                    aria-label={copy.nav.dashboard}
+                    className={ICON_BUTTON_CLASS}
+                  >
+                    <DashboardIcon />
+                  </Link>
+                )
+              ) : (
+                <Link href="/tasks" title={copy.nav.tasks} aria-label={copy.nav.tasks} className={ICON_BUTTON_CLASS}>
+                  <TasksIcon />
+                </Link>
+              )}
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
                * while a direct visit or refresh still renders the full page. */}
@@ -59,7 +127,7 @@ export function NavBar() {
                 href="/settings"
                 title={copy.nav.settings}
                 aria-label={copy.nav.settings}
-                className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]"
+                className={ICON_BUTTON_CLASS}
               >
                 <SettingsIcon />
               </Link>
@@ -68,12 +136,7 @@ export function NavBar() {
           </Show>
           <Show when="signed-out">
             <SignInButton mode="modal">
-              <button
-                type="button"
-                title={copy.nav.logIn}
-                aria-label={copy.nav.logIn}
-                className="rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]"
-              >
+              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
                 <AccountIcon />
               </button>
             </SignInButton>
