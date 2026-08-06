@@ -38,7 +38,6 @@ export interface AppCopy {
     close: string;
   };
   nav: {
-    dashboard: string;
     settings: string;
     logIn: string;
   };
@@ -176,7 +175,6 @@ export const APP_COPY = {
       close: "Close",
     },
     nav: {
-      dashboard: "Dashboard",
       settings: "Settings",
       logIn: "Log in",
     },
@@ -324,7 +322,6 @@ export const APP_COPY = {
       close: "Fermer",
     },
     nav: {
-      dashboard: "Tableau de bord",
       settings: "Paramètres",
       logIn: "Se connecter",
     },
@@ -479,7 +476,6 @@ export const APP_COPY = {
       close: "Cerrar",
     },
     nav: {
-      dashboard: "Panel",
       settings: "Configuración",
       logIn: "Iniciar sesión",
     },
@@ -634,7 +630,6 @@ export const APP_COPY = {
       close: "Fechar",
     },
     nav: {
-      dashboard: "Painel",
       settings: "Configurações",
       logIn: "Entrar",
     },
