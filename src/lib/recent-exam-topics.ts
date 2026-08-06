@@ -521,6 +521,11 @@ function getDocumentText(
     ? orderedElements.indexOf(nextDocumentHeading)
     : orderedElements.length;
 
+  // A document is usually one text-editor widget, but nothing on the source
+  // guarantees that -- collect every widget in the boundary window instead
+  // of stopping at the first, or a document split across multiple paragraph
+  // widgets would silently lose everything after the first one.
+  const paragraphs: string[] = [];
   for (let index = startIndex + 1; index < endIndex; index += 1) {
     const element = orderedElements[index];
     if (!isTextEditorWidget(element)) {
@@ -529,11 +534,15 @@ function getDocumentText(
 
     const text = normalizeTopicText($(element).text());
     if (text) {
-      return text;
+      paragraphs.push(text);
     }
   }
 
-  throw new RecentExamTopicError("INVALID_SOURCE", "A Tâche 3 document had no text.");
+  if (paragraphs.length === 0) {
+    throw new RecentExamTopicError("INVALID_SOURCE", "A Tâche 3 document had no text.");
+  }
+
+  return paragraphs.join("\n\n");
 }
 
 function isTextEditorWidget(element: Element): boolean {
