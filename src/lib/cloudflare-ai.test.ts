@@ -11,10 +11,12 @@ import {
 const originalFetch = global.fetch;
 const originalAccountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 const originalToken = process.env.CLOUDFLARE_AI_API_TOKEN;
+const originalModel = process.env.CLOUDFLARE_AI_MODEL;
 
 beforeEach(() => {
   process.env.CLOUDFLARE_ACCOUNT_ID = "account_1";
   process.env.CLOUDFLARE_AI_API_TOKEN = "token_1";
+  delete process.env.CLOUDFLARE_AI_MODEL;
 });
 
 afterEach(() => {
@@ -23,6 +25,8 @@ afterEach(() => {
   else process.env.CLOUDFLARE_ACCOUNT_ID = originalAccountId;
   if (originalToken === undefined) delete process.env.CLOUDFLARE_AI_API_TOKEN;
   else process.env.CLOUDFLARE_AI_API_TOKEN = originalToken;
+  if (originalModel === undefined) delete process.env.CLOUDFLARE_AI_MODEL;
+  else process.env.CLOUDFLARE_AI_MODEL = originalModel;
 });
 
 const params = { task: TASK_INSTRUCTIONS.TASK_2, level: "C1" as const, topicPrompt: "Le télétravail est-il bénéfique ?" };
@@ -72,6 +76,24 @@ describe("generateModelAnswerWithCloudflare", () => {
         body: expect.stringContaining('"chat_template_kwargs":{"enable_thinking":false}'),
       }),
     );
+  });
+
+  it("omits GLM's thinking toggle for a CLOUDFLARE_AI_MODEL override, since it's specific to the default model", async () => {
+    process.env.CLOUDFLARE_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { response: "Réponse simple." } }),
+    } as Response);
+
+    await generateModelAnswerWithCloudflare(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = String(requestInit.body);
+    expect(body).not.toContain("chat_template_kwargs");
+    // The generic hint is unaffected by the override, unlike the
+    // GLM-specific toggle.
+    expect(body).toContain('"reasoning_effort":"low"');
   });
 
   it("accepts the direct endpoint's simple response field", async () => {
