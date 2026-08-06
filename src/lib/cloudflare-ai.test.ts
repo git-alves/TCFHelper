@@ -149,8 +149,25 @@ describe("generateModelAnswerWithCloudflare", () => {
     const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(CloudflareRequestError);
-    // A non-string finish_reason is exactly why this must stay "n/a" instead
-    // of forwarding whatever value was actually present.
+    // finish_reason is a real string here, so only the whitelist -- not a
+    // typeof check -- is what keeps an unrecognized value from passing
+    // through verbatim.
     expect((error as CloudflareRequestError).payloadShape).not.toContain(sentinel);
+  });
+
+  it("never puts an arbitrary success value in the payload-shape diagnostic", async () => {
+    const sentinel = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ success: sentinel, result: { choices: [] } }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    const shape = (error as CloudflareRequestError).payloadShape;
+    expect(shape).not.toContain(sentinel);
+    expect(shape).toContain("success=not_boolean");
   });
 });

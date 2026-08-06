@@ -70,7 +70,12 @@ const KNOWN_FINISH_REASONS = new Set(["stop", "length", "content_filter", "tool_
 function describeCloudflarePayloadShape(payload: unknown): string {
   if (!isRecord(payload)) return "not_an_object";
 
-  const parts = [`success=${String(payload.success)}`];
+  // typeof-gated, like every other field here: payload.success is untrusted
+  // upstream data, and String(x) on an arbitrary value (a string, an
+  // object, ...) would stringify whatever that value actually is rather
+  // than a fixed label.
+  const success = typeof payload.success === "boolean" ? String(payload.success) : "not_boolean";
+  const parts = [`success=${success}`];
   if (Array.isArray(payload.errors)) parts.push(`errors_count=${payload.errors.length}`);
 
   if (!isRecord(payload.result)) {
