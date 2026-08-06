@@ -132,8 +132,21 @@ describe("generateModelAnswerWithCloudflare", () => {
 
     expect(error).toBeInstanceOf(CloudflareRequestError);
     const shape = (error as CloudflareRequestError).payloadShape;
-    expect(shape).toContain("has_message_content=false");
+    expect(shape).toContain("message_content=missing");
     expect(shape).toContain("finish_reason=length");
+  });
+
+  it("distinguishes an empty/whitespace text field from a genuinely missing one", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ result: { choices: [{ message: { content: "   " } }] } }),
+    } as Response);
+
+    const error: unknown = await generateModelAnswerWithCloudflare(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(CloudflareRequestError);
+    expect((error as CloudflareRequestError).payloadShape).toContain("message_content=empty");
   });
 
   it("never puts the response's own text in the payload-shape diagnostic", async () => {
