@@ -58,22 +58,26 @@ export const essayFeedbackSchema = z.object({
   errors: z.array(
     z.object({
       original: z.string().describe("The erroneous excerpt from the original text."),
+      // .nullish() (not .optional()): Gemini's responseSchema declares these
+      // as non-required but still fills unset properties with a JSON `null`
+      // rather than omitting the key, so the parser must accept null and
+      // undefined equally as "no offset available".
       originalStart: z
         .number()
         .int()
         .min(0)
-        .optional()
+        .nullish()
         .describe(
-          "When available, the zero-based UTF-16 character index where original starts in the student's exact submitted text. Omit this offset rather than guessing."
+          "When available, the zero-based UTF-16 character index where original starts in the student's exact submitted text. Use null when unavailable rather than guessing."
         ),
       correction: z.string().describe("The corrected version of that excerpt."),
       correctionStart: z
         .number()
         .int()
         .min(0)
-        .optional()
+        .nullish()
         .describe(
-          "When available, the zero-based UTF-16 character index where correction starts in correctedText. Omit this offset rather than guessing."
+          "When available, the zero-based UTF-16 character index where correction starts in correctedText. Use null when unavailable rather than guessing."
         ),
       explanation: z
         .string()

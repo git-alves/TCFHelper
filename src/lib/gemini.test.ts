@@ -1,20 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import {
+  GeminiCorrectionParseError,
   GeminiNotConfiguredError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
   generateModelAnswer,
+  gradeEssayWithGemini,
 } from "./gemini";
 
 const originalFetch = global.fetch;
 const originalApiKey = process.env.GEMINI_API_KEY;
 const originalModel = process.env.GEMINI_MODEL;
+const originalCorrectionModel = process.env.GEMINI_CORRECTION_MODEL;
 
 beforeEach(() => {
   process.env.GEMINI_API_KEY = "test-key";
   delete process.env.GEMINI_MODEL;
+  delete process.env.GEMINI_CORRECTION_MODEL;
 });
 
 afterEach(() => {
@@ -23,6 +27,8 @@ afterEach(() => {
   else process.env.GEMINI_API_KEY = originalApiKey;
   if (originalModel === undefined) delete process.env.GEMINI_MODEL;
   else process.env.GEMINI_MODEL = originalModel;
+  if (originalCorrectionModel === undefined) delete process.env.GEMINI_CORRECTION_MODEL;
+  else process.env.GEMINI_CORRECTION_MODEL = originalCorrectionModel;
 });
 
 const params = {
@@ -206,5 +212,152 @@ describe("generateModelAnswer", () => {
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
     expect(promptText).not.toContain("Summary (40-60 words)");
+  });
+});
+
+describe("gradeEssayWithGemini", () => {
+  const correctionParams = {
+    systemPrompt: "You are an examiner grading TCF essays.",
+    userPrompt: "Student's essay (12 words):\nBonjour, je m'appelle Marie.",
+  };
+
+  const feedback = {
+    correctedText: "Bonjour, je m'appelle Marie.",
+    modelVersion: "Bonjour, je m'appelle Marie, ravie de vous rencontrer.",
+    scores: {
+      content: { score: 60, feedback: "Answers the prompt." },
+      linguistics: { score: 70, feedback: "Mostly accurate." },
+      vocabulary: { score: 65, feedback: "Simple but appropriate." },
+    },
+    cefrLevel: "B1",
+    meetsWordCount: false,
+    wordCountNote: "Below the target range.",
+    errors: [],
+    suggestions: ["Add a supporting detail."],
+    summary: "A clear start.",
+  };
+
+  it("fails closed when GEMINI_API_KEY is not set", async () => {
+    delete process.env.GEMINI_API_KEY;
+
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiNotConfiguredError);
+  });
+
+  it("returns the parsed JSON feedback on success", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
+  });
+
+  it("sends the system prompt, user prompt, and a JSON response schema", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await gradeEssayWithGemini(correctionParams);
+
+    const [calledUrl, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(calledUrl)).toContain("/models/gemini-3.5-flash-lite:generateContent");
+    const body = JSON.parse(String(requestInit.body));
+    expect(body.systemInstruction.parts[0].text).toBe(correctionParams.systemPrompt);
+    expect(body.contents[0].parts[0].text).toBe(correctionParams.userPrompt);
+    expect(body.generationConfig.responseMimeType).toBe("application/json");
+    expect(body.generationConfig.responseSchema.properties.scores.properties.linguistics.properties.score.type).toBe(
+      "INTEGER",
+    );
+    expect(body.generationConfig.responseSchema.properties.scores.properties.linguistics.properties.score).toMatchObject({
+      minimum: 0,
+      maximum: 100,
+    });
+    // originalStart/correctionStart are nullable, not just non-required:
+    // Gemini fills every declared property either way, so a schema that
+    // only marks them non-required would still have Gemini return `null`
+    // for an unlocatable offset -- which the schema must explicitly allow.
+    const errorItemSchema = body.generationConfig.responseSchema.properties.errors.items;
+    expect(errorItemSchema.properties.originalStart).toEqual({ type: "INTEGER", minimum: 0, nullable: true });
+    expect(errorItemSchema.properties.correctionStart).toEqual({ type: "INTEGER", minimum: 0, nullable: true });
+  });
+
+  it("never sends a temperature parameter, since Google documents it as deprecated for Flash-Lite models", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await gradeEssayWithGemini(correctionParams);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    expect(body.generationConfig).not.toHaveProperty("temperature");
+  });
+
+  it("uses GEMINI_CORRECTION_MODEL when set, independent of GEMINI_MODEL", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    process.env.GEMINI_CORRECTION_MODEL = "gemini-2.5-flash-lite";
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await gradeEssayWithGemini(correctionParams);
+
+    const [calledUrl] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(calledUrl)).toContain("/models/gemini-2.5-flash-lite:generateContent");
+  });
+
+  it("ignores GEMINI_MODEL (the model-answer generator's setting) when choosing the default", async () => {
+    process.env.GEMINI_MODEL = "gemini-3.5-flash";
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await gradeEssayWithGemini(correctionParams);
+
+    const [calledUrl] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(String(calledUrl)).toContain("/models/gemini-3.5-flash-lite:generateContent");
+  });
+
+  it("throws GeminiCorrectionParseError when Gemini's text isn't valid JSON", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: "not json" }] } }],
+      }),
+    });
+
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiCorrectionParseError);
+  });
+
+  it("throws GeminiRateLimitedError on a 429 response", async () => {
+    mockFetchOnce({ ok: false, status: 429, json: async () => ({}) });
+
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRateLimitedError);
+  });
+
+  it("throws GeminiTransportError when fetch itself fails", async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
+
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiTransportError);
   });
 });

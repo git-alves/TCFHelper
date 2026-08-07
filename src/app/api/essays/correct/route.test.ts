@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getCurrentAppUserMock,
@@ -7,6 +7,7 @@ const {
   topicCreateMock,
   essayCreateMock,
   parseMock,
+  gradeEssayWithGeminiMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
@@ -17,6 +18,7 @@ const {
     topicCreateMock: vi.fn(),
     essayCreateMock: vi.fn(),
     parseMock: vi.fn(),
+    gradeEssayWithGeminiMock: vi.fn(),
   };
 });
 
@@ -32,6 +34,9 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/anthropic", () => ({
   anthropic: { messages: { parse: parseMock } },
+}));
+vi.mock("@/lib/gemini", () => ({
+  gradeEssayWithGemini: gradeEssayWithGeminiMock,
 }));
 
 const { POST } = await import("./route");
@@ -53,6 +58,7 @@ const feedback = {
 };
 
 const LOCAL_USER_ID = "cuid_local_user_1";
+const originalCorrectionProvider = process.env.CORRECTION_PROVIDER;
 
 beforeEach(() => {
   getCurrentAppUserMock.mockReset();
@@ -60,10 +66,17 @@ beforeEach(() => {
   topicCreateMock.mockReset();
   essayCreateMock.mockReset();
   parseMock.mockReset();
+  gradeEssayWithGeminiMock.mockReset();
+  delete process.env.CORRECTION_PROVIDER;
 
   getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   parseMock.mockResolvedValue({ stop_reason: "end_turn", parsed_output: feedback });
   essayCreateMock.mockResolvedValue({ id: "essay_1" });
+});
+
+afterEach(() => {
+  if (originalCorrectionProvider === undefined) delete process.env.CORRECTION_PROVIDER;
+  else process.env.CORRECTION_PROVIDER = originalCorrectionProvider;
 });
 
 function post(body: unknown) {
@@ -314,5 +327,115 @@ describe("POST /api/essays/correct", () => {
 
     expect(response.status).toBe(400);
     expect(parseMock).not.toHaveBeenCalled();
+  });
+
+  describe("CORRECTION_PROVIDER=gemini", () => {
+    beforeEach(() => {
+      process.env.CORRECTION_PROVIDER = "gemini";
+      findUniqueMock.mockResolvedValue({
+        id: "topic_1",
+        taskType: "TASK_1",
+        source: "OFFICIAL_EXAM",
+        prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+      });
+    });
+
+    it("grades with Gemini instead of Claude and persists the result", async () => {
+      gradeEssayWithGeminiMock.mockResolvedValue(feedback);
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ essayId: "essay_1", feedback });
+      expect(parseMock).not.toHaveBeenCalled();
+      expect(gradeEssayWithGeminiMock).toHaveBeenCalledTimes(1);
+      expect(essayCreateMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            feedback: {
+              create: expect.objectContaining({
+                grammarNotes: expect.objectContaining({ modelVersion: feedback.modelVersion }),
+              }),
+            },
+          }),
+        }),
+      );
+    });
+
+    it("accepts a null offset from Gemini rather than treating it as an unparseable response", async () => {
+      gradeEssayWithGeminiMock.mockResolvedValue({
+        ...feedback,
+        errors: [
+          {
+            original: "j'ai acheter",
+            originalStart: null,
+            correction: "j'ai acheté",
+            correctionStart: 5,
+            explanation: "The past participle should end in -é.",
+            category: "grammar",
+          },
+        ],
+      });
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.feedback.errors[0].originalStart).toBeNull();
+      expect(body.feedback.errors[0].correctionStart).toBe(5);
+    });
+
+    it("returns a 502 when Gemini's response doesn't match the expected feedback shape", async () => {
+      gradeEssayWithGeminiMock.mockResolvedValue({ correctedText: "Bonjour." });
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(502);
+      expect(essayCreateMock).not.toHaveBeenCalled();
+    });
+
+    it("returns a 502 when Gemini itself fails", async () => {
+      gradeEssayWithGeminiMock.mockRejectedValue(new Error("Gemini request failed (500)."));
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(502);
+      expect(essayCreateMock).not.toHaveBeenCalled();
+    });
+  });
+
+  it("uses Claude, not Gemini, when CORRECTION_PROVIDER is unset", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(parseMock).toHaveBeenCalledTimes(1);
   });
 });

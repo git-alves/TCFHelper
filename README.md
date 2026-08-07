@@ -38,6 +38,16 @@ gate yet — every logged-in user can reach `/tasks`.
    - `GEMINI_API_KEY`: a free-tier Gemini API key used first for model
      answers; `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_API_TOKEN` provide
      the Cloudflare Workers AI fallback when Gemini reaches its free limit.
+   - `CORRECTION_PROVIDER` (optional): set to `gemini` to grade essays with
+     Gemini instead of Claude, reusing `GEMINI_API_KEY` above. Meant for
+     testing the correction flow without spending Anthropic credits — leave
+     unset for production-quality grading.
+   - `GEMINI_CORRECTION_MODEL` (optional): the model used only when
+     `CORRECTION_PROVIDER=gemini`, kept separate from `GEMINI_MODEL` so test
+     grading doesn't implicitly share the model-answer generator's model.
+     Defaults to a free-tier Flash-Lite model; check
+     [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
+     for the current lineup, since free-tier names are retired over time.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
      key (ends in `:fx`), used server-side for live draft translation. Free
      covers 500,000 characters/month, no billing details required. If unset,

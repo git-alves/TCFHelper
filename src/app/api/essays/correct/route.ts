@@ -5,8 +5,10 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
+import { gradeEssayWithGemini } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema } from "@/lib/essay-feedback";
+import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
 import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
@@ -98,57 +100,53 @@ export async function POST(request: Request) {
     resolvedTopicPrompt = userTopic.prompt;
   }
 
+  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
+  const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
+  // Gemini's free tier is a deliberate, opt-in swap for Claude (used in
+  // production) so testing the grading flow never spends Anthropic credits.
+  // Never defaults to it: an unset/unrecognized value always means Claude.
+  const useGemini = process.env.CORRECTION_PROVIDER?.trim().toLowerCase() === "gemini";
+
   let feedback;
   try {
-    const response = await anthropic.messages.parse({
-      model: "claude-opus-5",
-      max_tokens: 4096,
-      output_config: {
-        effort: "medium",
-        format: zodOutputFormat(essayFeedbackSchema),
-      },
-      system:
-        "You are an examiner grading TCF (Test de Connaissance du Français) written expression " +
-        "tasks. Correct errors precisely, estimate the writer's CEFR level honestly (do not " +
-        "inflate it), and give constructive, encouraging feedback. Assess the essay from 0 to " +
-        "100 on three TCF-aligned learning criteria (not official TCF scores) -- content/pragmatics (how well it answers the " +
-        "prompt), linguistics (grammar, spelling, syntax), and vocabulary/register (lexical " +
-        "range and appropriateness of tone) -- each with a short note. Also write an " +
-        "idealized model version of the essay: a natural rewrite using more advanced " +
-        "vocabulary and phrasing than the corrected version, offered as inspiration. For every " +
-        "reported error, provide exact zero-based UTF-16 originalStart and correctionStart offsets " +
-        "for the original essay and correctedText respectively whenever they can be located exactly; " +
-        "omit an offset rather than guessing. Write " +
-        `all feedback in ${feedbackLanguage}, except for the corrected essay text and the ` +
-        "model version, which stay in French.",
-      messages: [
-        {
-          role: "user",
-          content:
-            `Task: ${task.label} - ${task.title}\n` +
-            `Instructions: ${task.description}\n` +
-            `Required length: ${task.minWords}-${task.maxWords} words.\n\n` +
-            `Topic prompt: ${resolvedTopicPrompt}\n\n` +
-            `Student's essay (${wordCount} words):\n${content}`,
+    if (useGemini) {
+      const rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
+      const parsed = essayFeedbackSchema.safeParse(rawFeedback);
+      if (!parsed.success) {
+        return NextResponse.json(
+          { error: "Could not parse feedback. Please try again." },
+          { status: 502 }
+        );
+      }
+      feedback = parsed.data;
+    } else {
+      const response = await anthropic.messages.parse({
+        model: "claude-opus-5",
+        max_tokens: 4096,
+        output_config: {
+          effort: "medium",
+          format: zodOutputFormat(essayFeedbackSchema),
         },
-      ],
-    });
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
 
-    if (response.stop_reason === "refusal") {
-      return NextResponse.json(
-        { error: "The essay could not be reviewed. Please try again." },
-        { status: 502 }
-      );
+      if (response.stop_reason === "refusal") {
+        return NextResponse.json(
+          { error: "The essay could not be reviewed. Please try again." },
+          { status: 502 }
+        );
+      }
+
+      if (!response.parsed_output) {
+        return NextResponse.json(
+          { error: "Could not parse feedback. Please try again." },
+          { status: 502 }
+        );
+      }
+
+      feedback = response.parsed_output;
     }
-
-    if (!response.parsed_output) {
-      return NextResponse.json(
-        { error: "Could not parse feedback. Please try again." },
-        { status: 502 }
-      );
-    }
-
-    feedback = response.parsed_output;
   } catch (error) {
     console.error("Essay correction failed", error);
     return NextResponse.json(

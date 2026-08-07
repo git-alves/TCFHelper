@@ -1,10 +1,17 @@
 import { TASK_INSTRUCTIONS, type TaskDefinition } from "@/lib/tcf-tasks";
+import { CEFR_LEVELS, ERROR_CATEGORIES } from "@/lib/essay-feedback";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Google AI Studio's free tier (no credit card, no billing) — kept
 // overridable via GEMINI_MODEL since free-tier model names are retired and
 // replaced over time.
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+// Deliberately separate from GEMINI_MODEL/DEFAULT_GEMINI_MODEL above: grading
+// (test-only, see gradeEssayWithGemini) should not silently share whatever
+// model the model-answer generator happens to be configured with. Flash-Lite
+// is the cheaper/faster free-tier line suited to test grading, not the
+// full Flash model used for learner-facing model answers.
+const DEFAULT_GEMINI_CORRECTION_MODEL = "gemini-3.5-flash-lite";
 const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
@@ -40,6 +47,13 @@ export class GeminiRequestError extends Error {
 export class GeminiTransportError extends Error {
   constructor() {
     super("Gemini request could not be completed.");
+  }
+}
+
+/** Gemini returned a 2xx response, but its body wasn't valid JSON. */
+export class GeminiCorrectionParseError extends Error {
+  constructor() {
+    super("Gemini's correction response was not valid JSON.");
   }
 }
 
@@ -195,4 +209,152 @@ export async function generateModelAnswer(params: GenerateModelAnswerParams): Pr
   }
 
   return text;
+}
+
+// Full grading responses (corrected text, model version, per-criterion
+// feedback) run far longer than a short model answer.
+const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
+
+const CRITERION_SCORE_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    score: { type: "INTEGER", minimum: 0, maximum: 100 },
+    feedback: { type: "STRING" },
+  },
+  required: ["score", "feedback"],
+};
+
+// A hand-written OpenAPI-subset mirror of essayFeedbackSchema
+// (essay-feedback.ts) -- Gemini's responseSchema only accepts that subset
+// (no zod, no $ref), so this is kept in sync by hand rather than derived.
+const CORRECTION_RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    correctedText: { type: "STRING" },
+    modelVersion: { type: "STRING" },
+    scores: {
+      type: "OBJECT",
+      properties: {
+        content: CRITERION_SCORE_RESPONSE_SCHEMA,
+        linguistics: CRITERION_SCORE_RESPONSE_SCHEMA,
+        vocabulary: CRITERION_SCORE_RESPONSE_SCHEMA,
+      },
+      required: ["content", "linguistics", "vocabulary"],
+    },
+    cefrLevel: { type: "STRING", enum: [...CEFR_LEVELS] },
+    meetsWordCount: { type: "BOOLEAN" },
+    wordCountNote: { type: "STRING" },
+    errors: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          original: { type: "STRING" },
+          // nullable, not just non-required: Gemini fills every declared
+          // property, required or not, so an omitted offset still arrives as
+          // JSON null rather than a missing key. essayFeedbackSchema accepts
+          // null here (.nullish()) to match.
+          originalStart: { type: "INTEGER", minimum: 0, nullable: true },
+          correction: { type: "STRING" },
+          correctionStart: { type: "INTEGER", minimum: 0, nullable: true },
+          explanation: { type: "STRING" },
+          category: { type: "STRING", enum: [...ERROR_CATEGORIES] },
+        },
+        required: ["original", "correction", "explanation", "category"],
+      },
+    },
+    suggestions: { type: "ARRAY", items: { type: "STRING" } },
+    summary: { type: "STRING" },
+  },
+  required: [
+    "correctedText",
+    "modelVersion",
+    "scores",
+    "cefrLevel",
+    "meetsWordCount",
+    "wordCountNote",
+    "errors",
+    "suggestions",
+    "summary",
+  ],
+};
+
+export interface GradeEssayWithGeminiParams {
+  systemPrompt: string;
+  userPrompt: string;
+}
+
+/**
+ * Grades an essay via Gemini's free tier using response-schema-constrained
+ * JSON output, as a cheaper stand-in for Claude (used in production) during
+ * testing. The caller is responsible for validating the returned value
+ * against essayFeedbackSchema -- Gemini's responseSchema narrows the shape
+ * but does not guarantee it as strictly as Claude's structured output does.
+ */
+export async function gradeEssayWithGemini({
+  systemPrompt,
+  userPrompt,
+}: GradeEssayWithGeminiParams): Promise<unknown> {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
+  }
+
+  // No fallback to GEMINI_MODEL: correction has its own setting so testing
+  // grading never implicitly rides on the model-answer generator's config.
+  const model = process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
+
+  let response: Response;
+  try {
+    response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userPrompt }] }],
+        // No `temperature`: the default correction model is a Flash-Lite
+        // model, and Google documents `temperature` as deprecated for that
+        // family (an error in a future release) -- omit it rather than send
+        // a parameter that could start failing requests later.
+        generationConfig: {
+          maxOutputTokens: 4096,
+          responseMimeType: "application/json",
+          responseSchema: CORRECTION_RESPONSE_SCHEMA,
+        },
+      }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(CORRECTION_REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new GeminiTransportError();
+  }
+
+  if (response.status === 429) {
+    throw new GeminiRateLimitedError("Gemini free-tier rate limit reached.");
+  }
+
+  if (!response.ok) {
+    throw new GeminiRequestError(response.status);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new GeminiRequestError(response.status);
+    }
+    throw new GeminiTransportError();
+  }
+
+  const text = extractText(payload).trim();
+  if (!text) {
+    throw new GeminiRequestError(response.status);
+  }
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new GeminiCorrectionParseError();
+  }
 }
