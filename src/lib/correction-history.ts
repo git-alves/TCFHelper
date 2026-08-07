@@ -218,3 +218,21 @@ export async function getCorrectionForUser(userId: string, essayId: string): Pro
     summary: essay.feedback.summary,
   };
 }
+
+/**
+ * Returns false for an unknown, draft, unreviewed, or another learner's
+ * essay -- the same not-found conditions as getCorrectionForUser, so a
+ * caller can respond identically rather than leaking which case applied.
+ * Feedback rows cascade-delete with the Essay (see the schema's onDelete:
+ * Cascade), so no separate cleanup is needed here.
+ */
+export async function deleteCorrectionForUser(userId: string, essayId: string): Promise<boolean> {
+  const { count } = await prisma.essay.deleteMany({
+    where: {
+      ...submittedCorrectionWhere(userId),
+      id: essayId,
+    },
+  });
+
+  return count > 0;
+}

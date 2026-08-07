@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useAppCopy } from "@/components/app-locale-provider";
 
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
   description: string;
   confirmLabel: string;
-  cancelLabel?: string;
+  cancelLabel: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -25,7 +24,6 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
-  const copy = useAppCopy();
   const cancelRef = useRef<HTMLButtonElement>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -99,7 +97,7 @@ export function ConfirmDialog({
             onClick={onCancel}
             className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
           >
-            {cancelLabel ?? copy.common.cancel}
+            {cancelLabel}
           </button>
           <button
             ref={confirmRef}
