@@ -9,7 +9,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-06b";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-07";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -89,10 +89,11 @@ const TASK_THREE_STRUCTURE =
   "without giving a personal opinion. Use contrasting connectors, e.g. \"D'un côté... d'un autre côté\", " +
   "\"Le premier document souligne que... tandis que le second met en avant...\".\n" +
   "3. Opinion (the rest of the length, roughly 100-130 words): structure it in exactly this order -- " +
-  "(a) one argument in favor of your position, followed by a concrete example illustrating it; " +
+  "(a) one argument in favor of your position (two to three sentences), followed by a concrete example " +
+  "illustrating it; " +
   "(b) a nuance acknowledging a limit or counterpoint to that argument; " +
-  "(c) one argument against your position -- a genuine counter-argument -- followed by a concrete " +
-  "example illustrating it; " +
+  "(c) one argument against your position (two to three sentences) -- a genuine counter-argument -- " +
+  "followed by a concrete example illustrating it; " +
   "(d) a brief conclusion restating your personal position. " +
   "Use connectors suited to each part, e.g. \"Premièrement\"/\"D'une part\" for the argument in favor, " +
   "\"Cependant\"/\"Néanmoins\" for the nuance, \"Toutefois\"/\"En revanche\" for the argument against, and " +
