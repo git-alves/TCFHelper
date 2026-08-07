@@ -7,15 +7,23 @@ import { prisma } from "@/lib/prisma";
 import { anthropic } from "@/lib/anthropic";
 import { gradeEssayWithGemini } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
-import { essayFeedbackSchema } from "@/lib/essay-feedback";
+import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
 import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
+import {
+  claimCorrection,
+  completeCorrectionClaim,
+  releaseCorrectionClaim,
+  type CorrectionTopicContext,
+} from "@/lib/correction-claim";
+import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
   TopicSource.OFFICIAL_EXAM,
   TopicSource.RECENT_EXAM,
 ]);
+const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
 const requestSchema = z.object({
   taskType: z.enum(TASK_TYPES),
@@ -35,6 +43,29 @@ const requestSchema = z.object({
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function duplicateCorrectionResponse(essayId: string) {
+  return NextResponse.json(
+    {
+      error: "This response has already been corrected. Edit it before requesting another correction.",
+      code: "CORRECTION_ALREADY_EXISTS",
+      essayId,
+    },
+    { status: 409, headers: NO_STORE_HEADERS },
+  );
+}
+
+function correctionInProgressResponse(retryAt: Date) {
+  const retryAfterSeconds = Math.max(1, Math.ceil((retryAt.getTime() - Date.now()) / 1000));
+  return NextResponse.json(
+    {
+      error: "A correction for this response is already in progress. Please try again shortly.",
+      code: "CORRECTION_IN_PROGRESS",
+      retryAt: retryAt.toISOString(),
+    },
+    { status: 409, headers: { ...NO_STORE_HEADERS, "Retry-After": String(retryAfterSeconds) } },
+  );
 }
 
 export async function POST(request: Request) {
@@ -70,8 +101,10 @@ export async function POST(request: Request) {
   const wordCount = countWords(content);
   const feedbackLanguage = APP_LOCALE_LANGUAGE_NAMES[locale];
 
-  let resolvedTopicId: string;
+  let resolvedTopicId: string | null = null;
   let resolvedTopicPrompt: string;
+  let correctionTopic: CorrectionTopicContext;
+  let requestKeyTopic: { kind: "recent"; id: string } | { kind: "custom"; prompt: string };
   if (topicId) {
     const topic = await prisma.topic.findUnique({ where: { id: topicId } });
     // `topicId` represents a server-authoritative shared source (the legacy
@@ -85,20 +118,53 @@ export async function POST(request: Request) {
     // A server-issued topic ID is the source of truth. Never let the client
     // pair an existing topic record with a different grading prompt.
     resolvedTopicPrompt = topic.prompt;
+    correctionTopic = { kind: "shared", id: topic.id };
+    requestKeyTopic = { kind: "recent", id: topic.id };
   } else {
     // The schema refinement above guarantees a prompt for this branch.
     const topicPrompt = submittedTopicPrompt!;
-    const userTopic = await prisma.topic.create({
-      data: {
-        taskType,
-        title: topicPrompt.slice(0, 80),
-        prompt: topicPrompt,
-        source: TopicSource.USER_SUBMITTED,
-      },
-    });
-    resolvedTopicId = userTopic.id;
-    resolvedTopicPrompt = userTopic.prompt;
+    // Defer creating this private-prompt Topic until the provider result is
+    // persisted. A duplicate/in-progress request must not leave an orphan
+    // Topic row behind merely because it was rejected before grading.
+    resolvedTopicPrompt = topicPrompt;
+    correctionTopic = { kind: "custom", prompt: topicPrompt };
+    requestKeyTopic = { kind: "custom", prompt: topicPrompt };
   }
+
+  const correctionKey = getCorrectionRequestKey({
+    taskType,
+    topic: requestKeyTopic,
+    content,
+  });
+  // Request validation and the topic branches above make this unreachable,
+  // but fail closed rather than send a provider request without a durable key.
+  if (!correctionKey) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  const claimInput = {
+    userId: user.id,
+    correctionKey,
+    taskType,
+    content,
+    topic: correctionTopic,
+  };
+
+  let claim;
+  try {
+    claim = await claimCorrection(claimInput);
+  } catch (error) {
+    // Failing closed avoids sending an unprotected provider request when the
+    // durable claim store cannot be reached.
+    console.error("Correction claim failed", error);
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable. Please try again." },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
+
+  if (claim.kind === "existing") return duplicateCorrectionResponse(claim.essayId);
+  if (claim.kind === "inProgress") return correctionInProgressResponse(claim.retryAt);
 
   const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
@@ -107,8 +173,9 @@ export async function POST(request: Request) {
   // Never defaults to it: an unset/unrecognized value always means Claude.
   const useGemini = process.env.CORRECTION_PROVIDER?.trim().toLowerCase() === "gemini";
 
-  let feedback;
+  let shouldReleaseClaim = true;
   try {
+    let feedback: EssayFeedback;
     if (useGemini) {
       const rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
       const parsed = essayFeedbackSchema.safeParse(rawFeedback);
@@ -147,39 +214,89 @@ export async function POST(request: Request) {
 
       feedback = response.parsed_output;
     }
+
+    const completion = await completeCorrectionClaim({
+      ...claimInput,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+      persist: async (tx) => {
+        const topicIdForEssay =
+          resolvedTopicId ??
+          (
+            await tx.topic.create({
+              data: {
+                taskType,
+                title: resolvedTopicPrompt.slice(0, 80),
+                prompt: resolvedTopicPrompt,
+                source: TopicSource.USER_SUBMITTED,
+              },
+            })
+          ).id;
+
+        return tx.essay.create({
+          data: {
+            userId: user.id,
+            topicId: topicIdForEssay,
+            taskType,
+            content,
+            correctionKeyHash: claim.correctionKeyHash,
+            wordCount,
+            status: EssayStatus.SUBMITTED,
+            feedback: {
+              create: {
+                level: feedback.cefrLevel,
+                feedbackLocale: locale,
+                summary: feedback.summary,
+                meetsWordCount: feedback.meetsWordCount,
+                grammarNotes: {
+                  correctedText: feedback.correctedText,
+                  modelVersion: feedback.modelVersion,
+                  cefrRationale: feedback.cefrRationale,
+                  wordCountNote: feedback.wordCountNote,
+                  errors: feedback.errors,
+                  scores: feedback.scores,
+                },
+                suggestions: feedback.suggestions,
+              },
+            },
+          },
+        });
+      },
+    },
+    );
+
+    if (completion.kind === "completed") {
+      shouldReleaseClaim = false;
+      return NextResponse.json(
+        { essayId: completion.value.id, feedback },
+        { headers: NO_STORE_HEADERS },
+      );
+    }
+    if (completion.kind === "existing") return duplicateCorrectionResponse(completion.essayId);
+    if (completion.kind === "inProgress") return correctionInProgressResponse(completion.retryAt);
+
+    // The lease disappeared before this request could persist. Do not return
+    // its unpersisted result; a retry will either see the winner or reclaim
+    // the expired key safely.
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable. Please try again." },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
   } catch (error) {
     console.error("Essay correction failed", error);
     return NextResponse.json(
       { error: "Something went wrong while grading your essay." },
-      { status: 502 }
+      { status: 502, headers: NO_STORE_HEADERS },
     );
+  } finally {
+    if (shouldReleaseClaim) {
+      await releaseCorrectionClaim({
+        userId: user.id,
+        correctionKeyHash: claim.correctionKeyHash,
+        claimToken: claim.claimToken,
+      }).catch(() => {
+        console.error("Correction claim cleanup failed");
+      });
+    }
   }
-
-  const essay = await prisma.essay.create({
-    data: {
-      userId: user.id,
-      topicId: resolvedTopicId,
-      taskType,
-      content,
-      wordCount,
-      status: EssayStatus.SUBMITTED,
-      feedback: {
-        create: {
-          level: feedback.cefrLevel,
-          summary: feedback.summary,
-          meetsWordCount: feedback.meetsWordCount,
-          grammarNotes: {
-            correctedText: feedback.correctedText,
-            modelVersion: feedback.modelVersion,
-            wordCountNote: feedback.wordCountNote,
-            errors: feedback.errors,
-            scores: feedback.scores,
-          },
-          suggestions: feedback.suggestions,
-        },
-      },
-    },
-  });
-
-  return NextResponse.json({ essayId: essay.id, feedback });
 }

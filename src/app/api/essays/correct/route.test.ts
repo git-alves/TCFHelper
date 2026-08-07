@@ -8,6 +8,9 @@ const {
   essayCreateMock,
   parseMock,
   gradeEssayWithGeminiMock,
+  claimCorrectionMock,
+  completeCorrectionClaimMock,
+  releaseCorrectionClaimMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
@@ -19,6 +22,9 @@ const {
     essayCreateMock: vi.fn(),
     parseMock: vi.fn(),
     gradeEssayWithGeminiMock: vi.fn(),
+    claimCorrectionMock: vi.fn(),
+    completeCorrectionClaimMock: vi.fn(),
+    releaseCorrectionClaimMock: vi.fn(),
   };
 });
 
@@ -38,6 +44,11 @@ vi.mock("@/lib/anthropic", () => ({
 vi.mock("@/lib/gemini", () => ({
   gradeEssayWithGemini: gradeEssayWithGeminiMock,
 }));
+vi.mock("@/lib/correction-claim", () => ({
+  claimCorrection: claimCorrectionMock,
+  completeCorrectionClaim: completeCorrectionClaimMock,
+  releaseCorrectionClaim: releaseCorrectionClaimMock,
+}));
 
 const { POST } = await import("./route");
 
@@ -50,6 +61,7 @@ const feedback = {
     vocabulary: { score: 65, feedback: "Simple but appropriate vocabulary." },
   },
   cefrLevel: "B1",
+  cefrRationale: "The response is understandable, but limited development and range keep it at B1.",
   meetsWordCount: false,
   wordCountNote: "This response is below the target range.",
   errors: [],
@@ -67,10 +79,29 @@ beforeEach(() => {
   essayCreateMock.mockReset();
   parseMock.mockReset();
   gradeEssayWithGeminiMock.mockReset();
+  claimCorrectionMock.mockReset();
+  completeCorrectionClaimMock.mockReset();
+  releaseCorrectionClaimMock.mockReset();
   delete process.env.CORRECTION_PROVIDER;
 
   getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   parseMock.mockResolvedValue({ stop_reason: "end_turn", parsed_output: feedback });
+  claimCorrectionMock.mockResolvedValue({
+    kind: "claimed",
+    claimToken: "claim_1",
+    correctionKeyHash: "correction_hash_1",
+  });
+  completeCorrectionClaimMock.mockImplementation(async (input: {
+    persist: (tx: { topic: { create: typeof topicCreateMock }; essay: { create: typeof essayCreateMock } }) => Promise<unknown>;
+  }) => ({
+    kind: "completed",
+    value: await input.persist({
+      topic: { create: topicCreateMock },
+      essay: { create: essayCreateMock },
+    }),
+  }));
+  releaseCorrectionClaimMock.mockResolvedValue({ count: 1 });
+  topicCreateMock.mockResolvedValue({ id: "custom_topic_1" });
   essayCreateMock.mockResolvedValue({ id: "essay_1" });
 });
 
@@ -190,19 +221,115 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ essayId: "essay_1", feedback });
     expect(parseMock.mock.calls[0][0].system).toContain("originalStart");
+    expect(parseMock.mock.calls[0][0].system).toContain("main blocker to the next band");
     expect(essayCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
+          correctionKeyHash: "correction_hash_1",
           feedback: {
             create: expect.objectContaining({
               grammarNotes: expect.objectContaining({
                 modelVersion: feedback.modelVersion,
                 scores: feedback.scores,
+                cefrRationale: feedback.cefrRationale,
               }),
             }),
           },
         }),
       }),
+    );
+  });
+
+  it("returns the existing correction without calling a provider for an unchanged custom draft", async () => {
+    claimCorrectionMock.mockResolvedValue({
+      kind: "existing",
+      essayId: "essay_existing",
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "This response has already been corrected. Edit it before requesting another correction.",
+      code: "CORRECTION_ALREADY_EXISTS",
+      essayId: "essay_existing",
+    });
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
+    expect(topicCreateMock).not.toHaveBeenCalled();
+    expect(essayCreateMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an in-progress response before calling a provider for the same correction", async () => {
+    const retryAt = new Date("2026-08-07T12:00:05.000Z");
+    claimCorrectionMock.mockResolvedValue({
+      kind: "inProgress",
+      retryAt,
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "A correction for this response is already in progress. Please try again shortly.",
+      code: "CORRECTION_IN_PROGRESS",
+      retryAt: retryAt.toISOString(),
+    });
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
+    expect(topicCreateMock).not.toHaveBeenCalled();
+    expect(essayCreateMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed when the durable correction claim cannot be acquired", async () => {
+    claimCorrectionMock.mockRejectedValue(new Error("database unavailable"));
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(503);
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
+    expect(topicCreateMock).not.toHaveBeenCalled();
+    expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("creates a custom topic only while persisting an owned completed claim", async () => {
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    expect(topicCreateMock).toHaveBeenCalledWith({
+      data: {
+        taskType: "TASK_1",
+        title: "Écrivez à votre voisin.",
+        prompt: "Écrivez à votre voisin.",
+        source: "USER_SUBMITTED",
+      },
+    });
+    expect(essayCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ topicId: "custom_topic_1" }) }),
     );
   });
 
@@ -291,6 +418,62 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(400);
     expect(topicCreateMock).not.toHaveBeenCalled();
     expect(parseMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unchanged custom-topic correction before creating a topic or calling a provider", async () => {
+    claimCorrectionMock.mockResolvedValue({
+      kind: "existing",
+      essayId: "essay_existing",
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "This response has already been corrected. Edit it before requesting another correction.",
+      code: "CORRECTION_ALREADY_EXISTS",
+      essayId: "essay_existing",
+    });
+    expect(topicCreateMock).not.toHaveBeenCalled();
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
+  });
+
+  it("does not call a provider while the same correction has an active claim", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+    const retryAt = new Date("2026-08-07T12:01:00.000Z");
+    claimCorrectionMock.mockResolvedValue({
+      kind: "inProgress",
+      retryAt,
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "A correction for this response is already in progress. Please try again shortly.",
+      code: "CORRECTION_IN_PROGRESS",
+      retryAt: retryAt.toISOString(),
+    });
+    expect(parseMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
   });
 
   it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {
@@ -404,6 +587,11 @@ describe("POST /api/essays/correct", () => {
 
       expect(response.status).toBe(502);
       expect(essayCreateMock).not.toHaveBeenCalled();
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledWith({
+        userId: LOCAL_USER_ID,
+        correctionKeyHash: "correction_hash_1",
+        claimToken: "claim_1",
+      });
     });
 
     it("returns a 502 when Gemini itself fails", async () => {
@@ -417,6 +605,11 @@ describe("POST /api/essays/correct", () => {
 
       expect(response.status).toBe(502);
       expect(essayCreateMock).not.toHaveBeenCalled();
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledWith({
+        userId: LOCAL_USER_ID,
+        correctionKeyHash: "correction_hash_1",
+        claimToken: "claim_1",
+      });
     });
   });
 
