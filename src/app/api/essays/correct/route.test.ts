@@ -38,6 +38,12 @@ const { POST } = await import("./route");
 
 const feedback = {
   correctedText: "Bonjour, je vais bien.",
+  modelVersion: "Bonjour, je vais très bien, merci de demander.",
+  scores: {
+    content: { score: 60, feedback: "Answers the prompt but stays brief." },
+    linguistics: { score: 70, feedback: "Mostly accurate, watch verb agreement." },
+    vocabulary: { score: 65, feedback: "Simple but appropriate vocabulary." },
+  },
   cefrLevel: "B1",
   meetsWordCount: false,
   wordCountNote: "This response is below the target range.",
@@ -152,6 +158,39 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(200);
     expect(topicCreateMock).not.toHaveBeenCalled();
     expect(parseMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns and persists the structured review details used by the correction modal", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ essayId: "essay_1", feedback });
+    expect(parseMock.mock.calls[0][0].system).toContain("originalStart");
+    expect(essayCreateMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          feedback: {
+            create: expect.objectContaining({
+              grammarNotes: expect.objectContaining({
+                modelVersion: feedback.modelVersion,
+                scores: feedback.scores,
+              }),
+            }),
+          },
+        }),
+      }),
+    );
   });
 
   it("accepts a recent-exam topic ID and uses its stored prompt", async () => {
