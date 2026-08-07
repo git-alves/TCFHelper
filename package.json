@@ -22,7 +22,6 @@
     "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.115.0",
     "@clerk/backend": "^3.15.0",
     "@clerk/localizations": "^4.13.10",
     "@clerk/nextjs": "^7.6.4",

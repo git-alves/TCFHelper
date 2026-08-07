@@ -129,11 +129,6 @@ function renderHighlightedText(
   return nodes.length > 0 ? nodes : [text];
 }
 
-function getCefrProgress(level: EssayFeedback["cefrLevel"]) {
-  const index = CEFR_LEVELS.indexOf(level);
-  return index < 0 ? 0 : Math.round((index / (CEFR_LEVELS.length - 1)) * 100);
-}
-
 function getLearningCriteria(feedback: EssayFeedback, modalCopy: CorrectionModalCopy): LearningCriterion[] {
   return [
     { label: modalCopy.contentScoreLabel, score: feedback.scores.content },
@@ -233,6 +228,9 @@ function createPrintDocument({
       <p>${escapeHtml(modalCopy.overallScore({ score: getOverallScore(criteria) }))}</p>
       <p>${escapeHtml(modalCopy.overallScoreDescription)}</p>
       <p>${printableText(feedback.wordCountNote)}</p>
+      <p>${escapeHtml(modalCopy.cefrEstimateDisclosure)}</p>
+      <h3>${escapeHtml(modalCopy.cefrRationaleHeading)}</h3>
+      <p>${printableText(feedback.cefrRationale)}</p>
       <table>${scoreRows}</table>
     </section>
 
@@ -273,7 +271,6 @@ export function CorrectionModal({
   onRetry,
 }: CorrectionModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
-  const [isMarkedRead, setIsMarkedRead] = useState(false);
   const [expandedCorrectionIndexes, setExpandedCorrectionIndexes] = useState<Set<number>>(() => new Set([0]));
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -308,7 +305,16 @@ export function CorrectionModal({
 
       if (event.key !== "Tab" || !dialogRef.current) return;
 
-      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      // Hidden tab panels can still contain elements matching the selector
+      // (notably <summary>). They are not tab stops, so including them here
+      // makes the trap calculate the wrong first/last element and lets focus
+      // escape from the visible footer. Match the browser's actual tab order.
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)).filter(
+        (element) =>
+          !element.closest("[hidden]") &&
+          element.tabIndex >= 0 &&
+          element.getClientRects().length > 0,
+      );
       if (focusable.length === 0) {
         event.preventDefault();
         return;
@@ -594,25 +600,34 @@ export function CorrectionModal({
                         {feedback.wordCountNote}
                       </p>
                     </div>
+                    <p className="mt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                      {modalCopy.cefrEstimateDisclosure}
+                    </p>
                     <div
-                      role="progressbar"
+                      role="list"
                       aria-label={modalCopy.estimatedLevel({ level: feedback.cefrLevel })}
-                      aria-valuemin={0}
-                      aria-valuemax={100}
-                      aria-valuenow={getCefrProgress(feedback.cefrLevel)}
-                      className="mt-4 h-2.5 overflow-hidden rounded-full bg-violet-500/10 dark:bg-violet-400/15"
+                      className="mt-4 grid grid-cols-6 gap-1 text-center text-xs"
                     >
-                      <div
-                        className="h-full rounded-full bg-violet-600 dark:bg-violet-400"
-                        style={{ width: `${getCefrProgress(feedback.cefrLevel)}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 flex justify-between text-xs text-zinc-500 dark:text-zinc-400">
                       {CEFR_LEVELS.map((level) => (
-                        <span key={level} className={level === feedback.cefrLevel ? "font-semibold text-foreground" : undefined}>
+                        <span
+                          key={level}
+                          role="listitem"
+                          aria-current={level === feedback.cefrLevel ? "true" : undefined}
+                          className={`rounded-md px-1.5 py-2 font-medium ${
+                            level === feedback.cefrLevel
+                              ? "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950"
+                              : "bg-black/[.05] text-zinc-500 dark:bg-white/[.08] dark:text-zinc-400"
+                          }`}
+                        >
                           {level}
                         </span>
                       ))}
+                    </div>
+                    <div className="mt-5 border-t border-black/[.08] pt-4 dark:border-white/[.12]">
+                      <h4 className="text-sm font-medium">{modalCopy.cefrRationaleHeading}</h4>
+                      <p lang={feedbackLanguage} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                        {feedback.cefrRationale}
+                      </p>
                     </div>
                   </div>
 
@@ -876,21 +891,8 @@ export function CorrectionModal({
           </div>
         )}
 
-        <footer className="flex flex-none flex-wrap items-center justify-between gap-3 border-t border-black/[.08] px-4 py-4 dark:border-white/[.12] sm:px-6">
-          {state === "result" && feedback ? (
-            <button
-              type="button"
-              onClick={() => setIsMarkedRead(true)}
-              disabled={isMarkedRead}
-              aria-pressed={isMarkedRead}
-              className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-default disabled:opacity-70 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-            >
-              {isMarkedRead ? modalCopy.markedAsRead : modalCopy.markAsRead}
-            </button>
-          ) : (
-            <span aria-hidden="true" />
-          )}
-          <div className="ml-auto flex items-center gap-3">
+        <footer className="flex flex-none flex-wrap items-center justify-end gap-3 border-t border-black/[.08] px-4 py-4 dark:border-white/[.12] sm:px-6">
+          <div className="flex items-center gap-3">
             {state === "error" && (
               <button
                 type="button"

@@ -13,21 +13,22 @@
 - Provide a fixed header and footer, submission reference, status/word-count/level badges, and three tabs: overview, compared text, and feedback/tips.
 - Show a global AI-learning visualization alongside the three criterion rows, without presenting the result as an official TCF score.
 - Show error snippets in the original text with a correction tooltip, corrected snippets in green, and structured, keyboard-operable correction cards.
-- Back the three score rows and model version with structured model output, then label them as AI-generated learning aids rather than official TCF scores or teacher feedback.
+- Back the three score rows and model version with structured model output, then label them as mytcflab learning aids rather than official TCF scores or teacher feedback.
+- Explain each estimated CEFR band with model-provided evidence from the submitted text and the primary blocker to the next band; do not infer that explanation from the score bars.
 - Offer browser-native print / Save-as-PDF for the current correction.
 
 ### Non-goals
 
 - No claim of an official TCF score, teacher review, teacher chat, teacher audio, or student-name lookup.
 - No server-rendered/downloadable PDF, stored PDF binary, or new PDF-rendering dependency.
-- No persistent `read` state or history UI; the “Mark as read” control applies only to the current browser session.
+- No session-only read state. A control that cannot be persisted or used in a later workflow must not appear as completed work.
 - No change to the assessment audit standard or any attempt to derive scores from CEFR level, error counts, or word count.
 
 ## Decision
 
 Use a controlled client-side dialog in the writing workspace, rather than the existing URL-backed settings drawer. The correction action opens the dialog immediately and records a snapshot of the submitted text. When the correction request succeeds, the same dialog changes to the review tabs; when it fails, it offers retry without discarding the draft.
 
-The correction schema adds three model-assessed, 0–100 learning indicators and a distinct model version. They are rendered only with a visible disclosure that they are AI-generated and not official TCF scores. This adds truthful data for the requested overview and model-version regions without inventing percentages on the client. The fields live in the existing `grammarNotes` JSON alongside the returned response, so this narrowly scoped feature does not need a database migration.
+The correction schema adds three model-assessed, 0–100 learning indicators, a distinct model version, and a concise `cefrRationale`. They are rendered only with a visible disclosure that they are mytcflab learning indicators and not an official TCF result. The CEFR rationale must cite the original submission and the main blocker to the next band; the overview also explains that a C1/C2 study-example request is a target, not a verified CEFR result. These fields live in the existing `grammarNotes` JSON alongside the returned response, so the display additions do not need a database migration.
 
 The API's returned `essayId` is retained in workspace state and shown as the submission reference in the completed modal and its printable document. The global visual is not a fourth assessment: it is the rounded arithmetic mean of the three returned AI criteria, labelled as such and displayed beside the criterion legend.
 
@@ -42,8 +43,9 @@ The correction response now contains:
 - `correctedText`, `errors`, `summary`, suggestions, CEFR estimate, and word-count result (existing fields);
 - `scores.content`, `scores.linguistics`, and `scores.vocabulary`, each with an AI-assessed integer score and concise feedback;
 - `modelVersion`, a French model response that preserves the learner’s core intent and meets the task word range.
+- `cefrRationale`, a concise explanation of why the original sample received its estimated CEFR band.
 
-The API persists `modelVersion` and `scores` in `Feedback.grammarNotes`, then returns the same structured object. Malformed or unavailable model output follows the existing retryable correction failure path; no partial feedback is saved.
+The API persists `modelVersion`, `scores`, and `cefrRationale` in `Feedback.grammarNotes`, then returns the same structured object. Malformed or unavailable model output follows the existing retryable correction failure path; no partial feedback is saved.
 
 Each error can carry exact, zero-based UTF-16 offsets for its original and corrected excerpts. The client highlights only when an offset is present and still matches the returned text exactly; otherwise it leaves the prose untouched and keeps the corresponding correction card. This avoids mislabelling a repeated word or phrase without dropping useful error guidance when the model cannot locate an occurrence confidently.
 
@@ -58,7 +60,8 @@ Correction cards use native disclosure controls: every card keeps its error, cor
 | Correction fails | Modal displays the existing concise error and a retry action; the draft remains intact. |
 | Learner dismisses while loading | The request may finish, but the dialog respects dismissal; the completed result remains available through “View correction.” |
 | Browser blocks the print window | The app renders the same printable correction document in a temporary hidden frame, then opens that frame’s browser print dialog. |
-| Learner edits after closing | Reopening displays the saved submission snapshot and a stale-feedback warning, not the new editor text. |
+| Learner edits after closing | Reopening displays the saved submission snapshot and a stale-feedback warning, not the new editor text. Reverting exactly to the assessed task/topic/text removes the stale warning and keeps a duplicate correction disabled. |
+| Learner requests an unchanged correction after a reload or in another tab | The server-side correction claim rejects the duplicate before calling a provider. The learner can use their saved correction history rather than spending another correction. |
 
 ## Success metric
 
@@ -74,5 +77,5 @@ The baseline is unmeasured. In a five-learner usability check, at least four lea
 
 ## Open questions
 
-- If the product later needs official TCF-aligned scoring, which authoritative rubric, score semantics, and reviewer-validation process will govern the replacement of these AI-generated indicators?
-- Should correction history expose the persisted `grammarNotes` fields, and if so, what owner-scoped route and JSON validation contract will it use?
+- If the product later needs official TCF-aligned scoring, which authoritative rubric, score semantics, and reviewer-validation process will govern the replacement of these mytcflab learning indicators?
+- When correction history reaches more than the initial server-rendered slice, should it use cursor pagination, search, or task/level filters first?

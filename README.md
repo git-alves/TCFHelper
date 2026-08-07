@@ -34,17 +34,11 @@ gate yet — every logged-in user can reach `/tasks`.
      secret key stays server-only.
    - `CLERK_WEBHOOK_SIGNING_SECRET`: the Svix signing secret for the Clerk
      webhook endpoint. Required once the Clerk user-sync webhook is enabled.
-   - `ANTHROPIC_API_KEY`: a Claude API key used to generate writing feedback.
-   - `GEMINI_API_KEY`: a free-tier Gemini API key used first for model
-     answers; `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_AI_API_TOKEN` provide
-     the Cloudflare Workers AI fallback when Gemini reaches its free limit.
-   - `CORRECTION_PROVIDER` (optional): set to `gemini` to grade essays with
-     Gemini instead of Claude, reusing `GEMINI_API_KEY` above. Meant for
-     testing the correction flow without spending Anthropic credits — leave
-     unset for production-quality grading.
-   - `GEMINI_CORRECTION_MODEL` (optional): the model used only when
-     `CORRECTION_PROVIDER=gemini`, kept separate from `GEMINI_MODEL` so test
-     grading doesn't implicitly share the model-answer generator's model.
+   - `GEMINI_API_KEY`: a Gemini API key used for writing corrections and
+     model answers.
+   - `GEMINI_CORRECTION_MODEL` (optional): the model used only for writing
+     correction, kept separate from `GEMINI_MODEL` so grading doesn't
+     implicitly share the model-answer generator's model.
      Defaults to a free-tier Flash-Lite model; check
      [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
      for the current lineup, since free-tier names are retired over time.
@@ -84,7 +78,8 @@ gate yet — every logged-in user can reach `/tasks`.
 
    Visit `http://localhost:3000`. Sign up at `/signup`, which uses Clerk's
    prebuilt flow and redirects to `/tasks`. Signing back in redirects to
-   `/dashboard`, a CEFR-level progress graph built from correction history.
+   `/dashboard`, which combines a CEFR-level progress graph with the learner's
+   five most recent corrections and a link to their full private history.
    Enable Google in the Clerk dashboard to show it as a sign-in option.
 
 ## Recent-exam topics
@@ -103,7 +98,7 @@ month's already-published page instead of failing outright; the displayed
 source label always reflects whichever month was actually used. Any other
 failure (the source is unreachable, or its structure changed) does not fall
 back — the app keeps the learner's draft and offers the paste-your-own path
-instead. Retrieved topics are saved with immutable provenance so Claude grades
+instead. Retrieved topics are saved with immutable provenance so Gemini grades
 against the exact prompt the learner saw.
 
 If neither the current nor the prior month is published, `/api/topics/recent`
@@ -122,15 +117,14 @@ structure (Task 3's are a title plus two contrasting `Document 1` /
 The Tasks screen keeps its recent-exam and custom-topic choices. Once a topic is
 selected, learners can generate a B2, C1, or C2 French model answer directly
 into the editor. The app caches answers privately per learner/topic/level and
-limits fresh generations per day. Gemini is tried first; Cloudflare Workers AI
-is used only when Gemini's free-tier limit is reached.
+limits fresh generations per day. Gemini generates new examples.
 
 ## Live translation
 
 Live draft translation sends the learner's French draft from the server to
 [DeepL](https://www.deepl.com/) via the API Free plan only when the selected
 application language is English, Spanish, or Portuguese. It is a writing aid,
-not part of Claude's correction workflow; a translation failure never prevents
+not part of Gemini's correction workflow; a translation failure never prevents
 writing or requesting feedback. The key is kept server-side in
 `DEEPL_API_KEY` and must not be exposed through `NEXT_PUBLIC_*` variables.
 
@@ -421,9 +415,9 @@ Either way, set these environment variables on the Vercel project (with
 `DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
 `CLERK_WEBHOOK_SIGNING_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
-`NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `ANTHROPIC_API_KEY`,
-`GEMINI_API_KEY`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_AI_API_TOKEN`,
-`DEEPL_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`,
+`NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `GEMINI_API_KEY`,
+`GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`,
 `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
 
 For an existing production database, complete any pending contract/destructive

@@ -15,6 +15,7 @@ const feedback = essayFeedbackSchema.parse({
     vocabulary: { score: 78, feedback: "Vocabulary is varied and appropriate." },
   },
   cefrLevel: "B1",
+  cefrRationale: "The response communicates its idea clearly, but limited sentence variety keeps the estimate at B1.",
   meetsWordCount: true,
   wordCountNote: "The response is within the target range.",
   errors: [
@@ -51,14 +52,19 @@ function renderResultModal() {
 }
 
 describe("CorrectionModal", () => {
-  it("renders the returned submission ID and a clearly labelled AI score visual", () => {
+  it("renders the returned submission ID, rationale, and clearly labelled learning visual", () => {
     const markup = renderResultModal();
 
     expect(markup).toContain("Submission ID: essay_123");
     expect(markup).toContain("Global performance");
     expect(markup).toContain("Overall learning indicator: 78%");
-    expect(markup).toContain("Average of the three AI-generated criteria below.");
-    expect(markup).toContain("AI-generated learning indicators — not official TCF scores.");
+    expect(markup).toContain("Average of the three mytcflab learning indicators below.");
+    expect(markup).toContain("mytcflab learning indicators - not official TCF.");
+    expect(markup).toContain("Why this estimate");
+    expect(markup).toContain("A requested C1/C2 study-example level is a target, not a verified result.");
+    expect(markup).toContain("limited sentence variety keeps the estimate at B1");
+    expect(markup).toContain("mytcflab generated model version");
+    expect(markup).not.toContain("Mark as read this session");
     expect(markup).toContain("<svg");
   });
 

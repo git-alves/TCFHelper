@@ -230,6 +230,7 @@ describe("gradeEssayWithGemini", () => {
       vocabulary: { score: 65, feedback: "Simple but appropriate." },
     },
     cefrLevel: "B1",
+    cefrRationale: "Simple accurate sentences support B1, while limited range blocks B2.",
     meetsWordCount: false,
     wordCountNote: "Below the target range.",
     errors: [],
@@ -279,6 +280,8 @@ describe("gradeEssayWithGemini", () => {
       minimum: 0,
       maximum: 100,
     });
+    expect(body.generationConfig.responseSchema.properties.cefrRationale).toEqual({ type: "STRING" });
+    expect(body.generationConfig.responseSchema.required).toContain("cefrRationale");
     // originalStart/correctionStart are nullable, not just non-required:
     // Gemini fills every declared property either way, so a schema that
     // only marks them non-required would still have Gemini return `null`

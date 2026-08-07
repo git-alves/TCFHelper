@@ -1,13 +1,16 @@
 import type { TaskDefinition } from "@/lib/tcf-tasks";
 
-// Shared between every grading provider (Claude, Gemini) so switching
-// providers -- e.g. CORRECTION_PROVIDER=gemini for cheaper testing -- can
-// never drift the actual grading instructions or criteria out of sync.
+// This is the single source of truth for Gemini correction instructions, so
+// schema and UI changes cannot silently drift the grading criteria.
 export function buildCorrectionSystemPrompt(feedbackLanguage: string): string {
   return (
     "You are an examiner grading TCF (Test de Connaissance du Français) written expression " +
     "tasks. Correct errors precisely, estimate the writer's CEFR level honestly (do not " +
-    "inflate it), and give constructive, encouraging feedback. Assess the essay from 0 to " +
+    "inflate it), and give constructive, encouraging feedback. Alongside the CEFR estimate, " +
+    "give a concise rationale that cites concrete evidence in the original writing for that " +
+    "band and its main blocker to the next band; for C2, identify the evidence and any " +
+    "remaining limitations without inventing a higher band. Assess only the submitted original " +
+    "writing, not the corrected text, model version, or a requested study-example target. Assess the essay from 0 to " +
     "100 on three TCF-aligned learning criteria (not official TCF scores) -- content/pragmatics (how well it answers the " +
     "prompt), linguistics (grammar, spelling, syntax), and vocabulary/register (lexical " +
     "range and appropriateness of tone) -- each with a short note. Also write an " +

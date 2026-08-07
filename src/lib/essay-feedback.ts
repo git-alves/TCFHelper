@@ -49,6 +49,12 @@ export const essayFeedbackSchema = z.object({
   cefrLevel: z
     .enum(CEFR_LEVELS)
     .describe("The estimated CEFR level (A1-C2) of the original writing sample."),
+  cefrRationale: z
+    .string()
+    .min(1)
+    .describe(
+      "A concise explanation of the estimated CEFR level, citing concrete evidence from the original writing and the main blocker to the next level. Write it in the feedback language specified in the system prompt."
+    ),
   meetsWordCount: z
     .boolean()
     .describe("Whether the essay's word count falls within the task's required range."),

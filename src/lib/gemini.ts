@@ -6,11 +6,11 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models
 // overridable via GEMINI_MODEL since free-tier model names are retired and
 // replaced over time.
 const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
-// Deliberately separate from GEMINI_MODEL/DEFAULT_GEMINI_MODEL above: grading
-// (test-only, see gradeEssayWithGemini) should not silently share whatever
-// model the model-answer generator happens to be configured with. Flash-Lite
-// is the cheaper/faster free-tier line suited to test grading, not the
-// full Flash model used for learner-facing model answers.
+// Deliberately separate from GEMINI_MODEL/DEFAULT_GEMINI_MODEL above:
+// learner-facing correction should not silently share whatever model the
+// model-answer generator happens to use. Flash-Lite is the cheaper/faster
+// line suited to structured grading, while full Flash remains available for
+// learner-facing model answers.
 const DEFAULT_GEMINI_CORRECTION_MODEL = "gemini-3.5-flash-lite";
 const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
@@ -148,9 +148,9 @@ function extractText(payload: unknown): string {
 }
 
 /**
- * Generates a French model answer via the Gemini API's free tier — kept as
- * a separate provider from Anthropic (used for grading) specifically so this
- * button never adds to the app's paid model spend.
+ * Generates a French model answer via Gemini. It deliberately keeps a
+ * separately configurable model from correction so example quality and
+ * correction quality can evolve independently.
  */
 export async function generateModelAnswer(params: GenerateModelAnswerParams): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -242,6 +242,7 @@ const CORRECTION_RESPONSE_SCHEMA = {
       required: ["content", "linguistics", "vocabulary"],
     },
     cefrLevel: { type: "STRING", enum: [...CEFR_LEVELS] },
+    cefrRationale: { type: "STRING" },
     meetsWordCount: { type: "BOOLEAN" },
     wordCountNote: { type: "STRING" },
     errors: {
@@ -271,6 +272,7 @@ const CORRECTION_RESPONSE_SCHEMA = {
     "modelVersion",
     "scores",
     "cefrLevel",
+    "cefrRationale",
     "meetsWordCount",
     "wordCountNote",
     "errors",
@@ -285,11 +287,10 @@ export interface GradeEssayWithGeminiParams {
 }
 
 /**
- * Grades an essay via Gemini's free tier using response-schema-constrained
- * JSON output, as a cheaper stand-in for Claude (used in production) during
- * testing. The caller is responsible for validating the returned value
- * against essayFeedbackSchema -- Gemini's responseSchema narrows the shape
- * but does not guarantee it as strictly as Claude's structured output does.
+ * Grades an essay via Gemini using response-schema-constrained JSON output.
+ * The caller still validates the returned value against essayFeedbackSchema:
+ * Gemini's response schema narrows the shape, but a provider response remains
+ * untrusted at the application boundary.
  */
 export async function gradeEssayWithGemini({
   systemPrompt,
@@ -300,8 +301,8 @@ export async function gradeEssayWithGemini({
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
   }
 
-  // No fallback to GEMINI_MODEL: correction has its own setting so testing
-  // grading never implicitly rides on the model-answer generator's config.
+  // No fallback to GEMINI_MODEL: correction has its own setting so grading
+  // never implicitly rides on the model-answer generator's configuration.
   const model = process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
 
   let response: Response;

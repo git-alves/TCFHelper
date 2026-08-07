@@ -88,6 +88,7 @@ model User {
   exampleAnswers          ExampleAnswer[]
   exampleGenerationQuota  ExampleGenerationQuota?
   exampleGenerationLeases ExampleGenerationLease[]
+  correctionLeases        CorrectionLease[]
   translationQuota        TranslationQuota?
 }
 
@@ -144,20 +145,26 @@ model Topic {
 }
 
 model Essay {
-  id        String      @id @default(cuid())
-  userId    String
-  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  topicId   String?
-  topic     Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
-  taskType  TaskType
-  content   String
-  wordCount Int         @default(0)
-  status    EssayStatus @default(DRAFT)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
+  id                String      @id @default(cuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topicId           String?
+  topic             Topic?      @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  taskType          TaskType
+  content           String
+  // This is a SHA-256 of the normalized task/topic/content correction key,
+  // not merely the text. Nullable keeps the additive rollout compatible with
+  // essays written by the still-live previous app version; the claim layer
+  // falls back to exact legacy content/context matching for those rows.
+  correctionKeyHash String?
+  wordCount         Int         @default(0)
+  status            EssayStatus @default(DRAFT)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
 
   feedback Feedback?
 
+  @@unique([userId, correctionKeyHash])
   @@index([userId])
   @@index([topicId])
 }
@@ -167,12 +174,31 @@ model Feedback {
   essayId        String     @unique
   essay          Essay      @relation(fields: [essayId], references: [id], onDelete: Cascade)
   level          CefrLevel?
+  // Feedback prose follows the interface locale used for the correction.
+  // Keeping it lets a saved review remain accurately labelled after a learner
+  // changes their interface language.
+  feedbackLocale Locale?
   summary        String
   grammarNotes   Json?
   suggestions    Json?
   translatedText String?
   meetsWordCount Boolean    @default(false)
   createdAt      DateTime   @default(now())
+}
+
+/// A short-lived, per-learner claim protects a provider call after its
+/// claiming transaction commits. A matching completed Essay is the durable
+/// result; this row exists only while a request is in progress.
+model CorrectionLease {
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  correctionKeyHash String
+  claimToken        String
+  expiresAt         DateTime
+  createdAt         DateTime @default(now())
+
+  @@id([userId, correctionKeyHash])
+  @@index([expiresAt])
 }
 
 /// A cached model answer is private to its learner. The hash avoids storing a

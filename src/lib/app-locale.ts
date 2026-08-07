@@ -13,7 +13,7 @@ export const APP_LOCALE_LABELS: Record<AppLocale, string> = {
   pt: "Português",
 };
 
-// Full language name for interpolating into prompts sent to Claude — kept
+// Full language name for interpolating into Gemini prompts — kept
 // separate from the UI label in case they ever need to diverge.
 export const APP_LOCALE_LANGUAGE_NAMES: Record<AppLocale, string> = {
   en: "English",
