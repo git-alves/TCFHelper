@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { AppCopy } from "@/lib/app-copy";
 import { APP_LOCALE_INTL_TAGS, type AppLocale } from "@/lib/app-locale";
 import type { CorrectionHistoryItem } from "@/lib/correction-history";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 
-interface CorrectionHistoryListProps {
+interface CorrectionHistoryListContentProps {
   items: CorrectionHistoryItem[];
   locale: AppLocale;
   copy: AppCopy;
@@ -18,7 +19,7 @@ function formatAssessedDate(assessedAt: string, locale: AppLocale) {
   return new Intl.DateTimeFormat(APP_LOCALE_INTL_TAGS[locale], { dateStyle: "medium" }).format(new Date(assessedAt));
 }
 
-export function CorrectionHistoryEmpty({ copy }: Pick<CorrectionHistoryListProps, "copy">) {
+export function CorrectionHistoryEmpty({ copy }: Pick<CorrectionHistoryListContentProps, "copy">) {
   return (
     <div className="rounded-2xl border border-black/[.08] p-8 text-center dark:border-white/[.145]">
       <p className="font-medium">{copy.dashboard.noCorrectionHistoryTitle}</p>
@@ -27,7 +28,21 @@ export function CorrectionHistoryEmpty({ copy }: Pick<CorrectionHistoryListProps
   );
 }
 
-export function CorrectionHistoryList({ items, locale, copy }: CorrectionHistoryListProps) {
+/**
+ * Client-only state and actions live behind this wrapper so server pages pass
+ * only serializable history records across the RSC boundary. AppCopy contains
+ * functions, so passing it from a Server Component would fail at runtime.
+ */
+export function CorrectionHistoryList({ items }: Pick<CorrectionHistoryListContentProps, "items">) {
+  const { locale } = useAppLocale();
+  const copy = useAppCopy();
+
+  return <CorrectionHistoryListContent items={items} locale={locale} copy={copy} />;
+}
+
+// Exported for static component tests. Server pages must render the wrapper
+// above so copy functions are obtained on the client rather than serialized.
+export function CorrectionHistoryListContent({ items, locale, copy }: CorrectionHistoryListContentProps) {
   const [visibleItems, setVisibleItems] = useState(items);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);

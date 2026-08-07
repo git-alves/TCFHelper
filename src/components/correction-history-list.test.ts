@@ -1,13 +1,24 @@
-import { createElement } from "react";
+import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import { APP_COPY } from "@/lib/app-copy";
-import { CorrectionHistoryEmpty, CorrectionHistoryList } from "./correction-history-list";
+import type { CorrectionHistoryItem } from "@/lib/correction-history";
+import {
+  CorrectionHistoryEmpty,
+  CorrectionHistoryList,
+  CorrectionHistoryListContent,
+} from "./correction-history-list";
 
 describe("CorrectionHistoryList", () => {
+  it("accepts only serializable records across the server/client boundary", () => {
+    expectTypeOf<ComponentProps<typeof CorrectionHistoryList>>().toEqualTypeOf<{
+      items: CorrectionHistoryItem[];
+    }>();
+  });
+
   it("links each owner-visible history item to its correction detail", () => {
     const markup = renderToStaticMarkup(
-      createElement(CorrectionHistoryList, {
+      createElement(CorrectionHistoryListContent, {
         locale: "en",
         copy: APP_COPY.en,
         items: [
