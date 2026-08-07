@@ -2,6 +2,7 @@ import "server-only";
 
 import { EssayStatus, type CefrLevel, type Prisma, type TaskType } from "@prisma/client";
 import { z } from "zod";
+import type { AppLocale } from "@/lib/app-locale";
 import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { prisma } from "@/lib/prisma";
 
@@ -41,6 +42,7 @@ const historyDetailSelect = {
   feedback: {
     select: {
       level: true,
+      feedbackLocale: true,
       summary: true,
       grammarNotes: true,
       suggestions: true,
@@ -74,6 +76,7 @@ interface CorrectionHistoryBase {
 export interface CompleteCorrectionHistoryDetail extends CorrectionHistoryBase {
   kind: "complete";
   feedback: EssayFeedback;
+  feedbackLocale: AppLocale | null;
 }
 
 export interface LimitedCorrectionHistoryDetail extends CorrectionHistoryBase {
@@ -199,7 +202,12 @@ export async function getCorrectionForUser(userId: string, essayId: string): Pro
   const feedback = parseStoredEssayFeedback(essay.feedback);
 
   if (feedback) {
-    return { ...base, kind: "complete", feedback };
+    return {
+      ...base,
+      kind: "complete",
+      feedback,
+      feedbackLocale: essay.feedback.feedbackLocale,
+    };
   }
 
   return {

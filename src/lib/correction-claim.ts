@@ -60,7 +60,11 @@ function legacyCorrectionWhere(input: CorrectionClaimKey): Prisma.EssayWhereInpu
     // could incorrectly collapse into one correction.
     correctionKeyHash: null,
     taskType: input.taskType,
-    content: input.content,
+    // Older routes trimmed content during request parsing. Preserve raw text
+    // for every new correction so offsets stay truthful, while matching the
+    // legacy stored representation here to avoid regrading a pasted draft
+    // that differs only by outer whitespace.
+    content: input.content.trim(),
   };
 
   // Older rows have no correctionKeyHash. Match their saved context exactly

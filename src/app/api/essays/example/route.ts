@@ -6,7 +6,6 @@ import { prisma } from "@/lib/prisma";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
-import { CloudflareRequestError, CloudflareTransportError } from "@/lib/cloudflare-ai";
 import {
   cacheExample,
   claimExampleGeneration,
@@ -17,7 +16,6 @@ import {
 } from "@/lib/example-answer-cache";
 import {
   hasConfiguredModelAnswerProvider,
-  ModelAnswerBothProvidersFailedError,
   ModelAnswerInvalidOutputError,
   ModelAnswerNotConfiguredError,
   ModelAnswerRateLimitedError,
@@ -56,19 +54,8 @@ const requestSchema = z
 function classifyExampleGenerationFailure(error: unknown): string {
   if (error instanceof ModelAnswerInvalidOutputError) return "invalid_output_length";
   if (error instanceof GeminiRequestError) return `gemini_request_failed_${error.status}`;
-  if (error instanceof CloudflareRequestError) {
-    return `cloudflare_request_failed_${error.status}${error.payloadShape ? ` [${error.payloadShape}]` : ""}`;
-  }
   if (error instanceof GeminiTransportError) return "gemini_transport_failed";
-  if (error instanceof CloudflareTransportError) return "cloudflare_transport_failed";
-  // Only reachable when Cloudflare's own failure isn't one of the cases
-  // above with a dedicated user-facing error (see ModelAnswerBothProvidersFailedError):
-  // both providers failed, and this is the only place that knows why Gemini
-  // was skipped in the first place, not just Cloudflare's own failure.
-  if (error instanceof ModelAnswerBothProvidersFailedError) {
-    return `gemini_${error.geminiReason}_then_${classifyExampleGenerationFailure(error.cloudflareError)}`;
-  }
-  return "provider_request_failed";
+  return "gemini_generation_failed";
 }
 
 export async function POST(request: Request) {
@@ -196,10 +183,8 @@ export async function POST(request: Request) {
 
   try {
     const generated = await generatePreferredModelAnswer({ task, level: typedLevel, topicPrompt: resolvedTopicPrompt });
-    // The provider name alone (a fixed "gemini" | "cloudflare") is the only
-    // thing logged on success, matching the failure path's safe-classification
-    // convention -- otherwise there is no way to tell, after the fact,
-    // whether a given generation used the primary provider or the fallback.
+    // The fixed provider name remains in the cache metadata and logs so each
+    // saved example has a clear provenance record.
     console.log("Example generated:", generated.provider);
     try {
       const saved = await cacheExample(

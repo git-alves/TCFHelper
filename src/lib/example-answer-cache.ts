@@ -5,14 +5,14 @@ import { MODEL_ANSWER_PROMPT_VERSION, type ExampleCefrLevel } from "@/lib/gemini
 import type { ModelAnswerProvider } from "@/lib/model-answer-generator";
 
 // Temporarily raised to a practically-unlimited number at the human's
-// explicit request while testing the Cloudflare reasoning_effort fix — a
-// real per-day number is still coming, this is not a permanent removal of
-// the limit. Finite (not Infinity) so the cap-exceeded path stays testable.
+// explicit request while testing the example-generation flow — a real per-day
+// number is still coming, this is not a permanent removal of the limit.
+// Finite (not Infinity) so the cap-exceeded path stays testable.
 const FRESH_EXAMPLES_PER_DAY = 1000;
 const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
-// Gemini and the Cloudflare fallback can each use their 20-second request
-// timeout. Keep the claim longer than that complete chain so a slow but valid
-// fallback cannot lose ownership and trigger a duplicate provider call.
+// Gemini can use its 20-second request timeout. Keep the claim longer than
+// that call so a slow but valid response cannot lose ownership and trigger a
+// duplicate provider request.
 const LEASE_DURATION_MS = 60_000;
 // A refunded failure never raises the daily count, so that count alone no
 // longer bounds how often a persistently failing provider gets called. This
@@ -27,10 +27,8 @@ const CLAIM_COOLDOWN_MS = 10_000;
 // checked against dailyAttemptCount, a counter that rises on every claim and
 // is never refunded, so it durably bounds total daily attempts (successful
 // or not) independent of the cooldown and independent of refunds.
-// Also temporarily raised alongside FRESH_EXAMPLES_PER_DAY above, for the
-// same reason: today's earlier failed attempts (before the Cloudflare fix)
-// already ate into this durable, non-refunded counter. The 10-second
-// cooldown (CLAIM_COOLDOWN_MS) still bounds burst rate regardless.
+// Also temporarily raised alongside FRESH_EXAMPLES_PER_DAY above. The
+// 10-second cooldown (CLAIM_COOLDOWN_MS) still bounds burst rate regardless.
 const DAILY_ATTEMPT_CAP = 1000;
 
 export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {

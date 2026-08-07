@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
@@ -16,6 +17,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
+import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 
 interface RecentExamTopic {
   id: string;
@@ -115,11 +117,22 @@ export function WritingWorkspace() {
 
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
-  const [feedbackIsStale, setFeedbackIsStale] = useState(false);
+  // This key is written only after a valid response arrives. It lets the
+  // workspace distinguish an unchanged successful correction from a failed
+  // request, and makes an edit-and-revert behave truthfully.
+  const [lastSuccessfulCorrectionKey, setLastSuccessfulCorrectionKey] = useState<string | null>(null);
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [correctionModalState, setCorrectionModalState] = useState<CorrectionModalState>("loading");
   const [correctionModalSession, setCorrectionModalSession] = useState(0);
   const [correctionEssayId, setCorrectionEssayId] = useState<string | null>(null);
+  // A server-side duplicate can be discovered after a reload or in another
+  // tab. Keep its owner-scoped ID long enough to send the learner straight to
+  // the immutable record instead of presenting a generic failure.
+  const [existingCorrectionEssayId, setExistingCorrectionEssayId] = useState<string | null>(null);
+  const [inProgressCorrection, setInProgressCorrection] = useState<{
+    key: string;
+    retryAt: number;
+  } | null>(null);
   const [submittedCorrectionText, setSubmittedCorrectionText] = useState("");
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
@@ -148,7 +161,6 @@ export function WritingWorkspace() {
   } | null>(null);
   const translationRequestId = useRef(0);
   const lastTranslatedRef = useRef<{ text: string; locale: typeof locale } | null>(null);
-  const suppressedTranslationForRef = useRef<string | null>(null);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -159,10 +171,49 @@ export function WritingWorkspace() {
       : topicMode === "custom"
         ? customTopic.trim()
         : "";
+  const correctionRequestKey = getCorrectionRequestKey({
+    taskType,
+    topic:
+      topicMode === "recent" && recentTopic
+        ? { kind: "recent", id: recentTopic.id }
+        : topicMode === "custom"
+          ? { kind: "custom", prompt: customTopic }
+          : null,
+    content,
+  });
+  const isCurrentDraftAlreadyCorrected =
+    correctionRequestKey !== null && correctionRequestKey === lastSuccessfulCorrectionKey;
+  const isCorrectionInProgressElsewhere =
+    correctionRequestKey !== null &&
+    correctionRequestKey === inProgressCorrection?.key;
+  // Do not latch this state on the first keystroke. If a learner reverts the
+  // draft and topic exactly to the assessed version, the saved feedback is
+  // current again and a duplicate correction stays disabled.
+  const feedbackIsStale = Boolean(feedback && !isCurrentDraftAlreadyCorrected);
 
   useEffect(() => {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
+
+  // A claim from another tab/server expires after a short lease. Keep the
+  // block tied to that exact correction key until then: changing and reverting
+  // the draft remains truthful, while a request that genuinely died can be
+  // retried without a page reload.
+  useEffect(() => {
+    if (!inProgressCorrection) return;
+
+    const remaining = Math.max(0, inProgressCorrection.retryAt - Date.now());
+
+    const timer = window.setTimeout(() => {
+      setInProgressCorrection((current) =>
+        current?.key === inProgressCorrection.key && current.retryAt === inProgressCorrection.retryAt
+          ? null
+          : current,
+      );
+    }, remaining);
+
+    return () => window.clearTimeout(timer);
+  }, [inProgressCorrection]);
 
   useEffect(() => {
     return () => {
@@ -182,11 +233,6 @@ export function WritingWorkspace() {
       // resetDraftAndFeedback() — both already clear translation state
       // synchronously there. This just guards against a stale in-flight
       // request resolving after the fact.
-      translationRequestId.current += 1;
-      return;
-    }
-
-    if (suppressedTranslationForRef.current === trimmed) {
       translationRequestId.current += 1;
       return;
     }
@@ -288,15 +334,17 @@ export function WritingWorkspace() {
     };
   }, [content, locale]);
 
-  // A model answer invalidates stale feedback like a learner edit, but its
-  // first insertion deliberately skips the separate live-translation quota.
-  function applyDraftContent(value: string, { suppressTranslation = false } = {}) {
-    suppressedTranslationForRef.current = suppressTranslation ? value.trim() : null;
+  // Every committed draft follows the same translation path, whether it was
+  // typed, pasted, or inserted by the study-example action. This keeps the
+  // translated panel honest and avoids requiring an extra learner edit.
+  function applyDraftContent(value: string) {
     setContent(value);
     setHasCorrectionError(false);
+    // Keep a server-returned history ID while the learner experiments with a
+    // revision. The link itself is rendered only when the current key matches
+    // again, so edit-and-revert restores the useful route to the saved review.
     setTranslationError(null);
     setTranslationErrorFor(null);
-    if (feedback) setFeedbackIsStale(true);
     if (!value.trim()) {
       translationRequestId.current += 1;
       setTranslation("");
@@ -313,10 +361,12 @@ export function WritingWorkspace() {
     setContent("");
     setFeedback(null);
     setFeedbackLocale(null);
-    setFeedbackIsStale(false);
+    setLastSuccessfulCorrectionKey(null);
     setCorrectionModalOpen(false);
     setCorrectionModalState("loading");
     setCorrectionEssayId(null);
+    setExistingCorrectionEssayId(null);
+    setInProgressCorrection(null);
     setSubmittedCorrectionText("");
     setHasCorrectionError(false);
     setExampleError(null);
@@ -329,7 +379,6 @@ export function WritingWorkspace() {
     setTranslationErrorFor(null);
     setTranslationRequestFor(null);
     lastTranslatedRef.current = null;
-    suppressedTranslationForRef.current = null;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -525,7 +574,18 @@ export function WritingWorkspace() {
   }
 
   async function handleCorrect() {
-    if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading || isCorrecting) return;
+    if (
+      !taskType ||
+      !activeTopicPrompt ||
+      !correctionRequestKey ||
+      wordCount === 0 ||
+      isTopicLoading ||
+      isCorrecting ||
+      isCorrectionInProgressElsewhere ||
+      isCurrentDraftAlreadyCorrected
+    ) {
+      return;
+    }
 
     const correctionLocale = locale;
     // Keep the exact submitted draft for the comparison tab. A correction is
@@ -543,8 +603,9 @@ export function WritingWorkspace() {
     setHasCorrectionError(false);
     setFeedback(null);
     setFeedbackLocale(null);
-    setFeedbackIsStale(false);
     setCorrectionEssayId(null);
+    setExistingCorrectionEssayId(null);
+    setInProgressCorrection(null);
     setSubmittedCorrectionText(submittedText);
     setCorrectionModalState("loading");
     setCorrectionModalSession((session) => session + 1);
@@ -561,18 +622,50 @@ export function WritingWorkspace() {
         }),
       });
 
+      const data: unknown = await res.json().catch(() => null);
       if (!res.ok) {
+        if (
+          requestId === correctionRequestId.current &&
+          data &&
+          typeof data === "object" &&
+          (data as { code?: unknown }).code === "CORRECTION_ALREADY_EXISTS"
+        ) {
+          setLastSuccessfulCorrectionKey(correctionRequestKey);
+          const essayId = (data as { essayId?: unknown }).essayId;
+          setExistingCorrectionEssayId(typeof essayId === "string" ? essayId : null);
+          setCorrectionModalOpen(false);
+          return;
+        }
+        if (
+          requestId === correctionRequestId.current &&
+          data &&
+          typeof data === "object" &&
+          (data as { code?: unknown }).code === "CORRECTION_IN_PROGRESS"
+        ) {
+          const retryAtValue = (data as { retryAt?: unknown }).retryAt;
+          const retryAt =
+            typeof retryAtValue === "string" ? Date.parse(retryAtValue) : Number.NaN;
+          setInProgressCorrection({
+            key: correctionRequestKey,
+            // A malformed or already-expired server timestamp should never
+            // create a permanent client-side block.
+            retryAt: Number.isFinite(retryAt) ? Math.max(retryAt, Date.now() + 1) : Date.now() + 5_000,
+          });
+          setCorrectionModalOpen(false);
+          return;
+        }
         throw new Error("Correction request failed");
       }
 
-      const data: { essayId: string; feedback: EssayFeedback } = await res.json();
+      const correction = data as { essayId: string; feedback: EssayFeedback };
       // The workspace may have been reset (a task switch) while this
       // request was in flight — a stale response must never write feedback
       // into whatever the learner has moved on to.
       if (requestId !== correctionRequestId.current) return;
-      setFeedback(data.feedback);
-      setCorrectionEssayId(data.essayId);
+      setFeedback(correction.feedback);
+      setCorrectionEssayId(correction.essayId);
       setFeedbackLocale(correctionLocale);
+      setLastSuccessfulCorrectionKey(correctionRequestKey);
       setCorrectionModalState("result");
     } catch {
       if (requestId === correctionRequestId.current) {
@@ -656,7 +749,7 @@ export function WritingWorkspace() {
 
       const data: { text: string } = await res.json();
       if (requestId !== exampleRequestId.current) return;
-      applyDraftContent(data.text, { suppressTranslation: true });
+      applyDraftContent(data.text);
     } catch (error) {
       if (requestId === exampleRequestId.current && !(error instanceof Error && error.name === "AbortError")) {
         setExampleError("generic");
@@ -853,7 +946,6 @@ export function WritingWorkspace() {
                     setCustomTopic(e.target.value);
                     if (e.target.value.trim()) setExampleNeedsTopic(false);
                     setHasCorrectionError(false);
-                    if (feedback) setFeedbackIsStale(true);
                   }}
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
                   rows={3}
@@ -906,13 +998,22 @@ export function WritingWorkspace() {
               <button
                 type="button"
                 onClick={handleCorrect}
-                disabled={!activeTopicPrompt || wordCount === 0 || isCorrecting || isTopicLoading || isGeneratingExample}
+                disabled={
+                  !activeTopicPrompt ||
+                  wordCount === 0 ||
+                  isCorrecting ||
+                  isTopicLoading ||
+                  isGeneratingExample ||
+                  isCorrectionInProgressElsewhere ||
+                  isCurrentDraftAlreadyCorrected
+                }
+                aria-describedby={isCurrentDraftAlreadyCorrected ? "already-corrected-note" : undefined}
                 className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
               >
                 {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
               </button>
 
-              {feedback && (
+              {feedback ? (
                 <button
                   type="button"
                   onClick={() => {
@@ -923,6 +1024,16 @@ export function WritingWorkspace() {
                 >
                   {copy.workspace.correctionModal.viewCorrection}
                 </button>
+              ) : (
+                existingCorrectionEssayId &&
+                isCurrentDraftAlreadyCorrected && (
+                  <Link
+                    href={`/dashboard/history/${encodeURIComponent(existingCorrectionEssayId)}`}
+                    className="self-start rounded-full border border-violet-500/30 bg-violet-500/[.06] px-4 py-2.5 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:border-violet-400/35 dark:bg-violet-400/[.1] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                  >
+                    {copy.workspace.correctionModal.viewCorrection}
+                  </Link>
+                )
               )}
 
               <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]">
@@ -981,6 +1092,20 @@ export function WritingWorkspace() {
             {hasCorrectionError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
                 {copy.workspace.editor.genericCorrectionError}
+              </p>
+            )}
+            {isCorrectionInProgressElsewhere && (
+              <p role="status" className="text-sm text-amber-700 dark:text-amber-300">
+                {copy.workspace.editor.correctionInProgress}
+              </p>
+            )}
+            {isCurrentDraftAlreadyCorrected && (
+              <p
+                id="already-corrected-note"
+                role="status"
+                className="text-sm text-zinc-600 dark:text-zinc-300"
+              >
+                {copy.workspace.editor.alreadyCorrected}
               </p>
             )}
             {isGeneratingExample && (

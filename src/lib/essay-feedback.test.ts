@@ -10,6 +10,7 @@ const validFeedback = {
     vocabulary: { score: 64, feedback: "Vocabulary is appropriate but could be more varied." },
   },
   cefrLevel: "B1",
+  cefrRationale: "The response uses simple accurate sentences, but limited range keeps it below B2.",
   meetsWordCount: true,
   wordCountNote: "The response is within the target range.",
   errors: [
@@ -42,5 +43,12 @@ describe("essayFeedbackSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("requires a non-empty rationale for the CEFR estimate", () => {
+    expect(essayFeedbackSchema.safeParse({ ...validFeedback, cefrRationale: "" }).success).toBe(false);
+    const withoutRationale = { ...validFeedback };
+    Reflect.deleteProperty(withoutRationale, "cefrRationale");
+    expect(essayFeedbackSchema.safeParse(withoutRationale).success).toBe(false);
   });
 });

@@ -25,11 +25,11 @@
 - No claim that a CEFR estimate is an official TCF score or a substitute for a human examiner.
 - No automatic topic generation or broad historical search. A recent-exam topic must match the selected task and come from the current month, except for one prior-month retry when the current WordPress page is genuinely not yet published; custom prompts remain learner supplied.
 - No translation spending cap of any kind — DeepL API Free has no billing to cap. The systemic risk it carries instead is reliability/availability of its unofficial backup, which the project-wide fallback circuit breaker addresses (see below), not a cost control.
-- No guarantee of feedback quality until the validation protocol below has been completed with a live Anthropic key.
+- No guarantee of feedback quality until the validation protocol below has been completed with a live Gemini key.
 
 ## Decision
 
-Build the smallest complete loop around one persisted essay and one schema-constrained Claude response. The interface should expose the context that determines useful feedback (task, prompt, word range, and text) and return feedback in sections rather than a free-form chat answer.
+Build the smallest complete loop around one persisted essay and one schema-constrained Gemini response. The interface should expose the context that determines useful feedback (task, prompt, word range, and text) and return feedback in sections rather than a free-form chat answer.
 
 This is preferable to building a dashboard or subscription gate first: the unproven product risk is feedback quality, not account management. Schema-constrained output makes the review display and later human audit predictable; it does not itself establish that the feedback is correct.
 
@@ -37,7 +37,7 @@ This is preferable to building a dashboard or subscription gate first: the unpro
 
 The selected application language controls visible product-interface copy and the language of AI feedback. It does **not** translate the French exam task, topic, learner draft, or corrected French text: those are learning material and must remain faithful to the source language. Static instructions use their official French TCF terminology; surrounding controls, labels, errors, and status messages use the selected interface language.
 
-Live draft translation is a separate, low-latency aid. It translates French learner text into the selected non-French language through DeepL's API Free plan; static UI strings come from a maintained local dictionary rather than consuming translation quota at runtime. Claude remains responsible for structured correction because translation alone cannot produce the error, word-count, CEFR, and suggestion contract. The DeepL credential stays server-only. DeepL's Free plan does not require end-user attribution, so the UI shows a plain, unbadged "Translations powered by DeepL" credit rather than a mandated badge.
+Live draft translation is a separate, low-latency aid. It translates French learner text into the selected non-French language through DeepL's API Free plan; static UI strings come from a maintained local dictionary rather than consuming translation quota at runtime. Gemini remains responsible for structured correction because translation alone cannot produce the error, word-count, CEFR, and suggestion contract. The DeepL credential stays server-only. DeepL's Free plan does not require end-user attribution, so the UI shows a plain, unbadged "Translations powered by DeepL" credit rather than a mandated badge.
 
 DeepL API Free allows 500,000 characters per account per month at no charge and no billing details — a hard cap (HTTP 456), not an overage. The product debounces and cancels stale draft requests, enforces a 4,000-character request ceiling, keeps the API key server-only, and returns a clear degraded state when the DeepL key or service is unavailable. A missing live translation must never block writing or correction.
 
@@ -126,7 +126,7 @@ API uses the record ID as its authoritative prompt context.
 
 ### Output
 
-Claude must return a structured object with:
+Gemini must return a structured object with:
 
 - corrected French text that preserves the learner's ideas;
 - an estimated CEFR level (`A1`–`C2`) for the original response;
@@ -138,7 +138,7 @@ The API treats malformed input, an unknown/mismatched selected topic, a model re
 
 ## Validation plan and success metric
 
-The phase passes only after an evaluator reviews a stratified sample of **30 successful live Claude reviews** (10 per task; include below-range, in-range, and above-range responses and a range of learner proficiency). The baseline is unmeasured at the start of Phase 1; this review establishes it.
+The phase passes only after an evaluator reviews a stratified sample of **30 successful live Gemini reviews** (10 per task; include below-range, in-range, and above-range responses and a range of learner proficiency). The baseline is unmeasured at the start of Phase 1; this review establishes it.
 
 For each review, a TCF-qualified reviewer—or two reviewers with disagreements adjudicated by one qualified reviewer—records whether:
 
@@ -154,7 +154,7 @@ This metric intentionally weights harmful false corrections more heavily than a 
 ## Review workflow
 
 1. Collect current-month topics (or the permitted immediately prior-month fallback when the current page is unpublished) and prepare the 30 consented test responses.
-2. Submit each response through the production-like loop using a live `ANTHROPIC_API_KEY`.
+2. Submit each response through the production-like loop using a live `GEMINI_API_KEY`.
 3. Export the persisted `Essay` and `Feedback` records for blinded review; redact learner identifiers from the review sheet.
 4. Score with the four checks above, log failures by task, error category, and severity, then make the advance/iterate decision against the stated gate.
 

@@ -32,6 +32,10 @@ interface ErrorCountValues {
   count: number;
 }
 
+interface AttemptedOnValues {
+  date: string;
+}
+
 export interface AppCopy {
   common: {
     cancel: string;
@@ -85,6 +89,15 @@ export interface AppCopy {
     taskLegend: (values: { number: number }) => string;
     levelAxisLabel: string;
     attemptAxisLabel: string;
+    recentCorrectionsTitle: string;
+    viewAllCorrections: string;
+    correctionHistoryTitle: string;
+    noCorrectionHistoryTitle: string;
+    noCorrectionHistoryDescription: string;
+    limitedCorrectionDetails: string;
+    backToCorrectionHistory: string;
+    backToDashboard: string;
+    attemptedOn: (values: AttemptedOnValues) => string;
   };
   settings: {
     title: string;
@@ -128,6 +141,8 @@ export interface AppCopy {
       correcting: string;
       correctingStatus: string;
       genericCorrectionError: string;
+      alreadyCorrected: string;
+      correctionInProgress: string;
       exampleLevelLabel: string;
       generateExample: string;
       generatingExample: string;
@@ -169,6 +184,8 @@ export interface AppCopy {
       statusEvaluated: string;
       wordCount: (values: WordCountValues) => string;
       estimatedLevel: (values: FeedbackLevelValues) => string;
+      cefrRationaleHeading: string;
+      cefrEstimateDisclosure: string;
       downloadPdf: string;
       viewCorrection: string;
       tabOverview: string;
@@ -191,8 +208,6 @@ export interface AppCopy {
       toggleNote: string;
       commentsHeading: string;
       modelVersionHeading: string;
-      markAsRead: string;
-      markedAsRead: string;
       tryAgain: string;
     };
     dialog: {
@@ -269,6 +284,15 @@ export const APP_COPY = {
       taskLegend: ({ number }) => `Task ${number}`,
       levelAxisLabel: "CEFR level",
       attemptAxisLabel: "Attempt",
+      recentCorrectionsTitle: "Recent corrections",
+      viewAllCorrections: "View all correction history",
+      correctionHistoryTitle: "Correction history",
+      noCorrectionHistoryTitle: "No corrections yet",
+      noCorrectionHistoryDescription: "Your corrected submissions will appear here.",
+      limitedCorrectionDetails: "Detailed review is unavailable for this earlier correction.",
+      backToCorrectionHistory: "Back to correction history",
+      backToDashboard: "Back to dashboard",
+      attemptedOn: ({ date }) => `Corrected ${date}`,
     },
     settings: {
       title: "Settings",
@@ -313,6 +337,10 @@ export const APP_COPY = {
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
+        alreadyCorrected:
+          "This version has already been corrected. Edit your response or topic to request a new correction.",
+        correctionInProgress:
+          "A correction for this exact response is already in progress. Wait for it to finish or edit the response or topic before requesting another one.",
         exampleLevelLabel: "Target level",
         generateExample: "Generate example",
         generatingExample: "Generating…",
@@ -345,7 +373,7 @@ export const APP_COPY = {
         heading: ({ language }) => `Feedback (${language})`,
         estimatedLevel: ({ level }) => `Estimated CEFR / CECRL level: ${level}`,
         generatedInOtherLanguage: ({ generatedLanguage, selectedLanguage }) =>
-          `This feedback was generated in ${generatedLanguage}. Select Correct again to receive feedback in ${selectedLanguage}.`,
+          `This feedback was generated in ${generatedLanguage}. It remains available in that language while the interface is in ${selectedLanguage}.`,
         stale: "You've edited your response since this feedback. Correct again for feedback on your latest draft.",
         correctedText: "Corrected text",
         errors: ({ count }) => `Errors (${count})`,
@@ -366,13 +394,16 @@ export const APP_COPY = {
         statusEvaluated: "Evaluated",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
         estimatedLevel: ({ level }) => `Estimated level: ${level}`,
+        cefrRationaleHeading: "Why this estimate",
+        cefrEstimateDisclosure:
+          "This automated estimate is based on this submitted response. A requested C1/C2 study-example level is a target, not a verified result.",
         downloadPdf: "Print / Save as PDF",
         viewCorrection: "View correction",
         tabOverview: "Overview & scores",
-        scoreDisclosure: "AI-generated learning indicators — not official TCF scores.",
+        scoreDisclosure: "mytcflab learning indicators - not official TCF.",
         globalPerformanceHeading: "Global performance",
         overallScore: ({ score }) => `Overall learning indicator: ${score}%`,
-        overallScoreDescription: "Average of the three AI-generated criteria below.",
+        overallScoreDescription: "Average of the three mytcflab learning indicators below.",
         tabCompared: "Compared text",
         tabComments: "Feedback & tips",
         contentScoreLabel: "Content & pragmatics",
@@ -387,9 +418,7 @@ export const APP_COPY = {
         noteLabel: "Note",
         toggleNote: "Show or hide note",
         commentsHeading: "Automated feedback",
-        modelVersionHeading: "AI-generated model version",
-        markAsRead: "Mark as read this session",
-        markedAsRead: "Marked as read this session",
+        modelVersionHeading: "mytcflab generated model version",
         tryAgain: "Try again",
       },
       dialog: {
@@ -463,6 +492,15 @@ export const APP_COPY = {
       taskLegend: ({ number }) => `Tâche ${number}`,
       levelAxisLabel: "Niveau du CECRL",
       attemptAxisLabel: "Tentative",
+      recentCorrectionsTitle: "Corrections récentes",
+      viewAllCorrections: "Voir tout l’historique des corrections",
+      correctionHistoryTitle: "Historique des corrections",
+      noCorrectionHistoryTitle: "Aucune correction pour le moment",
+      noCorrectionHistoryDescription: "Vos soumissions corrigées apparaîtront ici.",
+      limitedCorrectionDetails: "La revue détaillée n’est pas disponible pour cette ancienne correction.",
+      backToCorrectionHistory: "Retour à l’historique des corrections",
+      backToDashboard: "Retour au tableau de bord",
+      attemptedOn: ({ date }) => `Corrigée le ${date}`,
     },
     settings: {
       title: "Paramètres",
@@ -511,6 +549,10 @@ export const APP_COPY = {
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
+        alreadyCorrected:
+          "Cette version a déjà été corrigée. Modifiez votre réponse ou votre sujet pour demander une nouvelle correction.",
+        correctionInProgress:
+          "Une correction de cette réponse exacte est déjà en cours. Attendez sa fin ou modifiez la réponse ou le sujet avant d’en demander une autre.",
         exampleLevelLabel: "Niveau visé",
         generateExample: "Générer un exemple",
         generatingExample: "Génération en cours…",
@@ -543,7 +585,7 @@ export const APP_COPY = {
         heading: ({ language }) => `Commentaires (${language})`,
         estimatedLevel: ({ level }) => `Niveau CECR / CECRL estimé : ${level}`,
         generatedInOtherLanguage: ({ generatedLanguage, selectedLanguage }) =>
-          `Ces commentaires ont été générés en ${generatedLanguage}. Sélectionnez de nouveau Corriger pour les recevoir en ${selectedLanguage}.`,
+          `Ces commentaires ont été générés en ${generatedLanguage}. Ils restent disponibles dans cette langue tandis que l’interface est en ${selectedLanguage}.`,
         stale:
           "Vous avez modifié votre réponse depuis ces commentaires. Sélectionnez de nouveau Corriger pour obtenir des commentaires sur votre dernier brouillon.",
         correctedText: "Texte corrigé",
@@ -565,13 +607,16 @@ export const APP_COPY = {
         statusEvaluated: "Évaluée",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
         estimatedLevel: ({ level }) => `Niveau estimé : ${level}`,
+        cefrRationaleHeading: "Pourquoi cette estimation",
+        cefrEstimateDisclosure:
+          "Cette estimation automatisée repose sur la réponse soumise. Un niveau C1/C2 demandé pour un exemple est un objectif, pas un résultat vérifié.",
         downloadPdf: "Imprimer / Enregistrer en PDF",
         viewCorrection: "Voir la correction",
         tabOverview: "Vue d’ensemble et scores",
-        scoreDisclosure: "Indicateurs d’apprentissage générés par l’IA — ce ne sont pas des scores officiels du TCF.",
+        scoreDisclosure: "Indicateurs d’apprentissage mytcflab — pas une évaluation officielle du TCF.",
         globalPerformanceHeading: "Performance globale",
         overallScore: ({ score }) => `Indicateur global d’apprentissage : ${score} %`,
-        overallScoreDescription: "Moyenne des trois critères générés par l’IA ci-dessous.",
+        overallScoreDescription: "Moyenne des trois indicateurs d’apprentissage mytcflab ci-dessous.",
         tabCompared: "Comparer les textes",
         tabComments: "Commentaires et conseils",
         contentScoreLabel: "Contenu et pragmatique",
@@ -586,9 +631,7 @@ export const APP_COPY = {
         noteLabel: "Note",
         toggleNote: "Afficher ou masquer la note",
         commentsHeading: "Commentaires automatisés",
-        modelVersionHeading: "Version modèle générée par l’IA",
-        markAsRead: "Marquer comme lu pour cette session",
-        markedAsRead: "Marqué comme lu pour cette session",
+        modelVersionHeading: "Version modèle générée par mytcflab",
         tryAgain: "Réessayer",
       },
       dialog: {
@@ -662,6 +705,15 @@ export const APP_COPY = {
       taskLegend: ({ number }) => `Tarea ${number}`,
       levelAxisLabel: "Nivel MCER",
       attemptAxisLabel: "Intento",
+      recentCorrectionsTitle: "Correcciones recientes",
+      viewAllCorrections: "Ver todo el historial de correcciones",
+      correctionHistoryTitle: "Historial de correcciones",
+      noCorrectionHistoryTitle: "Aún no hay correcciones",
+      noCorrectionHistoryDescription: "Tus entregas corregidas aparecerán aquí.",
+      limitedCorrectionDetails: "La revisión detallada no está disponible para esta corrección anterior.",
+      backToCorrectionHistory: "Volver al historial de correcciones",
+      backToDashboard: "Volver al panel",
+      attemptedOn: ({ date }) => `Corregida el ${date}`,
     },
     settings: {
       title: "Configuración",
@@ -710,6 +762,10 @@ export const APP_COPY = {
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
+        alreadyCorrected:
+          "Esta versión ya se ha corregido. Modifica tu respuesta o tema para solicitar una nueva corrección.",
+        correctionInProgress:
+          "Ya hay una corrección de esta respuesta exacta en curso. Espera a que termine o modifica la respuesta o el tema antes de solicitar otra.",
         exampleLevelLabel: "Nivel objetivo",
         generateExample: "Generar ejemplo",
         generatingExample: "Generando…",
@@ -742,7 +798,7 @@ export const APP_COPY = {
         heading: ({ language }) => `Comentarios (${language})`,
         estimatedLevel: ({ level }) => `Nivel MCER / CECRL estimado: ${level}`,
         generatedInOtherLanguage: ({ generatedLanguage, selectedLanguage }) =>
-          `Estos comentarios se generaron en ${generatedLanguage}. Selecciona Corregir de nuevo para recibirlos en ${selectedLanguage}.`,
+          `Estos comentarios se generaron en ${generatedLanguage}. Siguen disponibles en ese idioma mientras la interfaz está en ${selectedLanguage}.`,
         stale:
           "Has editado tu respuesta desde estos comentarios. Selecciona Corregir de nuevo para recibir comentarios sobre tu último borrador.",
         correctedText: "Texto corregido",
@@ -764,13 +820,16 @@ export const APP_COPY = {
         statusEvaluated: "Evaluada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
         estimatedLevel: ({ level }) => `Nivel estimado: ${level}`,
+        cefrRationaleHeading: "Por qué esta estimación",
+        cefrEstimateDisclosure:
+          "Esta estimación automatizada se basa en la respuesta enviada. Un nivel C1/C2 solicitado para un ejemplo es un objetivo, no un resultado verificado.",
         downloadPdf: "Imprimir / Guardar como PDF",
         viewCorrection: "Ver corrección",
         tabOverview: "Resumen y puntuaciones",
-        scoreDisclosure: "Indicadores de aprendizaje generados por IA; no son puntuaciones oficiales del TCF.",
+        scoreDisclosure: "Indicadores de aprendizaje de mytcflab — no es una evaluación oficial del TCF.",
         globalPerformanceHeading: "Rendimiento global",
         overallScore: ({ score }) => `Indicador global de aprendizaje: ${score} %`,
-        overallScoreDescription: "Promedio de los tres criterios generados por IA que aparecen abajo.",
+        overallScoreDescription: "Promedio de los tres indicadores de aprendizaje de mytcflab que aparecen abajo.",
         tabCompared: "Comparar textos",
         tabComments: "Comentarios y consejos",
         contentScoreLabel: "Contenido y pragmática",
@@ -785,9 +844,7 @@ export const APP_COPY = {
         noteLabel: "Nota",
         toggleNote: "Mostrar u ocultar la nota",
         commentsHeading: "Comentarios automatizados",
-        modelVersionHeading: "Versión modelo generada por IA",
-        markAsRead: "Marcar como leído en esta sesión",
-        markedAsRead: "Marcado como leído en esta sesión",
+        modelVersionHeading: "Versión modelo generada por mytcflab",
         tryAgain: "Intentar de nuevo",
       },
       dialog: {
@@ -861,6 +918,15 @@ export const APP_COPY = {
       taskLegend: ({ number }) => `Tarefa ${number}`,
       levelAxisLabel: "Nível do QECR",
       attemptAxisLabel: "Tentativa",
+      recentCorrectionsTitle: "Correções recentes",
+      viewAllCorrections: "Ver todo o histórico de correções",
+      correctionHistoryTitle: "Histórico de correções",
+      noCorrectionHistoryTitle: "Ainda não há correções",
+      noCorrectionHistoryDescription: "Suas respostas corrigidas aparecerão aqui.",
+      limitedCorrectionDetails: "A revisão detalhada não está disponível para esta correção anterior.",
+      backToCorrectionHistory: "Voltar ao histórico de correções",
+      backToDashboard: "Voltar ao painel",
+      attemptedOn: ({ date }) => `Corrigida em ${date}`,
     },
     settings: {
       title: "Configurações",
@@ -909,6 +975,10 @@ export const APP_COPY = {
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
+        alreadyCorrected:
+          "Esta versão já foi corrigida. Edite sua resposta ou tema para solicitar uma nova correção.",
+        correctionInProgress:
+          "Já existe uma correção desta resposta exata em andamento. Aguarde a conclusão ou edite a resposta ou o tema antes de solicitar outra.",
         exampleLevelLabel: "Nível desejado",
         generateExample: "Gerar exemplo",
         generatingExample: "Gerando…",
@@ -941,7 +1011,7 @@ export const APP_COPY = {
         heading: ({ language }) => `Comentários (${language})`,
         estimatedLevel: ({ level }) => `Nível QECR / CECRL estimado: ${level}`,
         generatedInOtherLanguage: ({ generatedLanguage, selectedLanguage }) =>
-          `Estes comentários foram gerados em ${generatedLanguage}. Selecione Corrigir novamente para recebê-los em ${selectedLanguage}.`,
+          `Estes comentários foram gerados em ${generatedLanguage}. Eles continuam disponíveis nesse idioma enquanto a interface está em ${selectedLanguage}.`,
         stale:
           "Você editou sua resposta desde estes comentários. Selecione Corrigir novamente para receber comentários sobre seu último rascunho.",
         correctedText: "Texto corrigido",
@@ -963,13 +1033,16 @@ export const APP_COPY = {
         statusEvaluated: "Avaliada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
         estimatedLevel: ({ level }) => `Nível estimado: ${level}`,
+        cefrRationaleHeading: "Por que esta estimativa",
+        cefrEstimateDisclosure:
+          "Esta estimativa automatizada se baseia na resposta enviada. Um nível C1/C2 solicitado para um exemplo é uma meta, não um resultado verificado.",
         downloadPdf: "Imprimir / Salvar como PDF",
         viewCorrection: "Ver correção",
         tabOverview: "Visão geral e notas",
-        scoreDisclosure: "Indicadores de aprendizagem gerados por IA — não são notas oficiais do TCF.",
+        scoreDisclosure: "Indicadores de aprendizagem do mytcflab — não é uma avaliação oficial do TCF.",
         globalPerformanceHeading: "Desempenho geral",
         overallScore: ({ score }) => `Indicador geral de aprendizagem: ${score}%`,
-        overallScoreDescription: "Média dos três critérios gerados por IA abaixo.",
+        overallScoreDescription: "Média dos três indicadores de aprendizagem do mytcflab abaixo.",
         tabCompared: "Comparar textos",
         tabComments: "Comentários e dicas",
         contentScoreLabel: "Conteúdo e pragmática",
@@ -984,9 +1057,7 @@ export const APP_COPY = {
         noteLabel: "Nota",
         toggleNote: "Mostrar ou ocultar a nota",
         commentsHeading: "Comentários automatizados",
-        modelVersionHeading: "Versão modelo gerada por IA",
-        markAsRead: "Marcar como lido nesta sessão",
-        markedAsRead: "Marcado como lido nesta sessão",
+        modelVersionHeading: "Versão modelo gerada pelo mytcflab",
         tryAgain: "Tentar novamente",
       },
       dialog: {

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { CorrectionModal } from "@/components/correction-modal";
+import type { AppLocale } from "@/lib/app-locale";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 
@@ -13,6 +14,7 @@ interface CorrectionHistoryDialogProps {
     taskType: TaskType;
     originalText: string;
     feedback: EssayFeedback;
+    feedbackLocale: AppLocale | null;
   };
 }
 
@@ -30,7 +32,7 @@ export function CorrectionHistoryDialog({ detail }: CorrectionHistoryDialogProps
       submissionId={detail.id}
       originalText={detail.originalText}
       feedback={detail.feedback}
-      feedbackLocale={null}
+      feedbackLocale={detail.feedbackLocale}
       locale={locale}
       isStale={false}
       copy={copy}

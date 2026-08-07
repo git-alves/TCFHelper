@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
-import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
-import { anthropic } from "@/lib/anthropic";
 import { gradeEssayWithGemini } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
@@ -29,7 +27,10 @@ const requestSchema = z.object({
   taskType: z.enum(TASK_TYPES),
   topicId: z.string().min(1).optional(),
   topicPrompt: z.string().trim().min(1).max(2000).optional(),
-  content: z.string().trim().min(1).max(20000),
+  // Preserve the exact submitted characters after validation. The modal,
+  // persisted essay, and model-provided UTF-16 error offsets must all refer
+  // to the same text; trimming here would shift pasted leading whitespace.
+  content: z.string().min(1).max(20000).refine((value) => value.trim().length > 0),
   locale: z.enum(APP_LOCALES).default(DEFAULT_APP_LOCALE),
 }).superRefine((data, ctx) => {
   if (!data.topicId && !data.topicPrompt) {
@@ -45,14 +46,24 @@ function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(Boolean).length;
 }
 
-function duplicateCorrectionResponse(essayId: string) {
+function duplicateCorrectionResponse(essayId?: string) {
+  const body = {
+    error: "This response has already been corrected. Edit it before requesting another correction.",
+    code: "CORRECTION_ALREADY_EXISTS",
+  };
+
   return NextResponse.json(
-    {
-      error: "This response has already been corrected. Edit it before requesting another correction.",
-      code: "CORRECTION_ALREADY_EXISTS",
-      essayId,
-    },
+    essayId ? { ...body, essayId } : body,
     { status: 409, headers: NO_STORE_HEADERS },
+  );
+}
+
+function isUniqueCorrectionConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "P2002"
   );
 }
 
@@ -168,52 +179,17 @@ export async function POST(request: Request) {
 
   const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
-  // Gemini's free tier is a deliberate, opt-in swap for Claude (used in
-  // production) so testing the grading flow never spends Anthropic credits.
-  // Never defaults to it: an unset/unrecognized value always means Claude.
-  const useGemini = process.env.CORRECTION_PROVIDER?.trim().toLowerCase() === "gemini";
-
   let shouldReleaseClaim = true;
   try {
-    let feedback: EssayFeedback;
-    if (useGemini) {
-      const rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
-      const parsed = essayFeedbackSchema.safeParse(rawFeedback);
-      if (!parsed.success) {
-        return NextResponse.json(
-          { error: "Could not parse feedback. Please try again." },
-          { status: 502 }
-        );
-      }
-      feedback = parsed.data;
-    } else {
-      const response = await anthropic.messages.parse({
-        model: "claude-opus-5",
-        max_tokens: 4096,
-        output_config: {
-          effort: "medium",
-          format: zodOutputFormat(essayFeedbackSchema),
-        },
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      });
-
-      if (response.stop_reason === "refusal") {
-        return NextResponse.json(
-          { error: "The essay could not be reviewed. Please try again." },
-          { status: 502 }
-        );
-      }
-
-      if (!response.parsed_output) {
-        return NextResponse.json(
-          { error: "Could not parse feedback. Please try again." },
-          { status: 502 }
-        );
-      }
-
-      feedback = response.parsed_output;
+    const rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
+    const parsedFeedback = essayFeedbackSchema.safeParse(rawFeedback);
+    if (!parsedFeedback.success) {
+      return NextResponse.json(
+        { error: "Could not parse feedback. Please try again." },
+        { status: 502 },
+      );
     }
+    const feedback: EssayFeedback = parsedFeedback.data;
 
     const completion = await completeCorrectionClaim({
       ...claimInput,
@@ -283,6 +259,13 @@ export async function POST(request: Request) {
       { status: 503, headers: NO_STORE_HEADERS },
     );
   } catch (error) {
+    // The unique Essay key is a final backstop behind the claim lease. In the
+    // unlikely event a rolling deployment or external writer reaches it,
+    // preserve the product rule instead of presenting a misleading grading
+    // failure. A later history read will expose the already-saved review.
+    if (isUniqueCorrectionConstraintError(error)) {
+      return duplicateCorrectionResponse();
+    }
     console.error("Essay correction failed", error);
     return NextResponse.json(
       { error: "Something went wrong while grading your essay." },

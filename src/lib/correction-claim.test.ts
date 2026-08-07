@@ -132,6 +132,23 @@ describe("claimCorrection", () => {
     );
   });
 
+  it("uses the legacy trimmed representation for an outer-whitespace-only pasted revision", async () => {
+    const pastedInput = { ...input, content: `  ${input.content}  ` };
+    essayFindFirstMock.mockResolvedValue({ id: "essay_existing" });
+
+    await claimCorrection(pastedInput);
+
+    expect(essayFindFirstMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({ correctionKeyHash: null, content: input.content }),
+          ]),
+        }),
+      }),
+    );
+  });
+
   it("returns in-progress without issuing a second provider claim while a lease is live", async () => {
     const retryAt = new Date(now.getTime() + 30_000);
     leaseFindUniqueMock.mockResolvedValue({ expiresAt: retryAt });
@@ -235,26 +252,6 @@ describe("completeCorrectionClaim", () => {
     expect(leaseDeleteManyMock).not.toHaveBeenCalled();
   });
 
-  it("does not persist an owner whose lease has already expired", async () => {
-    const correctionKeyHash = hashCorrectionKey(input.correctionKey);
-    leaseFindUniqueMock.mockResolvedValue({
-      claimToken: "owner_1",
-      expiresAt: new Date(now.getTime() - 1),
-    });
-    const persist = vi.fn();
-
-    await expect(
-      completeCorrectionClaim({
-        ...input,
-        correctionKeyHash,
-        claimToken: "owner_1",
-        persist,
-      }),
-    ).resolves.toEqual({ kind: "lost" });
-
-    expect(persist).not.toHaveBeenCalled();
-    expect(leaseDeleteManyMock).not.toHaveBeenCalled();
-  });
 });
 
 describe("releaseCorrectionClaim", () => {

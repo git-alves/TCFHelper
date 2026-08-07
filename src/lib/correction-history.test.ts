@@ -42,6 +42,7 @@ const feedback = {
 function storedFeedback(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     level: feedback.cefrLevel,
+    feedbackLocale: "en",
     summary: feedback.summary,
     meetsWordCount: feedback.meetsWordCount,
     grammarNotes: {
@@ -150,7 +151,13 @@ describe("getCorrectionForUser", () => {
         },
       }),
     );
-    expect(detail).toMatchObject({ kind: "complete", id: "essay_1", originalText: "Je va au marché.", feedback });
+    expect(detail).toMatchObject({
+      kind: "complete",
+      id: "essay_1",
+      originalText: "Je va au marché.",
+      feedback,
+      feedbackLocale: "en",
+    });
   });
 
   it("returns an honest limited-details record when legacy feedback no longer matches the modal contract", async () => {
