@@ -164,9 +164,9 @@ describe("generateModelAnswer", () => {
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
     expect(promptText).toContain("Summary (40-60 words)");
-    expect(promptText).toContain("argument in favor of your position");
+    expect(promptText).toContain("argument in favor of your position (two to three sentences)");
     expect(promptText).toContain("a nuance acknowledging a limit or counterpoint");
-    expect(promptText).toContain("argument against your position");
+    expect(promptText).toContain("argument against your position (two to three sentences)");
     expect(promptText).toContain("a brief conclusion restating your personal position");
     expect(promptText).toContain("160-180 words");
     // The title counts toward the same total the validator measures -- the
