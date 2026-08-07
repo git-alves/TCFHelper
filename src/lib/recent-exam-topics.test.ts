@@ -82,6 +82,44 @@ describe("getRecentExamTopic", () => {
     );
   });
 
+  it("keeps every paragraph of a Tâche 3 document split across multiple text-editor widgets", async () => {
+    const html = [
+      "<h1>Juillet 2026</h1>",
+      `
+        <section class="elementor-top-section">
+          <div class="elementor-widget-divider">
+            <span class="elementor-divider__text">Combinaison 1</span>
+          </div>
+          <div class="elementor-widget-heading">
+            <span class="elementor-heading-title">Tâche 3</span>
+          </div>
+          <section class="elementor-inner-section">
+            <div class="elementor-widget-heading"><h2 class="elementor-heading-title">Sujet multi-paragraphe</h2></div>
+            <div class="elementor-widget-heading"><h3 class="elementor-heading-title">Document 1 :</h3></div>
+            <div class="elementor-widget-text-editor"><p>Premier paragraphe du document 1.</p></div>
+            <div class="elementor-widget-text-editor"><p>Second paragraphe du document 1.</p></div>
+            <div class="elementor-widget-heading"><h3 class="elementor-heading-title">Document 2 :</h3></div>
+            <div class="elementor-widget-text-editor"><p>Premier paragraphe du document 2.</p></div>
+            <div class="elementor-widget-text-editor"><p>Second paragraphe du document 2.</p></div>
+          </section>
+        </section>
+      `,
+    ].join("");
+
+    const topic = await getRecentExamTopic("TASK_3", {
+      now: JULY_2026,
+      fetch: vi.fn().mockResolvedValue(wordPressResponse(html)) as typeof fetch,
+      random: () => 0,
+    });
+
+    expect(topic.prompt).toContain(
+      "Premier paragraphe du document 1.\n\nSecond paragraphe du document 1."
+    );
+    expect(topic.prompt).toContain(
+      "Premier paragraphe du document 2.\n\nSecond paragraphe du document 2."
+    );
+  });
+
   it("returns a deterministic immutable reference for the same monthly source content", async () => {
     const options = {
       now: JULY_2026,
