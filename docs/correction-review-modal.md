@@ -10,8 +10,9 @@
 
 - Open a responsive correction-review modal as soon as a valid correction request begins, showing loading, result, and retryable-error states.
 - Preserve the exact submitted draft for comparison; never compare feedback against text that may have changed after submission.
-- Provide a fixed header and footer, status/word-count/level badges, and three tabs: overview, compared text, and feedback/tips.
-- Show error snippets in the original text with a correction tooltip, corrected snippets in green, and structured correction cards.
+- Provide a fixed header and footer, submission reference, status/word-count/level badges, and three tabs: overview, compared text, and feedback/tips.
+- Show a global AI-learning visualization alongside the three criterion rows, without presenting the result as an official TCF score.
+- Show error snippets in the original text with a correction tooltip, corrected snippets in green, and structured, keyboard-operable correction cards.
 - Back the three score rows and model version with structured model output, then label them as AI-generated learning aids rather than official TCF scores or teacher feedback.
 - Offer browser-native print / Save-as-PDF for the current correction.
 
@@ -28,6 +29,8 @@ Use a controlled client-side dialog in the writing workspace, rather than the ex
 
 The correction schema adds three model-assessed, 0–100 learning indicators and a distinct model version. They are rendered only with a visible disclosure that they are AI-generated and not official TCF scores. This adds truthful data for the requested overview and model-version regions without inventing percentages on the client. The fields live in the existing `grammarNotes` JSON alongside the returned response, so this narrowly scoped feature does not need a database migration.
 
+The API's returned `essayId` is retained in workspace state and shown as the submission reference in the completed modal and its printable document. The global visual is not a fourth assessment: it is the rounded arithmetic mean of the three returned AI criteria, labelled as such and displayed beside the criterion legend.
+
 The export control is labelled “Print / Save as PDF” and opens a purpose-built printable document. A real download endpoint would require a secure essay-detail route, a renderer, and a retention policy; it is not justified for this modal-only change.
 
 ## Details
@@ -43,6 +46,8 @@ The correction response now contains:
 The API persists `modelVersion` and `scores` in `Feedback.grammarNotes`, then returns the same structured object. Malformed or unavailable model output follows the existing retryable correction failure path; no partial feedback is saved.
 
 Each error can carry exact, zero-based UTF-16 offsets for its original and corrected excerpts. The client highlights only when an offset is present and still matches the returned text exactly; otherwise it leaves the prose untouched and keeps the corresponding correction card. This avoids mislabelling a repeated word or phrase without dropping useful error guidance when the model cannot locate an occurrence confidently.
+
+Correction cards use native disclosure controls: every card keeps its error, correction, and category visible, while its explanatory note can be expanded or collapsed with pointer, Enter, or Space input. The first note is open initially so the feedback remains discoverable without requiring a first click.
 
 ### Interaction and degraded paths
 

@@ -119,6 +119,7 @@ export function WritingWorkspace() {
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [correctionModalState, setCorrectionModalState] = useState<CorrectionModalState>("loading");
   const [correctionModalSession, setCorrectionModalSession] = useState(0);
+  const [correctionEssayId, setCorrectionEssayId] = useState<string | null>(null);
   const [submittedCorrectionText, setSubmittedCorrectionText] = useState("");
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
@@ -315,6 +316,7 @@ export function WritingWorkspace() {
     setFeedbackIsStale(false);
     setCorrectionModalOpen(false);
     setCorrectionModalState("loading");
+    setCorrectionEssayId(null);
     setSubmittedCorrectionText("");
     setHasCorrectionError(false);
     setExampleError(null);
@@ -542,6 +544,7 @@ export function WritingWorkspace() {
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
+    setCorrectionEssayId(null);
     setSubmittedCorrectionText(submittedText);
     setCorrectionModalState("loading");
     setCorrectionModalSession((session) => session + 1);
@@ -562,12 +565,13 @@ export function WritingWorkspace() {
         throw new Error("Correction request failed");
       }
 
-      const data: { feedback: EssayFeedback } = await res.json();
+      const data: { essayId: string; feedback: EssayFeedback } = await res.json();
       // The workspace may have been reset (a task switch) while this
       // request was in flight — a stale response must never write feedback
       // into whatever the learner has moved on to.
       if (requestId !== correctionRequestId.current) return;
       setFeedback(data.feedback);
+      setCorrectionEssayId(data.essayId);
       setFeedbackLocale(correctionLocale);
       setCorrectionModalState("result");
     } catch {
@@ -1054,6 +1058,7 @@ export function WritingWorkspace() {
           open={correctionModalOpen}
           state={correctionModalState}
           task={task}
+          submissionId={correctionEssayId}
           originalText={submittedCorrectionText}
           feedback={feedback}
           feedbackLocale={feedbackLocale}

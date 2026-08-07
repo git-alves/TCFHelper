@@ -19,6 +19,7 @@ interface CorrectionModalProps {
   open: boolean;
   state: CorrectionModalState;
   task: TaskDefinition;
+  submissionId: string | null;
   originalText: string;
   feedback: EssayFeedback | null;
   feedbackLocale: AppLocale | null;
@@ -32,7 +33,19 @@ interface CorrectionModalProps {
 type TabId = "overview" | "comparison" | "comments";
 
 const FOCUSABLE_SELECTOR =
-  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+  'a[href], button:not([disabled]), summary, textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+const RADAR_CENTER = 100;
+const RADAR_RADIUS = 70;
+const RADAR_ANGLES = [-90, 30, 150];
+const RADAR_AXIS_COLORS = ["#7c3aed", "#0284c7", "#c026d3"];
+
+type CorrectionModalCopy = AppCopy["workspace"]["correctionModal"];
+
+interface LearningCriterion {
+  label: string;
+  score: EssayFeedback["scores"][keyof EssayFeedback["scores"]];
+}
 
 function countWords(text: string) {
   return text.trim() ? text.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -121,21 +134,49 @@ function getCefrProgress(level: EssayFeedback["cefrLevel"]) {
   return index < 0 ? 0 : Math.round((index / (CEFR_LEVELS.length - 1)) * 100);
 }
 
+function getLearningCriteria(feedback: EssayFeedback, modalCopy: CorrectionModalCopy): LearningCriterion[] {
+  return [
+    { label: modalCopy.contentScoreLabel, score: feedback.scores.content },
+    { label: modalCopy.linguisticsScoreLabel, score: feedback.scores.linguistics },
+    { label: modalCopy.vocabularyScoreLabel, score: feedback.scores.vocabulary },
+  ];
+}
+
+function getOverallScore(criteria: LearningCriterion[]) {
+  return Math.round(criteria.reduce((total, criterion) => total + criterion.score.score, 0) / criteria.length);
+}
+
+function getRadarPoint(score: number, index: number) {
+  const angle = (RADAR_ANGLES[index] * Math.PI) / 180;
+  const radius = (Math.max(0, Math.min(100, score)) / 100) * RADAR_RADIUS;
+  return {
+    x: RADAR_CENTER + Math.cos(angle) * radius,
+    y: RADAR_CENTER + Math.sin(angle) * radius,
+  };
+}
+
+function getRadarPolygon(scores: number[]) {
+  return scores
+    .map((score, index) => {
+      const point = getRadarPoint(score, index);
+      return `${point.x},${point.y}`;
+    })
+    .join(" ");
+}
+
 function createPrintDocument({
   task,
+  submissionId,
   originalText,
   feedback,
   locale,
   copy,
-}: Pick<CorrectionModalProps, "task" | "originalText" | "feedback" | "locale" | "copy">) {
+}: Pick<CorrectionModalProps, "task" | "submissionId" | "originalText" | "feedback" | "locale" | "copy">) {
   if (!feedback) return "";
 
   const modalCopy = copy.workspace.correctionModal;
-  const scoreRows = [
-    { label: modalCopy.contentScoreLabel, score: feedback.scores.content },
-    { label: modalCopy.linguisticsScoreLabel, score: feedback.scores.linguistics },
-    { label: modalCopy.vocabularyScoreLabel, score: feedback.scores.vocabulary },
-  ]
+  const criteria = getLearningCriteria(feedback, modalCopy);
+  const scoreRows = criteria
     .map(
       ({ label, score }) =>
         `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(String(score.score))}%</td><td>${printableText(score.feedback)}</td></tr>`,
@@ -149,6 +190,9 @@ function createPrintDocument({
     .join("");
   const suggestionRows = feedback.suggestions.map((suggestion) => `<li>${printableText(suggestion)}</li>`).join("");
   const title = modalCopy.title({ taskLabel: task.label });
+  const submissionReference = submissionId
+    ? ` &middot; ${escapeHtml(modalCopy.submissionId({ id: submissionId }))}`
+    : "";
 
   return `<!doctype html>
 <html lang="${escapeHtml(locale)}">
@@ -180,11 +224,14 @@ function createPrintDocument({
         minWords: task.minWords,
         maxWords: task.maxWords,
       }),
-    )} &middot; ${escapeHtml(modalCopy.estimatedLevel({ level: feedback.cefrLevel }))}</p>
+    )} &middot; ${escapeHtml(modalCopy.estimatedLevel({ level: feedback.cefrLevel }))}${submissionReference}</p>
 
     <section class="card">
       <h2>${escapeHtml(modalCopy.tabOverview)}</h2>
       <p>${escapeHtml(modalCopy.scoreDisclosure)}</p>
+      <h3>${escapeHtml(modalCopy.globalPerformanceHeading)}</h3>
+      <p>${escapeHtml(modalCopy.overallScore({ score: getOverallScore(criteria) }))}</p>
+      <p>${escapeHtml(modalCopy.overallScoreDescription)}</p>
       <p>${printableText(feedback.wordCountNote)}</p>
       <table>${scoreRows}</table>
     </section>
@@ -215,6 +262,7 @@ export function CorrectionModal({
   open,
   state,
   task,
+  submissionId,
   originalText,
   feedback,
   feedbackLocale,
@@ -226,6 +274,7 @@ export function CorrectionModal({
 }: CorrectionModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [isMarkedRead, setIsMarkedRead] = useState(false);
+  const [expandedCorrectionIndexes, setExpandedCorrectionIndexes] = useState<Set<number>>(() => new Set([0]));
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
@@ -306,7 +355,7 @@ export function CorrectionModal({
   function handlePrint() {
     if (!feedback) return;
 
-    const printableDocument = createPrintDocument({ task, originalText, feedback, locale, copy });
+    const printableDocument = createPrintDocument({ task, submissionId, originalText, feedback, locale, copy });
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.opener = null;
@@ -363,6 +412,8 @@ export function CorrectionModal({
     { id: "comments", label: modalCopy.tabComments },
   ];
   const feedbackLanguage = feedbackLocale ?? locale;
+  const learningCriteria = feedback ? getLearningCriteria(feedback, modalCopy) : [];
+  const overallScore = learningCriteria.length > 0 ? getOverallScore(learningCriteria) : 0;
 
   function selectTab(nextTab: TabId, shouldFocus = false) {
     setActiveTab(nextTab);
@@ -407,6 +458,11 @@ export function CorrectionModal({
               <h2 id={titleId} className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl">
                 {modalCopy.title({ taskLabel: task.label })}
               </h2>
+              {state === "result" && submissionId && (
+                <p className="mt-1 break-all font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                  {modalCopy.submissionId({ id: submissionId })}
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-1">
               {state === "result" && feedback && (
@@ -560,15 +616,101 @@ export function CorrectionModal({
                     </div>
                   </div>
 
+                  <figure className="rounded-2xl border border-violet-500/20 bg-violet-500/[.035] p-4 dark:border-violet-400/25 dark:bg-violet-400/[.06] sm:p-5">
+                    <div className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_13rem] sm:items-center">
+                      <div className="min-w-0">
+                        <h3 id={`${dialogId}-overall-score-heading`} className="font-semibold">
+                          {modalCopy.globalPerformanceHeading}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{modalCopy.scoreDisclosure}</p>
+                        <p className="mt-2 text-2xl font-semibold tracking-tight text-violet-800 dark:text-violet-200">
+                          {modalCopy.overallScore({ score: overallScore })}
+                        </p>
+                        <p
+                          id={`${dialogId}-overall-score-description`}
+                          className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-300"
+                        >
+                          {modalCopy.overallScoreDescription}
+                        </p>
+                        <ul className="mt-4 grid gap-2 text-xs sm:grid-cols-1">
+                          {learningCriteria.map((criterion, index) => (
+                            <li key={criterion.label} className="flex items-center justify-between gap-3">
+                              <span className="flex min-w-0 items-center gap-2">
+                                <span
+                                  aria-hidden="true"
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: RADAR_AXIS_COLORS[index] }}
+                                />
+                                <span className="truncate">{criterion.label}</span>
+                              </span>
+                              <strong className="shrink-0 text-zinc-700 dark:text-zinc-200">{criterion.score.score}%</strong>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label={modalCopy.overallScore({ score: overallScore })}
+                        aria-describedby={`${dialogId}-overall-score-description`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={overallScore}
+                        className="mx-auto w-full max-w-[13rem] text-zinc-300 dark:text-zinc-700"
+                      >
+                        <svg viewBox="0 0 200 200" className="h-auto w-full" aria-hidden="true">
+                          {[25, 50, 75, 100].map((level) => (
+                            <polygon
+                              key={level}
+                              points={getRadarPolygon([level, level, level])}
+                              fill="none"
+                              stroke="currentColor"
+                              strokeDasharray={level === 100 ? undefined : "3 3"}
+                              strokeWidth="1"
+                            />
+                          ))}
+                          {RADAR_ANGLES.map((_, index) => {
+                            const point = getRadarPoint(100, index);
+                            return (
+                              <line
+                                key={index}
+                                x1={RADAR_CENTER}
+                                y1={RADAR_CENTER}
+                                x2={point.x}
+                                y2={point.y}
+                                stroke="currentColor"
+                                strokeWidth="1"
+                              />
+                            );
+                          })}
+                          <polygon
+                            points={getRadarPolygon(learningCriteria.map((criterion) => criterion.score.score))}
+                            fill="#7c3aed"
+                            fillOpacity="0.18"
+                            stroke="#7c3aed"
+                            strokeWidth="2"
+                          />
+                          {learningCriteria.map((criterion, index) => {
+                            const point = getRadarPoint(criterion.score.score, index);
+                            return <circle key={criterion.label} cx={point.x} cy={point.y} r="4" fill={RADAR_AXIS_COLORS[index]} />;
+                          })}
+                          <text
+                            x={RADAR_CENTER}
+                            y={RADAR_CENTER + 8}
+                            fill="currentColor"
+                            textAnchor="middle"
+                            className="fill-zinc-900 text-[26px] font-semibold dark:fill-white"
+                          >
+                            {overallScore}%
+                          </text>
+                        </svg>
+                      </div>
+                    </div>
+                  </figure>
+
                   <div className="rounded-2xl border border-black/[.08] p-4 dark:border-white/[.12] sm:p-5">
                     <h3 className="font-semibold">{modalCopy.tabOverview}</h3>
-                    <p className="mt-1 text-xs leading-5 text-zinc-500 dark:text-zinc-400">{modalCopy.scoreDisclosure}</p>
                     <div className="mt-4 space-y-5">
-                      {[
-                        { label: modalCopy.contentScoreLabel, score: feedback.scores.content },
-                        { label: modalCopy.linguisticsScoreLabel, score: feedback.scores.linguistics },
-                        { label: modalCopy.vocabularyScoreLabel, score: feedback.scores.vocabulary },
-                      ].map((criterion) => (
+                      {learningCriteria.map((criterion) => (
                         <div key={criterion.label}>
                           <div className="flex items-baseline justify-between gap-4">
                             <h4 className="text-sm font-medium">{criterion.label}</h4>
@@ -620,22 +762,62 @@ export function CorrectionModal({
                     {feedback.errors.length > 0 ? (
                       <ol className="mt-4 space-y-3">
                         {feedback.errors.map((error, index) => (
-                          <li key={`${error.original}-${index}`} className="rounded-xl border border-black/[.08] p-3 text-sm dark:border-white/[.12]">
-                            <div className="flex flex-wrap items-baseline gap-2">
-                              <span lang="fr" className="text-red-700 line-through decoration-red-500 dark:text-red-300">
-                                {error.original}
-                              </span>
-                              <span aria-hidden="true">→</span>
-                              <strong lang="fr" className="text-emerald-700 dark:text-emerald-300">
-                                {error.correction}
-                              </strong>
-                              <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-zinc-600 dark:bg-white/[.1] dark:text-zinc-300">
-                                {copy.workspace.feedback.errorCategories[error.category]}
-                              </span>
-                            </div>
-                            <p lang={feedbackLanguage} className="mt-2 leading-6 text-zinc-600 dark:text-zinc-300">
-                              {error.explanation}
-                            </p>
+                          <li key={`${error.original}-${index}`} className="text-sm">
+                            <details
+                              open={expandedCorrectionIndexes.has(index)}
+                              onToggle={(event) => {
+                                const isOpen = event.currentTarget.open;
+                                setExpandedCorrectionIndexes((indexes) => {
+                                  const nextIndexes = new Set(indexes);
+                                  if (isOpen) nextIndexes.add(index);
+                                  else nextIndexes.delete(index);
+                                  return nextIndexes;
+                                });
+                              }}
+                              className="group overflow-hidden rounded-xl border border-black/[.08] dark:border-white/[.12]"
+                            >
+                              <summary className="flex cursor-pointer list-none items-start justify-between gap-3 p-3 outline-none transition-colors hover:bg-black/[.025] focus-visible:bg-black/[.04] focus-visible:ring-2 focus-visible:ring-violet-600/60 dark:hover:bg-white/[.04] dark:focus-visible:bg-white/[.06] [&::-webkit-details-marker]:hidden">
+                                <span className="min-w-0">
+                                  <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                      {modalCopy.errorLabel}
+                                    </span>
+                                    <span lang="fr" className="text-red-700 line-through decoration-red-500 dark:text-red-300">
+                                      {error.original}
+                                    </span>
+                                    <span aria-hidden="true">→</span>
+                                    <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                                      {modalCopy.correctionLabel}
+                                    </span>
+                                    <strong lang="fr" className="text-emerald-700 dark:text-emerald-300">
+                                      {error.correction}
+                                    </strong>
+                                    <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-zinc-600 dark:bg-white/[.1] dark:text-zinc-300">
+                                      {copy.workspace.feedback.errorCategories[error.category]}
+                                    </span>
+                                  </span>
+                                </span>
+                                <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-violet-700 dark:text-violet-300">
+                                  {modalCopy.toggleNote}
+                                  <svg
+                                    viewBox="0 0 20 20"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.75"
+                                    className="h-4 w-4 transition-transform group-open:rotate-180"
+                                    aria-hidden="true"
+                                  >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m5 7 5 5 5-5" />
+                                  </svg>
+                                </span>
+                              </summary>
+                              <div className="border-t border-black/[.08] px-3 py-3 dark:border-white/[.12]">
+                                <p lang={feedbackLanguage} className="leading-6 text-zinc-600 dark:text-zinc-300">
+                                  <span className="font-medium text-foreground">{modalCopy.noteLabel}: </span>
+                                  {error.explanation}
+                                </p>
+                              </div>
+                            </details>
                           </li>
                         ))}
                       </ol>
