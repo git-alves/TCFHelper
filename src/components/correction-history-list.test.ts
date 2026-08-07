@@ -30,6 +30,7 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain("Estimated level: B2");
     expect(markup).toContain("A forum post");
     expect(markup).toContain("View correction");
+    expect(markup).toContain('aria-label="Delete"');
   });
 
   it("uses the dedicated no-history state instead of the progress-chart empty state", () => {

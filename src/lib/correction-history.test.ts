@@ -1,17 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findFirstMock, findManyMock } = vi.hoisted(() => ({
+const { findFirstMock, findManyMock, deleteManyMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
   findManyMock: vi.fn(),
+  deleteManyMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { essay: { findFirst: findFirstMock, findMany: findManyMock } },
+  prisma: { essay: { findFirst: findFirstMock, findMany: findManyMock, deleteMany: deleteManyMock } },
 }));
 
 import { EssayStatus } from "@prisma/client";
-import { getCorrectionForUser, getRecentCorrections, parseStoredEssayFeedback } from "./correction-history";
+import {
+  deleteCorrectionForUser,
+  getCorrectionForUser,
+  getRecentCorrections,
+  parseStoredEssayFeedback,
+} from "./correction-history";
 
 const feedback = {
   correctedText: "Je vais au marché.",
@@ -61,6 +67,7 @@ function storedFeedback(overrides: Partial<Record<string, unknown>> = {}) {
 beforeEach(() => {
   findFirstMock.mockReset();
   findManyMock.mockReset();
+  deleteManyMock.mockReset();
 });
 
 describe("parseStoredEssayFeedback", () => {
@@ -186,5 +193,28 @@ describe("getCorrectionForUser", () => {
     findFirstMock.mockResolvedValue(null);
 
     await expect(getCorrectionForUser("learner_1", "another_users_essay")).resolves.toBeNull();
+  });
+});
+
+describe("deleteCorrectionForUser", () => {
+  it("deletes an owned, submitted, reviewed essay with an owner-scoped where clause", async () => {
+    deleteManyMock.mockResolvedValue({ count: 1 });
+
+    await expect(deleteCorrectionForUser("learner_1", "essay_1")).resolves.toBe(true);
+
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "essay_1",
+        userId: "learner_1",
+        status: EssayStatus.SUBMITTED,
+        feedback: { is: {} },
+      },
+    });
+  });
+
+  it("returns false rather than throwing for an unowned or missing essay", async () => {
+    deleteManyMock.mockResolvedValue({ count: 0 });
+
+    await expect(deleteCorrectionForUser("learner_1", "another_users_essay")).resolves.toBe(false);
   });
 });
