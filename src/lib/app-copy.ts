@@ -162,6 +162,39 @@ export interface AppCopy {
       suggestions: string;
       errorCategories: Record<FeedbackErrorCategory, string>;
     };
+    correctionModal: {
+      title: (values: { taskLabel: string }) => string;
+      submissionId: (values: { id: string }) => string;
+      loading: string;
+      statusEvaluated: string;
+      wordCount: (values: WordCountValues) => string;
+      estimatedLevel: (values: FeedbackLevelValues) => string;
+      downloadPdf: string;
+      viewCorrection: string;
+      tabOverview: string;
+      scoreDisclosure: string;
+      globalPerformanceHeading: string;
+      overallScore: (values: { score: number }) => string;
+      overallScoreDescription: string;
+      tabCompared: string;
+      tabComments: string;
+      contentScoreLabel: string;
+      linguisticsScoreLabel: string;
+      vocabularyScoreLabel: string;
+      originalHeading: string;
+      correctedHeading: string;
+      correctionsHeading: (values: ErrorCountValues) => string;
+      noCorrectionsNote: string;
+      errorLabel: string;
+      correctionLabel: string;
+      noteLabel: string;
+      toggleNote: string;
+      commentsHeading: string;
+      modelVersionHeading: string;
+      markAsRead: string;
+      markedAsRead: string;
+      tryAgain: string;
+    };
     dialog: {
       title: string;
       taskSwitchDescription: string;
@@ -325,6 +358,39 @@ export const APP_COPY = {
           punctuation: "Punctuation",
           register: "Register",
         },
+      },
+      correctionModal: {
+        title: ({ taskLabel }) => `Correction: ${taskLabel}`,
+        submissionId: ({ id }) => `Submission ID: ${id}`,
+        loading: "Preparing your detailed correction…",
+        statusEvaluated: "Evaluated",
+        wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
+        estimatedLevel: ({ level }) => `Estimated level: ${level}`,
+        downloadPdf: "Print / Save as PDF",
+        viewCorrection: "View correction",
+        tabOverview: "Overview & scores",
+        scoreDisclosure: "AI-generated learning indicators — not official TCF scores.",
+        globalPerformanceHeading: "Global performance",
+        overallScore: ({ score }) => `Overall learning indicator: ${score}%`,
+        overallScoreDescription: "Average of the three AI-generated criteria below.",
+        tabCompared: "Compared text",
+        tabComments: "Feedback & tips",
+        contentScoreLabel: "Content & pragmatics",
+        linguisticsScoreLabel: "Linguistics",
+        vocabularyScoreLabel: "Vocabulary & register",
+        originalHeading: "Your original text",
+        correctedHeading: "Corrected text",
+        correctionsHeading: ({ count }) => `Corrections (${count})`,
+        noCorrectionsNote: "No specific corrections were identified.",
+        errorLabel: "Error",
+        correctionLabel: "Correction",
+        noteLabel: "Note",
+        toggleNote: "Show or hide note",
+        commentsHeading: "Automated feedback",
+        modelVersionHeading: "AI-generated model version",
+        markAsRead: "Mark as read this session",
+        markedAsRead: "Marked as read this session",
+        tryAgain: "Try again",
       },
       dialog: {
         title: "Discard your current work?",
@@ -492,6 +558,39 @@ export const APP_COPY = {
           register: "Registre",
         },
       },
+      correctionModal: {
+        title: ({ taskLabel }) => `Correction : ${taskLabel}`,
+        submissionId: ({ id }) => `Identifiant de la soumission : ${id}`,
+        loading: "Préparation de votre correction détaillée…",
+        statusEvaluated: "Évaluée",
+        wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
+        estimatedLevel: ({ level }) => `Niveau estimé : ${level}`,
+        downloadPdf: "Imprimer / Enregistrer en PDF",
+        viewCorrection: "Voir la correction",
+        tabOverview: "Vue d’ensemble et scores",
+        scoreDisclosure: "Indicateurs d’apprentissage générés par l’IA — ce ne sont pas des scores officiels du TCF.",
+        globalPerformanceHeading: "Performance globale",
+        overallScore: ({ score }) => `Indicateur global d’apprentissage : ${score} %`,
+        overallScoreDescription: "Moyenne des trois critères générés par l’IA ci-dessous.",
+        tabCompared: "Comparer les textes",
+        tabComments: "Commentaires et conseils",
+        contentScoreLabel: "Contenu et pragmatique",
+        linguisticsScoreLabel: "Linguistique",
+        vocabularyScoreLabel: "Vocabulaire et registre",
+        originalHeading: "Votre texte original",
+        correctedHeading: "Texte corrigé",
+        correctionsHeading: ({ count }) => `Corrections (${count})`,
+        noCorrectionsNote: "Aucune correction précise n’a été relevée.",
+        errorLabel: "Erreur",
+        correctionLabel: "Correction",
+        noteLabel: "Note",
+        toggleNote: "Afficher ou masquer la note",
+        commentsHeading: "Commentaires automatisés",
+        modelVersionHeading: "Version modèle générée par l’IA",
+        markAsRead: "Marquer comme lu pour cette session",
+        markedAsRead: "Marqué comme lu pour cette session",
+        tryAgain: "Réessayer",
+      },
       dialog: {
         title: "Supprimer votre travail actuel ?",
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
@@ -658,6 +757,39 @@ export const APP_COPY = {
           register: "Registro",
         },
       },
+      correctionModal: {
+        title: ({ taskLabel }) => `Corrección: ${taskLabel}`,
+        submissionId: ({ id }) => `ID de entrega: ${id}`,
+        loading: "Preparando tu corrección detallada…",
+        statusEvaluated: "Evaluada",
+        wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
+        estimatedLevel: ({ level }) => `Nivel estimado: ${level}`,
+        downloadPdf: "Imprimir / Guardar como PDF",
+        viewCorrection: "Ver corrección",
+        tabOverview: "Resumen y puntuaciones",
+        scoreDisclosure: "Indicadores de aprendizaje generados por IA; no son puntuaciones oficiales del TCF.",
+        globalPerformanceHeading: "Rendimiento global",
+        overallScore: ({ score }) => `Indicador global de aprendizaje: ${score} %`,
+        overallScoreDescription: "Promedio de los tres criterios generados por IA que aparecen abajo.",
+        tabCompared: "Comparar textos",
+        tabComments: "Comentarios y consejos",
+        contentScoreLabel: "Contenido y pragmática",
+        linguisticsScoreLabel: "Lingüística",
+        vocabularyScoreLabel: "Vocabulario y registro",
+        originalHeading: "Tu texto original",
+        correctedHeading: "Texto corregido",
+        correctionsHeading: ({ count }) => `Correcciones (${count})`,
+        noCorrectionsNote: "No se identificaron correcciones específicas.",
+        errorLabel: "Error",
+        correctionLabel: "Corrección",
+        noteLabel: "Nota",
+        toggleNote: "Mostrar u ocultar la nota",
+        commentsHeading: "Comentarios automatizados",
+        modelVersionHeading: "Versión modelo generada por IA",
+        markAsRead: "Marcar como leído en esta sesión",
+        markedAsRead: "Marcado como leído en esta sesión",
+        tryAgain: "Intentar de nuevo",
+      },
       dialog: {
         title: "¿Descartar tu trabajo actual?",
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
@@ -823,6 +955,39 @@ export const APP_COPY = {
           punctuation: "Pontuação",
           register: "Registro",
         },
+      },
+      correctionModal: {
+        title: ({ taskLabel }) => `Correção: ${taskLabel}`,
+        submissionId: ({ id }) => `ID da resposta: ${id}`,
+        loading: "Preparando sua correção detalhada…",
+        statusEvaluated: "Avaliada",
+        wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
+        estimatedLevel: ({ level }) => `Nível estimado: ${level}`,
+        downloadPdf: "Imprimir / Salvar como PDF",
+        viewCorrection: "Ver correção",
+        tabOverview: "Visão geral e notas",
+        scoreDisclosure: "Indicadores de aprendizagem gerados por IA — não são notas oficiais do TCF.",
+        globalPerformanceHeading: "Desempenho geral",
+        overallScore: ({ score }) => `Indicador geral de aprendizagem: ${score}%`,
+        overallScoreDescription: "Média dos três critérios gerados por IA abaixo.",
+        tabCompared: "Comparar textos",
+        tabComments: "Comentários e dicas",
+        contentScoreLabel: "Conteúdo e pragmática",
+        linguisticsScoreLabel: "Linguística",
+        vocabularyScoreLabel: "Vocabulário e registro",
+        originalHeading: "Seu texto original",
+        correctedHeading: "Texto corrigido",
+        correctionsHeading: ({ count }) => `Correções (${count})`,
+        noCorrectionsNote: "Nenhuma correção específica foi identificada.",
+        errorLabel: "Erro",
+        correctionLabel: "Correção",
+        noteLabel: "Nota",
+        toggleNote: "Mostrar ou ocultar a nota",
+        commentsHeading: "Comentários automatizados",
+        modelVersionHeading: "Versão modelo gerada por IA",
+        markAsRead: "Marcar como lido nesta sessão",
+        markedAsRead: "Marcado como lido nesta sessão",
+        tryAgain: "Tentar novamente",
       },
       dialog: {
         title: "Descartar seu trabalho atual?",

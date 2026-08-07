@@ -110,8 +110,17 @@ export async function POST(request: Request) {
       system:
         "You are an examiner grading TCF (Test de Connaissance du Français) written expression " +
         "tasks. Correct errors precisely, estimate the writer's CEFR level honestly (do not " +
-        `inflate it), and give constructive, encouraging feedback. Write all feedback in ` +
-        `${feedbackLanguage}, except for the corrected essay text itself, which stays in French.`,
+        "inflate it), and give constructive, encouraging feedback. Assess the essay from 0 to " +
+        "100 on three TCF-aligned learning criteria (not official TCF scores) -- content/pragmatics (how well it answers the " +
+        "prompt), linguistics (grammar, spelling, syntax), and vocabulary/register (lexical " +
+        "range and appropriateness of tone) -- each with a short note. Also write an " +
+        "idealized model version of the essay: a natural rewrite using more advanced " +
+        "vocabulary and phrasing than the corrected version, offered as inspiration. For every " +
+        "reported error, provide exact zero-based UTF-16 originalStart and correctionStart offsets " +
+        "for the original essay and correctedText respectively whenever they can be located exactly; " +
+        "omit an offset rather than guessing. Write " +
+        `all feedback in ${feedbackLanguage}, except for the corrected essay text and the ` +
+        "model version, which stay in French.",
       messages: [
         {
           role: "user",
@@ -163,8 +172,10 @@ export async function POST(request: Request) {
           meetsWordCount: feedback.meetsWordCount,
           grammarNotes: {
             correctedText: feedback.correctedText,
+            modelVersion: feedback.modelVersion,
             wordCountNote: feedback.wordCountNote,
             errors: feedback.errors,
+            scores: feedback.scores,
           },
           suggestions: feedback.suggestions,
         },

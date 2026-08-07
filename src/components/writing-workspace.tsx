@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
@@ -13,6 +13,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 
@@ -115,7 +116,11 @@ export function WritingWorkspace() {
   const [feedback, setFeedback] = useState<EssayFeedback | null>(null);
   const [feedbackLocale, setFeedbackLocale] = useState<AppLocale | null>(null);
   const [feedbackIsStale, setFeedbackIsStale] = useState(false);
-  const feedbackRef = useRef<HTMLElement>(null);
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
+  const [correctionModalState, setCorrectionModalState] = useState<CorrectionModalState>("loading");
+  const [correctionModalSession, setCorrectionModalSession] = useState(0);
+  const [correctionEssayId, setCorrectionEssayId] = useState<string | null>(null);
+  const [submittedCorrectionText, setSubmittedCorrectionText] = useState("");
   const customTopicRef = useRef<HTMLTextAreaElement>(null);
   const recentTopicRequestId = useRef(0);
   const exampleRequestId = useRef(0);
@@ -154,10 +159,6 @@ export function WritingWorkspace() {
       : topicMode === "custom"
         ? customTopic.trim()
         : "";
-
-  useEffect(() => {
-    if (feedback) feedbackRef.current?.focus();
-  }, [feedback]);
 
   useEffect(() => {
     if (topicMode === "custom") customTopicRef.current?.focus();
@@ -313,6 +314,10 @@ export function WritingWorkspace() {
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
+    setCorrectionModalOpen(false);
+    setCorrectionModalState("loading");
+    setCorrectionEssayId(null);
+    setSubmittedCorrectionText("");
     setHasCorrectionError(false);
     setExampleError(null);
     setExampleNeedsTopic(false);
@@ -355,6 +360,10 @@ export function WritingWorkspace() {
     correctionRequestId.current += 1;
     setIsCorrecting(false);
   }
+
+  const closeCorrectionModal = useCallback(() => {
+    setCorrectionModalOpen(false);
+  }, []);
 
   function hasUnsavedWork() {
     return Boolean(
@@ -516,9 +525,13 @@ export function WritingWorkspace() {
   }
 
   async function handleCorrect() {
-    if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading) return;
+    if (!taskType || !activeTopicPrompt || wordCount === 0 || isTopicLoading || isCorrecting) return;
 
     const correctionLocale = locale;
+    // Keep the exact submitted draft for the comparison tab. A correction is
+    // useful only when it is compared with the version the model actually
+    // assessed, not a later edit in the workspace.
+    const submittedText = content;
 
     const topicContext =
       topicMode === "recent" && recentTopic
@@ -531,6 +544,11 @@ export function WritingWorkspace() {
     setFeedback(null);
     setFeedbackLocale(null);
     setFeedbackIsStale(false);
+    setCorrectionEssayId(null);
+    setSubmittedCorrectionText(submittedText);
+    setCorrectionModalState("loading");
+    setCorrectionModalSession((session) => session + 1);
+    setCorrectionModalOpen(true);
     try {
       const res = await fetch("/api/essays/correct", {
         method: "POST",
@@ -538,7 +556,7 @@ export function WritingWorkspace() {
         body: JSON.stringify({
           taskType,
           ...topicContext,
-          content,
+          content: submittedText,
           locale: correctionLocale,
         }),
       });
@@ -547,15 +565,20 @@ export function WritingWorkspace() {
         throw new Error("Correction request failed");
       }
 
-      const data: { feedback: EssayFeedback } = await res.json();
+      const data: { essayId: string; feedback: EssayFeedback } = await res.json();
       // The workspace may have been reset (a task switch) while this
       // request was in flight — a stale response must never write feedback
       // into whatever the learner has moved on to.
       if (requestId !== correctionRequestId.current) return;
       setFeedback(data.feedback);
+      setCorrectionEssayId(data.essayId);
       setFeedbackLocale(correctionLocale);
+      setCorrectionModalState("result");
     } catch {
-      if (requestId === correctionRequestId.current) setHasCorrectionError(true);
+      if (requestId === correctionRequestId.current) {
+        setHasCorrectionError(true);
+        setCorrectionModalState("error");
+      }
     } finally {
       if (requestId === correctionRequestId.current) setIsCorrecting(false);
     }
@@ -889,6 +912,19 @@ export function WritingWorkspace() {
                 {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
               </button>
 
+              {feedback && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCorrectionModalState("result");
+                    setCorrectionModalOpen(true);
+                  }}
+                  className="self-start rounded-full border border-violet-500/30 bg-violet-500/[.06] px-4 py-2.5 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:border-violet-400/35 dark:bg-violet-400/[.1] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                >
+                  {copy.workspace.correctionModal.viewCorrection}
+                </button>
+              )}
+
               <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]">
                 <label htmlFor="example-level" className="sr-only">
                   {copy.workspace.editor.exampleLevelLabel}
@@ -1013,109 +1049,25 @@ export function WritingWorkspace() {
             )}
           </section>
 
-          {feedback && (
-            <section
-              ref={feedbackRef}
-              tabIndex={-1}
-              aria-labelledby="feedback-heading"
-              lang={locale}
-              className="flex flex-col gap-4 rounded-xl border border-black/[.1] p-5 outline-none focus:ring-2 focus:ring-foreground/40 dark:border-white/[.15]"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 id="feedback-heading" className="text-lg font-semibold">
-                  {copy.workspace.feedback.heading({
-                    language: feedbackLocale ? APP_LOCALE_LABELS[feedbackLocale] : "",
-                  })}
-                </h2>
-                <span className="rounded-full bg-black/[.06] px-3 py-1 text-sm font-medium dark:bg-white/[.1]">
-                  {copy.workspace.feedback.estimatedLevel({ level: feedback.cefrLevel })}
-                </span>
-              </div>
-
-              <p
-                lang={feedbackLocale ?? locale}
-                className={`text-sm ${
-                  feedback.meetsWordCount
-                    ? "text-green-700 dark:text-green-400"
-                    : "text-amber-600 dark:text-amber-400"
-                }`}
-              >
-                {feedback.wordCountNote}
-              </p>
-
-              <p lang={feedbackLocale ?? locale} className="text-sm">
-                {feedback.summary}
-              </p>
-
-              {feedbackLocale && feedbackLocale !== locale && (
-                <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  {copy.workspace.feedback.generatedInOtherLanguage({
-                    generatedLanguage: APP_LOCALE_LABELS[feedbackLocale],
-                    selectedLanguage: APP_LOCALE_LABELS[locale],
-                  })}
-                </p>
-              )}
-
-              {feedbackIsStale && (
-                <p role="status" className="rounded-md bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
-                  {copy.workspace.feedback.stale}
-                </p>
-              )}
-
-              <div>
-                <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.feedback.correctedText}
-                </h3>
-                <p lang="fr" className="whitespace-pre-wrap rounded-md bg-black/[.03] p-3 text-sm dark:bg-white/[.05]">
-                  {feedback.correctedText}
-                </p>
-              </div>
-
-              {feedback.errors.length > 0 && (
-                <div>
-                  <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.feedback.errors({ count: feedback.errors.length })}
-                  </h3>
-                  <ul className="flex flex-col gap-2">
-                    {feedback.errors.map((err, i) => (
-                      <li key={i} className="rounded-md border border-black/[.08] p-3 text-sm dark:border-white/[.1]">
-                        <div className="flex flex-wrap items-baseline gap-2">
-                          <span lang="fr" className="text-red-600 line-through dark:text-red-400">
-                            {err.original}
-                          </span>
-                          <span aria-hidden>→</span>
-                          <span lang="fr" className="text-green-700 dark:text-green-400">{err.correction}</span>
-                          <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-xs uppercase tracking-wide dark:bg-white/[.1]">
-                            {copy.workspace.feedback.errorCategories[err.category]}
-                          </span>
-                        </div>
-                        <p
-                          lang={feedbackLocale ?? locale}
-                          className="mt-1 text-zinc-500 dark:text-zinc-400"
-                        >
-                          {err.explanation}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {feedback.suggestions.length > 0 && (
-                <div>
-                  <h3 className="mb-1 text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                    {copy.workspace.feedback.suggestions}
-                  </h3>
-                  <ul lang={feedbackLocale ?? locale} className="list-disc pl-5 text-sm">
-                    {feedback.suggestions.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-          )}
         </>
+      )}
+
+      {task && (
+        <CorrectionModal
+          key={correctionModalSession}
+          open={correctionModalOpen}
+          state={correctionModalState}
+          task={task}
+          submissionId={correctionEssayId}
+          originalText={submittedCorrectionText}
+          feedback={feedback}
+          feedbackLocale={feedbackLocale}
+          locale={locale}
+          isStale={feedbackIsStale}
+          copy={copy}
+          onClose={closeCorrectionModal}
+          onRetry={() => void handleCorrect()}
+        />
       )}
 
       <ConfirmDialog
