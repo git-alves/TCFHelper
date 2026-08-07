@@ -56,6 +56,18 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
 }
 
+// A Tâche 3 topic's prompt is built as "title\n\nDocument 1 :\n...\n\nDocument
+// 2 :\n..." (see parseTaskThree in recent-exam-topics.ts) so the model
+// answer generator sees the title alongside the source documents. The title
+// is also shown on its own above the prompt, so displaying the prompt
+// verbatim would show it twice -- strip just that leading duplicate for
+// display. Other task types' prompts never start with their own title, so
+// this is a no-op for them.
+function promptWithoutLeadingTitle(title: string, prompt: string): string {
+  const prefix = `${title}\n\n`;
+  return prompt.startsWith(prefix) ? prompt.slice(prefix.length) : prompt;
+}
+
 function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
   if (!match) return sourceMonth;
@@ -785,7 +797,9 @@ export function WritingWorkspace() {
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
                 <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
-                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">{recentTopic.prompt}</p>
+                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                  {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
+                </p>
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
                   {copy.workspace.topic.sourceLabel}{" "}
                   <a
