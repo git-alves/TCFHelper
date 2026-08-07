@@ -9,7 +9,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-06";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-06b";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -61,26 +61,46 @@ const LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
   C2: "a highly nuanced, idiomatic response with sophisticated structure, subtle register control, and a near-native command of complex grammar and vocabulary.",
 };
 
-// Task 3's own two source documents (see parseTaskThree in
-// recent-exam-topics.ts, which formats every Task 3 topicPrompt as a title
-// followed by "Document 1 :" / "Document 2 :" sections) present opposing
-// viewpoints that the real exam requires synthesizing before arguing a
-// personal position — a fixed three-part shape, not just a longer essay.
+// A recent-exam Task 3 topicPrompt is always built by parseTaskThree in
+// recent-exam-topics.ts, which formats it as a title followed by literal
+// "Document 1 :" / "Document 2 :" sections. A custom (learner-pasted) Task 3
+// topic is free text and may not contain two opposing-viewpoint documents at
+// all -- asking the model to "synthesize the two documents" when none exist
+// would push it to invent source viewpoints, so the structured rubric below
+// only applies when both markers are actually present in the prompt.
+const TASK_THREE_DOCUMENT_PATTERN = /Document\s*1\s*:[\s\S]*Document\s*2\s*:/iu;
+
+function hasTaskThreeDocuments(topicPrompt: string): boolean {
+  return TASK_THREE_DOCUMENT_PATTERN.test(topicPrompt);
+}
+
+// validateAnswerLength (model-answer-generator.ts) counts every word in the
+// returned text, title included -- so the prompt must not tell the model a
+// title is exempt from the word range, or the two would disagree about what
+// "120-180 words" means. The title is kept in the total by asking for it to
+// be brief rather than by excluding it.
 const TASK_THREE_STRUCTURE =
   "This topic presents two source documents with opposing viewpoints on a social issue. Structure the " +
-  "response in exactly three parts, in this order:\n" +
-  "1. Title: a short, catchy title introducing the social issue (not counted toward the word range " +
-  "below).\n" +
+  "response in exactly three parts, in this order, keeping the total length (title included) within the " +
+  "required word range below, aiming for around 160-180 words overall:\n" +
+  "1. Title: a short, catchy title introducing the social issue (a few words -- keep it brief, it counts " +
+  "toward the total length).\n" +
   "2. Summary (40-60 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
   "without giving a personal opinion. Use contrasting connectors, e.g. \"D'un côté... d'un autre côté\", " +
   "\"Le premier document souligne que... tandis que le second met en avant...\".\n" +
-  "3. Opinion (80-120 words): clearly state a personal position, e.g. \"Je pense que\", \"À mon avis\", " +
-  "\"Je suis convaincu(e) que\", and defend it with specific arguments and examples. Even while taking a " +
-  "position, keep the stance nuanced, as is typical at B2 level.\n" +
+  "3. Opinion (the rest of the length, roughly 100-130 words): structure it in exactly this order -- " +
+  "(a) one argument in favor of your position, followed by a concrete example illustrating it; " +
+  "(b) a nuance acknowledging a limit or counterpoint to that argument; " +
+  "(c) one argument against your position -- a genuine counter-argument -- followed by a concrete " +
+  "example illustrating it; " +
+  "(d) a brief conclusion restating your personal position. " +
+  "Use connectors suited to each part, e.g. \"Premièrement\"/\"D'une part\" for the argument in favor, " +
+  "\"Cependant\"/\"Néanmoins\" for the nuance, \"Toutefois\"/\"En revanche\" for the argument against, and " +
+  "\"En conclusion\"/\"Pour conclure\" for the conclusion.\n" +
   "Separate the title, the summary, and the opinion each with a blank line.";
 
 export function buildExamplePrompt({ task, level, topicPrompt }: GenerateModelAnswerParams): string {
-  const isTaskThree = task.label === TASK_INSTRUCTIONS.TASK_3.label;
+  const isTaskThree = task.label === TASK_INSTRUCTIONS.TASK_3.label && hasTaskThreeDocuments(topicPrompt);
   return (
     "You are a TCF (Test de Connaissance du Français) examiner writing a model answer for a learner to " +
     "study.\n" +
