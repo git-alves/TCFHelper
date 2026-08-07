@@ -57,7 +57,7 @@ export default async function DashboardPage() {
             </Link>
           )}
         </div>
-        <CorrectionHistoryList items={recentCorrections} locale={locale} copy={copy} />
+        <CorrectionHistoryList items={recentCorrections} />
       </section>
     </main>
   );

@@ -36,7 +36,7 @@ export default async function CorrectionHistoryPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">{copy.dashboard.correctionHistoryTitle}</h1>
       </div>
-      <CorrectionHistoryList items={items} locale={locale} copy={copy} />
+      <CorrectionHistoryList items={items} />
     </main>
   );
 }
