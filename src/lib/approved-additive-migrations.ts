@@ -12,4 +12,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260805220000_add_example_generation_lease_day",
   "20260806000000_add_example_generation_cooldown",
   "20260806010000_add_example_generation_attempt_cap",
+  "20260807120000_add_correction_claims",
 ]);
