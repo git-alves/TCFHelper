@@ -59,4 +59,31 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain("No corrections yet");
     expect(markup).toContain("Your corrected submissions will appear here.");
   });
+
+  it("keeps the delete status live region outside the empty/non-empty branch, so it is never unmounted by that swap", () => {
+    const nonEmptyMarkup = renderToStaticMarkup(
+      createElement(CorrectionHistoryListContent, {
+        locale: "en",
+        copy: APP_COPY.en,
+        items: [
+          {
+            id: "essay_123",
+            taskType: "TASK_2",
+            wordCount: 135,
+            createdAt: "2026-08-07T12:00:00.000Z",
+            assessedAt: "2026-08-07T12:00:01.000Z",
+            cefrLevel: "B2",
+            meetsWordCount: true,
+            topicTitle: "A forum post",
+          },
+        ],
+      }),
+    );
+    const emptyMarkup = renderToStaticMarkup(
+      createElement(CorrectionHistoryListContent, { locale: "en", copy: APP_COPY.en, items: [] }),
+    );
+
+    expect(nonEmptyMarkup).toContain('role="status"');
+    expect(emptyMarkup).toContain('role="status"');
+  });
 });
