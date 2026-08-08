@@ -40,8 +40,14 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain("Tâche 2");
     expect(markup).toContain("Estimated level: B2");
     expect(markup).toContain("A forum post");
+    // The actions menu is closed by default (hidden, not unmounted, so it
+    // stays covered by this static-render-only test setup) -- its trigger is
+    // the only actions control visible without a click.
+    expect(markup).toContain('aria-label="More options"');
+    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("View correction");
-    expect(markup).toContain('aria-label="Delete"');
+    expect(markup).toContain(">Delete<");
   });
 
   it("uses the dedicated no-history state instead of the progress-chart empty state", () => {

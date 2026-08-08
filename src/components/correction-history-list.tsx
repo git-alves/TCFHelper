@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -44,9 +44,49 @@ export function CorrectionHistoryList({ items }: Pick<CorrectionHistoryListConte
 // above so copy functions are obtained on the client rather than serialized.
 export function CorrectionHistoryListContent({ items, locale, copy }: CorrectionHistoryListContentProps) {
   const [visibleItems, setVisibleItems] = useState(items);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState(false);
+  const menuContainerRefs = useRef(new Map<string, HTMLDivElement | null>());
+  const menuTriggerRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  // Set right before removing the deleted item from visibleItems, and
+  // consumed by the effect below once that removal has actually rendered --
+  // the deleted item's own trigger button no longer exists by then, so
+  // focus must move on its own rather than simply being restored.
+  const pendingFocusIdRef = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const container = menuContainerRefs.current.get(openMenuId as string);
+      if (container && !container.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      const id = openMenuId as string;
+      setOpenMenuId(null);
+      menuTriggerRefs.current.get(id)?.focus();
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openMenuId]);
+
+  useEffect(() => {
+    if (pendingFocusIdRef.current === undefined) return;
+    const nextId = pendingFocusIdRef.current;
+    pendingFocusIdRef.current = undefined;
+    if (nextId) menuTriggerRefs.current.get(nextId)?.focus();
+  }, [visibleItems]);
 
   if (visibleItems.length === 0) return <CorrectionHistoryEmpty copy={copy} />;
 
@@ -60,7 +100,13 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
     try {
       const res = await fetch(`/api/essays/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      setVisibleItems((prev) => prev.filter((item) => item.id !== id));
+      setVisibleItems((prev) => {
+        const index = prev.findIndex((item) => item.id === id);
+        const next = prev.filter((item) => item.id !== id);
+        const nextFocusItem = next[index] ?? next[index - 1];
+        pendingFocusIdRef.current = nextFocusItem ? nextFocusItem.id : null;
+        return next;
+      });
     } catch {
       setDeleteError(true);
     } finally {
@@ -112,22 +158,58 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                     </span>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2 self-start sm:self-auto">
-                  <Link
-                    href={`/dashboard/history/${encodeURIComponent(item.id)}`}
-                    className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                  >
-                    {copy.workspace.correctionModal.viewCorrection}
-                  </Link>
+                <div
+                  ref={(element) => {
+                    if (element) menuContainerRefs.current.set(item.id, element);
+                    else menuContainerRefs.current.delete(item.id);
+                  }}
+                  className="relative shrink-0 self-start sm:self-auto"
+                >
                   <button
+                    ref={(element) => {
+                      if (element) menuTriggerRefs.current.set(item.id, element);
+                      else menuTriggerRefs.current.delete(item.id);
+                    }}
                     type="button"
-                    onClick={() => setPendingDeleteId(item.id)}
+                    onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
                     disabled={deletingId === item.id}
-                    aria-label={copy.dashboard.deleteCorrectionAction}
-                    className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:text-red-400 dark:hover:bg-red-400/10"
+                    aria-haspopup="menu"
+                    aria-expanded={openMenuId === item.id}
+                    aria-label={copy.dashboard.correctionActionsMenu}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-black/[.15] text-zinc-600 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:text-zinc-300 dark:hover:bg-white/[.06]"
                   >
-                    {copy.dashboard.deleteCorrectionAction}
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
+                      <circle cx="10" cy="4" r="1.5" />
+                      <circle cx="10" cy="10" r="1.5" />
+                      <circle cx="10" cy="16" r="1.5" />
+                    </svg>
                   </button>
+                  <div
+                    role="menu"
+                    hidden={openMenuId !== item.id}
+                    aria-label={copy.dashboard.correctionActionsMenu}
+                    className="absolute right-0 top-full z-10 mt-2 w-48 overflow-hidden rounded-xl border border-black/[.1] bg-background py-1 shadow-lg dark:border-white/[.15]"
+                  >
+                    <Link
+                      role="menuitem"
+                      href={`/dashboard/history/${encodeURIComponent(item.id)}`}
+                      onClick={() => setOpenMenuId(null)}
+                      className="block px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+                    >
+                      {copy.workspace.correctionModal.viewCorrection}
+                    </Link>
+                    <button
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setOpenMenuId(null);
+                        setPendingDeleteId(item.id);
+                      }}
+                      className="block w-full px-4 py-2 text-left text-sm font-medium text-red-700 transition-colors hover:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-400/10"
+                    >
+                      {copy.dashboard.deleteCorrectionAction}
+                    </button>
+                  </div>
                 </div>
               </article>
             </li>

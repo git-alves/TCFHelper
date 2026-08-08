@@ -98,6 +98,7 @@ export interface AppCopy {
     backToCorrectionHistory: string;
     backToDashboard: string;
     attemptedOn: (values: AttemptedOnValues) => string;
+    correctionActionsMenu: string;
     deleteCorrectionAction: string;
     deleteCorrectionConfirmTitle: string;
     deleteCorrectionConfirmDescription: string;
@@ -298,6 +299,7 @@ export const APP_COPY = {
       backToCorrectionHistory: "Back to correction history",
       backToDashboard: "Back to dashboard",
       attemptedOn: ({ date }) => `Corrected ${date}`,
+      correctionActionsMenu: "More options",
       deleteCorrectionAction: "Delete",
       deleteCorrectionConfirmTitle: "Delete this correction?",
       deleteCorrectionConfirmDescription:
@@ -512,6 +514,7 @@ export const APP_COPY = {
       backToCorrectionHistory: "Retour à l’historique des corrections",
       backToDashboard: "Retour au tableau de bord",
       attemptedOn: ({ date }) => `Corrigée le ${date}`,
+      correctionActionsMenu: "Plus d’options",
       deleteCorrectionAction: "Supprimer",
       deleteCorrectionConfirmTitle: "Supprimer cette correction ?",
       deleteCorrectionConfirmDescription:
@@ -731,6 +734,7 @@ export const APP_COPY = {
       backToCorrectionHistory: "Volver al historial de correcciones",
       backToDashboard: "Volver al panel",
       attemptedOn: ({ date }) => `Corregida el ${date}`,
+      correctionActionsMenu: "Más opciones",
       deleteCorrectionAction: "Eliminar",
       deleteCorrectionConfirmTitle: "¿Eliminar esta corrección?",
       deleteCorrectionConfirmDescription:
@@ -950,6 +954,7 @@ export const APP_COPY = {
       backToCorrectionHistory: "Voltar ao histórico de correções",
       backToDashboard: "Voltar ao painel",
       attemptedOn: ({ date }) => `Corrigida em ${date}`,
+      correctionActionsMenu: "Mais opções",
       deleteCorrectionAction: "Excluir",
       deleteCorrectionConfirmTitle: "Excluir esta correção?",
       deleteCorrectionConfirmDescription:
