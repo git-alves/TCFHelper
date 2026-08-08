@@ -40,11 +40,14 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain("Tâche 2");
     expect(markup).toContain("Estimated level: B2");
     expect(markup).toContain("A forum post");
-    // The actions menu is closed by default (hidden, not unmounted, so it
+    // The actions popover is closed by default (hidden, not unmounted, so it
     // stays covered by this static-render-only test setup) -- its trigger is
-    // the only actions control visible without a click.
+    // the only actions control visible without a click. It's a plain
+    // disclosure, not role="menu"/"menuitem" -- see the comment at its
+    // definition for why.
     expect(markup).toContain('aria-label="More options"');
-    expect(markup).toContain('aria-haspopup="menu"');
+    expect(markup).not.toContain("aria-haspopup");
+    expect(markup).not.toContain('role="menu"');
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("View correction");
     expect(markup).toContain(">Delete<");

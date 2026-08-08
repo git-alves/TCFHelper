@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -19,9 +19,12 @@ function formatAssessedDate(assessedAt: string, locale: AppLocale) {
   return new Intl.DateTimeFormat(APP_LOCALE_INTL_TAGS[locale], { dateStyle: "medium" }).format(new Date(assessedAt));
 }
 
-export function CorrectionHistoryEmpty({ copy }: Pick<CorrectionHistoryListContentProps, "copy">) {
+export function CorrectionHistoryEmpty({
+  copy,
+  focusRef,
+}: Pick<CorrectionHistoryListContentProps, "copy"> & { focusRef?: Ref<HTMLDivElement> }) {
   return (
-    <div className="rounded-2xl border border-black/[.08] p-8 text-center dark:border-white/[.145]">
+    <div ref={focusRef} tabIndex={-1} className="rounded-2xl border border-black/[.08] p-8 text-center outline-none dark:border-white/[.145]">
       <p className="font-medium">{copy.dashboard.noCorrectionHistoryTitle}</p>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">{copy.dashboard.noCorrectionHistoryDescription}</p>
     </div>
@@ -47,13 +50,16 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState(false);
+  const [deleteStatus, setDeleteStatus] = useState<"idle" | "success" | "error">("idle");
   const menuContainerRefs = useRef(new Map<string, HTMLDivElement | null>());
   const menuTriggerRefs = useRef(new Map<string, HTMLButtonElement | null>());
+  const emptyStateRef = useRef<HTMLDivElement>(null);
   // Set right before removing the deleted item from visibleItems, and
   // consumed by the effect below once that removal has actually rendered --
   // the deleted item's own trigger button no longer exists by then, so
-  // focus must move on its own rather than simply being restored.
+  // focus must move on its own rather than simply being restored. null means
+  // the deleted item was the only one left, so the empty state (rendered in
+  // its place) gets focus instead of a next/previous item's trigger.
   const pendingFocusIdRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
@@ -86,9 +92,10 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
     const nextId = pendingFocusIdRef.current;
     pendingFocusIdRef.current = undefined;
     if (nextId) menuTriggerRefs.current.get(nextId)?.focus();
+    else emptyStateRef.current?.focus();
   }, [visibleItems]);
 
-  if (visibleItems.length === 0) return <CorrectionHistoryEmpty copy={copy} />;
+  if (visibleItems.length === 0) return <CorrectionHistoryEmpty copy={copy} focusRef={emptyStateRef} />;
 
   async function handleConfirmDelete() {
     const id = pendingDeleteId;
@@ -96,7 +103,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
 
     setPendingDeleteId(null);
     setDeletingId(id);
-    setDeleteError(false);
+    setDeleteStatus("idle");
     try {
       const res = await fetch(`/api/essays/${encodeURIComponent(id)}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
@@ -107,8 +114,9 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
         pendingFocusIdRef.current = nextFocusItem ? nextFocusItem.id : null;
         return next;
       });
+      setDeleteStatus("success");
     } catch {
-      setDeleteError(true);
+      setDeleteStatus("error");
     } finally {
       setDeletingId(null);
     }
@@ -116,11 +124,22 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
 
   return (
     <>
-      {deleteError && (
-        <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-          {copy.dashboard.deleteCorrectionError}
-        </p>
-      )}
+      {/* A single, persistent live region with a fixed role (rather than one
+          mounted, or re-roled, only when there's something to say) so
+          assistive tech reliably announces the text change -- some screen
+          readers miss an announcement from a region whose role or presence
+          changes at the same moment its content does. */}
+      <p
+        role="status"
+        aria-live="polite"
+        className={`text-sm ${deleteStatus === "error" ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"}`}
+      >
+        {deleteStatus === "error"
+          ? copy.dashboard.deleteCorrectionError
+          : deleteStatus === "success"
+            ? copy.dashboard.deleteCorrectionSuccess
+            : ""}
+      </p>
       <ol className="grid gap-3">
         {visibleItems.map((item) => {
           const task = TASK_INSTRUCTIONS[item.taskType];
@@ -173,7 +192,6 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                     type="button"
                     onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
                     disabled={deletingId === item.id}
-                    aria-haspopup="menu"
                     aria-expanded={openMenuId === item.id}
                     aria-label={copy.dashboard.correctionActionsMenu}
                     className="flex h-9 w-9 items-center justify-center rounded-full border border-black/[.15] text-zinc-600 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:text-zinc-300 dark:hover:bg-white/[.06]"
@@ -184,14 +202,17 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                       <circle cx="10" cy="16" r="1.5" />
                     </svg>
                   </button>
+                  {/* A plain disclosure popover, not role="menu"/"menuitem": with
+                      only two ordinary actions (a real link and a button), the
+                      APG menu-button pattern's roving-tabindex and arrow/Home/End
+                      navigation would be complexity without benefit here. Normal
+                      Tab order plus the existing Escape/click-outside handling
+                      already covers keyboard use correctly for a disclosure. */}
                   <div
-                    role="menu"
                     hidden={openMenuId !== item.id}
-                    aria-label={copy.dashboard.correctionActionsMenu}
                     className="absolute right-0 top-full z-10 mt-2 w-48 overflow-hidden rounded-xl border border-black/[.1] bg-background py-1 shadow-lg dark:border-white/[.15]"
                   >
                     <Link
-                      role="menuitem"
                       href={`/dashboard/history/${encodeURIComponent(item.id)}`}
                       onClick={() => setOpenMenuId(null)}
                       className="block px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:hover:bg-white/[.06]"
@@ -199,7 +220,6 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                       {copy.workspace.correctionModal.viewCorrection}
                     </Link>
                     <button
-                      role="menuitem"
                       type="button"
                       onClick={() => {
                         setOpenMenuId(null);

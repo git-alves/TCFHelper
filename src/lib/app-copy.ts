@@ -104,6 +104,7 @@ export interface AppCopy {
     deleteCorrectionConfirmDescription: string;
     deleteCorrectionConfirm: string;
     deleteCorrectionError: string;
+    deleteCorrectionSuccess: string;
   };
   settings: {
     title: string;
@@ -306,6 +307,7 @@ export const APP_COPY = {
         "This will permanently delete this response and its feedback. This can't be undone.",
       deleteCorrectionConfirm: "Delete",
       deleteCorrectionError: "Couldn't delete this correction. Please try again.",
+      deleteCorrectionSuccess: "Correction deleted.",
     },
     settings: {
       title: "Settings",
@@ -521,6 +523,7 @@ export const APP_COPY = {
         "Cette réponse et ses commentaires seront définitivement supprimés. Cette action est irréversible.",
       deleteCorrectionConfirm: "Supprimer",
       deleteCorrectionError: "Impossible de supprimer cette correction. Veuillez réessayer.",
+      deleteCorrectionSuccess: "Correction supprimée.",
     },
     settings: {
       title: "Paramètres",
@@ -741,6 +744,7 @@ export const APP_COPY = {
         "Esta respuesta y sus comentarios se eliminarán de forma permanente. Esta acción no se puede deshacer.",
       deleteCorrectionConfirm: "Eliminar",
       deleteCorrectionError: "No se pudo eliminar esta corrección. Inténtalo de nuevo.",
+      deleteCorrectionSuccess: "Corrección eliminada.",
     },
     settings: {
       title: "Configuración",
@@ -961,6 +965,7 @@ export const APP_COPY = {
         "Esta resposta e seus comentários serão excluídos permanentemente. Essa ação não pode ser desfeita.",
       deleteCorrectionConfirm: "Excluir",
       deleteCorrectionError: "Não foi possível excluir esta correção. Tente novamente.",
+      deleteCorrectionSuccess: "Correção excluída.",
     },
     settings: {
       title: "Configurações",
