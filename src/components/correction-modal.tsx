@@ -195,7 +195,7 @@ function createPrintDocument({
     <meta charset="utf-8" />
     <title>${escapeHtml(title)}</title>
     <style>
-      body { color: #171717; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; margin: 40px auto; max-width: 900px; }
+      body { color: #171717; font-family: Arial, Helvetica, sans-serif; line-height: 1.5; margin: 40px auto; max-width: 900px; overflow-wrap: anywhere; }
       h1, h2, h3 { line-height: 1.2; }
       h1 { margin-bottom: 4px; }
       h2 { border-bottom: 1px solid #d4d4d8; margin-top: 32px; padding-bottom: 6px; }
@@ -531,7 +531,11 @@ export function CorrectionModal({
 
         {state === "result" && feedback ? (
           <>
-            <div role="tablist" aria-label={modalCopy.title({ taskLabel: task.label })} className="flex flex-none gap-1 overflow-x-auto border-b border-black/[.08] px-4 pt-3 dark:border-white/[.12] sm:px-6">
+            {/* Grid, not scrolling flex, below sm: exactly 3 equal-width tabs always
+                fit a narrow phone with no off-screen tab and no scroll cue needed,
+                even with a longer translated label. Reverts to the original
+                left-aligned, non-wrapping tab row from sm: up. */}
+            <div role="tablist" aria-label={modalCopy.title({ taskLabel: task.label })} className="grid grid-cols-3 gap-1 border-b border-black/[.08] px-2 pt-3 dark:border-white/[.12] sm:flex sm:flex-none sm:overflow-x-auto sm:px-6">
               {tabs.map((tab) => {
                 const selected = activeTab === tab.id;
                 return (
@@ -548,7 +552,7 @@ export function CorrectionModal({
                     tabIndex={selected ? 0 : -1}
                     onClick={() => selectTab(tab.id)}
                     onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-                    className={`whitespace-nowrap rounded-t-lg border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`rounded-t-lg border-b-2 px-2 py-2.5 text-center text-xs font-medium transition-colors sm:whitespace-nowrap sm:px-3 sm:text-left sm:text-sm ${
                       selected
                         ? "border-foreground text-foreground"
                         : "border-transparent text-zinc-500 hover:text-foreground dark:text-zinc-400"
@@ -760,13 +764,13 @@ export function CorrectionModal({
                   <div className="grid gap-4 lg:grid-cols-2">
                     <article className="rounded-2xl border border-black/[.08] p-4 dark:border-white/[.12] sm:p-5">
                       <h3 className="font-semibold">{modalCopy.originalHeading}</h3>
-                      <p lang="fr" className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-200">
+                      <p lang="fr" className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-700 dark:text-zinc-200">
                         {renderHighlightedText(originalText, originalHighlights, "original")}
                       </p>
                     </article>
                     <article className="rounded-2xl border border-emerald-500/20 bg-emerald-500/[.035] p-4 dark:border-emerald-400/25 dark:bg-emerald-400/[.06] sm:p-5">
                       <h3 className="font-semibold">{modalCopy.correctedHeading}</h3>
-                      <p lang="fr" className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-200">
+                      <p lang="fr" className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-700 dark:text-zinc-200">
                         {renderHighlightedText(feedback.correctedText, correctedHighlights, "corrected")}
                       </p>
                     </article>
@@ -797,14 +801,14 @@ export function CorrectionModal({
                                     <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                                       {modalCopy.errorLabel}
                                     </span>
-                                    <span lang="fr" className="text-red-700 line-through decoration-red-500 dark:text-red-300">
+                                    <span lang="fr" className="break-words text-red-700 line-through decoration-red-500 dark:text-red-300">
                                       {error.original}
                                     </span>
                                     <span aria-hidden="true">→</span>
                                     <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                                       {modalCopy.correctionLabel}
                                     </span>
-                                    <strong lang="fr" className="text-emerald-700 dark:text-emerald-300">
+                                    <strong lang="fr" className="break-words text-emerald-700 dark:text-emerald-300">
                                       {error.correction}
                                     </strong>
                                     <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-zinc-600 dark:bg-white/[.1] dark:text-zinc-300">
@@ -827,7 +831,7 @@ export function CorrectionModal({
                                 </span>
                               </summary>
                               <div className="border-t border-black/[.08] px-3 py-3 dark:border-white/[.12]">
-                                <p lang={feedbackLanguage} className="leading-6 text-zinc-600 dark:text-zinc-300">
+                                <p lang={feedbackLanguage} className="break-words leading-6 text-zinc-600 dark:text-zinc-300">
                                   <span className="font-medium text-foreground">{modalCopy.noteLabel}: </span>
                                   {error.explanation}
                                 </p>
@@ -851,13 +855,13 @@ export function CorrectionModal({
               >
                   <div className="rounded-2xl border border-black/[.08] p-4 dark:border-white/[.12] sm:p-5">
                     <h3 className="font-semibold">{modalCopy.commentsHeading}</h3>
-                    <p lang={feedbackLanguage} className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-200">
+                    <p lang={feedbackLanguage} className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-700 dark:text-zinc-200">
                       {feedback.summary}
                     </p>
                     {feedback.suggestions.length > 0 && (
                       <div className="mt-5 border-t border-black/[.08] pt-5 dark:border-white/[.12]">
                         <h4 className="font-medium">{copy.workspace.feedback.suggestions}</h4>
-                        <ul lang={feedbackLanguage} className="mt-3 list-disc space-y-2 pl-5 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
+                        <ul lang={feedbackLanguage} className="mt-3 list-disc space-y-2 break-words pl-5 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
                           {feedback.suggestions.map((suggestion, index) => (
                             <li key={`${suggestion}-${index}`}>{suggestion}</li>
                           ))}
@@ -868,7 +872,7 @@ export function CorrectionModal({
 
                   <blockquote className="rounded-2xl border border-violet-500/20 bg-violet-500/[.055] p-4 dark:border-violet-400/25 dark:bg-violet-400/[.09] sm:p-5">
                     <h3 className="font-semibold">{modalCopy.modelVersionHeading}</h3>
-                    <p lang="fr" className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-800 dark:text-zinc-100">
+                    <p lang="fr" className="mt-3 whitespace-pre-wrap break-words text-sm leading-7 text-zinc-800 dark:text-zinc-100">
                       {feedback.modelVersion}
                     </p>
                   </blockquote>
