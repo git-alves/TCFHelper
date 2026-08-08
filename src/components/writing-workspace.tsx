@@ -1145,7 +1145,7 @@ export function WritingWorkspace() {
             <div
               role="status"
               aria-live="polite"
-              className="min-h-16 w-full whitespace-pre-wrap rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
+              className="min-h-16 w-full whitespace-pre-wrap break-words rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
             >
               {isDraftTooLongToTranslate
                 ? ""
