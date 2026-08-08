@@ -200,7 +200,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                         disabled={deletingId === item.id}
                         aria-expanded={openMenuId === item.id}
                         aria-label={copy.dashboard.correctionActionsMenu}
-                        className="flex h-11 w-11 items-center justify-center rounded-full border border-black/[.15] text-zinc-600 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:text-zinc-300 dark:hover:bg-white/[.06]"
+                        className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-white/[.06]"
                       >
                         <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5" aria-hidden="true">
                           <circle cx="10" cy="4" r="1.5" />
