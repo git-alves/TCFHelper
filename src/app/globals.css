@@ -39,25 +39,33 @@ body {
  * 9999px spread) plus a pulsing accent ring around the target, so a step
  * reads as "look/click here" rather than a static highlight. Kept as plain
  * CSS, not an inline style, so prefers-reduced-motion can turn the pulse off
- * without fighting inline-style specificity. */
+ * without fighting inline-style specificity.
+ *
+ * The ring shadow is listed BEFORE the backdrop shadow: box-shadow layers
+ * paint in listed order with the first on top, so listing the backdrop
+ * first (as an earlier version of this did) let its 60%-opacity black wash
+ * out the ring wherever they overlap -- invisible against a dark page. The
+ * keyframes also always keep the ring at some visible spread/opacity; they
+ * never hit "0 spread" and "0 opacity" at the same moment the way the
+ * previous version's endpoints did. */
 @keyframes walkthrough-pulse {
   0%,
   100% {
     box-shadow:
-      0 0 0 9999px rgba(0, 0, 0, 0.6),
-      0 0 0 0 rgba(139, 92, 246, 0.55);
+      0 0 0 3px rgba(167, 139, 250, 0.9),
+      0 0 0 9999px rgba(0, 0, 0, 0.6);
   }
   50% {
     box-shadow:
-      0 0 0 9999px rgba(0, 0, 0, 0.6),
-      0 0 0 10px rgba(139, 92, 246, 0);
+      0 0 0 14px rgba(167, 139, 250, 0),
+      0 0 0 9999px rgba(0, 0, 0, 0.6);
   }
 }
 
 .walkthrough-highlight {
   box-shadow:
-    0 0 0 9999px rgba(0, 0, 0, 0.6),
-    0 0 0 0 rgba(139, 92, 246, 0.55);
+    0 0 0 3px rgba(167, 139, 250, 0.9),
+    0 0 0 9999px rgba(0, 0, 0, 0.6);
   animation: walkthrough-pulse 1.8s ease-in-out infinite;
 }
 
