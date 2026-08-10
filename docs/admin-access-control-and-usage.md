@@ -110,7 +110,7 @@ hidden backfill.
 | Anonymous | Pages go to `/login` with a safe local callback; APIs return generic `401`. | Generic `404`. |
 | Provisioning failure | Existing unavailable-account recovery. | Generic `404`. |
 | Blocked Clerk session | Silent sign-out bridge then `/`; APIs return the same generic `401`. | Generic `404`. |
-| Signed in, not activated | Pages go to `/activate`; APIs return `403 ACCOUNT_ACTIVATION_REQUIRED` and no data. | Owner is activation-exempt. |
+| Signed in, not activated | Pages go to `/activate`; APIs return the same generic `401` as other unavailable learner sessions and no data. | Owner is activation-exempt. |
 | Activated learner | Normal learner access. | Generic `404`. |
 | Unblocked owner | Normal admin access and optional learner access without a code. | Normal admin access. |
 
@@ -159,8 +159,9 @@ Reporting is explicitly **current-window**, not lifetime analytics. Serializers
 and aggregates treat stale rows as zero rather than summing a dormant
 learner's previous window:
 
-- Translation: current-minute request/code-point use and current-month
-  code points.
+- Translation: current-month code points in aggregates; each learner's detail
+  additionally shows current-minute request/code-point use for limit
+  diagnosis.
 - Examples: current-day fresh provider requests.
 - Corrections: current-day and current-month provider attempts.
 
