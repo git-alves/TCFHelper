@@ -165,8 +165,24 @@ export function WalkthroughOverlay({
         aria-labelledby={titleId}
         aria-describedby={bodyId}
         onClick={(event) => event.stopPropagation()}
-        className="absolute rounded-2xl border border-black/[.1] bg-background p-5 shadow-2xl dark:border-white/[.15]"
-        style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH, maxWidth: "calc(100vw - 2rem)" }}
+        className="absolute overflow-y-auto rounded-2xl border border-black/[.1] bg-background p-5 shadow-2xl dark:border-white/[.15]"
+        style={{
+          top: tooltip.top,
+          left: tooltip.left,
+          width: TOOLTIP_WIDTH,
+          maxWidth: "calc(100vw - 2rem)",
+          // A longer step body (e.g. the tasks tour's example-generate step)
+          // can render taller than TOOLTIP_HEIGHT, the fixed estimate
+          // computeTooltipPosition uses for placement math -- without this,
+          // the Next/Back/Skip/Finish row could render below the viewport
+          // with no way to reach it. Anchored to this panel's own computed
+          // `top`, not a flat "100vh - 2rem": a cap relative to the viewport
+          // alone would still let a panel positioned partway down the page
+          // render past the bottom edge, since nothing stops its natural
+          // height from being smaller than that flat cap but still bigger
+          // than the room actually left below `top`.
+          maxHeight: `calc(100vh - ${tooltip.top}px - 1rem)`,
+        }}
       >
         {/* role="status"/aria-live so screen readers announce each new step
             on its own -- focus moves to Next/Finish on every step change,
