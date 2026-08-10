@@ -85,6 +85,12 @@ export function NavBar() {
   // flip this to "Tasks" the moment Settings opens.
   const onTasks = isWorkspaceMounted;
 
+  // The home page already has its own "start a task" hero CTA, so the nav
+  // bar's job there is just getting a signed-in visitor to their dashboard
+  // -- a plain link, not the same prominent action button that starts the
+  // writing loop from the dashboard.
+  const isHome = pathname === "/";
+
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
   // pathname genuinely is the right signal here. Clicking Dashboard while
@@ -113,7 +119,11 @@ export function NavBar() {
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           <Show when="signed-in">
             <>
-              {onTasks ? (
+              {isHome ? (
+                <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
+                  {copy.nav.dashboard}
+                </Link>
+              ) : onTasks ? (
                 // A correction the server already received can't be
                 // recalled by leaving the page, or the Settings modal
                 // covering the workspace's own confirmation dialog, are
