@@ -26,11 +26,14 @@ export interface TooltipPosition {
 const TOOLTIP_GAP = 12;
 // A fixed estimate, not a measurement of the real tooltip: this keeps
 // placement decisions synchronous and available on the very first paint,
-// before the tooltip itself has ever been laid out to measure. The
-// component that renders the tooltip caps its actual size to match these
-// same constants, so the estimate never meaningfully diverges from reality.
+// before the tooltip itself has ever been laid out to measure. Sized to fit
+// the longest current step body (a few sentences) at TOOLTIP_WIDTH without
+// scrolling; a step with an even longer body, or a narrow viewport, can
+// still render taller than this -- WalkthroughOverlay's tooltip panel caps
+// its own height to the viewport and scrolls internally rather than
+// overflowing it, so this only has to be a good estimate, not a guarantee.
 export const TOOLTIP_WIDTH = 320;
-export const TOOLTIP_HEIGHT = 170;
+export const TOOLTIP_HEIGHT = 260;
 const VIEWPORT_MARGIN = 16;
 
 /**
