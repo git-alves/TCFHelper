@@ -14,6 +14,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260810120000_add_walkthrough_version");
   });
 
+  it("allows the reviewed admin-access migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260810130000_add_admin_access_controls");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

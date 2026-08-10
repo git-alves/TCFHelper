@@ -10,6 +10,8 @@ const APP_USER_SELECT = {
   email: true,
   name: true,
   locale: true,
+  isAdmin: true,
+  isBlocked: true,
   walkthroughCompletedVersion: true,
 } satisfies Prisma.UserSelect;
 
@@ -59,7 +61,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   const mappedUser = await findAppUserByClerkId(clerkUserId);
   if (mappedUser) {
-    return mappedUser;
+    return mappedUser.isBlocked ? null : mappedUser;
   }
 
   const clerkUser = await currentUser();
@@ -67,7 +69,18 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
     throw new AppUserProvisioningError("The signed-in Clerk user could not be resolved.");
   }
 
-  return syncClerkUser(identityFromBackendUser(clerkUser));
+  const syncedUser = await syncClerkUser(identityFromBackendUser(clerkUser));
+  return syncedUser.isBlocked ? null : syncedUser;
+}
+
+/**
+ * Resolves the owner account for an admin page or route. Callers deliberately
+ * receive null for anonymous, blocked, and non-admin users so pages can
+ * respond with notFound() and APIs with a non-disclosing 404.
+ */
+export async function getCurrentAdminUser(): Promise<AppUser | null> {
+  const user = await getCurrentAppUser();
+  return user?.isAdmin ? user : null;
 }
 
 /**

@@ -80,6 +80,12 @@ model User {
   // `id` (the CUID), never at this Clerk subject, so no foreign key needs to
   // be rewritten as part of the Clerk cutover.
   clerkUserId                 String?  @unique
+  // There is deliberately no self-service role assignment. The single owner
+  // account is promoted through an operational database change.
+  isAdmin                     Boolean  @default(false)
+  // Blocked accounts resolve as unauthenticated at the application boundary
+  // so every existing protected page and API route denies access uniformly.
+  isBlocked                   Boolean  @default(false)
   createdAt                   DateTime @default(now())
   updatedAt                   DateTime @updatedAt
   // Null means this learner has never completed or skipped a walkthrough.
@@ -97,7 +103,10 @@ model User {
   exampleGenerationQuota  ExampleGenerationQuota?
   exampleGenerationLeases ExampleGenerationLease[]
   correctionLeases        CorrectionLease[]
+  correctionUsage         CorrectionUsage?
   translationQuota        TranslationQuota?
+  quotaOverride           UserQuotaOverride?
+  redeemedAccessCodes     AccessCode[]          @relation("AccessCodeRedeemedBy")
 }
 
 model Subscription {
@@ -207,6 +216,51 @@ model CorrectionLease {
 
   @@id([userId, correctionKeyHash])
   @@index([expiresAt])
+}
+
+/// Durable correction usage. Unlike CorrectionLease, which is only an
+/// in-flight deduplication lock, this remains after a successful correction
+/// so limits and admin reporting can use the same rolling-window pattern as
+/// translation and example generation.
+model CorrectionUsage {
+  userId              String   @id
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayStartedAt        DateTime
+  dailyRequestCount   Int      @default(0)
+  monthStartedAt      DateTime
+  monthlyRequestCount Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+/// Nullable limits override only the specified global default. Keeping every
+/// metric nullable lets an owner adjust one abuse-control dimension without
+/// accidentally pinning the rest when product-wide defaults later change.
+model UserQuotaOverride {
+  userId                          String   @id
+  user                            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  translationRequestsPerMinute    Int?
+  translationCharactersPerMinute  Int?
+  translationCharactersPerMonth   Int?
+  exampleGenerationsPerDay        Int?
+  correctionRequestsPerDay        Int?
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+}
+
+/// A code activates exactly one learner account. A unique redeemedByUserId
+/// makes activation idempotent and prevents a single account from consuming
+/// an extra code after it is already admitted.
+model AccessCode {
+  id               String    @id @default(cuid())
+  code             String    @unique
+  note             String?
+  createdAt        DateTime  @default(now())
+  redeemedAt       DateTime?
+  redeemedByUserId String?   @unique
+  redeemedByUser   User?     @relation("AccessCodeRedeemedBy", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([redeemedAt])
 }
 
 /// A cached model answer is private to its learner. The hash avoids storing a
