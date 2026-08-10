@@ -36,7 +36,16 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
 
       if (!hasScrolledIntoView) {
         hasScrolledIntoView = true;
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        // Not "smooth": an animated scroll doesn't finish before the
+        // getBoundingClientRect() call below runs, so the very first
+        // measurement after scrolling would still reflect the pre-scroll
+        // position -- and clicking through steps faster than the animation
+        // settles (easy to do by the later, more familiar steps) leaves the
+        // previous step's scroll still running when this one starts,
+        // fighting it for the final position. "auto" jumps immediately, so
+        // the measurement taken right after is always accurate and there is
+        // never more than one scroll in flight.
+        element.scrollIntoView({ behavior: "auto", block: "center", inline: "nearest" });
       }
 
       const domRect = element.getBoundingClientRect();

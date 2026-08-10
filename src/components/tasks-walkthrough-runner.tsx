@@ -90,11 +90,26 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   // Announces the active step to WritingWorkspace so it can drive its own
   // state (see applyWalkthroughStep there) -- fires on open and on every
   // step change, not just individual step ids, so re-opening always
-  // re-announces the current step.
+  // re-announces the current step. A step can report back that it turned
+  // out to have nothing to show (e.g. correction-modal with no real or
+  // scripted feedback available), in which case this advances past it
+  // immediately instead of leaving the tour stalled on a target that will
+  // never appear -- re-running this same effect for whatever step that
+  // lands on, cascading if that one also has nothing to show.
   const activeStepId = isOpen ? (steps[stepIndex]?.id ?? null) : null;
+  const stepCount = steps.length;
   useEffect(() => {
-    if (activeStepId) applyStep(activeStepId);
-  }, [activeStepId, applyStep]);
+    if (!activeStepId) return;
+    const shouldSkip = applyStep(activeStepId);
+    if (!shouldSkip) return;
+    // Deferred rather than called directly in the effect body: this is a
+    // reaction to applyStep's result (an external system, from this
+    // component's point of view), not a value derivable during render.
+    const timer = setTimeout(() => {
+      setStepIndex((index) => Math.min(index + 1, stepCount - 1));
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [activeStepId, applyStep, stepCount]);
 
   function dismiss() {
     setIsOpen(false);

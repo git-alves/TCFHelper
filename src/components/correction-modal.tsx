@@ -469,7 +469,14 @@ export function CorrectionModal({
       <div
         ref={dialogRef}
         role="dialog"
-        aria-modal="true"
+        // Not aria-modal while the tour is showing this as a preview: two
+        // simultaneous aria-modal="true" elements (this one and
+        // WalkthroughOverlay's own tooltip) is undefined behavior for
+        // assistive tech, which may pick either as "the" modal and treat
+        // the other -- including its controls -- as inert. The tour's own
+        // dialog is the one actually driving this step, so it keeps the
+        // designation; this one is a non-modal panel being explained by it.
+        aria-modal={suppressFocusTrap ? undefined : true}
         aria-labelledby={titleId}
         data-walkthrough="correction-modal"
         onClick={(event) => event.stopPropagation()}
