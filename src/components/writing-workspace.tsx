@@ -625,7 +625,11 @@ export function WritingWorkspace() {
   // fixture instead of a POST to /api/essays/correct, so no permanent
   // history record or API cost is created for a demo essay -- see
   // walkthrough-sample-feedback.ts.
-  function applyWalkthroughStep(stepId: string) {
+  // Returns true when the step has nothing to show and the runner should
+  // advance past it immediately, rather than leaving the tour stalled on a
+  // target that will never exist -- only the correction-modal step can end
+  // up in that situation (see its own case below).
+  function applyWalkthroughStep(stepId: string): boolean {
     if (stepId !== "correct-button" && stepId !== "correction-modal") {
       setCorrectionModalOpen(false);
       setIsWalkthroughCorrectionPreview(false);
@@ -633,18 +637,18 @@ export function WritingWorkspace() {
 
     switch (stepId) {
       case "task-picker": {
-        if (taskType !== null) return;
+        if (taskType !== null) return false;
         walkthroughDemoActiveRef.current = true;
         setTaskType(TASK_ORDER[0]);
-        return;
+        return false;
       }
       case "topic-picker": {
-        if (!walkthroughDemoActiveRef.current || topicMode !== null) return;
+        if (!walkthroughDemoActiveRef.current || topicMode !== null) return false;
         getRecentTopic(taskType ?? TASK_ORDER[0]);
-        return;
+        return false;
       }
       case "editor": {
-        if (!walkthroughDemoActiveRef.current || content.trim()) return;
+        if (!walkthroughDemoActiveRef.current || content.trim()) return false;
         // The topic-picker step's fetch may still be in flight -- its own
         // success handler unconditionally calls resetDraftAndFeedback(),
         // which would wipe the sample text this step is about to paste in
@@ -653,7 +657,7 @@ export function WritingWorkspace() {
         // is a harmless no-op instead.
         cancelPendingRecentTopicRequest();
         applyDraftContent(WALKTHROUGH_SAMPLE_ESSAY);
-        return;
+        return false;
       }
       case "correction-modal": {
         // WalkthroughOverlay owns Tab/Escape for this step (see
@@ -664,28 +668,33 @@ export function WritingWorkspace() {
         // A returning learner who already has a real correction can still
         // see this step -- reopening their own real result, never the
         // fixture, since resetWalkthroughDemo below only ever discards
-        // tour-authored state. Outside the demo, with no real correction
-        // either (a returning learner who picked a task before ever
-        // opening the tour, but hasn't corrected anything yet), this step
-        // has nothing to show; it's the one case where the tour can end
-        // early here rather than fabricating feedback for content that was
-        // never actually submitted.
+        // tour-authored state.
         if (feedback) {
           setCorrectionModalState("result");
           setCorrectionModalOpen(true);
-          return;
+          return false;
         }
-        if (!walkthroughDemoActiveRef.current) return;
+        // Outside the demo, with no real correction either (a returning
+        // learner who picked a task before ever opening the tour, but
+        // hasn't corrected anything yet), there is nothing to preview:
+        // fabricating feedback for content that was never actually
+        // submitted would show comments that don't match whatever real
+        // text is in the editor. Skip straight past this step instead of
+        // leaving the tour stalled on a target that will never appear.
+        if (!walkthroughDemoActiveRef.current) {
+          setIsWalkthroughCorrectionPreview(false);
+          return true;
+        }
         setSubmittedCorrectionText(content || WALKTHROUGH_SAMPLE_ESSAY);
         setFeedback(getWalkthroughSampleFeedback(copy));
         setFeedbackLocale(locale);
         setCorrectionModalState("result");
         setCorrectionModalSession((session) => session + 1);
         setCorrectionModalOpen(true);
-        return;
+        return false;
       }
       default:
-        return;
+        return false;
     }
   }
 
@@ -956,13 +965,18 @@ export function WritingWorkspace() {
         : visibleTranslationError
           ? copy.workspace.translation.unavailableError
           : null;
-  // Always the last translation actually fetched, even once the draft has
-  // moved on from it -- translation is on-demand now, not live, so a stale
-  // (but still accurate for the text it covers) translation stays visible
-  // until the learner re-opens the panel, rather than blanking on every
-  // keystroke while the button still reads "Hide translation". A French
-  // interface simply shows the original French draft.
-  const visibleTranslation = locale === "fr" ? content : translation;
+  // The last translation actually fetched, even once the draft has moved on
+  // from it -- translation is on-demand now, not live, so a stale (but
+  // still accurate for the text it covers) translation stays visible until
+  // the learner re-opens the panel, rather than blanking on every keystroke
+  // while the button still reads "Hide translation". This tolerance is only
+  // for the DRAFT changing, though: a translation into a language the
+  // interface has since moved away from isn't stale, it's simply wrong for
+  // what's on screen now (the heading above it already updates to the new
+  // language), so a locale mismatch still blanks it. A French interface
+  // simply shows the original French draft.
+  const visibleTranslation =
+    locale === "fr" ? content : translationFor?.locale === locale ? translation : "";
 
   return (
     <div className="flex w-full flex-col gap-8">
