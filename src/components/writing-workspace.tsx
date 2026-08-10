@@ -19,6 +19,7 @@ import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
+import { computeTranslationDelta } from "@/lib/translation-delta";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 
@@ -155,13 +156,18 @@ export function WritingWorkspace() {
     null
   );
 
+  // Hidden until the learner asks for it, and translated on demand rather
+  // than live as they type -- each click sends at most the text that
+  // wasn't already translated (see requestTranslation), since every call
+  // spends from the same metered per-learner translation quota.
+  const [isTranslationVisible, setIsTranslationVisible] = useState(false);
+  const [isTranslationLoading, setIsTranslationLoading] = useState(false);
   const [translation, setTranslation] = useState("");
   const [translationProvider, setTranslationProvider] = useState<TranslationProviderKind | null>(null);
+  // What `translation` actually corresponds to -- the base case for "is the
+  // draft unchanged" (skip re-translating), and for "was text only appended"
+  // (translate just the new suffix and concatenate) in requestTranslation.
   const [translationFor, setTranslationFor] = useState<{
-    text: string;
-    locale: typeof locale;
-  } | null>(null);
-  const [translationRequestFor, setTranslationRequestFor] = useState<{
     text: string;
     locale: typeof locale;
   } | null>(null);
@@ -171,7 +177,7 @@ export function WritingWorkspace() {
     locale: typeof locale;
   } | null>(null);
   const translationRequestId = useRef(0);
-  const lastTranslatedRef = useRef<{ text: string; locale: typeof locale } | null>(null);
+  const translationAbortController = useRef<AbortController | null>(null);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -230,120 +236,126 @@ export function WritingWorkspace() {
     return () => {
       if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
       exampleAbortController.current?.abort();
+      translationAbortController.current?.abort();
     };
   }, []);
 
-  // Debounced live translation of the draft into the app's display
-  // language. Fires 800ms after the learner stops typing, skips re-sending
-  // the same text/locale pair, and drops stale responses via requestId.
-  useEffect(() => {
+  function cancelPendingTranslation() {
+    translationRequestId.current += 1;
+    translationAbortController.current?.abort();
+    translationAbortController.current = null;
+    setIsTranslationLoading(false);
+  }
+
+  // Translates on demand instead of live as the learner types, and sends at
+  // most the text that wasn't already covered by `translation` -- every
+  // call spends from the same metered per-learner quota (see
+  // TRANSLATION_CHARACTERS_PER_MONTH in /api/translate), so re-translating
+  // the whole draft on every click/keystroke would waste most of it on text
+  // that was already translated a moment ago.
+  async function requestTranslation() {
     const trimmed = content.trim();
+    if (!trimmed) return;
 
-    if (!trimmed) {
-      // Content only becomes empty via the textarea's onChange handler or
-      // resetDraftAndFeedback() — both already clear translation state
-      // synchronously there. This just guards against a stale in-flight
-      // request resolving after the fact.
-      translationRequestId.current += 1;
-      return;
-    }
-
-    // A French-language interface shows the learner's French draft directly.
-    // This avoids an unnecessary model call that could otherwise paraphrase
-    // their words rather than faithfully show the same-language text.
+    // A French-language interface shows the learner's French draft
+    // directly. This avoids an unnecessary model call that could otherwise
+    // paraphrase their words rather than faithfully show the same-language
+    // text.
     if (locale === "fr") {
-      translationRequestId.current += 1;
-      lastTranslatedRef.current = { text: trimmed, locale };
+      cancelPendingTranslation();
+      setTranslation(content);
+      setTranslationProvider(null);
+      setTranslationFor({ text: trimmed, locale });
+      setTranslationError(null);
+      setTranslationErrorFor(null);
       return;
     }
 
     // Beyond this, /api/translate rejects the request outright (same shared
-    // limit). Skip the doomed call — the too-long notice below is derived
-    // straight from `content`, so there is nothing to schedule here.
-    if (trimmed.length > TRANSLATABLE_MAX_CHARS) {
-      translationRequestId.current += 1;
+    // limit). The too-long notice below is derived straight from `content`,
+    // so there is nothing to send here.
+    if (trimmed.length > TRANSLATABLE_MAX_CHARS) return;
+
+    const delta = computeTranslationDelta(trimmed, translationFor, locale);
+    if (delta.kind === "unchanged") return;
+    if (delta.kind === "whitespace-only") {
+      setTranslationFor({ text: trimmed, locale });
       return;
     }
 
-    if (
-      lastTranslatedRef.current?.text === trimmed &&
-      lastTranslatedRef.current?.locale === locale
-    ) {
-      return;
-    }
+    const isAppend = delta.kind === "append";
+    const textToSend = delta.textToSend;
 
-    const requestId = ++translationRequestId.current;
+    cancelPendingTranslation();
+    const requestId = translationRequestId.current;
     const controller = new AbortController();
-    const timer = setTimeout(() => {
-      setTranslationRequestFor({ text: trimmed, locale });
-      setTranslationError(null);
-      setTranslationErrorFor(null);
+    translationAbortController.current = controller;
+    setIsTranslationLoading(true);
+    setTranslationError(null);
+    setTranslationErrorFor(null);
 
-      fetch("/api/translate", {
+    try {
+      const res = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed, targetLocale: locale }),
+        body: JSON.stringify({ text: textToSend, targetLocale: locale }),
         signal: controller.signal,
-      })
-        .then(async (res) => {
-          if (requestId !== translationRequestId.current) return;
+      });
 
-          if (!res.ok) {
-            const data: unknown = await res.json().catch(() => null);
-            const errorCode =
-              data && typeof data === "object" && "code" in data
-                ? (data as { code?: unknown }).code
-                : undefined;
-            setTranslationError(
-              errorCode === "TRANSLATION_RATE_LIMITED"
-                ? "rateLimited"
-                : errorCode === "TRANSLATION_MONTHLY_QUOTA_REACHED"
-                  ? "monthlyQuota"
-                  : "unavailable",
-            );
-            setTranslationErrorFor({ text: trimmed, locale });
-            return;
-          }
+      if (requestId !== translationRequestId.current) return;
 
-          const data: unknown = await res.json();
-          if (requestId !== translationRequestId.current) return;
-
-          const nextTranslation =
-            data && typeof data === "object" && typeof (data as { translation?: unknown }).translation === "string"
-              ? (data as { translation: string }).translation
-              : "";
-          const nextProvider =
-            data && typeof data === "object" && (data as { provider?: unknown }).provider === "unofficial"
-              ? "unofficial"
-              : "deepl";
-
-          setTranslation(nextTranslation);
-          setTranslationProvider(nextProvider);
-          setTranslationFor({ text: trimmed, locale });
-          lastTranslatedRef.current = { text: trimmed, locale };
-        })
-        .catch((error: unknown) => {
-          if (
-            requestId === translationRequestId.current &&
-            !(error instanceof Error && error.name === "AbortError")
-          ) {
-            setTranslationError("unavailable");
-            setTranslationErrorFor({ text: trimmed, locale });
-          }
-        })
-        .finally(() => {
-          if (requestId === translationRequestId.current) setTranslationRequestFor(null);
-        });
-    }, 800);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-      if (translationRequestId.current === requestId) {
-        translationRequestId.current += 1;
+      if (!res.ok) {
+        const data: unknown = await res.json().catch(() => null);
+        const errorCode =
+          data && typeof data === "object" && "code" in data
+            ? (data as { code?: unknown }).code
+            : undefined;
+        setTranslationError(
+          errorCode === "TRANSLATION_RATE_LIMITED"
+            ? "rateLimited"
+            : errorCode === "TRANSLATION_MONTHLY_QUOTA_REACHED"
+              ? "monthlyQuota"
+              : "unavailable",
+        );
+        setTranslationErrorFor({ text: trimmed, locale });
+        return;
       }
-    };
-  }, [content, locale]);
+
+      const data: unknown = await res.json();
+      if (requestId !== translationRequestId.current) return;
+
+      const chunk =
+        data && typeof data === "object" && typeof (data as { translation?: unknown }).translation === "string"
+          ? (data as { translation: string }).translation
+          : "";
+      const nextProvider =
+        data && typeof data === "object" && (data as { provider?: unknown }).provider === "unofficial"
+          ? "unofficial"
+          : "deepl";
+
+      setTranslation((previous) => (isAppend ? `${previous}${chunk}` : chunk));
+      setTranslationProvider(nextProvider);
+      setTranslationFor({ text: trimmed, locale });
+    } catch (error) {
+      if (requestId === translationRequestId.current && !(error instanceof Error && error.name === "AbortError")) {
+        setTranslationError("unavailable");
+        setTranslationErrorFor({ text: trimmed, locale });
+      }
+    } finally {
+      if (requestId === translationRequestId.current) setIsTranslationLoading(false);
+    }
+  }
+
+  function handleToggleTranslation() {
+    if (isTranslationVisible) {
+      cancelPendingTranslation();
+      setIsTranslationVisible(false);
+      return;
+    }
+
+    setIsTranslationVisible(true);
+    void requestTranslation();
+  }
 
   // Every committed draft follows the same translation path, whether it was
   // typed, pasted, or inserted by the study-example action. This keeps the
@@ -357,14 +369,13 @@ export function WritingWorkspace() {
     setTranslationError(null);
     setTranslationErrorFor(null);
     if (!value.trim()) {
-      translationRequestId.current += 1;
+      cancelPendingTranslation();
+      setIsTranslationVisible(false);
       setTranslation("");
       setTranslationProvider(null);
       setTranslationFor(null);
       setTranslationError(null);
       setTranslationErrorFor(null);
-      setTranslationRequestFor(null);
-      lastTranslatedRef.current = null;
     }
   }
 
@@ -382,14 +393,13 @@ export function WritingWorkspace() {
     setHasCorrectionError(false);
     setExampleError(null);
     setExampleNeedsTopic(false);
-    translationRequestId.current += 1;
+    cancelPendingTranslation();
+    setIsTranslationVisible(false);
     setTranslation("");
     setTranslationProvider(null);
     setTranslationFor(null);
     setTranslationError(null);
     setTranslationErrorFor(null);
-    setTranslationRequestFor(null);
-    lastTranslatedRef.current = null;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -890,9 +900,7 @@ export function WritingWorkspace() {
     locale !== "fr" && trimmedContent.length > TRANSLATABLE_MAX_CHARS;
   const translationIsCurrent =
     translationFor?.text === trimmedContent && translationFor.locale === locale;
-  const isTranslating =
-    translationRequestFor?.text === trimmedContent &&
-    translationRequestFor.locale === locale;
+  const isTranslating = isTranslationLoading;
   const visibleTranslationError =
     translationErrorFor?.text === trimmedContent &&
     translationErrorFor.locale === locale
@@ -1193,6 +1201,16 @@ export function WritingWorkspace() {
               >
                 {copy.workspace.editor.clear}
               </button>
+              <button
+                type="button"
+                data-walkthrough="translation"
+                onClick={handleToggleTranslation}
+                disabled={!content.trim()}
+                aria-pressed={isTranslationVisible}
+                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {isTranslationVisible ? copy.workspace.translation.hide : copy.workspace.translation.show}
+              </button>
             </div>
             {isCorrecting && (
               <p role="status" className="sr-only">
@@ -1241,48 +1259,48 @@ export function WritingWorkspace() {
             )}
           </section>
 
-          <section data-walkthrough="translation" className="flex flex-col gap-2" aria-labelledby="translation-heading">
-            <div className="flex items-center justify-between gap-4">
-              <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
-              </h2>
-              {isTranslating && !isDraftTooLongToTranslate && (
-                <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.translation.inProgress}
-                </span>
+          {isTranslationVisible && (
+            <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
+              <div className="flex items-center justify-between gap-4">
+                <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                  {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
+                </h2>
+                {isTranslating && !isDraftTooLongToTranslate && (
+                  <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">
+                    {copy.workspace.translation.inProgress}
+                  </span>
+                )}
+              </div>
+              <div
+                role="status"
+                aria-live="polite"
+                className="min-h-16 w-full whitespace-pre-wrap break-words rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
+              >
+                {isDraftTooLongToTranslate ? "" : visibleTranslation}
+              </div>
+              {locale !== "fr" && visibleTranslation && translationProvider && (
+                <TranslationProviderNotice
+                  provider={translationProvider}
+                  unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
+                />
               )}
-            </div>
-            <div
-              role="status"
-              aria-live="polite"
-              className="min-h-16 w-full whitespace-pre-wrap break-words rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
-            >
-              {isDraftTooLongToTranslate
-                ? ""
-                : visibleTranslation || (trimmedContent ? "" : copy.workspace.translation.empty)}
-            </div>
-            {locale !== "fr" && visibleTranslation && translationProvider && (
-              <TranslationProviderNotice
-                provider={translationProvider}
-                unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
-              />
-            )}
-            {isDraftTooLongToTranslate ? (
-              <p className="text-sm text-amber-600 dark:text-amber-400">
-                {copy.workspace.translation.tooLong({
-                  maxCharacters: new Intl.NumberFormat(APP_LOCALE_INTL_TAGS[locale]).format(
-                    TRANSLATABLE_MAX_CHARS,
-                  ),
-                })}
-              </p>
-            ) : (
-              visibleTranslationErrorMessage && (
-                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                  {visibleTranslationErrorMessage}
+              {isDraftTooLongToTranslate ? (
+                <p className="text-sm text-amber-600 dark:text-amber-400">
+                  {copy.workspace.translation.tooLong({
+                    maxCharacters: new Intl.NumberFormat(APP_LOCALE_INTL_TAGS[locale]).format(
+                      TRANSLATABLE_MAX_CHARS,
+                    ),
+                  })}
                 </p>
-              )
-            )}
-          </section>
+              ) : (
+                visibleTranslationErrorMessage && (
+                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                    {visibleTranslationErrorMessage}
+                  </p>
+                )
+              )}
+            </section>
+          )}
 
         </>
       )}
