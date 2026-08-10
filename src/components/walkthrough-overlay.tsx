@@ -14,6 +14,9 @@ export interface WalkthroughStepContent {
   placement?: TooltipPlacement;
 }
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 interface WalkthroughOverlayProps {
   open: boolean;
   steps: WalkthroughStepContent[];
@@ -48,27 +51,74 @@ export function WalkthroughOverlay({
 }: WalkthroughOverlayProps) {
   const step = steps[stepIndex] ?? null;
   const targetRect = useWalkthroughTargetRect(open ? (step?.id ?? null) : null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const dialogId = useId();
   const titleId = `${dialogId}-title`;
   const bodyId = `${dialogId}-body`;
 
-  useEffect(() => {
-    if (open && targetRect) nextButtonRef.current?.focus();
-  }, [open, stepIndex, targetRect]);
+  // A stable boolean, not targetRect itself, so the effects below don't
+  // re-run on every resize-triggered remeasurement -- only on the dialog
+  // actually appearing or disappearing.
+  const isVisible = open && step !== null && targetRect !== null;
 
+  // Focus trap + restore, matching ConfirmDialog/Modal: captures whatever
+  // had focus right before the dialog appeared and gives it back on close,
+  // and keeps Tab cycling inside the dialog the whole time -- aria-modal
+  // implies both, and neither happens for free.
   useEffect(() => {
-    if (!open) return;
+    if (!isVisible) return;
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onSkip();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onSkip();
+        return;
+      }
+
+      if (event.key !== "Tab" || !dialogRef.current) return;
+
+      const focusable = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (!dialogRef.current.contains(active)) {
+        event.preventDefault();
+        first.focus();
+      } else if (event.shiftKey && active === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && active === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
 
     document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, onSkip]);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previouslyFocusedRef.current?.focus();
+    };
+  }, [isVisible, onSkip]);
 
-  if (!open || !step || !targetRect) return null;
+  // Separate from the effect above: this fires on every step change, not
+  // just the dialog's open/close transitions, so it can't be the same
+  // effect without also re-capturing previouslyFocusedRef from inside the
+  // dialog itself on step 2 onward.
+  useEffect(() => {
+    if (isVisible) nextButtonRef.current?.focus();
+  }, [isVisible, stepIndex]);
+
+  if (!isVisible || !step || !targetRect) return null;
 
   const viewport = { width: window.innerWidth, height: window.innerHeight };
   const tooltip = computeTooltipPosition(targetRect, viewport, step.placement ?? "bottom");
@@ -96,6 +146,7 @@ export function WalkthroughOverlay({
         }}
       />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
+import { WALKTHROUGH_CONTINUE_PARAM, WALKTHROUGH_CONTINUE_VALUE } from "@/lib/walkthrough";
 
 interface DashboardWalkthroughRunnerProps {
   shouldAutoStart: boolean;
@@ -46,7 +47,11 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
 
   function continueToTasks() {
     setIsOpen(false);
-    router.push("/tasks");
+    // Only meaningful for a manual re-trigger by a learner who has already
+    // completed the current version -- shouldAutoStart alone would be false
+    // for them on /tasks. A genuine first-time run doesn't need this: both
+    // pages already read the same still-unrecorded (null) version.
+    router.push(`/tasks?${WALKTHROUGH_CONTINUE_PARAM}=${WALKTHROUGH_CONTINUE_VALUE}`);
   }
 
   return (
