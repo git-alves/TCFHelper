@@ -1264,7 +1264,13 @@ export function WritingWorkspace() {
                 type="button"
                 data-walkthrough="translation"
                 onClick={handleToggleTranslation}
-                disabled={!content.trim()}
+                // Also disabled while loading: each click that lands during
+                // an in-flight request aborts it and starts another, and
+                // the server intentionally keeps the quota reservation for
+                // the aborted one (see the no-refund note in
+                // /api/translate/route.ts) -- repeated clicks here would
+                // burn real quota on requests that never even finish.
+                disabled={!content.trim() || isTranslationLoading}
                 aria-pressed={isTranslationVisible && !isTranslationStale}
                 className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >

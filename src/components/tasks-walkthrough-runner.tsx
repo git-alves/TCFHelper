@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
@@ -111,11 +111,16 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     return () => clearTimeout(timer);
   }, [activeStepId, applyStep, stepCount]);
 
-  function dismiss() {
+  // Stable across renders (not a plain function, recreated every render):
+  // WalkthroughOverlay's focus-trap effect keys on this via onSkip, so a
+  // new identity on every step change made it tear down and rebuild that
+  // effect each time -- restoring focus to whatever was active before the
+  // tour ever opened, right before immediately refocusing the Next button.
+  const dismiss = useCallback(() => {
     setIsOpen(false);
     resetDemo();
     void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
-  }
+  }, [resetDemo]);
 
   return (
     <WalkthroughOverlay
