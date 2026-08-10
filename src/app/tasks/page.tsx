@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
+import { TasksWalkthroughRunner } from "@/components/tasks-walkthrough-runner";
 import { WritingWorkspace } from "@/components/writing-workspace";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 export default async function TasksPage() {
   let user;
@@ -20,6 +22,7 @@ export default async function TasksPage() {
 
   return (
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <TasksWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
       <WritingWorkspace />
     </main>
   );
