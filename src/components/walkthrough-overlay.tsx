@@ -156,7 +156,14 @@ export function WalkthroughOverlay({
         className="absolute rounded-2xl border border-black/[.1] bg-background p-5 shadow-2xl dark:border-white/[.15]"
         style={{ top: tooltip.top, left: tooltip.left, width: TOOLTIP_WIDTH, maxWidth: "calc(100vw - 2rem)" }}
       >
-        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {/* role="status"/aria-live so screen readers announce each new step
+            on its own -- focus moves to Next/Finish on every step change,
+            not to this text, so nothing else would announce the change. */}
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        >
           {copy.stepProgress({ step: stepIndex + 1, total: steps.length })}
         </p>
         <h2 id={titleId} className="mt-1 text-base font-semibold">
