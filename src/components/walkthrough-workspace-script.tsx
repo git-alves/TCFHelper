@@ -33,16 +33,39 @@ const WalkthroughWorkspaceScriptContext = createContext<WalkthroughWorkspaceScri
 // cross-component coordination.
 export function WalkthroughWorkspaceScriptProvider({ children }: { children: ReactNode }) {
   const handlersRef = useRef<WalkthroughScriptHandlers | null>(null);
+  // TasksWalkthroughRunner and WritingWorkspace are siblings, and React
+  // fires a component's own effects before its later siblings' -- since
+  // the runner is rendered first (see WalkthroughWorkspaceScriptProvider's
+  // usage in app/tasks/page.tsx), an auto-starting tour's very first
+  // applyStep("task-picker") call can land here before WritingWorkspace's
+  // registration effect has run at all, on the very first commit. Without
+  // buffering, that call would just be silently dropped (handlersRef still
+  // null), and since nothing else re-announces the same step, the tour's
+  // very first action -- the one every later step's target depends on --
+  // would simply never happen. Buffering the most recent request and
+  // replaying it the moment a real handler registers makes this correct
+  // regardless of which order the two actually mount in.
+  const pendingStepIdRef = useRef<string | null>(null);
 
   const register = useCallback((handlers: WalkthroughScriptHandlers | null) => {
     handlersRef.current = handlers;
+    if (handlers && pendingStepIdRef.current !== null) {
+      const stepId = pendingStepIdRef.current;
+      pendingStepIdRef.current = null;
+      handlers.applyStep(stepId);
+    }
   }, []);
 
   const applyStep = useCallback((stepId: string) => {
-    handlersRef.current?.applyStep(stepId);
+    if (handlersRef.current) {
+      handlersRef.current.applyStep(stepId);
+    } else {
+      pendingStepIdRef.current = stepId;
+    }
   }, []);
 
   const resetDemo = useCallback(() => {
+    pendingStepIdRef.current = null;
     handlersRef.current?.resetDemo();
   }, []);
 

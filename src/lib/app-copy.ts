@@ -366,7 +366,7 @@ export const APP_COPY = {
       themeDark: "Dark",
       themeSystem: "Match system",
       languageHeading: "Language",
-      languageDescription: "Choose the language used across the interface, feedback, and live translation panel.",
+      languageDescription: "Choose the language used across the interface, feedback, and translation panel.",
       helpHeading: "Help & support",
       helpDescription: "Have a question or found a problem? Reach out and we'll help.",
     },
@@ -644,7 +644,7 @@ export const APP_COPY = {
       themeSystem: "Système",
       languageHeading: "Langue",
       languageDescription:
-        "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct.",
+        "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction.",
       helpHeading: "Aide et assistance",
       helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
     },
@@ -925,8 +925,7 @@ export const APP_COPY = {
       themeDark: "Oscuro",
       themeSystem: "Igual que el sistema",
       languageHeading: "Idioma",
-      languageDescription:
-        "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción en tiempo real.",
+      languageDescription: "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción.",
       helpHeading: "Ayuda y soporte",
       helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
@@ -1207,8 +1206,7 @@ export const APP_COPY = {
       themeDark: "Escuro",
       themeSystem: "Igual ao sistema",
       languageHeading: "Idioma",
-      languageDescription:
-        "Escolha o idioma usado na interface, nos comentários e no painel de tradução em tempo real.",
+      languageDescription: "Escolha o idioma usado na interface, nos comentários e no painel de tradução.",
       helpHeading: "Ajuda e suporte",
       helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
     },

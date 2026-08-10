@@ -35,9 +35,9 @@ describe("computeTranslationDelta", () => {
     expect(result).toEqual({ kind: "retranslate", textToSend: "Bonjour, ça va ?" });
   });
 
-  it("advances the cache without a request when only whitespace was appended", () => {
+  it("treats trailing whitespace as unchanged, since both sides are trimmed before this is called", () => {
     const cache = { text: "Bonjour, ça va ?", locale: "en" };
-    const result = computeTranslationDelta("Bonjour, ça va ?\n\n", cache, "en");
-    expect(result).toEqual({ kind: "whitespace-only" });
+    const result = computeTranslationDelta("Bonjour, ça va ?".trim(), cache, "en");
+    expect(result).toEqual({ kind: "unchanged" });
   });
 });

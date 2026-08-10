@@ -2,6 +2,13 @@
 // unit-testable in a repo with no jsdom/testing-library. Kept separate from
 // WritingWorkspace's requestTranslation, which owns the actual API call and
 // state updates.
+//
+// Both `currentText` and `cache.text` are expected to already be trimmed by
+// the caller (WritingWorkspace always stores/compares `content.trim()`) --
+// given that, a suffix produced by slicing one trimmed string from a prefix
+// of another can never be whitespace-only, since neither string can end in
+// whitespace. There is deliberately no separate "whitespace-only" case here;
+// that scenario collapses into "unchanged" once both sides are trimmed.
 
 export interface TranslationCache {
   text: string;
@@ -9,12 +16,8 @@ export interface TranslationCache {
 }
 
 export type TranslationDelta =
-  // The draft is byte-for-byte what `cache` already covers -- nothing to do.
+  // The draft is exactly what `cache` already covers -- nothing to do.
   | { kind: "unchanged" }
-  // Only whitespace was appended since `cache` -- advance the cache to the
-  // current text so it stays the "is this unchanged" baseline, but there is
-  // no new wording to spend a translation call on.
-  | { kind: "whitespace-only" }
   // The draft grew by adding text after everything `cache` already covers.
   // Only `textToSend` (the new suffix) needs translating; the caller
   // appends the result to the existing translation.
@@ -38,11 +41,7 @@ export function computeTranslationDelta(currentText: string, cache: TranslationC
   const isAppend =
     cache !== null && cache.locale === locale && currentText.startsWith(cache.text) && currentText.length > cache.text.length;
 
-  const textToSend = isAppend ? currentText.slice(cache!.text.length) : currentText;
-
-  if (!textToSend.trim()) {
-    return { kind: "whitespace-only" };
-  }
-
-  return isAppend ? { kind: "append", textToSend } : { kind: "retranslate", textToSend };
+  return isAppend
+    ? { kind: "append", textToSend: currentText.slice(cache!.text.length) }
+    : { kind: "retranslate", textToSend: currentText };
 }
