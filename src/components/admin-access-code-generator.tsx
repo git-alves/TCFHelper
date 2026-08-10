@@ -79,6 +79,7 @@ export function AdminAccessCodeGenerator() {
 
       {justCreated && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-violet-500/40 bg-violet-500/[.06] px-4 py-3">
+          <p className="sr-only" role="status" aria-live="polite">New access code generated and ready to copy.</p>
           <p className="text-sm text-zinc-600 dark:text-zinc-400">New code:</p>
           <code className="font-mono text-sm font-semibold">{justCreated.code}</code>
           <CopyButton value={justCreated.code} label="Copy the new access code" />

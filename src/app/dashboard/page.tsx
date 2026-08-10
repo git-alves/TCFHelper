@@ -45,7 +45,17 @@ export default async function DashboardPage() {
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <DashboardWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
 
-      <DashboardHeading name={user.name ?? user.email} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DashboardHeading name={user.name ?? user.email} />
+        {user.isAdmin && (
+          <Link
+            href="/admin"
+            className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+          >
+            Admin
+          </Link>
+        )}
+      </div>
 
       <section aria-labelledby="progress-chart-heading" data-walkthrough="dashboard-welcome" className="flex flex-col gap-3">
         <h2 id="progress-chart-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
