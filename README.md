@@ -9,7 +9,10 @@ Phase 1 is the core writing loop. Its purpose is to validate feedback quality
 before the product invests in retention or monetization features. See the
 [Phase 1 validation spec](docs/phase-1-core-writing-loop.md) for the job to
 be done, success gate, and deliberately excluded scope. There is no billing
-gate yet — every logged-in user can reach `/tasks`.
+or plan-purchase flow: Clerk sign-up remains open, while a learner redeems an
+owner-issued access code before reaching the app. The owner controls admission
+and current usage through the
+[admin access-control specification](docs/admin-access-control-and-usage.md).
 
 ## Stack
 

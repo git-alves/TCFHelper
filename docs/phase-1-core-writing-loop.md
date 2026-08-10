@@ -19,6 +19,11 @@
 - No subscription, checkout, entitlement, or billing gate. Clerk authentication
   exists only to establish learner ownership of persisted work; it is not a
   retention or monetization feature in this phase.
+  **Current-scope note:** the later owner-operated access-code gate changes
+  application admission without adding a purchase or billing entitlement; see
+  [admin access control and usage](admin-access-control-and-usage.md). This
+  Phase 1 statement remains the decision not to build monetization before
+  feedback-quality validation.
 - No feedback history UI, saved drafts, sharing, or notifications. (A learner
   progress/CEFR-trend dashboard was originally excluded here too, but was
   added after Phase 1 shipped — see `/dashboard` and `src/lib/essay-progress.ts`.)
