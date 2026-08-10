@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
+import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { WALKTHROUGH_CONTINUE_PARAM, WALKTHROUGH_CONTINUE_VALUE } from "@/lib/walkthrough";
 
 interface TasksWalkthroughRunnerProps {
@@ -14,15 +15,17 @@ interface TasksWalkthroughRunnerProps {
 }
 
 /**
- * Owns both the "Take a tour" manual re-trigger and the tour itself for the
- * /tasks workspace, so a single mount point carries the whole feature for
- * this page. Skipping or finishing both record the current walkthrough
- * version -- same meaning either way, see /api/walkthrough/dismiss.
+ * Owns the tour itself for the /tasks workspace. Its "Take a tour" trigger
+ * lives in the nav bar, not on this page -- see WalkthroughTriggerProvider --
+ * so this component only registers a starter function while mounted.
+ * Skipping or finishing both record the current walkthrough version -- same
+ * meaning either way, see /api/walkthrough/dismiss.
  */
 export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunnerProps) {
   const copy = useAppCopy();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { register } = useWalkthroughTrigger();
   // A learner who already completed the current version has shouldAutoStart
   // === false here even when they just clicked "Take a tour" on the
   // dashboard and are continuing into these steps -- see
@@ -42,6 +45,14 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     router.replace("/tasks", { scroll: false });
   }, [continueFromDashboard, router]);
 
+  useEffect(() => {
+    register(() => {
+      setStepIndex(0);
+      setIsOpen(true);
+    });
+    return () => register(null);
+  }, [register]);
+
   const steps: WalkthroughStepContent[] = [
     { id: "task-picker", title: copy.walkthrough.taskPickerTitle, body: copy.walkthrough.taskPickerBody },
     { id: "topic-picker", title: copy.walkthrough.topicPickerTitle, body: copy.walkthrough.topicPickerBody },
@@ -60,27 +71,15 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => {
-          setStepIndex(0);
-          setIsOpen(true);
-        }}
-        className="self-start text-sm font-medium text-violet-700 underline underline-offset-4 transition-colors hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-      >
-        {copy.walkthrough.takeATour}
-      </button>
-      <WalkthroughOverlay
-        open={isOpen}
-        steps={steps}
-        stepIndex={stepIndex}
-        copy={copy.walkthrough}
-        onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
-        onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
-        onSkip={dismiss}
-        onFinish={dismiss}
-      />
-    </>
+    <WalkthroughOverlay
+      open={isOpen}
+      steps={steps}
+      stepIndex={stepIndex}
+      copy={copy.walkthrough}
+      onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
+      onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
+      onSkip={dismiss}
+      onFinish={dismiss}
+    />
   );
 }

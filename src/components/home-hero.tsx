@@ -19,10 +19,10 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         {copy.home.description}
       </p>
       <Link
-        href={isAuthenticated ? "/dashboard" : "/signup"}
+        href={isAuthenticated ? "/tasks" : "/signup"}
         className="rounded-full bg-foreground px-6 py-3 text-base font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
       >
-        {isAuthenticated ? copy.home.goToDashboard : copy.home.getStarted}
+        {isAuthenticated ? copy.home.startATask : copy.home.getStarted}
       </Link>
     </main>
   );

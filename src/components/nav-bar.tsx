@@ -6,6 +6,7 @@ import type { MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 
 function SettingsIcon() {
   return (
@@ -23,6 +24,22 @@ function SettingsIcon() {
         d="M8.34 2.5h3.32l.46 2.32a6.5 6.5 0 0 1 1.68.98l2.24-.78 1.66 2.88-1.8 1.54a6.5 6.5 0 0 1 0 1.94l1.8 1.54-1.66 2.88-2.24-.78a6.5 6.5 0 0 1-1.68.98l-.46 2.32H8.34l-.46-2.32a6.5 6.5 0 0 1-1.68-.98l-2.24.78-1.66-2.88 1.8-1.54a6.5 6.5 0 0 1 0-1.94l-1.8-1.54 1.66-2.88 2.24.78a6.5 6.5 0 0 1 1.68-.98l.46-2.32Z"
       />
       <circle cx="10" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function TourIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="7.25" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="m12.75 7.25-1.5 4-4 1.5 1.5-4 4-1.5Z" />
     </svg>
   );
 }
@@ -46,10 +63,11 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
-// Follows the theme instead of inverting it: bg-background/text-foreground
-// (light pill in light mode, dark pill in dark mode), not the reverse.
+// A filled primary action, not the outlined pill used for secondary nav
+// controls -- this is the one control on the dashboard that actually starts
+// the core writing loop, so it should read as more than a plain nav link.
 const TASKS_BUTTON_CLASS =
-  "shrink-0 rounded-full border border-black/[.15] bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]";
+  "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
 const DASHBOARD_BUTTON_CLASS =
   "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
@@ -57,6 +75,7 @@ export function NavBar() {
   const copy = useAppCopy();
   const pathname = usePathname();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
+  const { requestStart: requestWalkthroughStart, isAvailable: isWalkthroughAvailable } = useWalkthroughTrigger();
 
   // Toggles between the two screens: while the workspace is mounted, this
   // offers Dashboard; otherwise it offers Tasks. Driven by whether the
@@ -122,9 +141,20 @@ export function NavBar() {
                   </Link>
                 )
               ) : (
-                <Link href="/tasks" className={TASKS_BUTTON_CLASS}>
+                <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
                   {copy.nav.tasks}
                 </Link>
+              )}
+              {isWalkthroughAvailable && (
+                <button
+                  type="button"
+                  onClick={requestWalkthroughStart}
+                  title={copy.walkthrough.takeATour}
+                  aria-label={copy.walkthrough.takeATour}
+                  className={ICON_BUTTON_CLASS}
+                >
+                  <TourIcon />
+                </button>
               )}
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,

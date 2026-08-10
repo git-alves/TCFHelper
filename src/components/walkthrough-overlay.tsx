@@ -133,16 +133,17 @@ export function WalkthroughOverlay({
     <div className="fixed inset-0 z-[70]" onClick={onSkip}>
       {/* A single element with an oversized box-shadow, rather than four
           separate dimming panels, is the simplest way to cut a "spotlight"
-          out of a full-page backdrop. */}
+          out of a full-page backdrop -- see the walkthrough-highlight/
+          walkthrough-pulse rules in globals.css for the animated ring that
+          makes the target read as "look/click here". */}
       <div
         aria-hidden="true"
-        className="absolute rounded-lg transition-[top,left,width,height] duration-200"
+        className="walkthrough-highlight absolute rounded-lg transition-[top,left,width,height] duration-200"
         style={{
           top: targetRect.top - 4,
           left: targetRect.left - 4,
           width: targetRect.width + 8,
           height: targetRect.height + 8,
-          boxShadow: "0 0 0 9999px rgba(0, 0, 0, 0.6)",
         }}
       />
       <div
