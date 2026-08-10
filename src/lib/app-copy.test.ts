@@ -157,6 +157,7 @@ describe("APP_COPY", () => {
         copy.workspace.editor.clear,
         copy.workspace.translation.heading({ language: "English" }),
         copy.workspace.translation.show,
+        copy.workspace.translation.update,
         copy.workspace.translation.hide,
         copy.workspace.translation.inProgress,
         copy.workspace.translation.unavailableError,
