@@ -183,6 +183,13 @@ export function WritingWorkspace() {
   } | null>(null);
   const translationRequestId = useRef(0);
   const translationAbortController = useRef<AbortController | null>(null);
+  // The toggle button's own `disabled={isTranslationLoading}` only takes
+  // effect on the render after setIsTranslationLoading(true) commits, so it
+  // can't stop a second requestTranslation() call that lands in the same
+  // tick as the first (rapid/programmatic activation, not just a normal
+  // click) -- this ref is set synchronously, before any state update, so
+  // it closes that gap regardless of render timing.
+  const isRequestingTranslationRef = useRef(false);
 
   const task = taskType ? TASK_INSTRUCTIONS[taskType] : null;
   const wordCount = content.trim() ? content.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -250,6 +257,7 @@ export function WritingWorkspace() {
     translationAbortController.current?.abort();
     translationAbortController.current = null;
     setIsTranslationLoading(false);
+    isRequestingTranslationRef.current = false;
   }
 
   // Translates on demand instead of live as the learner types, and sends at
@@ -259,6 +267,12 @@ export function WritingWorkspace() {
   // the whole draft on every click/keystroke would waste most of it on text
   // that was already translated a moment ago.
   async function requestTranslation() {
+    // The button's own disabled state only reflects isTranslationLoading
+    // after that state update commits, which isn't synchronous -- this ref
+    // is, so it also covers a second call landing before that render (e.g.
+    // rapid or programmatic activation, not just an ordinary click).
+    if (isRequestingTranslationRef.current) return;
+
     const trimmed = content.trim();
     if (!trimmed) return;
 
@@ -296,6 +310,7 @@ export function WritingWorkspace() {
     const appendSeparator = isAppend ? (/^\s*/.exec(textToSend)?.[0] ?? "") : "";
 
     cancelPendingTranslation();
+    isRequestingTranslationRef.current = true;
     const requestId = translationRequestId.current;
     const controller = new AbortController();
     translationAbortController.current = controller;
@@ -351,7 +366,10 @@ export function WritingWorkspace() {
         setTranslationErrorFor({ text: trimmed, locale });
       }
     } finally {
-      if (requestId === translationRequestId.current) setIsTranslationLoading(false);
+      if (requestId === translationRequestId.current) {
+        setIsTranslationLoading(false);
+        isRequestingTranslationRef.current = false;
+      }
     }
   }
 
