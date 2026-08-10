@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { APP_LOCALES, TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 import { prisma } from "@/lib/prisma";
 import { DeepLQuotaExceededError, translateWithDeepL } from "@/lib/deepl-translate";
@@ -10,19 +11,11 @@ import {
   recordFallbackFailure,
   recordFallbackSuccess,
 } from "@/lib/translation-fallback-circuit";
+import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
 
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
-// DeepL API Free allows 500,000 characters per account per month — a hard
-// cap that returns HTTP 456, not a billing overage. This per-learner cap
-// keeps any single learner from exhausting that shared allowance alone before
-// a provider quota response triggers the unofficial fallback for everyone.
-// The per-minute limits are an independent abuse guard, not tied to either
-// provider's own rate limit.
-const TRANSLATION_REQUESTS_PER_MINUTE = 20;
-const TRANSLATION_CHARACTERS_PER_MINUTE = 20_000;
-const TRANSLATION_CHARACTERS_PER_MONTH = 100_000;
 const QUOTA_TRANSACTION_TIMEOUT_MS = 3_000;
 
 const requestSchema = z
@@ -93,7 +86,18 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       const monthStartedAt = startOfUtcMonth(now);
       const minuteResetsAt = new Date(minuteStartedAt.getTime() + 60_000);
       const monthResetsAt = startOfNextUtcMonth(now);
-      const existing = await tx.translationQuota.findUnique({ where: { userId } });
+      const [existing, overrides] = await Promise.all([
+        tx.translationQuota.findUnique({ where: { userId } }),
+        tx.userQuotaOverride.findUnique({
+          where: { userId },
+          select: {
+            translationRequestsPerMinute: true,
+            translationCharactersPerMinute: true,
+            translationCharactersPerMonth: true,
+          },
+        }),
+      ]);
+      const limits = resolveUserQuotaLimits(overrides);
 
       const continuingMinute =
         existing !== null && isSameWindow(existing.minuteStartedAt, minuteStartedAt);
@@ -106,13 +110,13 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
         (continuingMonth ? existing.monthCharacterCount : 0) + characterCount;
 
       if (
-        minuteRequestCount > TRANSLATION_REQUESTS_PER_MINUTE ||
-        minuteCharacterCount > TRANSLATION_CHARACTERS_PER_MINUTE
+        minuteRequestCount > limits.translationRequestsPerMinute ||
+        minuteCharacterCount > limits.translationCharactersPerMinute
       ) {
         return { allowed: false, reason: "rate", resetAt: minuteResetsAt };
       }
 
-      if (monthCharacterCount > TRANSLATION_CHARACTERS_PER_MONTH) {
+      if (monthCharacterCount > limits.translationCharactersPerMonth) {
         return { allowed: false, reason: "monthly", resetAt: monthResetsAt };
       }
 
@@ -174,9 +178,9 @@ function translationResponse(
 }
 
 export async function POST(request: Request) {
-  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
   try {
-    user = await getCurrentAppUser();
+    user = await getCurrentActivatedAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return translationResponse(

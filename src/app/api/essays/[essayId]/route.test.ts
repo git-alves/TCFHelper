@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentAppUserMock, AppUserProvisioningErrorMock, deleteCorrectionForUserMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, deleteCorrectionForUserMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     deleteCorrectionForUserMock: vi.fn(),
   };
 });
 
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+}));
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/correction-history", () => ({
@@ -23,10 +25,10 @@ const { DELETE } = await import("./route");
 const LOCAL_USER_ID = "cuid_local_user_1";
 
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   deleteCorrectionForUserMock.mockReset();
 
-  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   deleteCorrectionForUserMock.mockResolvedValue(true);
 });
 
@@ -37,8 +39,8 @@ function del(essayId: string) {
 }
 
 describe("DELETE /api/essays/[essayId]", () => {
-  it("requires an authenticated learner", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+  it("requires an activated learner", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await del("essay_1");
 
@@ -47,7 +49,7 @@ describe("DELETE /api/essays/[essayId]", () => {
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(
+    getCurrentActivatedAppUserMock.mockRejectedValue(
       new AppUserProvisioningErrorMock("identity cannot be linked"),
     );
 

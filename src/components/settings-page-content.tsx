@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 import { currentUser } from "@clerk/nextjs/server";
 import { AccountUnavailableMessage } from "@/components/account-unavailable-message";
 import { SettingsForm } from "@/components/settings-form";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { resolveSettingsProfile } from "@/lib/settings-profile";
 
 // Shared by the full /settings page and its intercepted-route modal so
@@ -20,7 +22,12 @@ export async function SettingsPageContent() {
   }
 
   if (!user) {
-    redirect("/login?callbackUrl=/settings");
+    await redirectForUnauthenticatedOrBlockedUser("/settings");
+    return null;
+  }
+
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   // Clerk's own profile is the account the learner actually signed in with,

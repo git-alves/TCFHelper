@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { transactionMock, executeRawMock, leaseFindMock, answerUpsertMock, leaseDeleteMock, quotaUpdateManyMock } =
+const {
+  transactionMock,
+  executeRawMock,
+  leaseFindMock,
+  answerUpsertMock,
+  leaseDeleteMock,
+  quotaUpdateManyMock,
+  overrideFindMock,
+} =
   vi.hoisted(() => ({
     transactionMock: vi.fn(),
     executeRawMock: vi.fn(),
@@ -8,6 +16,7 @@ const { transactionMock, executeRawMock, leaseFindMock, answerUpsertMock, leaseD
     answerUpsertMock: vi.fn(),
     leaseDeleteMock: vi.fn(),
     quotaUpdateManyMock: vi.fn(),
+    overrideFindMock: vi.fn(),
   }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -33,8 +42,10 @@ beforeEach(() => {
   answerUpsertMock.mockReset();
   leaseDeleteMock.mockReset();
   quotaUpdateManyMock.mockReset();
+  overrideFindMock.mockReset();
   leaseDeleteMock.mockResolvedValue({ count: 1 });
   quotaUpdateManyMock.mockResolvedValue({ count: 1 });
+  overrideFindMock.mockResolvedValue(null);
   transactionMock.mockImplementation((callback) =>
     callback({
       $executeRaw: executeRawMock,
@@ -145,6 +156,7 @@ describe("claimExampleGeneration", () => {
         exampleAnswer: { findUnique: answerFindMock },
         exampleGenerationLease: { findUnique: leaseFindMock, upsert: leaseUpsertMock },
         exampleGenerationQuota: { findUnique: quotaFindMock, upsert: quotaUpsertMock },
+        userQuotaOverride: { findUnique: overrideFindMock },
       }),
     );
   });
@@ -195,6 +207,29 @@ describe("claimExampleGeneration", () => {
         update: expect.objectContaining({ lastAttemptAt: expect.any(Date) }),
       }),
     );
+  });
+
+  it("uses a learner-specific daily example allowance", async () => {
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      dailyRequestCount: 2,
+      dailyAttemptCount: 2,
+      lastAttemptAt: new Date("2026-08-05T11:00:00.000Z"),
+    });
+    overrideFindMock.mockResolvedValue({ exampleGenerationsPerDay: 2 });
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:00:00.000Z"));
+
+    await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    expect(overrideFindMock).toHaveBeenCalledWith({
+      where: { userId: "learner_1" },
+      select: { exampleGenerationsPerDay: true },
+    });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it("rejects a claim within the cooldown window without spending a daily slot", async () => {
@@ -249,6 +284,50 @@ describe("claimExampleGeneration", () => {
     const result = await claimExampleGeneration(...cacheKey);
 
     expect(result).toEqual({ kind: "dailyLimit", resetAt: new Date("2026-08-06T00:00:00.000Z") });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(leaseUpsertMock).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("applies a lowered override to failed-provider attempts too", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:01:00.000Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      // A failed prior call was refunded from this count but must not let a
+      // learner with a one-example override make another provider attempt.
+      dailyRequestCount: 0,
+      dailyAttemptCount: 1,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+    overrideFindMock.mockResolvedValue({ exampleGenerationsPerDay: 1 });
+
+    await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(leaseUpsertMock).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
+  it("does not let a raised override exceed the global failed-attempt ceiling", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:01:00.000Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      dailyRequestCount: 0,
+      dailyAttemptCount: 1_000,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+    overrideFindMock.mockResolvedValue({ exampleGenerationsPerDay: 1_001 });
+
+    await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-06T00:00:00.000Z"),
+    });
     expect(quotaUpsertMock).not.toHaveBeenCalled();
     expect(leaseUpsertMock).not.toHaveBeenCalled();
 

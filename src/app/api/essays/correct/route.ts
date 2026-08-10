@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
-import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
-import { gradeEssayWithGemini } from "@/lib/gemini";
+import { gradeEssayWithGemini, hasConfiguredGemini } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
@@ -15,6 +16,7 @@ import {
   type CorrectionTopicContext,
 } from "@/lib/correction-claim";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
+import { reserveCorrectionUsage } from "@/lib/correction-usage";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
@@ -79,10 +81,21 @@ function correctionInProgressResponse(retryAt: Date) {
   );
 }
 
+function correctionDailyLimitResponse(resetAt: Date) {
+  return NextResponse.json(
+    {
+      error: "The daily correction limit has been reached. Please try again tomorrow.",
+      code: "CORRECTION_DAILY_LIMIT_REACHED",
+      resetAt: resetAt.toISOString(),
+    },
+    { status: 429, headers: NO_STORE_HEADERS },
+  );
+}
+
 export async function POST(request: Request) {
-  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
   try {
-    user = await getCurrentAppUser();
+    user = await getCurrentActivatedAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return NextResponse.json(
@@ -176,6 +189,53 @@ export async function POST(request: Request) {
 
   if (claim.kind === "existing") return duplicateCorrectionResponse(claim.essayId);
   if (claim.kind === "inProgress") return correctionInProgressResponse(claim.retryAt);
+
+  // Preserve duplicate/in-progress responses during an outage, but do not
+  // reserve an unrefundable slot if this newly claimed request cannot reach
+  // Gemini. Release only this caller's lease so a later configured retry can
+  // claim it normally.
+  if (!hasConfiguredGemini()) {
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable.", code: "CORRECTION_SERVICE_UNAVAILABLE" },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
+
+  let usageReservation: Awaited<ReturnType<typeof reserveCorrectionUsage>>;
+  try {
+    usageReservation = await reserveCorrectionUsage(user.id);
+  } catch (error) {
+    console.error("Correction usage reservation failed", error);
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable.", code: "CORRECTION_QUOTA_UNAVAILABLE" },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
+
+  if (usageReservation.kind === "dailyLimit") {
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return correctionDailyLimitResponse(usageReservation.resetAt);
+  }
 
   const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });

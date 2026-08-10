@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
 
 const {
-  getCurrentAppUserMock,
+  getCurrentActivatedAppUserMock,
   AppUserProvisioningErrorMock,
   findUniqueMock,
   findCachedExampleMock,
@@ -22,7 +22,7 @@ const {
   class ModelAnswerInvalidOutputErrorMock extends Error {}
 
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findUniqueMock: vi.fn(),
     findCachedExampleMock: vi.fn(),
@@ -39,8 +39,10 @@ const {
 });
 
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
+}));
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock } } }));
 vi.mock("@/lib/example-answer-cache", () => ({
@@ -64,7 +66,7 @@ const { POST } = await import("./route");
 const LOCAL_USER_ID = "cuid_local_user_1";
 
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   findUniqueMock.mockReset();
   findCachedExampleMock.mockReset();
   claimExampleGenerationMock.mockReset();
@@ -74,7 +76,7 @@ beforeEach(() => {
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredModelAnswerProviderMock.mockReset();
 
-  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   findCachedExampleMock.mockResolvedValue(null);
   claimExampleGenerationMock.mockResolvedValue({ kind: "claimed", claimToken: "claim_1" });
   generatePreferredModelAnswerMock.mockResolvedValue({ text: "Un exemple de réponse.", provider: "gemini" });
@@ -96,16 +98,26 @@ function post(body: unknown) {
 
 describe("POST /api/essays/example", () => {
   it("requires an authenticated learner", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(401);
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock("identity cannot be linked"));
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock("identity cannot be linked"));
 
     expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(503);
+    expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
+  });
+
+  it("does not disclose an unactivated account before checking the example cache", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+    expect(response.status).toBe(401);
+    expect(findCachedExampleMock).not.toHaveBeenCalled();
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
   });
 

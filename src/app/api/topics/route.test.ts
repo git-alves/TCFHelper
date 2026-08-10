@@ -1,11 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentClerkUserIdMock, findManyMock } = vi.hoisted(() => ({
-  getCurrentClerkUserIdMock: vi.fn(),
-  findManyMock: vi.fn(),
-}));
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock } = vi.hoisted(() => {
+  class AppUserProvisioningErrorMock extends Error {}
 
-vi.mock("@/lib/app-user", () => ({ getCurrentClerkUserId: getCurrentClerkUserIdMock }));
+  return {
+    getCurrentActivatedAppUserMock: vi.fn(),
+    AppUserProvisioningErrorMock,
+    findManyMock: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+}));
+vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: AppUserProvisioningErrorMock }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { topic: { findMany: findManyMock } },
 }));
@@ -13,19 +21,28 @@ vi.mock("@/lib/prisma", () => ({
 const { GET } = await import("./route");
 
 beforeEach(() => {
-  getCurrentClerkUserIdMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   findManyMock.mockReset();
-  getCurrentClerkUserIdMock.mockResolvedValue("clerk_user_1");
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   findManyMock.mockResolvedValue([]);
 });
 
 describe("GET /api/topics", () => {
-  it("requires an authenticated Clerk subject", async () => {
-    getCurrentClerkUserIdMock.mockResolvedValue(null);
+  it("requires an activated learner", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await GET(new Request("http://localhost/api/topics?taskType=TASK_1"));
 
     expect(response.status).toBe(401);
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed while the signed-in account cannot be provisioned", async () => {
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock());
+
+    const response = await GET(new Request("http://localhost/api/topics?taskType=TASK_1"));
+
+    expect(response.status).toBe(503);
     expect(findManyMock).not.toHaveBeenCalled();
   });
 

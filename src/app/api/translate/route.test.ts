@@ -2,12 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TRANSLATABLE_MAX_CHARS } from "@/lib/app-locale";
 
 const {
-  getCurrentAppUserMock,
+  getCurrentActivatedAppUserMock,
   AppUserProvisioningErrorMock,
   transactionMock,
   executeRawMock,
   quotaFindUniqueMock,
   quotaUpsertMock,
+  overrideFindUniqueMock,
   deeplTranslateMock,
   scraperTranslateMock,
   isFallbackCircuitOpenMock,
@@ -17,12 +18,13 @@ const {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     transactionMock: vi.fn(),
     executeRawMock: vi.fn(),
     quotaFindUniqueMock: vi.fn(),
     quotaUpsertMock: vi.fn(),
+    overrideFindUniqueMock: vi.fn(),
     deeplTranslateMock: vi.fn(),
     scraperTranslateMock: vi.fn(),
     isFallbackCircuitOpenMock: vi.fn(),
@@ -32,8 +34,10 @@ const {
 });
 
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
+}));
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { $transaction: transactionMock },
@@ -80,11 +84,12 @@ function quotaRecord(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   transactionMock.mockReset();
   executeRawMock.mockReset();
   quotaFindUniqueMock.mockReset();
   quotaUpsertMock.mockReset();
+  overrideFindUniqueMock.mockReset();
   deeplTranslateMock.mockReset();
   scraperTranslateMock.mockReset();
   isFallbackCircuitOpenMock.mockReset();
@@ -92,9 +97,10 @@ beforeEach(() => {
   recordFallbackSuccessMock.mockReset();
 
   vi.stubEnv("DEEPL_API_KEY", "deepl-server-secret");
-  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   quotaFindUniqueMock.mockResolvedValue(null);
   quotaUpsertMock.mockResolvedValue(quotaRecord());
+  overrideFindUniqueMock.mockResolvedValue(null);
   transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
     callback({
       $executeRaw: executeRawMock,
@@ -102,6 +108,7 @@ beforeEach(() => {
         findUnique: quotaFindUniqueMock,
         upsert: quotaUpsertMock,
       },
+      userQuotaOverride: { findUnique: overrideFindUniqueMock },
     }),
   );
   deeplTranslateMock.mockResolvedValue("I enjoy learning French.");
@@ -119,7 +126,7 @@ afterEach(() => {
 
 describe("POST /api/translate", () => {
   it("requires an authenticated learner", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await post({ text: "J'aime apprendre le français.", targetLocale: "en" });
 
@@ -129,7 +136,7 @@ describe("POST /api/translate", () => {
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(
+    getCurrentActivatedAppUserMock.mockRejectedValue(
       new AppUserProvisioningErrorMock("identity cannot be linked"),
     );
 
@@ -143,6 +150,16 @@ describe("POST /api/translate", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(deeplTranslateMock).not.toHaveBeenCalled();
     expect(transactionMock).not.toHaveBeenCalled();
+  });
+
+  it("does not disclose an unactivated account before reading or metering its request", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+
+    const response = await post({ text: "Bonjour.", targetLocale: "en" });
+
+    expect(response.status).toBe(401);
+    expect(transactionMock).not.toHaveBeenCalled();
+    expect(deeplTranslateMock).not.toHaveBeenCalled();
   });
 
   it("rejects malformed text or an unsupported target locale", async () => {
@@ -308,6 +325,29 @@ describe("POST /api/translate", () => {
     expect(quotaUpsertMock).not.toHaveBeenCalled();
   });
 
+  it("uses a learner-specific translation override inside the quota transaction", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
+    overrideFindUniqueMock.mockResolvedValue({ translationRequestsPerMinute: 1 });
+    quotaFindUniqueMock.mockResolvedValue(
+      quotaRecord({ minuteRequestCount: 1, minuteCharacterCount: 100 }),
+    );
+
+    const response = await post({ text: "Bonjour.", targetLocale: "en" });
+
+    expect(response.status).toBe(429);
+    expect(overrideFindUniqueMock).toHaveBeenCalledWith({
+      where: { userId: LOCAL_USER_ID },
+      select: {
+        translationRequestsPerMinute: true,
+        translationCharactersPerMinute: true,
+        translationCharactersPerMonth: true,
+      },
+    });
+    expect(deeplTranslateMock).not.toHaveBeenCalled();
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+  });
+
   it("meters Unicode input as code points rather than UTF-16 code units", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
@@ -427,6 +467,7 @@ describe("POST /api/translate", () => {
           findUnique: quotaFindUniqueMock,
           upsert: quotaUpsertMock,
         },
+        userQuotaOverride: { findUnique: overrideFindUniqueMock },
       });
       abortController.abort();
       return reservation;

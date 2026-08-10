@@ -3,12 +3,8 @@ import type { TaskType } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { MODEL_ANSWER_PROMPT_VERSION, type ExampleCefrLevel } from "@/lib/gemini";
 import type { ModelAnswerProvider } from "@/lib/model-answer-generator";
+import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
 
-// Temporarily raised to a practically-unlimited number at the human's
-// explicit request while testing the example-generation flow — a real per-day
-// number is still coming, this is not a permanent removal of the limit.
-// Finite (not Infinity) so the cap-exceeded path stays testable.
-const FRESH_EXAMPLES_PER_DAY = 1000;
 const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
 // Gemini can use its 20-second request timeout. Keep the claim longer than
 // that call so a slow but valid response cannot lose ownership and trigger a
@@ -23,13 +19,11 @@ const LEASE_DURATION_MS = 60_000;
 const CLAIM_COOLDOWN_MS = 10_000;
 // A refunded failure never raises dailyRequestCount, so it alone cannot cap
 // how many times a persistently failing provider gets called in a day — the
-// cooldown above only bounds the burst rate, not the total. This cap is
-// checked against dailyAttemptCount, a counter that rises on every claim and
-// is never refunded, so it durably bounds total daily attempts (successful
-// or not) independent of the cooldown and independent of refunds.
-// Also temporarily raised alongside FRESH_EXAMPLES_PER_DAY above. The
-// 10-second cooldown (CLAIM_COOLDOWN_MS) still bounds burst rate regardless.
-const DAILY_ATTEMPT_CAP = 1000;
+// cooldown above only bounds the burst rate, not the total. dailyAttemptCount
+// is never refunded. A lower override tightens this cap, while the fixed
+// global ceiling prevents an unusually high override from allowing unlimited
+// failed-provider retries.
+const DAILY_ATTEMPT_CAP = 1_000;
 
 export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {
   return createHash("sha256")
@@ -106,7 +100,14 @@ export async function claimExampleGeneration(
       // above: a long wait here must never let a stale pre-wait timestamp
       // compute the wrong UTC day for the reservation.
       now = new Date();
-      const existing = await tx.exampleGenerationQuota.findUnique({ where: { userId } });
+      const [existing, overrides] = await Promise.all([
+        tx.exampleGenerationQuota.findUnique({ where: { userId } }),
+        tx.userQuotaOverride.findUnique({
+          where: { userId },
+          select: { exampleGenerationsPerDay: true },
+        }),
+      ]);
+      const limits = resolveUserQuotaLimits(overrides);
 
       if (existing?.lastAttemptAt) {
         const cooldownEndsAt = new Date(existing.lastAttemptAt.getTime() + CLAIM_COOLDOWN_MS);
@@ -121,12 +122,12 @@ export async function claimExampleGeneration(
       // Checked before, and independent of, the refundable count below: a
       // string of refunded failures must not let this claim through forever.
       const dailyAttemptCount = (continuingDay ? existing.dailyAttemptCount : 0) + 1;
-      if (dailyAttemptCount > DAILY_ATTEMPT_CAP) {
+      if (dailyAttemptCount > Math.min(DAILY_ATTEMPT_CAP, limits.exampleGenerationsPerDay)) {
         return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
       }
 
       const dailyRequestCount = (continuingDay ? existing.dailyRequestCount : 0) + 1;
-      if (dailyRequestCount > FRESH_EXAMPLES_PER_DAY) {
+      if (dailyRequestCount > limits.exampleGenerationsPerDay) {
         return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
       }
 

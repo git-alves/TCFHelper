@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { TaskType, TopicSource } from "@prisma/client";
-import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
@@ -59,9 +60,9 @@ function classifyExampleGenerationFailure(error: unknown): string {
 }
 
 export async function POST(request: Request) {
-  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
   try {
-    user = await getCurrentAppUser();
+    user = await getCurrentActivatedAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return NextResponse.json(

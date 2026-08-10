@@ -14,4 +14,6 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260806010000_add_example_generation_attempt_cap",
   "20260807120000_add_correction_claims",
   "20260810120000_add_walkthrough_version",
+  "20260810130000_add_admin_access_controls",
+  "20260810140000_enforce_single_admin_owner",
 ]);

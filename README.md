@@ -9,7 +9,10 @@ Phase 1 is the core writing loop. Its purpose is to validate feedback quality
 before the product invests in retention or monetization features. See the
 [Phase 1 validation spec](docs/phase-1-core-writing-loop.md) for the job to
 be done, success gate, and deliberately excluded scope. There is no billing
-gate yet — every logged-in user can reach `/tasks`.
+or plan-purchase flow: Clerk sign-up remains open, while a learner redeems an
+owner-issued access code before reaching the app. The owner controls admission
+and current usage through the
+[admin access-control specification](docs/admin-access-control-and-usage.md).
 
 ## Stack
 
@@ -77,10 +80,10 @@ gate yet — every logged-in user can reach `/tasks`.
    ```
 
    Visit `http://localhost:3000`. Sign up at `/signup`, which uses Clerk's
-   prebuilt flow and redirects to `/tasks`. Signing back in redirects to
-   `/dashboard`, which combines a CEFR-level progress graph with the learner's
-   five most recent corrections and a link to their full private history.
-   Enable Google in the Clerk dashboard to show it as a sign-in option.
+   prebuilt flow and then sends non-owner learners to `/activate`. Redeem an
+   owner-issued single-use access code there before reaching `/tasks` or the
+   `/dashboard` progress/history views. Enable Google in the Clerk dashboard
+   to show it as a sign-in option.
 
 ## Recent-exam topics
 

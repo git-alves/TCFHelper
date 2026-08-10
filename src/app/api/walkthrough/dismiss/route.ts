@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { CURRENT_WALKTHROUGH_VERSION } from "@/lib/walkthrough";
 
@@ -8,9 +9,9 @@ import { CURRENT_WALKTHROUGH_VERSION } from "@/lib/walkthrough";
 // this version either way. "Take a tour" (a manual re-trigger) covers anyone
 // who wants to see it again.
 export async function POST() {
-  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
   try {
-    user = await getCurrentAppUser();
+    user = await getCurrentActivatedAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return NextResponse.json(

@@ -2,8 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { CorrectionHistoryDialog } from "@/components/correction-history-dialog";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { getAppCopy } from "@/lib/app-copy";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { getCorrectionForUser } from "@/lib/correction-history";
 import { APP_LOCALE_INTL_TAGS } from "@/lib/app-locale";
 import { getRequestLocale } from "@/lib/request-locale";
@@ -26,7 +28,12 @@ export default async function CorrectionHistoryDetailPage({ params }: Correction
   }
 
   if (!user) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(`/dashboard/history/${essayId}`)}`);
+    await redirectForUnauthenticatedOrBlockedUser(`/dashboard/history/${essayId}`);
+    return null;
+  }
+
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   const [detail, locale] = await Promise.all([getCorrectionForUser(user.id, essayId), getRequestLocale()]);

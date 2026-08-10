@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
 import { getEssayProgressPoints } from "@/lib/essay-progress";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
 export async function GET() {
-  let user: Awaited<ReturnType<typeof getCurrentAppUser>>;
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
   try {
-    user = await getCurrentAppUser();
+    user = await getCurrentActivatedAppUser();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return NextResponse.json(

@@ -5,8 +5,10 @@ import { DashboardAccountUnavailable } from "@/components/dashboard-account-unav
 import { DashboardHeading } from "@/components/dashboard-heading";
 import { DashboardWalkthroughRunner } from "@/components/dashboard-walkthrough-runner";
 import { ProgressChart } from "@/components/progress-chart";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { getAppCopy } from "@/lib/app-copy";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { getRecentCorrections } from "@/lib/correction-history";
 import { getEssayProgressPoints } from "@/lib/essay-progress";
 import { getRequestLocale } from "@/lib/request-locale";
@@ -24,7 +26,12 @@ export default async function DashboardPage() {
   }
 
   if (!user) {
-    redirect("/login?callbackUrl=/dashboard");
+    await redirectForUnauthenticatedOrBlockedUser("/dashboard");
+    return null;
+  }
+
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   const [points, recentCorrections, locale] = await Promise.all([
@@ -38,7 +45,17 @@ export default async function DashboardPage() {
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <DashboardWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
 
-      <DashboardHeading name={user.name ?? user.email} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DashboardHeading name={user.name ?? user.email} />
+        {user.isAdmin && (
+          <Link
+            href="/admin"
+            className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+          >
+            Admin
+          </Link>
+        )}
+      </div>
 
       <section aria-labelledby="progress-chart-heading" data-walkthrough="dashboard-welcome" className="flex flex-col gap-3">
         <h2 id="progress-chart-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">

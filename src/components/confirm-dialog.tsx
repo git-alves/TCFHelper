@@ -8,6 +8,7 @@ interface ConfirmDialogProps {
   description: string;
   confirmLabel: string;
   cancelLabel: string;
+  isConfirming?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -21,6 +22,7 @@ export function ConfirmDialog({
   description,
   confirmLabel,
   cancelLabel,
+  isConfirming = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -95,6 +97,7 @@ export function ConfirmDialog({
             ref={cancelRef}
             type="button"
             onClick={onCancel}
+            disabled={isConfirming}
             className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
           >
             {cancelLabel}
@@ -103,6 +106,7 @@ export function ConfirmDialog({
             ref={confirmRef}
             type="button"
             onClick={onConfirm}
+            disabled={isConfirming}
             className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
           >
             {confirmLabel}

@@ -34,6 +34,7 @@ vi.mock("@/lib/prisma", () => ({
 
 const {
   AppUserProvisioningError,
+  getCurrentAdminUser,
   getCurrentAppUser,
   syncClerkUserFromWebhook,
 } = await import("./app-user");
@@ -43,6 +44,8 @@ const APP_USER = {
   email: "learner@example.com",
   name: "Learner",
   locale: "en",
+  isAdmin: false,
+  isBlocked: false,
 };
 
 function clerkUser(overrides: Record<string, unknown> = {}) {
@@ -112,6 +115,25 @@ describe("getCurrentAppUser", () => {
       expect.objectContaining({ where: { clerkUserId: "user_clerk_1" } }),
     );
     expect(currentUserMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a blocked mapped account as unauthenticated", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, isBlocked: true });
+
+    await expect(getCurrentAppUser()).resolves.toBeNull();
+    expect(currentUserMock).not.toHaveBeenCalled();
+  });
+
+  it("admits only the owner account through the admin guard", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, isAdmin: true });
+
+    await expect(getCurrentAdminUser()).resolves.toEqual({ ...APP_USER, isAdmin: true });
+  });
+
+  it("does not disclose the admin guard to a regular account", async () => {
+    findUniqueMock.mockResolvedValue(APP_USER);
+
+    await expect(getCurrentAdminUser()).resolves.toBeNull();
   });
 
   it("links an imported legacy account only through Clerk externalId", async () => {
