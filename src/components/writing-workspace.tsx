@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
+import { useWalkthroughTaskPreview } from "@/components/walkthrough-task-preview";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 
 interface RecentExamTopic {
@@ -87,6 +88,7 @@ export function WritingWorkspace() {
   const copy = useAppCopy();
   const router = useRouter();
   const { register: registerDashboardNavGuard, setNavigationBusy } = useDashboardNavGuard();
+  const { register: registerWalkthroughTaskPreview } = useWalkthroughTaskPreview();
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -194,6 +196,17 @@ export function WritingWorkspace() {
   useEffect(() => {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
+
+  // Only fills in a task when none is picked yet, so this can never discard
+  // an in-progress selection -- the walkthrough tour uses it to preview a
+  // task type on open, since its later steps target elements that only
+  // render once `task` is non-null.
+  useEffect(() => {
+    registerWalkthroughTaskPreview(() => {
+      setTaskType((current) => current ?? TASK_ORDER[0]);
+    });
+    return () => registerWalkthroughTaskPreview(null);
+  }, [registerWalkthroughTaskPreview]);
 
   // A claim from another tab/server expires after a short lease. Keep the
   // block tied to that exact correction key until then: changing and reverting

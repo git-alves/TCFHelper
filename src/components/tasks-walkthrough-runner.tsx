@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
+import { useWalkthroughTaskPreview } from "@/components/walkthrough-task-preview";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { WALKTHROUGH_CONTINUE_PARAM, WALKTHROUGH_CONTINUE_VALUE } from "@/lib/walkthrough";
 
@@ -26,6 +27,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
+  const { requestDefaultTask } = useWalkthroughTaskPreview();
   // A learner who already completed the current version has shouldAutoStart
   // === false here even when they just clicked "Take a tour" on the
   // dashboard and are continuing into these steps -- see
@@ -52,6 +54,15 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     });
     return () => register(null);
   }, [register]);
+
+  // The topic-picker, editor, and correct-button steps below target elements
+  // that only render once a task type is selected -- ask WritingWorkspace to
+  // preview one the moment the tour opens (auto-start or a manual "Take a
+  // tour" replay both flow through isOpen becoming true) so every step has
+  // something to point at.
+  useEffect(() => {
+    if (isOpen) requestDefaultTask();
+  }, [isOpen, requestDefaultTask]);
 
   const steps: WalkthroughStepContent[] = [
     { id: "task-picker", title: copy.walkthrough.taskPickerTitle, body: copy.walkthrough.taskPickerBody },
