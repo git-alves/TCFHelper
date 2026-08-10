@@ -5,8 +5,10 @@ import { DashboardAccountUnavailable } from "@/components/dashboard-account-unav
 import { DashboardHeading } from "@/components/dashboard-heading";
 import { DashboardWalkthroughRunner } from "@/components/dashboard-walkthrough-runner";
 import { ProgressChart } from "@/components/progress-chart";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { getAppCopy } from "@/lib/app-copy";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { getRecentCorrections } from "@/lib/correction-history";
 import { getEssayProgressPoints } from "@/lib/essay-progress";
 import { getRequestLocale } from "@/lib/request-locale";
@@ -24,7 +26,12 @@ export default async function DashboardPage() {
   }
 
   if (!user) {
-    redirect("/login?callbackUrl=/dashboard");
+    await redirectForUnauthenticatedOrBlockedUser("/dashboard");
+    return null;
+  }
+
+  if (!(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   const [points, recentCorrections, locale] = await Promise.all([

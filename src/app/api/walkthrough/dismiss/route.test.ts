@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentAppUserMock, AppUserProvisioningErrorMock, updateMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, updateMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     updateMock: vi.fn(),
   };
 });
 
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+}));
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
@@ -23,16 +25,16 @@ const { POST } = await import("./route");
 const LOCAL_USER_ID = "cuid_local_user_1";
 
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   updateMock.mockReset();
 
-  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   updateMock.mockResolvedValue({ id: LOCAL_USER_ID });
 });
 
 describe("POST /api/walkthrough/dismiss", () => {
-  it("requires an authenticated learner", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+  it("requires an activated learner", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await POST();
 
@@ -41,7 +43,7 @@ describe("POST /api/walkthrough/dismiss", () => {
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock("identity cannot be linked"));
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock("identity cannot be linked"));
 
     const response = await POST();
 

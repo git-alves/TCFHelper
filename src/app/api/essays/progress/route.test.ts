@@ -1,16 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentAppUserMock, AppUserProvisioningErrorMock, getEssayProgressPointsMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, getEssayProgressPointsMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     getEssayProgressPointsMock: vi.fn(),
   };
 });
 
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+}));
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/essay-progress", () => ({
@@ -22,13 +24,13 @@ import { GET } from "./route";
 const LOCAL_USER_ID = "learner_1";
 
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   getEssayProgressPointsMock.mockReset();
 });
 
 describe("GET /api/essays/progress", () => {
-  it("returns 401 when signed out", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+  it("returns 401 when the learner is not activated", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await GET();
 
@@ -37,7 +39,7 @@ describe("GET /api/essays/progress", () => {
   });
 
   it("returns 503 when the account is still being provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock());
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock());
 
     const response = await GET();
 
@@ -46,7 +48,7 @@ describe("GET /api/essays/progress", () => {
   });
 
   it("scopes the query strictly to the authenticated user's own id", async () => {
-    getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+    getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
     getEssayProgressPointsMock.mockResolvedValue([]);
 
     await GET();
@@ -56,7 +58,7 @@ describe("GET /api/essays/progress", () => {
   });
 
   it("returns only graph-safe point fields, never essay or feedback text", async () => {
-    getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+    getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
     getEssayProgressPointsMock.mockResolvedValue([
       {
         id: "essay_1",

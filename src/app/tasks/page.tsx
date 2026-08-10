@@ -3,7 +3,9 @@ import { DashboardAccountUnavailable } from "@/components/dashboard-account-unav
 import { TasksWalkthroughRunner } from "@/components/tasks-walkthrough-runner";
 import { WalkthroughWorkspaceScriptProvider } from "@/components/walkthrough-workspace-script";
 import { WritingWorkspace } from "@/components/writing-workspace";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 export default async function TasksPage() {
@@ -18,7 +20,12 @@ export default async function TasksPage() {
   }
 
   if (!user) {
-    redirect("/login?callbackUrl=/tasks");
+    await redirectForUnauthenticatedOrBlockedUser("/tasks");
+    return null;
+  }
+
+  if (!(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   return (

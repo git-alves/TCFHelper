@@ -2,8 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CorrectionHistoryList } from "@/components/correction-history-list";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
+import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { getAppCopy } from "@/lib/app-copy";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
 import { getCorrectionHistory } from "@/lib/correction-history";
 import { getRequestLocale } from "@/lib/request-locale";
 
@@ -19,7 +21,12 @@ export default async function CorrectionHistoryPage() {
   }
 
   if (!user) {
-    redirect("/login?callbackUrl=/dashboard/history");
+    await redirectForUnauthenticatedOrBlockedUser("/dashboard/history");
+    return null;
+  }
+
+  if (!(await hasRedeemedAccessCode(user.id))) {
+    redirect("/activate");
   }
 
   const [items, locale] = await Promise.all([getCorrectionHistory(user.id), getRequestLocale()]);

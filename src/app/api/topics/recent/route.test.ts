@@ -1,6 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentClerkUserIdMock, getRecentExamTopicMock, upsertMock, RecentExamTopicErrorMock } = vi.hoisted(() => {
+const {
+  getCurrentActivatedAppUserMock,
+  AppUserProvisioningErrorMock,
+  getRecentExamTopicMock,
+  upsertMock,
+  RecentExamTopicErrorMock,
+} = vi.hoisted(() => {
+  class AppUserProvisioningErrorMock extends Error {}
   class RecentExamTopicErrorMock extends Error {
     readonly code: string;
 
@@ -11,14 +18,18 @@ const { getCurrentClerkUserIdMock, getRecentExamTopicMock, upsertMock, RecentExa
   }
 
   return {
-    getCurrentClerkUserIdMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
+    AppUserProvisioningErrorMock,
     getRecentExamTopicMock: vi.fn(),
     upsertMock: vi.fn(),
     RecentExamTopicErrorMock,
   };
 });
 
-vi.mock("@/lib/app-user", () => ({ getCurrentClerkUserId: getCurrentClerkUserIdMock }));
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+}));
+vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: AppUserProvisioningErrorMock }));
 vi.mock("@/lib/recent-exam-topics", () => ({
   getRecentExamTopic: getRecentExamTopicMock,
   RecentExamTopicError: RecentExamTopicErrorMock,
@@ -40,11 +51,11 @@ const recentTopic = {
 };
 
 beforeEach(() => {
-  getCurrentClerkUserIdMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   getRecentExamTopicMock.mockReset();
   upsertMock.mockReset();
 
-  getCurrentClerkUserIdMock.mockResolvedValue("clerk_user_1");
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   getRecentExamTopicMock.mockResolvedValue(recentTopic);
   upsertMock.mockResolvedValue({
     id: "recent_topic_1",
@@ -114,14 +125,26 @@ describe("GET /api/topics/recent", () => {
     expect(upsertMock).not.toHaveBeenCalled();
   });
 
-  it("requires an authenticated learner", async () => {
-    getCurrentClerkUserIdMock.mockResolvedValue(null);
+  it("requires an activated learner", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await GET(
       new Request("http://localhost/api/topics/recent?taskType=TASK_2")
     );
 
     expect(response.status).toBe(401);
+    expect(getRecentExamTopicMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed while the signed-in account cannot be provisioned", async () => {
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock());
+
+    const response = await GET(
+      new Request("http://localhost/api/topics/recent?taskType=TASK_2"),
+    );
+
+    expect(response.status).toBe(503);
     expect(getRecentExamTopicMock).not.toHaveBeenCalled();
     expect(upsertMock).not.toHaveBeenCalled();
   });

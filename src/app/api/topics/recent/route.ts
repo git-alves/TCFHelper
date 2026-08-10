@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
-import { getCurrentClerkUserId } from "@/lib/app-user";
+import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
+import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { getRecentExamTopic, RecentExamTopicError } from "@/lib/recent-exam-topics";
 
@@ -29,8 +30,23 @@ function notPublishedResponse() {
 }
 
 export async function GET(request: Request) {
-  const userId = await getCurrentClerkUserId();
-  if (!userId) {
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
+  try {
+    user = await getCurrentActivatedAppUser();
+  } catch (error) {
+    if (error instanceof AppUserProvisioningError) {
+      return NextResponse.json(
+        {
+          error: "Your account is still being set up. Please try again.",
+          code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
+        },
+        { status: 503, headers: NO_STORE_HEADERS },
+      );
+    }
+    throw error;
+  }
+
+  if (!user) {
     return NextResponse.json(
       { error: "Unauthorized" },
       { status: 401, headers: NO_STORE_HEADERS }
