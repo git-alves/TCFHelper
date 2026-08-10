@@ -23,7 +23,7 @@ describe("APP_COPY", () => {
         copy.nav.closeSettingsFirst,
         copy.home.title,
         copy.home.description,
-        copy.home.goToDashboard,
+        copy.home.startATask,
         copy.home.getStarted,
         copy.login.title,
         copy.login.emailLabel,

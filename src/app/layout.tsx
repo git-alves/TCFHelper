@@ -6,6 +6,7 @@ import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
 import { DashboardNavGuardProvider } from "@/components/dashboard-nav-guard";
 import { NavBar } from "@/components/nav-bar";
+import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
 import { getRequestLocale } from "@/lib/request-locale";
 import { THEME_INIT_SCRIPT } from "@/lib/app-theme";
@@ -57,9 +58,11 @@ export default async function RootLayout({
           <AppLocaleProvider initialLocale={locale}>
             <ClerkLocaleProvider>
               <DashboardNavGuardProvider>
-                <NavBar />
-                <div className="flex flex-1 flex-col">{children}</div>
-                {settings}
+                <WalkthroughTriggerProvider>
+                  <NavBar />
+                  <div className="flex flex-1 flex-col">{children}</div>
+                  {settings}
+                </WalkthroughTriggerProvider>
               </DashboardNavGuardProvider>
             </ClerkLocaleProvider>
           </AppLocaleProvider>

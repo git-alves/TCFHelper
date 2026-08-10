@@ -34,3 +34,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* The walkthrough overlay's spotlight: a dimmed backdrop cutout (the large
+ * 9999px spread) plus a pulsing accent ring around the target, so a step
+ * reads as "look/click here" rather than a static highlight. Kept as plain
+ * CSS, not an inline style, so prefers-reduced-motion can turn the pulse off
+ * without fighting inline-style specificity. */
+@keyframes walkthrough-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.6),
+      0 0 0 0 rgba(139, 92, 246, 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.6),
+      0 0 0 10px rgba(139, 92, 246, 0);
+  }
+}
+
+.walkthrough-highlight {
+  box-shadow:
+    0 0 0 9999px rgba(0, 0, 0, 0.6),
+    0 0 0 0 rgba(139, 92, 246, 0.55);
+  animation: walkthrough-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .walkthrough-highlight {
+    animation: none;
+  }
+}

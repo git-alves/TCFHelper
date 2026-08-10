@@ -51,7 +51,7 @@ export interface AppCopy {
   home: {
     title: string;
     description: string;
-    goToDashboard: string;
+    startATask: string;
     getStarted: string;
   };
   login: {
@@ -105,7 +105,6 @@ export interface AppCopy {
     deleteCorrectionConfirm: string;
     deleteCorrectionError: string;
     deleteCorrectionSuccess: string;
-    startWritingCta: string;
   };
   settings: {
     title: string;
@@ -277,7 +276,7 @@ export const APP_COPY = {
       title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
       description:
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
-      goToDashboard: "Go to dashboard",
+      startATask: "Start a task",
       getStarted: "Get started",
     },
     login: {
@@ -333,7 +332,6 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Delete",
       deleteCorrectionError: "Couldn't delete this correction. Please try again.",
       deleteCorrectionSuccess: "Correction deleted.",
-      startWritingCta: "Start writing",
     },
     settings: {
       title: "Settings",
@@ -516,7 +514,7 @@ export const APP_COPY = {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
       description:
         "Entraînez-vous aux tâches 1, 2 et 3, puis recevez en quelques secondes des commentaires sur la grammaire, le vocabulaire et votre niveau du CECRL.",
-      goToDashboard: "Accéder au tableau de bord",
+      startATask: "Commencer une tâche",
       getStarted: "Commencer",
     },
     login: {
@@ -574,7 +572,6 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Supprimer",
       deleteCorrectionError: "Impossible de supprimer cette correction. Veuillez réessayer.",
       deleteCorrectionSuccess: "Correction supprimée.",
-      startWritingCta: "Commencer à écrire",
     },
     settings: {
       title: "Paramètres",
@@ -763,7 +760,7 @@ export const APP_COPY = {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
       description:
         "Practica las tareas 1, 2 y 3 y recibe en segundos comentarios sobre gramática, vocabulario y nivel MCER.",
-      goToDashboard: "Ir al panel",
+      startATask: "Empezar una tarea",
       getStarted: "Empezar",
     },
     login: {
@@ -820,7 +817,6 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Eliminar",
       deleteCorrectionError: "No se pudo eliminar esta corrección. Inténtalo de nuevo.",
       deleteCorrectionSuccess: "Corrección eliminada.",
-      startWritingCta: "Empezar a escribir",
     },
     settings: {
       title: "Configuración",
@@ -1009,7 +1005,7 @@ export const APP_COPY = {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",
       description:
         "Pratique as tarefas 1, 2 e 3 e receba em segundos comentários sobre gramática, vocabulário e nível do QECR.",
-      goToDashboard: "Ir para o painel",
+      startATask: "Começar uma tarefa",
       getStarted: "Começar",
     },
     login: {
@@ -1066,7 +1062,6 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Excluir",
       deleteCorrectionError: "Não foi possível excluir esta correção. Tente novamente.",
       deleteCorrectionSuccess: "Correção excluída.",
-      startWritingCta: "Começar a escrever",
     },
     settings: {
       title: "Configurações",
