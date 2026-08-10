@@ -16,14 +16,13 @@ const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
 // DeepL API Free allows 500,000 characters per account per month — a hard
 // cap that returns HTTP 456, not a billing overage. This per-learner cap
-// keeps any single learner from exhausting that shared allowance alone,
-// leaving room for roughly ten learners' full monthly usage before DeepL's
-// quota response triggers the unofficial fallback for everyone. The
-// per-minute limits are an independent abuse guard, not tied to either
+// keeps any single learner from exhausting that shared allowance alone before
+// a provider quota response triggers the unofficial fallback for everyone.
+// The per-minute limits are an independent abuse guard, not tied to either
 // provider's own rate limit.
 const TRANSLATION_REQUESTS_PER_MINUTE = 20;
 const TRANSLATION_CHARACTERS_PER_MINUTE = 20_000;
-const TRANSLATION_CHARACTERS_PER_MONTH = 50_000;
+const TRANSLATION_CHARACTERS_PER_MONTH = 100_000;
 const QUOTA_TRANSACTION_TIMEOUT_MS = 3_000;
 
 const requestSchema = z

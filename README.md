@@ -130,7 +130,7 @@ writing or requesting feedback. The key is kept server-side in
 
 Before calling DeepL, the translation route also reserves a durable allowance
 for the signed-in learner in Postgres: at most 20 requests and 20,000 input
-Unicode code points per UTC minute, plus 50,000 input code points per UTC
+Unicode code points per UTC minute, plus 100,000 input code points per UTC
 calendar month. DeepL meters code points (including whitespace), so the server
 counts them the same way. A transaction-scoped per-user PostgreSQL lock
 serializes concurrent reservations across server instances; a direct caller
