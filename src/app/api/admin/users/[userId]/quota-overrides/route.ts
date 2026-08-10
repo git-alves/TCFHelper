@@ -56,12 +56,10 @@ export async function PATCH(
   const { userId } = await params;
   const result = await prisma.$transaction(
     async (tx) => {
-      // Translation and example reservations already lock the bare app CUID.
-      // Correction usage currently has its own key, so take both in a stable
-      // order. The override affects the *next* reservation without resetting
-      // any counts, and cannot race a read-then-write reservation.
+      // Every quota reservation locks the bare app CUID before it reads an
+      // override. The write affects the *next* reservation without resetting
+      // any counts or racing a read-then-write reservation.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId})::bigint)`;
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`correction-usage:${userId}`})::bigint)`;
 
       const target = await tx.user.findUnique({ where: { id: userId }, select: { id: true } });
       if (!target) return { kind: "missing" as const };

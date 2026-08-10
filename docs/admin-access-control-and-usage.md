@@ -103,6 +103,16 @@ At launch every existing non-owner remains unactivated and needs a code. A
 grandfathering campaign is a separate explicit product decision, never a
 hidden backfill.
 
+After the intended owner has a provisioned local `User` (by signing in and
+opening `/activate` once), run the explicit production command:
+
+```bash
+npm run admin:promote -- owner@example.com --apply
+```
+
+It serializes promotion and refuses to create a second owner. Promote this
+account and issue any needed learner codes before enabling the activation gate.
+
 ### Account states and authorization
 
 | State | Learner pages/APIs | Admin pages/APIs |
@@ -182,8 +192,8 @@ block/unblock. Blocking self or the owner is rejected. There is no editable
 admin switch; the owner label explains that ownership is operationally managed.
 
 `/admin/access-codes` accepts an optional short note, generates/copies a code,
-and lists newest issued codes with created/redeemed state and redeemer email.
-It is bounded/paginated and `private, no-store`. The code format uses an
+and lists the newest bounded set of issued codes with created/redeemed state
+and redeemer email. It is `private, no-store`. The code format uses an
 unambiguous uppercase alphabet and at least four groups of four random
 characters (80 bits before the fixed `TCF-` prefix).
 
@@ -199,7 +209,7 @@ not-found to non-owners. Owner-visible success/errors are `private, no-store`.
 | `GET /api/admin/users/[id]` | Detail, effective limits, raw nullable overrides; unknown ID is owner-visible 404. |
 | `PATCH /api/admin/users/[id]/block` | Strict `{ isBlocked: boolean }`; rejects blocking owner/self. |
 | `PATCH /api/admin/users/[id]/quota-overrides` | Strict nullable non-negative integer fields. All-null resets/removes override. |
-| `GET /api/admin/access-codes` | Bounded/paginated issued-code list. |
+| `GET /api/admin/access-codes` | Newest bounded issued-code list. |
 | `POST /api/admin/access-codes` | Strict optional note; generates a code. No client-selected code. |
 | `POST /api/access-codes/redeem` | Authenticated, unblocked learner submits one code. Invalid and already-spent codes share one generic error; repeat success for an already-activated account is idempotent. |
 

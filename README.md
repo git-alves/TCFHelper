@@ -80,10 +80,10 @@ and current usage through the
    ```
 
    Visit `http://localhost:3000`. Sign up at `/signup`, which uses Clerk's
-   prebuilt flow and redirects to `/tasks`. Signing back in redirects to
-   `/dashboard`, which combines a CEFR-level progress graph with the learner's
-   five most recent corrections and a link to their full private history.
-   Enable Google in the Clerk dashboard to show it as a sign-in option.
+   prebuilt flow and then sends non-owner learners to `/activate`. Redeem an
+   owner-issued single-use access code there before reaching `/tasks` or the
+   `/dashboard` progress/history views. Enable Google in the Clerk dashboard
+   to show it as a sign-in option.
 
 ## Recent-exam topics
 

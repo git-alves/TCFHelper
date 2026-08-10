@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  getCurrentAppUserMock,
+  getCurrentActivatedAppUserMock,
   AppUserProvisioningErrorMock,
   findUniqueMock,
   topicCreateMock,
@@ -10,11 +10,12 @@ const {
   claimCorrectionMock,
   completeCorrectionClaimMock,
   releaseCorrectionClaimMock,
+  reserveCorrectionUsageMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
-    getCurrentAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findUniqueMock: vi.fn(),
     topicCreateMock: vi.fn(),
@@ -23,12 +24,15 @@ const {
     claimCorrectionMock: vi.fn(),
     completeCorrectionClaimMock: vi.fn(),
     releaseCorrectionClaimMock: vi.fn(),
+    reserveCorrectionUsageMock: vi.fn(),
   };
 });
 
 vi.mock("@/lib/app-user", () => ({
-  getCurrentAppUser: getCurrentAppUserMock,
   AppUserProvisioningError: AppUserProvisioningErrorMock,
+}));
+vi.mock("@/lib/activated-app-user", () => ({
+  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -43,6 +47,9 @@ vi.mock("@/lib/correction-claim", () => ({
   claimCorrection: claimCorrectionMock,
   completeCorrectionClaim: completeCorrectionClaimMock,
   releaseCorrectionClaim: releaseCorrectionClaimMock,
+}));
+vi.mock("@/lib/correction-usage", () => ({
+  reserveCorrectionUsage: reserveCorrectionUsageMock,
 }));
 
 const { POST } = await import("./route");
@@ -66,7 +73,7 @@ const feedback = {
 
 const LOCAL_USER_ID = "cuid_local_user_1";
 beforeEach(() => {
-  getCurrentAppUserMock.mockReset();
+  getCurrentActivatedAppUserMock.mockReset();
   findUniqueMock.mockReset();
   topicCreateMock.mockReset();
   essayCreateMock.mockReset();
@@ -74,7 +81,8 @@ beforeEach(() => {
   claimCorrectionMock.mockReset();
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
-  getCurrentAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  reserveCorrectionUsageMock.mockReset();
+  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   gradeEssayWithGeminiMock.mockResolvedValue(feedback);
   claimCorrectionMock.mockResolvedValue({
     kind: "claimed",
@@ -91,6 +99,11 @@ beforeEach(() => {
     }),
   }));
   releaseCorrectionClaimMock.mockResolvedValue({ count: 1 });
+  reserveCorrectionUsageMock.mockResolvedValue({
+    kind: "claimed",
+    dayStartedAt: new Date("2026-08-10T00:00:00.000Z"),
+    monthStartedAt: new Date("2026-08-01T00:00:00.000Z"),
+  });
   topicCreateMock.mockResolvedValue({ id: "custom_topic_1" });
   essayCreateMock.mockResolvedValue({ id: "essay_1" });
 });
@@ -107,7 +120,7 @@ function post(body: unknown) {
 
 describe("POST /api/essays/correct", () => {
   it("requires an authenticated learner", async () => {
-    getCurrentAppUserMock.mockResolvedValue(null);
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
     const response = await post({
       taskType: "TASK_1",
@@ -121,7 +134,7 @@ describe("POST /api/essays/correct", () => {
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentAppUserMock.mockRejectedValue(
+    getCurrentActivatedAppUserMock.mockRejectedValue(
       new AppUserProvisioningErrorMock("identity cannot be linked"),
     );
 
@@ -138,6 +151,20 @@ describe("POST /api/essays/correct", () => {
     });
     expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
     expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("does not disclose an unactivated account before claiming a correction", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(401);
+    expect(claimCorrectionMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
   });
 
   it("uses the stored bank prompt as the authoritative grading context", async () => {
@@ -244,6 +271,46 @@ describe("POST /api/essays/correct", () => {
         }),
       }),
     );
+    expect(reserveCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID);
+  });
+
+  it("does not call the model when the learner has reached a correction override", async () => {
+    reserveCorrectionUsageMock.mockResolvedValue({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-11T00:00:00.000Z"),
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "The daily correction limit has been reached. Please try again tomorrow.",
+      code: "CORRECTION_DAILY_LIMIT_REACHED",
+      resetAt: "2026-08-11T00:00:00.000Z",
+    });
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).toHaveBeenCalledWith({
+      userId: LOCAL_USER_ID,
+      correctionKeyHash: "correction_hash_1",
+      claimToken: "claim_1",
+    });
+  });
+
+  it("counts a provider call even when its response cannot be parsed", async () => {
+    gradeEssayWithGeminiMock.mockResolvedValue({ invalid: true });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(502);
+    expect(reserveCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID);
   });
 
   it("returns the existing correction without calling a provider for an unchanged custom draft", async () => {

@@ -36,13 +36,14 @@ beforeEach(() => {
   exampleAggregateMock.mockReset();
   correctionAggregateMock.mockReset();
 
-  userCountMock.mockImplementation(async (args?: { where?: { isBlocked?: boolean; isAdmin?: boolean } }) => {
+  userCountMock.mockImplementation(async (args?: { where?: { isBlocked?: boolean; isAdmin?: boolean; redeemedAccessCodes?: unknown } }) => {
     if (args?.where?.isBlocked) return 2;
     if (args?.where?.isAdmin) return 1;
+    if (args?.where?.redeemedAccessCodes) return 30;
     return 50;
   });
-  accessCodeCountMock.mockImplementation(async (args?: { where?: { redeemedByUserId?: unknown } }) => {
-    if (args?.where?.redeemedByUserId) return 30;
+  accessCodeCountMock.mockImplementation(async (args?: { where?: { redeemedAt?: unknown } }) => {
+    if (args?.where?.redeemedAt) return 30;
     return 40;
   });
   translationAggregateMock.mockResolvedValue({ _sum: { monthCharacterCount: 12_345 }, _count: { _all: 8 } });
@@ -75,6 +76,15 @@ describe("getAdminOverviewStats", () => {
     expect(exampleAggregateMock).toHaveBeenCalledWith(
       expect.objectContaining({ where: { dayStartedAt: new Date("2026-08-10T00:00:00.000Z") } }),
     );
+  });
+
+  it("treats redeemedAt as the durable single-use marker", async () => {
+    await getAdminOverviewStats(NOW);
+
+    expect(accessCodeCountMock).toHaveBeenCalledWith({ where: { redeemedAt: { not: null } } });
+    expect(userCountMock).toHaveBeenCalledWith({
+      where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } },
+    });
   });
 
   it("treats missing sums as zero", async () => {

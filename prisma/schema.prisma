@@ -219,9 +219,9 @@ model CorrectionLease {
 }
 
 /// Durable correction usage. Unlike CorrectionLease, which is only an
-/// in-flight deduplication lock, this remains after a successful correction
-/// so limits and admin reporting can use the same rolling-window pattern as
-/// translation and example generation.
+/// in-flight deduplication lock, this remains after a provider-call slot is
+/// claimed so limits and admin reporting can use the same rolling-window
+/// pattern as translation and example generation.
 model CorrectionUsage {
   userId              String   @id
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)

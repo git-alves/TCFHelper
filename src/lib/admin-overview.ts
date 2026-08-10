@@ -42,6 +42,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     totalUsers,
     blockedUsers,
     adminUsers,
+    activatedUsers,
     totalAccessCodes,
     redeemedAccessCodes,
     translationMonthAgg,
@@ -52,8 +53,9 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     prisma.user.count(),
     prisma.user.count({ where: { isBlocked: true } }),
     prisma.user.count({ where: { isAdmin: true } }),
+    prisma.user.count({ where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } } }),
     prisma.accessCode.count(),
-    prisma.accessCode.count({ where: { redeemedByUserId: { not: null } } }),
+    prisma.accessCode.count({ where: { redeemedAt: { not: null } } }),
     prisma.translationQuota.aggregate({
       where: { monthStartedAt: currentMonthStart },
       _sum: { monthCharacterCount: true },
@@ -80,7 +82,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       total: totalUsers,
       blocked: blockedUsers,
       admins: adminUsers,
-      activated: redeemedAccessCodes,
+      activated: activatedUsers,
     },
     accessCodes: {
       total: totalAccessCodes,

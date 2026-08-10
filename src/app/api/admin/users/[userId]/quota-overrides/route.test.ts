@@ -102,7 +102,7 @@ describe("PATCH /api/admin/users/[userId]/quota-overrides", () => {
         }),
       }),
     );
-    expect(executeRawMock).toHaveBeenCalledTimes(2);
+    expect(executeRawMock).toHaveBeenCalledTimes(1);
   });
 
   it("rejects a fractional or negative override before writing", async () => {

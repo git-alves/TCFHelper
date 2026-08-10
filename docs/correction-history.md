@@ -14,7 +14,10 @@
 
 ### Non-goals
 
-- No public sharing links, cross-user lookup, staff access, or client-supplied user IDs.
+- No public sharing links, cross-user lookup, staff access to correction
+  content, or client-supplied user IDs. The later owner dashboard may manage
+  account access and rolling usage only; see
+  [admin access control and usage](admin-access-control-and-usage.md).
 - No claim that a historical CEFR estimate or mytcflab learning indicator is an official TCF result.
 - No migration that rewrites historical feedback JSON merely to match the latest modal schema.
 - No client-side or cross-user history query. The initial server-rendered route lists the learner’s saved corrections; cursor pagination should be introduced before account history becomes large.
