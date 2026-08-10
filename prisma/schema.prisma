@@ -68,20 +68,28 @@ enum SubscriptionStatus {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id                          String   @id @default(cuid())
+  email                       String   @unique
   // Legacy bcrypt hashes remain only for the Clerk import/cutover. New
   // Clerk users (including Google sign-ins) have no app-managed password.
-  passwordHash String?
-  name         String?
-  locale       Locale   @default(en)
+  passwordHash                String?
+  name                        String?
+  locale                      Locale   @default(en)
   // Additive Clerk identity mapping. Nullable until each existing learner is
   // imported into Clerk; every essay/subscription/quota FK keeps pointing at
   // `id` (the CUID), never at this Clerk subject, so no foreign key needs to
   // be rewritten as part of the Clerk cutover.
-  clerkUserId  String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  clerkUserId                 String?  @unique
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  // Null means this learner has never completed or skipped a walkthrough.
+  // Compared against the app's CURRENT_WALKTHROUGH_VERSION constant to
+  // decide whether to auto-start it -- bumping that constant re-shows a
+  // revised tour to everyone below the new version, with no new migration.
+  // Existing accounts are backfilled to the version current at rollout in a
+  // separate, explicitly-approved data migration (not on the automatic
+  // additive-migration allowlist, since a backfill mutates existing rows).
+  walkthroughCompletedVersion Int?
 
   subscriptions           Subscription[]
   essays                  Essay[]

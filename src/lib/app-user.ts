@@ -10,6 +10,7 @@ const APP_USER_SELECT = {
   email: true,
   name: true,
   locale: true,
+  walkthroughCompletedVersion: true,
 } satisfies Prisma.UserSelect;
 
 export type AppUser = Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>;

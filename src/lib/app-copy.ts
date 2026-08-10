@@ -118,6 +118,16 @@ export interface AppCopy {
     helpHeading: string;
     helpDescription: string;
   };
+  // Step titles/bodies are added per-step once the tour component exists;
+  // this is only the chrome shared by every step.
+  walkthrough: {
+    takeATour: string;
+    stepProgress: (values: { step: number; total: number }) => string;
+    next: string;
+    back: string;
+    skip: string;
+    finish: string;
+  };
   workspace: {
     task: {
       heading: string;
@@ -320,6 +330,14 @@ export const APP_COPY = {
       languageDescription: "Choose the language used across the interface, feedback, and live translation panel.",
       helpHeading: "Help & support",
       helpDescription: "Have a question or found a problem? Reach out and we'll help.",
+    },
+    walkthrough: {
+      takeATour: "Take a tour",
+      stepProgress: ({ step, total }) => `Step ${step} of ${total}`,
+      next: "Next",
+      back: "Back",
+      skip: "Skip",
+      finish: "Finish",
     },
     workspace: {
       task: {
@@ -538,6 +556,14 @@ export const APP_COPY = {
         "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction en direct.",
       helpHeading: "Aide et assistance",
       helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
+    },
+    walkthrough: {
+      takeATour: "Faire la visite guidée",
+      stepProgress: ({ step, total }) => `Étape ${step} sur ${total}`,
+      next: "Suivant",
+      back: "Précédent",
+      skip: "Ignorer",
+      finish: "Terminer",
     },
     workspace: {
       task: {
@@ -760,6 +786,14 @@ export const APP_COPY = {
       helpHeading: "Ayuda y soporte",
       helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
+    walkthrough: {
+      takeATour: "Hacer el recorrido",
+      stepProgress: ({ step, total }) => `Paso ${step} de ${total}`,
+      next: "Siguiente",
+      back: "Atrás",
+      skip: "Omitir",
+      finish: "Finalizar",
+    },
     workspace: {
       task: {
         heading: "1. Elige una tarea",
@@ -980,6 +1014,14 @@ export const APP_COPY = {
         "Escolha o idioma usado na interface, nos comentários e no painel de tradução em tempo real.",
       helpHeading: "Ajuda e suporte",
       helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
+    },
+    walkthrough: {
+      takeATour: "Fazer o tour",
+      stepProgress: ({ step, total }) => `Etapa ${step} de ${total}`,
+      next: "Avançar",
+      back: "Voltar",
+      skip: "Pular",
+      finish: "Concluir",
     },
     workspace: {
       task: {
