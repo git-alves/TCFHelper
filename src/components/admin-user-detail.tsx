@@ -35,6 +35,8 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
             {user.isAdmin && <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-900 dark:bg-violet-950 dark:text-violet-200">Owner account</span>}
             {user.isBlocked ? (
               <span className="rounded-full bg-red-100 px-2.5 py-1 text-red-800 dark:bg-red-950 dark:text-red-200">Blocked</span>
+            ) : user.isAdmin ? (
+              <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-900 dark:bg-violet-950 dark:text-violet-200">Owner access</span>
             ) : user.activatedAt ? (
               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated {dateTime(user.activatedAt)}</span>
             ) : (

@@ -74,7 +74,12 @@ describe("getAdminOverviewStats", () => {
       expect.objectContaining({ where: { monthStartedAt: new Date("2026-08-01T00:00:00.000Z") } }),
     );
     expect(exampleAggregateMock).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { dayStartedAt: new Date("2026-08-10T00:00:00.000Z") } }),
+      expect.objectContaining({
+        where: {
+          dayStartedAt: new Date("2026-08-10T00:00:00.000Z"),
+          dailyRequestCount: { gt: 0 },
+        },
+      }),
     );
   });
 

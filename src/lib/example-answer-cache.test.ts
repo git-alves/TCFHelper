@@ -290,6 +290,29 @@ describe("claimExampleGeneration", () => {
     vi.useRealTimers();
   });
 
+  it("applies a lowered override to failed-provider attempts too", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-05T12:01:00.000Z"));
+    quotaFindMock.mockResolvedValue({
+      dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),
+      // A failed prior call was refunded from this count but must not let a
+      // learner with a one-example override make another provider attempt.
+      dailyRequestCount: 0,
+      dailyAttemptCount: 1,
+      lastAttemptAt: new Date("2026-08-05T12:00:00.000Z"),
+    });
+    overrideFindMock.mockResolvedValue({ exampleGenerationsPerDay: 1 });
+
+    await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-06T00:00:00.000Z"),
+    });
+    expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(leaseUpsertMock).not.toHaveBeenCalled();
+
+    vi.useRealTimers();
+  });
+
   it("persists the incremented attempt count, distinct from and independent of the refundable request count", async () => {
     quotaFindMock.mockResolvedValue({
       dayStartedAt: new Date("2026-08-05T00:00:00.000Z"),

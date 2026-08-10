@@ -19,13 +19,9 @@ const LEASE_DURATION_MS = 60_000;
 const CLAIM_COOLDOWN_MS = 10_000;
 // A refunded failure never raises dailyRequestCount, so it alone cannot cap
 // how many times a persistently failing provider gets called in a day — the
-// cooldown above only bounds the burst rate, not the total. This cap is
-// checked against dailyAttemptCount, a counter that rises on every claim and
-// is never refunded, so it durably bounds total daily attempts (successful
-// or not) independent of the cooldown and independent of refunds.
-// An administrator can explicitly grant a higher daily allowance. The
-// cooldown (CLAIM_COOLDOWN_MS) still bounds burst rate regardless.
-const DAILY_ATTEMPT_CAP = 1000;
+// cooldown above only bounds the burst rate, not the total. dailyAttemptCount
+// is never refunded and follows the same effective per-user allowance, so a
+// lower override also bounds failed-provider retries.
 
 export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {
   return createHash("sha256")
@@ -124,7 +120,7 @@ export async function claimExampleGeneration(
       // Checked before, and independent of, the refundable count below: a
       // string of refunded failures must not let this claim through forever.
       const dailyAttemptCount = (continuingDay ? existing.dailyAttemptCount : 0) + 1;
-      if (dailyAttemptCount > Math.max(DAILY_ATTEMPT_CAP, limits.exampleGenerationsPerDay)) {
+      if (dailyAttemptCount > limits.exampleGenerationsPerDay) {
         return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
       }
 

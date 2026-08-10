@@ -2,6 +2,7 @@ import {
   GeminiNotConfiguredError,
   GeminiRateLimitedError,
   generateModelAnswer,
+  hasConfiguredGemini,
   type GenerateModelAnswerParams,
 } from "@/lib/gemini";
 
@@ -13,7 +14,7 @@ export class ModelAnswerInvalidOutputError extends Error {}
 
 /** True when the configured Gemini model can be called. */
 export function hasConfiguredModelAnswerProvider() {
-  return Boolean(process.env.GEMINI_API_KEY?.trim());
+  return hasConfiguredGemini();
 }
 
 // Free-tier models frequently miss an exact word target by a modest margin

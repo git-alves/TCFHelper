@@ -4,7 +4,7 @@ import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
-import { gradeEssayWithGemini } from "@/lib/gemini";
+import { gradeEssayWithGemini, hasConfiguredGemini } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
@@ -189,6 +189,24 @@ export async function POST(request: Request) {
 
   if (claim.kind === "existing") return duplicateCorrectionResponse(claim.essayId);
   if (claim.kind === "inProgress") return correctionInProgressResponse(claim.retryAt);
+
+  // Preserve duplicate/in-progress responses during an outage, but do not
+  // reserve an unrefundable slot if this newly claimed request cannot reach
+  // Gemini. Release only this caller's lease so a later configured retry can
+  // claim it normally.
+  if (!hasConfiguredGemini()) {
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable.", code: "CORRECTION_SERVICE_UNAVAILABLE" },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
 
   let usageReservation: Awaited<ReturnType<typeof reserveCorrectionUsage>>;
   try {

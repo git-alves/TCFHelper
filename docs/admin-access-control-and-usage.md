@@ -153,9 +153,10 @@ Activation protects the complete learner application:
 | Correction | 10 provider attempts/UTC day | Corrections/day |
 
 Only fresh provider work counts: accepted translation attempts, uncached example
-generation, and a newly claimed correction provider attempt. Example's internal
-cooldown/attempt-safety cap remains a global anti-abuse control, not an owner
-override.
+generation, and a newly claimed correction provider attempt. Example's fixed
+cooldown remains a global burst-control, while its durable failed-attempt cap
+follows the effective examples/day limit so a lower owner override cannot be
+bypassed by repeated provider failures.
 
 Each quota reservation takes a transaction-scoped per-user PostgreSQL advisory
 lock, reads that learner's override inside that same transaction, normalizes

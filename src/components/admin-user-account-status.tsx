@@ -85,7 +85,7 @@ export function AdminUserAccountStatus({
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
             {isBlocked
               ? "This learner cannot open MyTCFLab until you restore access."
-              : "Blocking quietly returns this learner to the sign-in flow on their next protected request."}
+              : "Blocking quietly signs this learner out to the public page on their next protected request."}
           </p>
         </div>
       )}
@@ -114,7 +114,7 @@ export function AdminUserAccountStatus({
       <ConfirmDialog
         open={confirmingBlock}
         title="Block learner access?"
-        description={`${email} will be quietly returned to the sign-in flow and will not be able to use MyTCFLab until you unblock them.`}
+        description={`${email} will be quietly signed out to the public page and will not be able to use MyTCFLab until you unblock them.`}
         confirmLabel={isSaving ? "Blocking…" : "Block user"}
         cancelLabel="Cancel"
         isConfirming={isSaving}

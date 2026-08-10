@@ -7,6 +7,7 @@ const {
   topicCreateMock,
   essayCreateMock,
   gradeEssayWithGeminiMock,
+  hasConfiguredGeminiMock,
   claimCorrectionMock,
   completeCorrectionClaimMock,
   releaseCorrectionClaimMock,
@@ -21,6 +22,7 @@ const {
     topicCreateMock: vi.fn(),
     essayCreateMock: vi.fn(),
     gradeEssayWithGeminiMock: vi.fn(),
+    hasConfiguredGeminiMock: vi.fn(),
     claimCorrectionMock: vi.fn(),
     completeCorrectionClaimMock: vi.fn(),
     releaseCorrectionClaimMock: vi.fn(),
@@ -42,6 +44,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/gemini", () => ({
   gradeEssayWithGemini: gradeEssayWithGeminiMock,
+  hasConfiguredGemini: hasConfiguredGeminiMock,
 }));
 vi.mock("@/lib/correction-claim", () => ({
   claimCorrection: claimCorrectionMock,
@@ -78,11 +81,13 @@ beforeEach(() => {
   topicCreateMock.mockReset();
   essayCreateMock.mockReset();
   gradeEssayWithGeminiMock.mockReset();
+  hasConfiguredGeminiMock.mockReset();
   claimCorrectionMock.mockReset();
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
   reserveCorrectionUsageMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  hasConfiguredGeminiMock.mockReturnValue(true);
   gradeEssayWithGeminiMock.mockResolvedValue(feedback);
   claimCorrectionMock.mockResolvedValue({
     kind: "claimed",
@@ -298,6 +303,81 @@ describe("POST /api/essays/correct", () => {
       correctionKeyHash: "correction_hash_1",
       claimToken: "claim_1",
     });
+  });
+
+  it("does not consume correction quota while Gemini is not configured", async () => {
+    hasConfiguredGeminiMock.mockReturnValue(false);
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "The correction service is temporarily unavailable.",
+      code: "CORRECTION_SERVICE_UNAVAILABLE",
+    });
+    expect(claimCorrectionMock).toHaveBeenCalledTimes(1);
+    expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).toHaveBeenCalledWith({
+      userId: LOCAL_USER_ID,
+      correctionKeyHash: "correction_hash_1",
+      claimToken: "claim_1",
+    });
+  });
+
+  it("preserves an already-saved duplicate during a Gemini configuration outage", async () => {
+    hasConfiguredGeminiMock.mockReturnValue(false);
+    claimCorrectionMock.mockResolvedValue({
+      kind: "existing",
+      essayId: "essay_existing",
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "This response has already been corrected. Edit it before requesting another correction.",
+      code: "CORRECTION_ALREADY_EXISTS",
+      essayId: "essay_existing",
+    });
+    expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves an in-progress correction during a Gemini configuration outage", async () => {
+    hasConfiguredGeminiMock.mockReturnValue(false);
+    const retryAt = new Date("2026-08-10T12:05:00.000Z");
+    claimCorrectionMock.mockResolvedValue({
+      kind: "inProgress",
+      retryAt,
+      correctionKeyHash: "correction_hash_1",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "A correction for this response is already in progress. Please try again shortly.",
+      code: "CORRECTION_IN_PROGRESS",
+      retryAt: retryAt.toISOString(),
+    });
+    expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
+    expect(gradeEssayWithGeminiMock).not.toHaveBeenCalled();
+    expect(releaseCorrectionClaimMock).not.toHaveBeenCalled();
   });
 
   it("counts a provider call even when its response cannot be parsed", async () => {

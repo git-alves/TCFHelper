@@ -23,6 +23,11 @@ export type ExampleCefrLevel = "B2" | "C1" | "C2";
 export class GeminiNotConfiguredError extends Error {}
 export class GeminiRateLimitedError extends Error {}
 
+/** True when a server-side Gemini credential is available for a provider call. */
+export function hasConfiguredGemini() {
+  return Boolean(process.env.GEMINI_API_KEY?.trim());
+}
+
 /**
  * Any other Gemini failure (bad request, auth rejection, upstream outage, or
  * an unparseable response). The constructor accepts only the HTTP status —
@@ -154,7 +159,7 @@ function extractText(payload: unknown): string {
  */
 export async function generateModelAnswer(params: GenerateModelAnswerParams): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!hasConfiguredGemini() || !apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
   }
 
@@ -297,7 +302,7 @@ export async function gradeEssayWithGemini({
   userPrompt,
 }: GradeEssayWithGeminiParams): Promise<unknown> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
+  if (!hasConfiguredGemini() || !apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
   }
 

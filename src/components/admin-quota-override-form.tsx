@@ -46,9 +46,14 @@ interface AdminQuotaOverrideFormProps {
   globalDefaults: UserQuotaLimits;
 }
 
-function formValues(overrides: AdminQuotaOverride): Record<QuotaField, string> {
+export function quotaOverrideFormValues(
+  overrides: AdminQuotaOverride | null,
+): Record<QuotaField, string> {
   return Object.fromEntries(
-    QUOTA_FIELDS.map(({ name }) => [name, overrides[name] === null ? "" : String(overrides[name])]),
+    QUOTA_FIELDS.map(({ name }) => {
+      const value = overrides?.[name];
+      return [name, value === null || value === undefined ? "" : String(value)];
+    }),
   ) as Record<QuotaField, string>;
 }
 
@@ -82,7 +87,7 @@ export function AdminQuotaOverrideForm({
   globalDefaults,
 }: AdminQuotaOverrideFormProps) {
   const router = useRouter();
-  const initialValues = useMemo(() => formValues(initialOverrides), [initialOverrides]);
+  const initialValues = useMemo(() => quotaOverrideFormValues(initialOverrides), [initialOverrides]);
   const [values, setValues] = useState(initialValues);
   const [savedValues, setSavedValues] = useState(initialValues);
   const [isSaving, setIsSaving] = useState(false);
@@ -108,14 +113,17 @@ export function AdminQuotaOverrideForm({
         body: JSON.stringify(parsedValues),
       });
       const body = (await response.json().catch(() => null)) as
-        | { error?: string; quotaOverride?: AdminQuotaOverride }
+        | { error?: string; quotaOverride?: AdminQuotaOverride | null }
         | null;
-      if (!response.ok || !body?.quotaOverride) {
+      if (!response.ok || !body || !Object.hasOwn(body, "quotaOverride")) {
         setStatus(body?.error ?? "Could not save quota limits. Please try again.");
         return;
       }
 
-      const nextValues = formValues(body.quotaOverride);
+      // An all-blank form deliberately deletes the sparse override row. The
+      // API represents that successful inherited state as `quotaOverride:
+      // null`, which must reset the inputs rather than look like an error.
+      const nextValues = quotaOverrideFormValues(body.quotaOverride ?? null);
       setValues(nextValues);
       setSavedValues(nextValues);
       setStatus(`Quota limits saved for ${email}.`);

@@ -62,7 +62,9 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       _count: { _all: true },
     }),
     prisma.exampleGenerationQuota.aggregate({
-      where: { dayStartedAt: currentDayStart },
+      // Failed provider calls refund dailyRequestCount but leave a cooldown
+      // row behind. Do not report zero-work rows as active learners.
+      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
       _sum: { dailyRequestCount: true },
       _count: { _all: true },
     }),

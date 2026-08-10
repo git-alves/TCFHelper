@@ -62,6 +62,8 @@ describe("AdminUserDetail", () => {
     );
 
     expect(markup).toContain("Owner account");
+    expect(markup).toContain("Owner access");
+    expect(markup).not.toContain("Awaiting access code");
     expect(markup).toContain("cannot be blocked");
     expect(markup).not.toContain("Block user");
   });
