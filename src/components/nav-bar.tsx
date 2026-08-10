@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
@@ -88,8 +88,21 @@ export function NavBar() {
   // The home page already has its own "start a task" hero CTA, so the nav
   // bar's job there is just getting a signed-in visitor to their dashboard
   // -- a plain link, not the same prominent action button that starts the
-  // writing loop from the dashboard.
-  const isHome = pathname === "/";
+  // writing loop from the dashboard. Same interception problem as onTasks
+  // above: Settings turns pathname into "/settings" while home stays
+  // mounted underneath, so this remembers the last real (non-/settings)
+  // pathname instead of trusting pathname directly. Adjusted during render
+  // (React's documented pattern for deriving state from a prop change)
+  // rather than an effect, so there's no one-frame flash of the wrong
+  // button.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  const [lastRealPathname, setLastRealPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    if (pathname !== "/settings") setLastRealPathname(pathname);
+  }
+  const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
+  const isHome = realPathname === "/";
 
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
