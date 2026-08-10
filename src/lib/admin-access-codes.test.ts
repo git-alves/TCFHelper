@@ -30,7 +30,7 @@ beforeEach(() => {
 });
 
 describe("createAccessCode", () => {
-  it("creates a code in the TCF-XXXX-XXXX shape with a trimmed note", async () => {
+  it("creates an 80-bit TCF-XXXX-XXXX-XXXX-XXXX code with a trimmed note", async () => {
     createMock.mockResolvedValue({
       id: "code_1",
       code: "TCF-AB12-CD34",
@@ -51,7 +51,7 @@ describe("createAccessCode", () => {
     });
     expect(createMock).toHaveBeenCalledTimes(1);
     const createdData = createMock.mock.calls[0][0].data;
-    expect(createdData.code).toMatch(/^TCF-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
+    expect(createdData.code).toMatch(/^TCF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
   });
 
   it("stores a null note when none is given", async () => {

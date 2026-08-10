@@ -11,7 +11,11 @@ const CODE_GENERATION_ATTEMPTS = 5;
 // these are the pairs most often confused across fonts.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_GROUP_LENGTH = 4;
-const CODE_GROUP_COUNT = 2;
+// 32 symbols × 16 independently generated characters = 2^80 possible
+// values. Access codes are bearer credentials and redemption deliberately
+// does not disclose availability, so this needs more than a short PIN's
+// search space even before an operator adds perimeter rate limiting.
+const CODE_GROUP_COUNT = 4;
 
 export type AdminAccessCode = {
   id: string;
@@ -30,7 +34,7 @@ function randomCodeGroup() {
   return group;
 }
 
-/** Matches the "TCF-AB12-CD34" shape already shown on the /activate form. */
+/** Matches the human-readable shape shown on the /activate form. */
 function generateCandidateCode() {
   const groups = Array.from({ length: CODE_GROUP_COUNT }, randomCodeGroup);
   return ["TCF", ...groups].join("-");

@@ -14,6 +14,7 @@ export function AccessCodeActivationForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canSubmit = code.trim().length > 0 && !isSubmitting;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -62,9 +63,10 @@ export function AccessCodeActivationForm() {
           spellCheck="false"
           required
           disabled={isSubmitting}
+          aria-invalid={Boolean(error)}
           aria-describedby={error ? errorId : undefined}
           className="rounded-xl border border-black/[.15] bg-transparent px-4 py-3 font-mono text-base uppercase tracking-wide outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-violet-400"
-          placeholder="e.g. TCF-AB12-CD34"
+          placeholder="e.g. TCF-AB12-CD34-EF56-GH78"
         />
       </div>
 
@@ -76,7 +78,7 @@ export function AccessCodeActivationForm() {
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={!canSubmit}
         className="rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc]"
       >
         {isSubmitting ? "Activating…" : "Activate account"}
