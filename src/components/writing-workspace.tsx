@@ -815,7 +815,7 @@ export function WritingWorkspace() {
         <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           {copy.workspace.task.heading}
         </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div data-walkthrough="task-picker" className="grid gap-3 sm:grid-cols-3">
           {TASK_ORDER.map((type) => (
             <button
               key={type}
@@ -855,7 +855,7 @@ export function WritingWorkspace() {
             <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
               {copy.workspace.topic.heading}
             </h2>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div data-walkthrough="topic-picker" className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() => getRecentTopic(taskType!)}
@@ -982,6 +982,7 @@ export function WritingWorkspace() {
             </label>
             <textarea
               id="essay-content"
+              data-walkthrough="editor"
               value={content}
               onChange={(e) => {
                 cancelPendingTopicRequests();
@@ -997,6 +998,7 @@ export function WritingWorkspace() {
             <div className="flex flex-wrap items-center gap-3">
               <button
                 type="button"
+                data-walkthrough="correct-button"
                 onClick={handleCorrect}
                 disabled={
                   !activeTopicPrompt ||

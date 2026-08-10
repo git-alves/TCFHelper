@@ -104,6 +104,7 @@ export function NavBar() {
                   <button
                     type="button"
                     disabled
+                    data-walkthrough="nav-dashboard"
                     title={dashboardBlockedReason}
                     aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
                     className={DASHBOARD_BUTTON_CLASS}
@@ -111,7 +112,12 @@ export function NavBar() {
                     {copy.nav.dashboard}
                   </button>
                 ) : (
-                  <Link href="/dashboard" onClick={handleDashboardClick} className={DASHBOARD_BUTTON_CLASS}>
+                  <Link
+                    href="/dashboard"
+                    data-walkthrough="nav-dashboard"
+                    onClick={handleDashboardClick}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
                     {copy.nav.dashboard}
                   </Link>
                 )

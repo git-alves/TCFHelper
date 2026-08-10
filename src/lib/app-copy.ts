@@ -105,6 +105,7 @@ export interface AppCopy {
     deleteCorrectionConfirm: string;
     deleteCorrectionError: string;
     deleteCorrectionSuccess: string;
+    startWritingCta: string;
   };
   settings: {
     title: string;
@@ -127,6 +128,20 @@ export interface AppCopy {
     back: string;
     skip: string;
     finish: string;
+    dashboardWelcomeTitle: string;
+    dashboardWelcomeBody: string;
+    dashboardStartWritingTitle: string;
+    dashboardStartWritingBody: string;
+    taskPickerTitle: string;
+    taskPickerBody: string;
+    topicPickerTitle: string;
+    topicPickerBody: string;
+    editorTitle: string;
+    editorBody: string;
+    correctButtonTitle: string;
+    correctButtonBody: string;
+    navTitle: string;
+    navBody: string;
   };
   workspace: {
     task: {
@@ -318,6 +333,7 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Delete",
       deleteCorrectionError: "Couldn't delete this correction. Please try again.",
       deleteCorrectionSuccess: "Correction deleted.",
+      startWritingCta: "Start writing",
     },
     settings: {
       title: "Settings",
@@ -338,6 +354,22 @@ export const APP_COPY = {
       back: "Back",
       skip: "Skip",
       finish: "Finish",
+      dashboardWelcomeTitle: "Welcome to MyTCFLab",
+      dashboardWelcomeBody:
+        "This is your dashboard — your CEFR level over time and your recent corrections will show up here once you've written a few.",
+      dashboardStartWritingTitle: "Ready to write?",
+      dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
+      taskPickerTitle: "Choose a task",
+      taskPickerBody: "TCF written expression has three task types. Pick one to get started.",
+      topicPickerTitle: "Choose a topic",
+      topicPickerBody: "Get a topic from a recent exam, or paste in one of your own.",
+      editorTitle: "Write your response",
+      editorBody: "Write in French here. The word count updates as you type.",
+      correctButtonTitle: "Get feedback",
+      correctButtonBody:
+        "When you're ready, click Correct. Your corrected text, an estimated level, and detailed feedback will open right here.",
+      navTitle: "Your progress",
+      navBody: "Come back here any time to see your correction history and estimated level over time.",
     },
     workspace: {
       task: {
@@ -542,6 +574,7 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Supprimer",
       deleteCorrectionError: "Impossible de supprimer cette correction. Veuillez réessayer.",
       deleteCorrectionSuccess: "Correction supprimée.",
+      startWritingCta: "Commencer à écrire",
     },
     settings: {
       title: "Paramètres",
@@ -564,6 +597,22 @@ export const APP_COPY = {
       back: "Précédent",
       skip: "Ignorer",
       finish: "Terminer",
+      dashboardWelcomeTitle: "Bienvenue sur MyTCFLab",
+      dashboardWelcomeBody:
+        "Voici votre tableau de bord — votre niveau CECR au fil du temps et vos corrections récentes apparaîtront ici après quelques rédactions.",
+      dashboardStartWritingTitle: "Prêt à écrire ?",
+      dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
+      taskPickerTitle: "Choisissez une tâche",
+      taskPickerBody: "L’expression écrite du TCF comprend trois types de tâches. Choisissez-en une pour commencer.",
+      topicPickerTitle: "Choisissez un sujet",
+      topicPickerBody: "Obtenez un sujet d’un examen récent, ou collez le vôtre.",
+      editorTitle: "Rédigez votre réponse",
+      editorBody: "Écrivez en français ici. Le nombre de mots se met à jour au fur et à mesure.",
+      correctButtonTitle: "Obtenez des commentaires",
+      correctButtonBody:
+        "Quand vous êtes prêt, cliquez sur Corriger. Votre texte corrigé, un niveau estimé et des commentaires détaillés s’ouvriront ici même.",
+      navTitle: "Votre progression",
+      navBody: "Revenez ici à tout moment pour consulter votre historique de corrections et votre niveau estimé.",
     },
     workspace: {
       task: {
@@ -771,6 +820,7 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Eliminar",
       deleteCorrectionError: "No se pudo eliminar esta corrección. Inténtalo de nuevo.",
       deleteCorrectionSuccess: "Corrección eliminada.",
+      startWritingCta: "Empezar a escribir",
     },
     settings: {
       title: "Configuración",
@@ -793,6 +843,22 @@ export const APP_COPY = {
       back: "Atrás",
       skip: "Omitir",
       finish: "Finalizar",
+      dashboardWelcomeTitle: "Bienvenido a MyTCFLab",
+      dashboardWelcomeBody:
+        "Este es tu panel: tu nivel MCER a lo largo del tiempo y tus correcciones recientes aparecerán aquí después de escribir algunas.",
+      dashboardStartWritingTitle: "¿Listo para escribir?",
+      dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
+      taskPickerTitle: "Elige una tarea",
+      taskPickerBody: "La expresión escrita del TCF tiene tres tipos de tareas. Elige una para empezar.",
+      topicPickerTitle: "Elige un tema",
+      topicPickerBody: "Obtén un tema de un examen reciente o pega el tuyo propio.",
+      editorTitle: "Escribe tu respuesta",
+      editorBody: "Escribe en francés aquí. El conteo de palabras se actualiza mientras escribes.",
+      correctButtonTitle: "Recibe comentarios",
+      correctButtonBody:
+        "Cuando estés listo, haz clic en Corregir. Tu texto corregido, un nivel estimado y comentarios detallados se abrirán aquí mismo.",
+      navTitle: "Tu progreso",
+      navBody: "Vuelve aquí cuando quieras para ver tu historial de correcciones y tu nivel estimado.",
     },
     workspace: {
       task: {
@@ -1000,6 +1066,7 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Excluir",
       deleteCorrectionError: "Não foi possível excluir esta correção. Tente novamente.",
       deleteCorrectionSuccess: "Correção excluída.",
+      startWritingCta: "Começar a escrever",
     },
     settings: {
       title: "Configurações",
@@ -1022,6 +1089,22 @@ export const APP_COPY = {
       back: "Voltar",
       skip: "Pular",
       finish: "Concluir",
+      dashboardWelcomeTitle: "Bem-vindo ao MyTCFLab",
+      dashboardWelcomeBody:
+        "Este é o seu painel — seu nível QECR ao longo do tempo e suas correções recentes aparecerão aqui depois de algumas redações.",
+      dashboardStartWritingTitle: "Pronto para escrever?",
+      dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
+      taskPickerTitle: "Escolha uma tarefa",
+      taskPickerBody: "A expressão escrita do TCF tem três tipos de tarefa. Escolha uma para começar.",
+      topicPickerTitle: "Escolha um tema",
+      topicPickerBody: "Obtenha um tema de uma prova recente, ou cole o seu próprio.",
+      editorTitle: "Escreva sua resposta",
+      editorBody: "Escreva em francês aqui. A contagem de palavras é atualizada conforme você digita.",
+      correctButtonTitle: "Receba feedback",
+      correctButtonBody:
+        "Quando estiver pronto, clique em Corrigir. Seu texto corrigido, um nível estimado e feedback detalhado abrirão bem aqui.",
+      navTitle: "Seu progresso",
+      navBody: "Volte aqui quando quiser para ver seu histórico de correções e seu nível estimado.",
     },
     workspace: {
       task: {
