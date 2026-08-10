@@ -357,7 +357,7 @@ describe("POST /api/translate", () => {
     vi.setSystemTime(new Date("2026-07-31T12:34:56.000Z"));
     quotaFindUniqueMock.mockResolvedValue(
       quotaRecord({
-        monthCharacterCount: 49_999,
+        monthCharacterCount: 99_999,
       }),
     );
 
@@ -383,7 +383,7 @@ describe("POST /api/translate", () => {
         minuteRequestCount: 20,
         minuteCharacterCount: 20_000,
         monthStartedAt: new Date("2026-07-01T00:00:00.000Z"),
-        monthCharacterCount: 50_000,
+        monthCharacterCount: 100_000,
       }),
     );
 
