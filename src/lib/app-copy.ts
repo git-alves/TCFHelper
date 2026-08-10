@@ -129,6 +129,8 @@ export interface AppCopy {
     finish: string;
     dashboardWelcomeTitle: string;
     dashboardWelcomeBody: string;
+    dashboardCorrectionsTitle: string;
+    dashboardCorrectionsBody: string;
     dashboardStartWritingTitle: string;
     dashboardStartWritingBody: string;
     taskPickerTitle: string;
@@ -139,8 +141,30 @@ export interface AppCopy {
     editorBody: string;
     correctButtonTitle: string;
     correctButtonBody: string;
+    correctionModalTitle: string;
+    correctionModalBody: string;
+    exampleGenerateTitle: string;
+    exampleGenerateBody: string;
+    editorCopyTitle: string;
+    editorCopyBody: string;
+    editorClearTitle: string;
+    editorClearBody: string;
+    translationTitle: string;
+    translationBody: string;
     navTitle: string;
     navBody: string;
+    previewFeedback: {
+      summary: string;
+      cefrRationale: string;
+      wordCountNote: string;
+      contentNote: string;
+      linguisticsNote: string;
+      vocabularyNote: string;
+      agreementErrorExplanation: string;
+      participleErrorExplanation: string;
+      suggestionOne: string;
+      suggestionTwo: string;
+    };
   };
   workspace: {
     task: {
@@ -355,19 +379,55 @@ export const APP_COPY = {
       dashboardWelcomeTitle: "Welcome to MyTCFLab",
       dashboardWelcomeBody:
         "This is your dashboard — your CEFR level over time and your recent corrections will show up here once you've written a few.",
+      dashboardCorrectionsTitle: "Your recent corrections",
+      dashboardCorrectionsBody:
+        "Every corrected essay's score and estimated level appear below the chart, so you can track exactly how each attempt went.",
       dashboardStartWritingTitle: "Ready to write?",
       dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
       taskPickerTitle: "Choose a task",
-      taskPickerBody: "TCF written expression has three task types. Pick one to get started.",
+      taskPickerBody:
+        "TCF written expression has three task types: Tâche 1 (describe or recount an experience), Tâche 2 (give and justify an opinion), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
       topicPickerTitle: "Choose a topic",
-      topicPickerBody: "Get a topic from a recent exam, or paste in one of your own.",
+      topicPickerBody:
+        "Recent exam topics are pulled directly from real, recently published TCF exams on this site, so you always practice with an authentic prompt. You can also paste in your own topic instead.",
       editorTitle: "Write your response",
-      editorBody: "Write in French here. The word count updates as you type.",
+      editorBody:
+        "Write your response in French here — we've pasted in a sample response so you can see how the rest of the tour works. The word count updates as you type.",
       correctButtonTitle: "Get feedback",
       correctButtonBody:
-        "When you're ready, click Correct. Your corrected text, an estimated level, and detailed feedback will open right here.",
+        "When you're ready, click Correct to get grammar, vocabulary, and CEFR-level feedback. Let's see what that looks like.",
+      correctionModalTitle: "Your correction",
+      correctionModalBody:
+        "Your corrected text, an estimated CEFR level, and detailed comments open right here. The Overview, Compared, and Comments tabs break everything down.",
+      exampleGenerateTitle: "Need inspiration?",
+      exampleGenerateBody:
+        "Generate Example writes a full model answer at the CEFR level you choose, so you can see what a strong response looks like. We won't generate one during the tour — try it any time.",
+      editorCopyTitle: "Copy your text",
+      editorCopyBody:
+        "Copy sends your response to the clipboard, handy for pasting it into a document or an official practice test.",
+      editorClearTitle: "Start over",
+      editorClearBody: "Clear empties the response so you can start a fresh draft.",
+      translationTitle: "Live translation",
+      translationBody:
+        "As you write, your response is translated here into your interface language, so you can check your meaning without leaving the page.",
       navTitle: "Your progress",
       navBody: "Come back here any time to see your correction history and estimated level over time.",
+      previewFeedback: {
+        summary:
+          "Solid, natural French overall — two small agreement mistakes are the only things holding this back from a higher score.",
+        cefrRationale:
+          "The vocabulary and sentence structure are appropriate for B1, but the two agreement errors below are the main blocker to B2.",
+        wordCountNote: "Within the target range for this task.",
+        contentNote: "Clearly answers the prompt with relevant, well-organized details.",
+        linguisticsNote: "Mostly accurate grammar, with two past-participle agreement errors.",
+        vocabularyNote: "Good everyday vocabulary and a natural, friendly tone.",
+        agreementErrorExplanation:
+          "The past participle must agree in gender and number with a preceding direct object.",
+        participleErrorExplanation:
+          "With être, the past participle agrees with the subject — “resté” needs an “s” to match “nous”.",
+        suggestionOne: "Review past-participle agreement rules for avoir and être verbs.",
+        suggestionTwo: "Try reading your draft aloud — agreement mistakes are often easier to hear than to see.",
+      },
     },
     workspace: {
       task: {
@@ -597,19 +657,56 @@ export const APP_COPY = {
       dashboardWelcomeTitle: "Bienvenue sur MyTCFLab",
       dashboardWelcomeBody:
         "Voici votre tableau de bord — votre niveau CECR au fil du temps et vos corrections récentes apparaîtront ici après quelques rédactions.",
+      dashboardCorrectionsTitle: "Vos corrections récentes",
+      dashboardCorrectionsBody:
+        "La note et le niveau estimé de chaque rédaction corrigée apparaissent sous le graphique, pour suivre précisément chaque tentative.",
       dashboardStartWritingTitle: "Prêt à écrire ?",
       dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
       taskPickerTitle: "Choisissez une tâche",
-      taskPickerBody: "L’expression écrite du TCF comprend trois types de tâches. Choisissez-en une pour commencer.",
+      taskPickerBody:
+        "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (décrire ou raconter une expérience), la Tâche 2 (donner et justifier une opinion) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
       topicPickerTitle: "Choisissez un sujet",
-      topicPickerBody: "Obtenez un sujet d’un examen récent, ou collez le vôtre.",
+      topicPickerBody:
+        "Les sujets d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des sujets authentiques. Vous pouvez aussi coller votre propre sujet.",
       editorTitle: "Rédigez votre réponse",
-      editorBody: "Écrivez en français ici. Le nombre de mots se met à jour au fur et à mesure.",
+      editorBody:
+        "Rédigez votre réponse en français ici — nous avons collé une réponse d’exemple pour vous montrer la suite de la visite. Le nombre de mots se met à jour au fur et à mesure.",
       correctButtonTitle: "Obtenez des commentaires",
       correctButtonBody:
-        "Quand vous êtes prêt, cliquez sur Corriger. Votre texte corrigé, un niveau estimé et des commentaires détaillés s’ouvriront ici même.",
+        "Quand vous êtes prêt, cliquez sur Corriger pour obtenir des commentaires sur la grammaire, le vocabulaire et le niveau CECR. Voyons à quoi cela ressemble.",
+      correctionModalTitle: "Votre correction",
+      correctionModalBody:
+        "Votre texte corrigé, un niveau CECR estimé et des commentaires détaillés s’ouvrent ici même. Les onglets Aperçu, Comparaison et Commentaires détaillent tout.",
+      exampleGenerateTitle: "Besoin d’inspiration ?",
+      exampleGenerateBody:
+        "Générer un exemple rédige une réponse modèle complète au niveau CECR de votre choix, pour voir à quoi ressemble une bonne réponse. Nous n’en générerons pas pendant la visite — essayez-le quand vous voulez.",
+      editorCopyTitle: "Copiez votre texte",
+      editorCopyBody:
+        "Copier envoie votre réponse dans le presse-papiers, pratique pour la coller dans un document ou un test blanc officiel.",
+      editorClearTitle: "Recommencer",
+      editorClearBody: "Effacer vide la réponse pour repartir d’une page blanche.",
+      translationTitle: "Traduction en direct",
+      translationBody:
+        "Pendant que vous écrivez, votre réponse est traduite ici dans la langue de l’interface, pour vérifier le sens sans quitter la page.",
       navTitle: "Votre progression",
       navBody: "Revenez ici à tout moment pour consulter votre historique de corrections et votre niveau estimé.",
+      previewFeedback: {
+        summary:
+          "Un français solide et naturel dans l’ensemble — seules deux petites erreurs d’accord empêchent une meilleure note.",
+        cefrRationale:
+          "Le vocabulaire et la structure des phrases correspondent au niveau B1, mais les deux erreurs d’accord ci-dessous sont le principal frein au niveau B2.",
+        wordCountNote: "Dans la fourchette visée pour cette tâche.",
+        contentNote: "Répond clairement au sujet avec des détails pertinents et bien organisés.",
+        linguisticsNote: "Grammaire globalement correcte, avec deux erreurs d’accord du participe passé.",
+        vocabularyNote: "Bon vocabulaire courant et ton naturel et chaleureux.",
+        agreementErrorExplanation:
+          "Le participe passé doit s’accorder en genre et en nombre avec un complément d’objet direct placé avant.",
+        participleErrorExplanation:
+          "Avec être, le participe passé s’accorde avec le sujet — « resté » a besoin d’un « s » pour s’accorder avec « nous ».",
+        suggestionOne: "Révisez les règles d’accord du participe passé avec avoir et être.",
+        suggestionTwo:
+          "Essayez de relire votre texte à voix haute — les erreurs d’accord s’entendent souvent mieux qu’elles ne se voient.",
+      },
     },
     workspace: {
       task: {
@@ -842,19 +939,56 @@ export const APP_COPY = {
       dashboardWelcomeTitle: "Bienvenido a MyTCFLab",
       dashboardWelcomeBody:
         "Este es tu panel: tu nivel MCER a lo largo del tiempo y tus correcciones recientes aparecerán aquí después de escribir algunas.",
+      dashboardCorrectionsTitle: "Tus correcciones recientes",
+      dashboardCorrectionsBody:
+        "La nota y el nivel estimado de cada redacción corregida aparecen debajo del gráfico, para seguir exactamente cómo te fue en cada intento.",
       dashboardStartWritingTitle: "¿Listo para escribir?",
       dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
       taskPickerTitle: "Elige una tarea",
-      taskPickerBody: "La expresión escrita del TCF tiene tres tipos de tareas. Elige una para empezar.",
+      taskPickerBody:
+        "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (describir o narrar una experiencia), la Tarea 2 (dar y justificar una opinión) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
       topicPickerTitle: "Elige un tema",
-      topicPickerBody: "Obtén un tema de un examen reciente o pega el tuyo propio.",
+      topicPickerBody:
+        "Los temas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con un enunciado auténtico. También puedes pegar tu propio tema.",
       editorTitle: "Escribe tu respuesta",
-      editorBody: "Escribe en francés aquí. El conteo de palabras se actualiza mientras escribes.",
+      editorBody:
+        "Escribe tu respuesta en francés aquí — hemos pegado una respuesta de ejemplo para que veas el resto del recorrido. El conteo de palabras se actualiza mientras escribes.",
       correctButtonTitle: "Recibe comentarios",
       correctButtonBody:
-        "Cuando estés listo, haz clic en Corregir. Tu texto corregido, un nivel estimado y comentarios detallados se abrirán aquí mismo.",
+        "Cuando estés listo, haz clic en Corregir para obtener comentarios sobre gramática, vocabulario y nivel MCER. Veamos cómo se ve eso.",
+      correctionModalTitle: "Tu corrección",
+      correctionModalBody:
+        "Tu texto corregido, un nivel MCER estimado y comentarios detallados se abren aquí mismo. Las pestañas Resumen, Comparación y Comentarios lo desglosan todo.",
+      exampleGenerateTitle: "¿Necesitas inspiración?",
+      exampleGenerateBody:
+        "Generar ejemplo escribe una respuesta modelo completa en el nivel MCER que elijas, para que veas cómo es una buena respuesta. No generaremos ninguna durante el recorrido — pruébalo cuando quieras.",
+      editorCopyTitle: "Copia tu texto",
+      editorCopyBody:
+        "Copiar envía tu respuesta al portapapeles, útil para pegarla en un documento o en un examen de práctica oficial.",
+      editorClearTitle: "Empezar de nuevo",
+      editorClearBody: "Borrar vacía la respuesta para empezar un borrador nuevo.",
+      translationTitle: "Traducción en vivo",
+      translationBody:
+        "Mientras escribes, tu respuesta se traduce aquí a tu idioma de interfaz, para que puedas revisar el significado sin salir de la página.",
       navTitle: "Tu progreso",
       navBody: "Vuelve aquí cuando quieras para ver tu historial de correcciones y tu nivel estimado.",
+      previewFeedback: {
+        summary:
+          "En general, un francés sólido y natural — solo dos pequeños errores de concordancia impiden una nota más alta.",
+        cefrRationale:
+          "El vocabulario y la estructura de las oraciones corresponden al nivel B1, pero los dos errores de concordancia de abajo son el principal obstáculo para el B2.",
+        wordCountNote: "Dentro del rango previsto para esta tarea.",
+        contentNote: "Responde claramente al enunciado con detalles relevantes y bien organizados.",
+        linguisticsNote: "Gramática mayormente correcta, con dos errores de concordancia del participio pasado.",
+        vocabularyNote: "Buen vocabulario cotidiano y un tono natural y cercano.",
+        agreementErrorExplanation:
+          "El participio pasado debe concordar en género y número con un complemento directo que lo precede.",
+        participleErrorExplanation:
+          "Con être, el participio pasado concuerda con el sujeto — «resté» necesita una «s» para concordar con «nous».",
+        suggestionOne: "Repasa las reglas de concordancia del participio pasado con avoir y être.",
+        suggestionTwo:
+          "Prueba a leer tu borrador en voz alta — los errores de concordancia suelen notarse más al oído que a la vista.",
+      },
     },
     workspace: {
       task: {
@@ -1087,19 +1221,56 @@ export const APP_COPY = {
       dashboardWelcomeTitle: "Bem-vindo ao MyTCFLab",
       dashboardWelcomeBody:
         "Este é o seu painel — seu nível QECR ao longo do tempo e suas correções recentes aparecerão aqui depois de algumas redações.",
+      dashboardCorrectionsTitle: "Suas correções recentes",
+      dashboardCorrectionsBody:
+        "A nota e o nível estimado de cada redação corrigida aparecem abaixo do gráfico, para você acompanhar exatamente como foi cada tentativa.",
       dashboardStartWritingTitle: "Pronto para escrever?",
       dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
       taskPickerTitle: "Escolha uma tarefa",
-      taskPickerBody: "A expressão escrita do TCF tem três tipos de tarefa. Escolha uma para começar.",
+      taskPickerBody:
+        "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (descrever ou narrar uma experiência), a Tarefa 2 (dar e justificar uma opinião) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
       topicPickerTitle: "Escolha um tema",
-      topicPickerBody: "Obtenha um tema de uma prova recente, ou cole o seu próprio.",
+      topicPickerBody:
+        "Os temas de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio tema.",
       editorTitle: "Escreva sua resposta",
-      editorBody: "Escreva em francês aqui. A contagem de palavras é atualizada conforme você digita.",
+      editorBody:
+        "Escreva sua resposta em francês aqui — colamos uma resposta de exemplo para você ver o restante do tour. A contagem de palavras é atualizada conforme você digita.",
       correctButtonTitle: "Receba feedback",
       correctButtonBody:
-        "Quando estiver pronto, clique em Corrigir. Seu texto corrigido, um nível estimado e feedback detalhado abrirão bem aqui.",
+        "Quando estiver pronto, clique em Corrigir para receber feedback sobre gramática, vocabulário e nível QECR. Vamos ver como isso fica.",
+      correctionModalTitle: "Sua correção",
+      correctionModalBody:
+        "Seu texto corrigido, um nível QECR estimado e feedback detalhado abrem bem aqui. As abas Visão geral, Comparação e Comentários detalham tudo.",
+      exampleGenerateTitle: "Precisa de inspiração?",
+      exampleGenerateBody:
+        "Gerar exemplo escreve uma resposta modelo completa no nível QECR escolhido, para você ver como é uma boa resposta. Não vamos gerar nenhuma durante o tour — experimente quando quiser.",
+      editorCopyTitle: "Copie seu texto",
+      editorCopyBody:
+        "Copiar envia sua resposta para a área de transferência, útil para colar em um documento ou em uma prova oficial de treino.",
+      editorClearTitle: "Recomeçar",
+      editorClearBody: "Limpar esvazia a resposta para você começar um rascunho novo.",
+      translationTitle: "Tradução ao vivo",
+      translationBody:
+        "Enquanto você escreve, sua resposta é traduzida aqui para o idioma da interface, para você conferir o sentido sem sair da página.",
       navTitle: "Seu progresso",
       navBody: "Volte aqui quando quiser para ver seu histórico de correções e seu nível estimado.",
+      previewFeedback: {
+        summary:
+          "No geral, um francês sólido e natural — apenas dois pequenos erros de concordância impedem uma nota mais alta.",
+        cefrRationale:
+          "O vocabulário e a estrutura das frases correspondem ao nível B1, mas os dois erros de concordância abaixo são o principal obstáculo para o B2.",
+        wordCountNote: "Dentro da faixa esperada para esta tarefa.",
+        contentNote: "Responde claramente ao enunciado com detalhes relevantes e bem organizados.",
+        linguisticsNote: "Gramática majoritariamente correta, com dois erros de concordância do particípio passado.",
+        vocabularyNote: "Bom vocabulário do dia a dia e um tom natural e caloroso.",
+        agreementErrorExplanation:
+          "O particípio passado deve concordar em gênero e número com um objeto direto que o precede.",
+        participleErrorExplanation:
+          "Com être, o particípio passado concorda com o sujeito — “resté” precisa de um “s” para concordar com “nous”.",
+        suggestionOne: "Revise as regras de concordância do particípio passado com avoir e être.",
+        suggestionTwo:
+          "Tente ler seu rascunho em voz alta — erros de concordância costumam ser mais fáceis de ouvir do que de ver.",
+      },
     },
     workspace: {
       task: {

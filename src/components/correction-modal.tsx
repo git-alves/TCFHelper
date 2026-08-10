@@ -452,6 +452,7 @@ export function CorrectionModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        data-walkthrough="correction-modal"
         onClick={(event) => event.stopPropagation()}
         className="flex h-[100dvh] w-full flex-col overflow-hidden bg-background shadow-2xl outline-none sm:h-auto sm:max-h-[92dvh] sm:w-[80vw] sm:max-w-6xl sm:rounded-2xl sm:border sm:border-black/[.1] dark:sm:border-white/[.15]"
       >
