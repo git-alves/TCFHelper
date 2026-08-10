@@ -356,7 +356,13 @@ export function WritingWorkspace() {
   }
 
   function handleToggleTranslation() {
-    if (isTranslationVisible) {
+    // Once shown, the same control keeps offering to (re)translate for as
+    // long as the draft has moved on since the last translation -- only
+    // hides when what's displayed is actually still in sync, matching
+    // isTranslationStale below (recomputed here rather than closed over,
+    // since this and the button label need the same answer independently).
+    const isStale = computeTranslationDelta(content.trim(), translationFor, locale).kind !== "unchanged";
+    if (isTranslationVisible && !isStale) {
       cancelPendingTranslation();
       setIsTranslationVisible(false);
       return;
@@ -933,6 +939,10 @@ export function WritingWorkspace() {
   const isDraftTooLongToTranslate =
     locale !== "fr" && trimmedContent.length > TRANSLATABLE_MAX_CHARS;
   const isTranslating = isTranslationLoading;
+  // Whether what's currently shown (if anything) still matches the draft --
+  // drives both the toggle button's label and, mirrored in
+  // handleToggleTranslation, whether clicking it hides or (re)translates.
+  const isTranslationStale = computeTranslationDelta(trimmedContent, translationFor, locale).kind !== "unchanged";
   const visibleTranslationError =
     translationErrorFor?.text === trimmedContent &&
     translationErrorFor.locale === locale
@@ -1241,10 +1251,14 @@ export function WritingWorkspace() {
                 data-walkthrough="translation"
                 onClick={handleToggleTranslation}
                 disabled={!content.trim()}
-                aria-pressed={isTranslationVisible}
+                aria-pressed={isTranslationVisible && !isTranslationStale}
                 className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                {isTranslationVisible ? copy.workspace.translation.hide : copy.workspace.translation.show}
+                {!isTranslationVisible
+                  ? copy.workspace.translation.show
+                  : isTranslationStale
+                    ? copy.workspace.translation.update
+                    : copy.workspace.translation.hide}
               </button>
             </div>
             {isCorrecting && (

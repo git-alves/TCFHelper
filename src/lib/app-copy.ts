@@ -215,6 +215,7 @@ export interface AppCopy {
     translation: {
       heading: (values: LanguageValues) => string;
       show: string;
+      update: string;
       hide: string;
       inProgress: string;
       unavailableError: string;
@@ -483,6 +484,7 @@ export const APP_COPY = {
       translation: {
         heading: ({ language }) => `Translation (${language})`,
         show: "Show translation",
+        update: "Update translation",
         hide: "Hide translation",
         inProgress: "Translating…",
         unavailableError: "Translation is unavailable right now.",
@@ -764,6 +766,7 @@ export const APP_COPY = {
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
         show: "Afficher la traduction",
+        update: "Mettre à jour la traduction",
         hide: "Masquer la traduction",
         inProgress: "Traduction en cours…",
         unavailableError: "La traduction est indisponible pour le moment.",
@@ -1045,6 +1048,7 @@ export const APP_COPY = {
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
         show: "Mostrar traducción",
+        update: "Actualizar traducción",
         hide: "Ocultar traducción",
         inProgress: "Traduciendo…",
         unavailableError: "La traducción no está disponible en este momento.",
@@ -1326,6 +1330,7 @@ export const APP_COPY = {
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
         show: "Mostrar tradução",
+        update: "Atualizar tradução",
         hide: "Ocultar tradução",
         inProgress: "Traduzindo…",
         unavailableError: "A tradução não está disponível no momento.",
