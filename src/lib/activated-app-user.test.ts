@@ -32,6 +32,14 @@ describe("getCurrentActivatedAppUser", () => {
     expect(hasRedeemedAccessCodeMock).toHaveBeenCalledWith("learner_1");
   });
 
+  it("admits the unblocked owner without consuming an access code", async () => {
+    const owner = { id: "owner_1", email: "owner@example.com", isAdmin: true };
+    getCurrentAppUserMock.mockResolvedValue(owner);
+
+    await expect(getCurrentActivatedAppUser()).resolves.toEqual(owner);
+    expect(hasRedeemedAccessCodeMock).not.toHaveBeenCalled();
+  });
+
   it("returns the activated application user", async () => {
     const user = { id: "learner_1", email: "learner@example.com" };
     getCurrentAppUserMock.mockResolvedValue(user);

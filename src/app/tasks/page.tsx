@@ -24,7 +24,7 @@ export default async function TasksPage() {
     return null;
   }
 
-  if (!(await hasRedeemedAccessCode(user.id))) {
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
     redirect("/activate");
   }
 

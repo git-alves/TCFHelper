@@ -58,6 +58,17 @@ describe("POST /api/access-codes/redeem", () => {
     expect(redeemAccessCodeMock).not.toHaveBeenCalled();
   });
 
+  it("does not consume a code for the activation-exempt owner", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ id: "owner_1", isAdmin: true });
+
+    const response = await POST(redemptionRequest({ code: "TCF-AB12-CD34-EF56-GH78" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ activated: true });
+    expect(normalizeAccessCodeMock).not.toHaveBeenCalled();
+    expect(redeemAccessCodeMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed while the Clerk identity cannot be provisioned", async () => {
     getCurrentAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock("identity cannot be linked"));
 

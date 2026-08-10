@@ -22,7 +22,7 @@ export default async function ActivatePage() {
   }
 
   try {
-    if (await hasRedeemedAccessCode(user.id)) {
+    if (user.isAdmin || await hasRedeemedAccessCode(user.id)) {
       redirect("/tasks");
     }
   } catch {

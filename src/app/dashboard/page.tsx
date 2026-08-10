@@ -30,7 +30,7 @@ export default async function DashboardPage() {
     return null;
   }
 
-  if (!(await hasRedeemedAccessCode(user.id))) {
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
     redirect("/activate");
   }
 

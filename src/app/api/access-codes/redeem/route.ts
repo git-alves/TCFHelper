@@ -36,6 +36,12 @@ export async function POST(request: Request) {
     return response({ error: "Unauthorized" }, 401);
   }
 
+  // The sole owner is activation-exempt. Returning the same success shape
+  // prevents a pasted code from consuming an invite the owner does not need.
+  if (user.isAdmin) {
+    return response({ activated: true });
+  }
+
   const body = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {

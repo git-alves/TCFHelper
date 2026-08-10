@@ -32,7 +32,7 @@ export default async function CorrectionHistoryDetailPage({ params }: Correction
     return null;
   }
 
-  if (!(await hasRedeemedAccessCode(user.id))) {
+  if (!user.isAdmin && !(await hasRedeemedAccessCode(user.id))) {
     redirect("/activate");
   }
 

@@ -13,5 +13,10 @@ export async function getCurrentActivatedAppUser(): Promise<AppUser | null> {
   const user = await getCurrentAppUser();
   if (!user) return null;
 
+  // The one owner needs to reach both /admin and the learner workspace before
+  // an invitation exists. Do not make that account consume a single-use code
+  // merely to test the product it operates.
+  if (user.isAdmin) return user;
+
   return (await hasRedeemedAccessCode(user.id)) ? user : null;
 }
