@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
-import { useWalkthroughTaskPreview } from "@/components/walkthrough-task-preview";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
+import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WALKTHROUGH_CONTINUE_PARAM, WALKTHROUGH_CONTINUE_VALUE } from "@/lib/walkthrough";
 
 interface TasksWalkthroughRunnerProps {
@@ -21,13 +21,20 @@ interface TasksWalkthroughRunnerProps {
  * so this component only registers a starter function while mounted.
  * Skipping or finishing both record the current walkthrough version -- same
  * meaning either way, see /api/walkthrough/dismiss.
+ *
+ * Most of these steps drive WritingWorkspace's real state (select a task,
+ * fetch a topic, paste a sample response, show a canned correction preview)
+ * instead of just pointing at it -- see WalkthroughWorkspaceScriptProvider.
+ * This runner only announces which step is active; WritingWorkspace decides
+ * what that means and guards every action so it can never overwrite a
+ * returning learner's real in-progress work.
  */
 export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunnerProps) {
   const copy = useAppCopy();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
-  const { requestDefaultTask } = useWalkthroughTaskPreview();
+  const { applyStep, resetDemo } = useWalkthroughWorkspaceScript();
   // A learner who already completed the current version has shouldAutoStart
   // === false here even when they just clicked "Take a tour" on the
   // dashboard and are continuing into these steps -- see
@@ -55,15 +62,6 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     return () => register(null);
   }, [register]);
 
-  // The topic-picker, editor, and correct-button steps below target elements
-  // that only render once a task type is selected -- ask WritingWorkspace to
-  // preview one the moment the tour opens (auto-start or a manual "Take a
-  // tour" replay both flow through isOpen becoming true) so every step has
-  // something to point at.
-  useEffect(() => {
-    if (isOpen) requestDefaultTask();
-  }, [isOpen, requestDefaultTask]);
-
   const steps: WalkthroughStepContent[] = [
     { id: "task-picker", title: copy.walkthrough.taskPickerTitle, body: copy.walkthrough.taskPickerBody },
     { id: "topic-picker", title: copy.walkthrough.topicPickerTitle, body: copy.walkthrough.topicPickerBody },
@@ -73,11 +71,35 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       title: copy.walkthrough.correctButtonTitle,
       body: copy.walkthrough.correctButtonBody,
     },
+    {
+      id: "correction-modal",
+      title: copy.walkthrough.correctionModalTitle,
+      body: copy.walkthrough.correctionModalBody,
+      suppressFocusTrap: true,
+    },
+    {
+      id: "example-generate",
+      title: copy.walkthrough.exampleGenerateTitle,
+      body: copy.walkthrough.exampleGenerateBody,
+    },
+    { id: "editor-copy", title: copy.walkthrough.editorCopyTitle, body: copy.walkthrough.editorCopyBody },
+    { id: "editor-clear", title: copy.walkthrough.editorClearTitle, body: copy.walkthrough.editorClearBody },
+    { id: "translation", title: copy.walkthrough.translationTitle, body: copy.walkthrough.translationBody },
     { id: "nav-dashboard", title: copy.walkthrough.navTitle, body: copy.walkthrough.navBody, placement: "left" },
   ];
 
+  // Announces the active step to WritingWorkspace so it can drive its own
+  // state (see applyWalkthroughStep there) -- fires on open and on every
+  // step change, not just individual step ids, so re-opening always
+  // re-announces the current step.
+  const activeStepId = isOpen ? (steps[stepIndex]?.id ?? null) : null;
+  useEffect(() => {
+    if (activeStepId) applyStep(activeStepId);
+  }, [activeStepId, applyStep]);
+
   function dismiss() {
     setIsOpen(false);
+    resetDemo();
     void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
   }
 

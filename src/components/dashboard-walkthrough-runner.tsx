@@ -48,6 +48,11 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
       body: copy.walkthrough.dashboardWelcomeBody,
     },
     {
+      id: "dashboard-corrections",
+      title: copy.walkthrough.dashboardCorrectionsTitle,
+      body: copy.walkthrough.dashboardCorrectionsBody,
+    },
+    {
       id: "nav-tasks",
       title: copy.walkthrough.dashboardStartWritingTitle,
       body: copy.walkthrough.dashboardStartWritingBody,

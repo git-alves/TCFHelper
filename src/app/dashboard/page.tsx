@@ -47,7 +47,11 @@ export default async function DashboardPage() {
         <ProgressChart points={points} />
       </section>
 
-      <section aria-labelledby="recent-corrections-heading" className="flex flex-col gap-3">
+      <section
+        aria-labelledby="recent-corrections-heading"
+        data-walkthrough="dashboard-corrections"
+        className="flex flex-col gap-3"
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 id="recent-corrections-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
             {copy.dashboard.recentCorrectionsTitle}

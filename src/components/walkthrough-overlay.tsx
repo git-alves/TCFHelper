@@ -12,6 +12,13 @@ export interface WalkthroughStepContent {
   title: string;
   body: string;
   placement?: TooltipPlacement;
+  // True for a step whose target is itself a focus-trapped dialog (e.g. the
+  // real CorrectionModal, shown during the /tasks tour's correction-preview
+  // step) -- installing this overlay's own trap/Tab-cycling/auto-focus on
+  // top of that dialog's own would fight it for every Tab press and steal
+  // focus back from whatever it auto-focused on mount. The target dialog's
+  // own focus management is left in sole control for the step.
+  suppressFocusTrap?: boolean;
 }
 
 const FOCUSABLE_SELECTOR =
@@ -62,13 +69,15 @@ export function WalkthroughOverlay({
   // re-run on every resize-triggered remeasurement -- only on the dialog
   // actually appearing or disappearing.
   const isVisible = open && step !== null && targetRect !== null;
+  const isFocusTrapped = isVisible && !step?.suppressFocusTrap;
 
   // Focus trap + restore, matching ConfirmDialog/Modal: captures whatever
   // had focus right before the dialog appeared and gives it back on close,
   // and keeps Tab cycling inside the dialog the whole time -- aria-modal
-  // implies both, and neither happens for free.
+  // implies both, and neither happens for free. Skipped entirely for a
+  // suppressFocusTrap step -- see that flag's own comment.
   useEffect(() => {
-    if (!isVisible) return;
+    if (!isFocusTrapped) return;
 
     previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
 
@@ -108,15 +117,18 @@ export function WalkthroughOverlay({
       document.removeEventListener("keydown", handleKeyDown);
       previouslyFocusedRef.current?.focus();
     };
-  }, [isVisible, onSkip]);
+  }, [isFocusTrapped, onSkip]);
 
   // Separate from the effect above: this fires on every step change, not
   // just the dialog's open/close transitions, so it can't be the same
   // effect without also re-capturing previouslyFocusedRef from inside the
-  // dialog itself on step 2 onward.
+  // dialog itself on step 2 onward. Also skipped for a suppressFocusTrap
+  // step -- stealing focus onto this overlay's own Next button would undo
+  // whatever the target dialog itself focused on mount.
   useEffect(() => {
-    if (isVisible) nextButtonRef.current?.focus();
-  }, [isVisible, stepIndex]);
+    if (!isFocusTrapped) return;
+    nextButtonRef.current?.focus();
+  }, [isFocusTrapped, stepIndex]);
 
   if (!isVisible || !step || !targetRect) return null;
 

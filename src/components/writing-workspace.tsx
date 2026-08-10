@@ -17,8 +17,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
-import { useWalkthroughTaskPreview } from "@/components/walkthrough-task-preview";
+import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
+import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
+import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 
 interface RecentExamTopic {
   id: string;
@@ -88,7 +90,14 @@ export function WritingWorkspace() {
   const copy = useAppCopy();
   const router = useRouter();
   const { register: registerDashboardNavGuard, setNavigationBusy } = useDashboardNavGuard();
-  const { register: registerWalkthroughTaskPreview } = useWalkthroughTaskPreview();
+  const { register: registerWalkthroughScript } = useWalkthroughWorkspaceScript();
+  // Set the moment the tour's own scripted action first runs (the
+  // task-picker step selecting a task while none was picked yet) -- true
+  // only when every subsequent scripted overwrite is our own doing, never
+  // the learner's real in-progress work. Gates every other scripted step,
+  // and tells resetWalkthroughDemo whether there is anything tour-authored
+  // to discard when the tour closes.
+  const walkthroughDemoActiveRef = useRef(false);
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -196,17 +205,6 @@ export function WritingWorkspace() {
   useEffect(() => {
     if (topicMode === "custom") customTopicRef.current?.focus();
   }, [topicMode]);
-
-  // Only fills in a task when none is picked yet, so this can never discard
-  // an in-progress selection -- the walkthrough tour uses it to preview a
-  // task type on open, since its later steps target elements that only
-  // render once `task` is non-null.
-  useEffect(() => {
-    registerWalkthroughTaskPreview(() => {
-      setTaskType((current) => current ?? TASK_ORDER[0]);
-    });
-    return () => registerWalkthroughTaskPreview(null);
-  }, [registerWalkthroughTaskPreview]);
 
   // A claim from another tab/server expires after a short lease. Keep the
   // block tied to that exact correction key until then: changing and reverting
@@ -585,6 +583,98 @@ export function WritingWorkspace() {
       if (requestId === recentTopicRequestId.current) setIsRecentTopicLoading(false);
     }
   }
+
+  // What the /tasks tour's Next-button-driven steps actually do to this
+  // workspace, keyed by WalkthroughStepContent.id (see
+  // TasksWalkthroughRunner). Every action is guarded by
+  // walkthroughDemoActiveRef and, individually, by the same "only if still
+  // empty" check resetForTask/fetchRecentTopic already use elsewhere --
+  // never overwrites a real task/topic/draft a returning learner already
+  // had in progress when they replayed the tour. The correction preview
+  // reuses the real result UI (CorrectionModal, feedback state) with a
+  // fixture instead of a POST to /api/essays/correct, so no permanent
+  // history record or API cost is created for a demo essay -- see
+  // walkthrough-sample-feedback.ts.
+  function applyWalkthroughStep(stepId: string) {
+    if (stepId !== "correct-button" && stepId !== "correction-modal") {
+      setCorrectionModalOpen(false);
+    }
+
+    switch (stepId) {
+      case "task-picker": {
+        if (taskType !== null) return;
+        walkthroughDemoActiveRef.current = true;
+        setTaskType(TASK_ORDER[0]);
+        return;
+      }
+      case "topic-picker": {
+        if (!walkthroughDemoActiveRef.current || topicMode !== null) return;
+        getRecentTopic(taskType ?? TASK_ORDER[0]);
+        return;
+      }
+      case "editor": {
+        if (!walkthroughDemoActiveRef.current || content.trim()) return;
+        applyDraftContent(WALKTHROUGH_SAMPLE_ESSAY);
+        return;
+      }
+      case "correction-modal": {
+        // A returning learner who already has a real correction can still
+        // see this step -- reopening their own real result, never the
+        // fixture, since resetWalkthroughDemo below only ever discards
+        // tour-authored state. Outside the demo, with no real correction
+        // either (a returning learner who picked a task before ever
+        // opening the tour, but hasn't corrected anything yet), this step
+        // has nothing to show; it's the one case where the tour can end
+        // early here rather than fabricating feedback for content that was
+        // never actually submitted.
+        if (feedback) {
+          setCorrectionModalState("result");
+          setCorrectionModalOpen(true);
+          return;
+        }
+        if (!walkthroughDemoActiveRef.current) return;
+        setSubmittedCorrectionText(content || WALKTHROUGH_SAMPLE_ESSAY);
+        setFeedback(getWalkthroughSampleFeedback(copy));
+        setFeedbackLocale(locale);
+        setCorrectionModalState("result");
+        setCorrectionModalSession((session) => session + 1);
+        setCorrectionModalOpen(true);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  function resetWalkthroughDemo() {
+    if (!walkthroughDemoActiveRef.current) return;
+    walkthroughDemoActiveRef.current = false;
+    setTaskType(null);
+    setTopicMode(null);
+    setRecentTopic(null);
+    setRecentTopicError(null);
+    setCustomTopic("");
+    resetDraftAndFeedback();
+  }
+
+  const walkthroughScriptRef = useRef<{ applyStep: typeof applyWalkthroughStep; resetDemo: typeof resetWalkthroughDemo }>({
+    applyStep: applyWalkthroughStep,
+    resetDemo: resetWalkthroughDemo,
+  });
+  // Same reasoning as goToDashboardRef above: the registered handlers must
+  // always see this render's state, not whatever they closed over when the
+  // registration effect last ran.
+  useLayoutEffect(() => {
+    walkthroughScriptRef.current = { applyStep: applyWalkthroughStep, resetDemo: resetWalkthroughDemo };
+  });
+
+  useEffect(() => {
+    registerWalkthroughScript({
+      applyStep: (stepId) => walkthroughScriptRef.current.applyStep(stepId),
+      resetDemo: () => walkthroughScriptRef.current.resetDemo(),
+    });
+    return () => registerWalkthroughScript(null);
+  }, [registerWalkthroughScript]);
 
   async function handleCorrect() {
     if (
@@ -1051,7 +1141,10 @@ export function WritingWorkspace() {
                 )
               )}
 
-              <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]">
+              <div
+                data-walkthrough="example-generate"
+                className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]"
+              >
                 <label htmlFor="example-level" className="sr-only">
                   {copy.workspace.editor.exampleLevelLabel}
                 </label>
@@ -1080,6 +1173,7 @@ export function WritingWorkspace() {
 
               <button
                 type="button"
+                data-walkthrough="editor-copy"
                 onClick={handleCopyContent}
                 disabled={!content.trim()}
                 className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
@@ -1092,6 +1186,7 @@ export function WritingWorkspace() {
               </button>
               <button
                 type="button"
+                data-walkthrough="editor-clear"
                 onClick={handleClearDraft}
                 disabled={!content.trim()}
                 className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
@@ -1146,7 +1241,7 @@ export function WritingWorkspace() {
             )}
           </section>
 
-          <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
+          <section data-walkthrough="translation" className="flex flex-col gap-2" aria-labelledby="translation-heading">
             <div className="flex items-center justify-between gap-4">
               <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                 {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
