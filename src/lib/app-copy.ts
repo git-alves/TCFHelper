@@ -214,8 +214,9 @@ export interface AppCopy {
     };
     translation: {
       heading: (values: LanguageValues) => string;
+      show: string;
+      hide: string;
       inProgress: string;
-      empty: string;
       unavailableError: string;
       rateLimitedError: string;
       monthlyQuotaError: string;
@@ -407,9 +408,9 @@ export const APP_COPY = {
         "Copy sends your response to the clipboard, handy for pasting it into a document or an official practice test.",
       editorClearTitle: "Start over",
       editorClearBody: "Clear empties the response so you can start a fresh draft.",
-      translationTitle: "Live translation",
+      translationTitle: "Translate your response",
       translationBody:
-        "As you write, your response is translated here into your interface language, so you can check your meaning without leaving the page.",
+        "Show translation translates your response into your interface language, so you can check your meaning without leaving the page. It only translates on demand, and only whatever you've added since the last time, to save your translation quota.",
       navTitle: "Your progress",
       navBody: "Come back here any time to see your correction history and estimated level over time.",
       previewFeedback: {
@@ -481,14 +482,14 @@ export const APP_COPY = {
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
+        show: "Show translation",
+        hide: "Hide translation",
         inProgress: "Translating…",
-        empty: "Your translation will appear here as you write.",
         unavailableError: "Translation is unavailable right now.",
         rateLimitedError: "You’re translating too quickly. Please wait a moment and try again.",
-        monthlyQuotaError:
-          "You’ve reached this month’s live translation limit. Please try again next month.",
+        monthlyQuotaError: "You’ve reached this month’s translation limit. Please try again next month.",
         tooLong: ({ maxCharacters }) =>
-          `Live translation is available for drafts up to ${maxCharacters} characters. This draft is longer — submit it for correction to see full feedback.`,
+          `Translation is available for drafts up to ${maxCharacters} characters. This draft is longer — submit it for correction to see full feedback.`,
         unofficialFallbackNotice:
           "This translation used an unofficial backup method, not the DeepL API. It may be less accurate and can be briefly unavailable.",
       },
@@ -685,9 +686,9 @@ export const APP_COPY = {
         "Copier envoie votre réponse dans le presse-papiers, pratique pour la coller dans un document ou un test blanc officiel.",
       editorClearTitle: "Recommencer",
       editorClearBody: "Effacer vide la réponse pour repartir d’une page blanche.",
-      translationTitle: "Traduction en direct",
+      translationTitle: "Traduisez votre réponse",
       translationBody:
-        "Pendant que vous écrivez, votre réponse est traduite ici dans la langue de l’interface, pour vérifier le sens sans quitter la page.",
+        "Afficher la traduction traduit votre réponse dans la langue de l’interface, pour vérifier le sens sans quitter la page. Elle ne se lance qu’à la demande, et seulement pour ce que vous avez ajouté depuis la dernière fois, afin de préserver votre quota de traduction.",
       navTitle: "Votre progression",
       navBody: "Revenez ici à tout moment pour consulter votre historique de corrections et votre niveau estimé.",
       previewFeedback: {
@@ -762,14 +763,14 @@ export const APP_COPY = {
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
+        show: "Afficher la traduction",
+        hide: "Masquer la traduction",
         inProgress: "Traduction en cours…",
-        empty: "Votre traduction apparaîtra ici au fur et à mesure de votre rédaction.",
         unavailableError: "La traduction est indisponible pour le moment.",
         rateLimitedError: "Vous traduisez trop rapidement. Patientez un instant puis réessayez.",
-        monthlyQuotaError:
-          "Vous avez atteint la limite mensuelle de traduction en direct. Réessayez le mois prochain.",
+        monthlyQuotaError: "Vous avez atteint la limite mensuelle de traduction. Réessayez le mois prochain.",
         tooLong: ({ maxCharacters }) =>
-          `La traduction en direct est disponible pour les brouillons de ${maxCharacters} caractères maximum. Ce brouillon est plus long : soumettez-le pour obtenir des commentaires complets.`,
+          `La traduction est disponible pour les brouillons de ${maxCharacters} caractères maximum. Ce brouillon est plus long : soumettez-le pour obtenir des commentaires complets.`,
         unofficialFallbackNotice:
           "Cette traduction provient d’une méthode de secours non officielle, pas de l’API DeepL. Elle peut être moins précise et parfois indisponible.",
       },
@@ -967,9 +968,9 @@ export const APP_COPY = {
         "Copiar envía tu respuesta al portapapeles, útil para pegarla en un documento o en un examen de práctica oficial.",
       editorClearTitle: "Empezar de nuevo",
       editorClearBody: "Borrar vacía la respuesta para empezar un borrador nuevo.",
-      translationTitle: "Traducción en vivo",
+      translationTitle: "Traduce tu respuesta",
       translationBody:
-        "Mientras escribes, tu respuesta se traduce aquí a tu idioma de interfaz, para que puedas revisar el significado sin salir de la página.",
+        "Mostrar traducción traduce tu respuesta a tu idioma de interfaz, para que puedas revisar el significado sin salir de la página. Solo traduce cuando lo pides, y solo lo que agregaste desde la última vez, para ahorrar tu cuota de traducción.",
       navTitle: "Tu progreso",
       navBody: "Vuelve aquí cuando quieras para ver tu historial de correcciones y tu nivel estimado.",
       previewFeedback: {
@@ -1044,14 +1045,14 @@ export const APP_COPY = {
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
+        show: "Mostrar traducción",
+        hide: "Ocultar traducción",
         inProgress: "Traduciendo…",
-        empty: "Tu traducción aparecerá aquí mientras escribes.",
         unavailableError: "La traducción no está disponible en este momento.",
         rateLimitedError: "Estás traduciendo demasiado rápido. Espera un momento e inténtalo de nuevo.",
-        monthlyQuotaError:
-          "Has alcanzado el límite mensual de traducción en tiempo real. Inténtalo de nuevo el próximo mes.",
+        monthlyQuotaError: "Has alcanzado el límite mensual de traducción. Inténtalo de nuevo el próximo mes.",
         tooLong: ({ maxCharacters }) =>
-          `La traducción en tiempo real está disponible para borradores de hasta ${maxCharacters} caracteres. Este borrador es más largo; envíalo para corregirlo y recibir comentarios completos.`,
+          `La traducción está disponible para borradores de hasta ${maxCharacters} caracteres. Este borrador es más largo; envíalo para corregirlo y recibir comentarios completos.`,
         unofficialFallbackNotice:
           "Esta traducción se obtuvo mediante un método de respaldo no oficial, no la API de DeepL. Puede ser menos precisa y no estar disponible en ocasiones.",
       },
@@ -1249,9 +1250,9 @@ export const APP_COPY = {
         "Copiar envia sua resposta para a área de transferência, útil para colar em um documento ou em uma prova oficial de treino.",
       editorClearTitle: "Recomeçar",
       editorClearBody: "Limpar esvazia a resposta para você começar um rascunho novo.",
-      translationTitle: "Tradução ao vivo",
+      translationTitle: "Traduza sua resposta",
       translationBody:
-        "Enquanto você escreve, sua resposta é traduzida aqui para o idioma da interface, para você conferir o sentido sem sair da página.",
+        "Mostrar tradução traduz sua resposta para o idioma da interface, para você conferir o sentido sem sair da página. Ela só traduz quando você pede, e só o que você adicionou desde a última vez, para economizar sua cota de tradução.",
       navTitle: "Seu progresso",
       navBody: "Volte aqui quando quiser para ver seu histórico de correções e seu nível estimado.",
       previewFeedback: {
@@ -1326,14 +1327,14 @@ export const APP_COPY = {
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
+        show: "Mostrar tradução",
+        hide: "Ocultar tradução",
         inProgress: "Traduzindo…",
-        empty: "Sua tradução aparecerá aqui enquanto você escreve.",
         unavailableError: "A tradução não está disponível no momento.",
         rateLimitedError: "Você está traduzindo rápido demais. Aguarde um momento e tente novamente.",
-        monthlyQuotaError:
-          "Você atingiu o limite mensal de tradução em tempo real. Tente novamente no próximo mês.",
+        monthlyQuotaError: "Você atingiu o limite mensal de tradução. Tente novamente no próximo mês.",
         tooLong: ({ maxCharacters }) =>
-          `A tradução em tempo real está disponível para rascunhos de até ${maxCharacters} caracteres. Este rascunho é maior; envie-o para correção e receba comentários completos.`,
+          `A tradução está disponível para rascunhos de até ${maxCharacters} caracteres. Este rascunho é maior; envie-o para correção e receba comentários completos.`,
         unofficialFallbackNotice:
           "Esta tradução usou um método de backup não oficial, não a API do DeepL. Ela pode ser menos precisa e ficar indisponível ocasionalmente.",
       },
