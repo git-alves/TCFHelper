@@ -99,6 +99,11 @@ export function WritingWorkspace() {
   // and tells resetWalkthroughDemo whether there is anything tour-authored
   // to discard when the tour closes.
   const walkthroughDemoActiveRef = useRef(false);
+  // True only while the tour itself is showing CorrectionModal (the
+  // correction-modal step) -- lets CorrectionModal skip its own focus trap
+  // for just that step, since WalkthroughOverlay owns Tab/Escape for every
+  // step. Real, non-tour use of the modal never sets this.
+  const [isWalkthroughCorrectionPreview, setIsWalkthroughCorrectionPreview] = useState(false);
 
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
@@ -278,13 +283,17 @@ export function WritingWorkspace() {
 
     const delta = computeTranslationDelta(trimmed, translationFor, locale);
     if (delta.kind === "unchanged") return;
-    if (delta.kind === "whitespace-only") {
-      setTranslationFor({ text: trimmed, locale });
-      return;
-    }
 
     const isAppend = delta.kind === "append";
     const textToSend = delta.textToSend;
+    // Both translation providers trim their output (see deepl-translate.ts
+    // and unofficial-translate.ts), so the response can't be trusted to
+    // carry the whitespace/newline that separated the new sentence from
+    // what was already translated -- concatenating raw responses can join
+    // "Hello" and "world" into "Helloworld". Capture that separator from
+    // what was actually typed, before it's sent, and reinsert it on the
+    // response instead.
+    const appendSeparator = isAppend ? (/^\s*/.exec(textToSend)?.[0] ?? "") : "";
 
     cancelPendingTranslation();
     const requestId = translationRequestId.current;
@@ -333,7 +342,7 @@ export function WritingWorkspace() {
           ? "unofficial"
           : "deepl";
 
-      setTranslation((previous) => (isAppend ? `${previous}${chunk}` : chunk));
+      setTranslation((previous) => (isAppend ? `${previous}${appendSeparator}${chunk}` : chunk));
       setTranslationProvider(nextProvider);
       setTranslationFor({ text: trimmed, locale });
     } catch (error) {
@@ -368,8 +377,12 @@ export function WritingWorkspace() {
     // again, so edit-and-revert restores the useful route to the saved review.
     setTranslationError(null);
     setTranslationErrorFor(null);
+    // A translation in flight was requested for whatever the draft looked
+    // like a moment ago -- any further edit makes it stale before it even
+    // arrives, so there is no reason to let it finish and spend quota on
+    // text that's already out of date.
+    cancelPendingTranslation();
     if (!value.trim()) {
-      cancelPendingTranslation();
       setIsTranslationVisible(false);
       setTranslation("");
       setTranslationProvider(null);
@@ -385,6 +398,7 @@ export function WritingWorkspace() {
     setFeedbackLocale(null);
     setLastSuccessfulCorrectionKey(null);
     setCorrectionModalOpen(false);
+    setIsWalkthroughCorrectionPreview(false);
     setCorrectionModalState("loading");
     setCorrectionEssayId(null);
     setExistingCorrectionEssayId(null);
@@ -608,6 +622,7 @@ export function WritingWorkspace() {
   function applyWalkthroughStep(stepId: string) {
     if (stepId !== "correct-button" && stepId !== "correction-modal") {
       setCorrectionModalOpen(false);
+      setIsWalkthroughCorrectionPreview(false);
     }
 
     switch (stepId) {
@@ -624,10 +639,22 @@ export function WritingWorkspace() {
       }
       case "editor": {
         if (!walkthroughDemoActiveRef.current || content.trim()) return;
+        // The topic-picker step's fetch may still be in flight -- its own
+        // success handler unconditionally calls resetDraftAndFeedback(),
+        // which would wipe the sample text this step is about to paste in
+        // the moment that late response lands. Invalidating it here (the
+        // same guard fetchRecentTopic already checks) means a late arrival
+        // is a harmless no-op instead.
+        cancelPendingRecentTopicRequest();
         applyDraftContent(WALKTHROUGH_SAMPLE_ESSAY);
         return;
       }
       case "correction-modal": {
+        // WalkthroughOverlay owns Tab/Escape for this step (see
+        // CorrectionModal's suppressFocusTrap prop) -- set for both
+        // branches below, since either one shows the modal as part of the
+        // tour, not as a standalone dialog.
+        setIsWalkthroughCorrectionPreview(true);
         // A returning learner who already has a real correction can still
         // see this step -- reopening their own real result, never the
         // fixture, since resetWalkthroughDemo below only ever discards
@@ -657,8 +684,14 @@ export function WritingWorkspace() {
   }
 
   function resetWalkthroughDemo() {
+    setIsWalkthroughCorrectionPreview(false);
     if (!walkthroughDemoActiveRef.current) return;
     walkthroughDemoActiveRef.current = false;
+    // A topic fetch from the topic-picker step can still be in flight when
+    // the tour is skipped/finished -- without this, its success handler
+    // would repopulate the topic (and wipe whatever the learner has done
+    // since) into a workspace the tour has already reset.
+    cancelPendingRecentTopicRequest();
     setTaskType(null);
     setTopicMode(null);
     setRecentTopic(null);
@@ -722,6 +755,7 @@ export function WritingWorkspace() {
     setSubmittedCorrectionText(submittedText);
     setCorrectionModalState("loading");
     setCorrectionModalSession((session) => session + 1);
+    setIsWalkthroughCorrectionPreview(false);
     setCorrectionModalOpen(true);
     try {
       const res = await fetch("/api/essays/correct", {
@@ -898,8 +932,6 @@ export function WritingWorkspace() {
   const trimmedContent = content.trim();
   const isDraftTooLongToTranslate =
     locale !== "fr" && trimmedContent.length > TRANSLATABLE_MAX_CHARS;
-  const translationIsCurrent =
-    translationFor?.text === trimmedContent && translationFor.locale === locale;
   const isTranslating = isTranslationLoading;
   const visibleTranslationError =
     translationErrorFor?.text === trimmedContent &&
@@ -914,10 +946,13 @@ export function WritingWorkspace() {
         : visibleTranslationError
           ? copy.workspace.translation.unavailableError
           : null;
-  // Hide an older response immediately when the learner edits the draft or
-  // changes the target language; the matching response will render once it
-  // arrives. A French interface simply shows the original French draft.
-  const visibleTranslation = locale === "fr" ? content : translationIsCurrent ? translation : "";
+  // Always the last translation actually fetched, even once the draft has
+  // moved on from it -- translation is on-demand now, not live, so a stale
+  // (but still accurate for the text it covers) translation stays visible
+  // until the learner re-opens the panel, rather than blanking on every
+  // keystroke while the button still reads "Hide translation". A French
+  // interface simply shows the original French draft.
+  const visibleTranslation = locale === "fr" ? content : translation;
 
   return (
     <div className="flex w-full flex-col gap-8">
@@ -1320,6 +1355,7 @@ export function WritingWorkspace() {
           copy={copy}
           onClose={closeCorrectionModal}
           onRetry={() => void handleCorrect()}
+          suppressFocusTrap={isWalkthroughCorrectionPreview}
         />
       )}
 

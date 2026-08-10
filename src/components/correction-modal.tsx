@@ -28,6 +28,14 @@ interface CorrectionModalProps {
   copy: AppCopy;
   onClose: () => void;
   onRetry: () => void;
+  // True while the walkthrough tour is showing this modal as a preview.
+  // WalkthroughOverlay owns the focus trap and Tab cycling for every tour
+  // step, including this one -- installing this modal's own trap on top of
+  // it would fight over Tab focus and strand a keyboard user unable to
+  // reach the tour's Next/Back/Skip/Finish controls, which live outside
+  // this modal's own dialog element. Defaults to false so standalone use
+  // (a real correction, opened outside any tour) keeps its normal trap.
+  suppressFocusTrap?: boolean;
 }
 
 type TabId = "overview" | "comparison" | "comments";
@@ -269,6 +277,7 @@ export function CorrectionModal({
   copy,
   onClose,
   onRetry,
+  suppressFocusTrap = false,
 }: CorrectionModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [expandedCorrectionIndexes, setExpandedCorrectionIndexes] = useState<Set<number>>(() => new Set([0]));
@@ -291,9 +300,19 @@ export function CorrectionModal({
   useEffect(() => {
     if (!open) return;
 
-    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    // The walkthrough tour owns Tab/Escape and initial focus for this step
+    // instead -- see suppressFocusTrap's own comment. Only the scroll lock
+    // above still applies.
+    if (suppressFocusTrap) {
+      return () => {
+        document.body.style.overflow = previousOverflow;
+      };
+    }
+
+    previouslyFocusedRef.current = document.activeElement as HTMLElement | null;
     const focusFrame = window.requestAnimationFrame(() => closeButtonRef.current?.focus());
 
     function handleKeyDown(event: KeyboardEvent) {
@@ -343,7 +362,7 @@ export function CorrectionModal({
       document.body.style.overflow = previousOverflow;
       previouslyFocusedRef.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open, onClose, suppressFocusTrap]);
 
   if (!open) return null;
 

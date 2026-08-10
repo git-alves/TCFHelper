@@ -16,6 +16,9 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
   useLayoutEffect(() => {
     if (!targetId) return;
 
+    let observer: MutationObserver | null = null;
+    let hasScrolledIntoView = false;
+
     function measure() {
       const element = targetId ? document.querySelector<HTMLElement>(`[data-walkthrough="${targetId}"]`) : null;
       if (!element) {
@@ -23,17 +26,37 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
         return;
       }
 
+      // A scripted tour step (see WritingWorkspace's applyWalkthroughStep)
+      // can make its own target appear asynchronously -- targetId itself
+      // doesn't change when that happens, so nothing else here would ever
+      // notice. Keep watching until it shows up, then stop; resize/scroll
+      // stay covered by the listeners below for as long as the step lasts.
+      observer?.disconnect();
+      observer = null;
+
+      if (!hasScrolledIntoView) {
+        hasScrolledIntoView = true;
+        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+      }
+
       const domRect = element.getBoundingClientRect();
       setRect({ top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height });
     }
 
     measure();
+
+    if (!hasScrolledIntoView) {
+      observer = new MutationObserver(measure);
+      observer.observe(document.body, { childList: true, subtree: true });
+    }
+
     window.addEventListener("resize", measure);
     // Capture phase: a target can sit inside a scrollable ancestor other
     // than the window (e.g. a long form), and only capture-phase listening
     // catches that scroll at all.
     window.addEventListener("scroll", measure, true);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };

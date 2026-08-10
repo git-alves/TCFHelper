@@ -75,7 +75,6 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       id: "correction-modal",
       title: copy.walkthrough.correctionModalTitle,
       body: copy.walkthrough.correctionModalBody,
-      suppressFocusTrap: true,
     },
     {
       id: "example-generate",
