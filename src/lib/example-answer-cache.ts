@@ -20,8 +20,10 @@ const CLAIM_COOLDOWN_MS = 10_000;
 // A refunded failure never raises dailyRequestCount, so it alone cannot cap
 // how many times a persistently failing provider gets called in a day — the
 // cooldown above only bounds the burst rate, not the total. dailyAttemptCount
-// is never refunded and follows the same effective per-user allowance, so a
-// lower override also bounds failed-provider retries.
+// is never refunded. A lower override tightens this cap, while the fixed
+// global ceiling prevents an unusually high override from allowing unlimited
+// failed-provider retries.
+const DAILY_ATTEMPT_CAP = 1_000;
 
 export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {
   return createHash("sha256")
@@ -120,7 +122,7 @@ export async function claimExampleGeneration(
       // Checked before, and independent of, the refundable count below: a
       // string of refunded failures must not let this claim through forever.
       const dailyAttemptCount = (continuingDay ? existing.dailyAttemptCount : 0) + 1;
-      if (dailyAttemptCount > limits.exampleGenerationsPerDay) {
+      if (dailyAttemptCount > Math.min(DAILY_ATTEMPT_CAP, limits.exampleGenerationsPerDay)) {
         return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
       }
 

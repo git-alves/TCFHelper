@@ -154,9 +154,10 @@ Activation protects the complete learner application:
 
 Only fresh provider work counts: accepted translation attempts, uncached example
 generation, and a newly claimed correction provider attempt. Example's fixed
-cooldown remains a global burst-control, while its durable failed-attempt cap
-follows the effective examples/day limit so a lower owner override cannot be
-bypassed by repeated provider failures.
+cooldown remains a global burst-control. Its durable failed-attempt cap uses
+the lower of the effective examples/day limit and a fixed 1,000-attempt global
+ceiling, so a lower owner override cannot be bypassed and a higher override
+cannot weaken provider-outage protection.
 
 Each quota reservation takes a transaction-scoped per-user PostgreSQL advisory
 lock, reads that learner's override inside that same transaction, normalizes
