@@ -129,6 +129,19 @@ describe("POST /api/access-codes/redeem", () => {
     });
   });
 
+  it("sends a learner below the current walkthrough version to dashboard", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 0 });
+
+    const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/dashboard",
+    });
+  });
+
   it("does not disclose whether an unavailable code is missing or already used", async () => {
     redeemAccessCodeMock.mockResolvedValue({ kind: "invalid" });
 

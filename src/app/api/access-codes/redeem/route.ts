@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { normalizeAccessCode, redeemAccessCode } from "@/lib/access-code";
+import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -74,7 +75,9 @@ export async function POST(request: Request) {
             activated: true,
             showWelcome: true,
             welcomeDestination:
-              user.walkthroughCompletedVersion === null ? "/dashboard" : "/tasks",
+              shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)
+                ? "/dashboard"
+                : "/tasks",
           }
         : { activated: true, showWelcome: false },
     );
