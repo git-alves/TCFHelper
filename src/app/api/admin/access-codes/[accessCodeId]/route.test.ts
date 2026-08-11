@@ -85,4 +85,15 @@ describe("DELETE /api/admin/access-codes/[accessCodeId]", () => {
       error: "This code is currently granting a learner access. Deactivate their admission first.",
     });
   });
+
+  it("reports a definite 504 -- not deleted -- when the database could not confirm the deletion in time", async () => {
+    deleteAccessCodeMock.mockResolvedValue({ kind: "timedOut" });
+
+    const response = await DELETE(deleteRequest(), { params: Promise.resolve({ accessCodeId: "code_1" }) });
+
+    expect(response.status).toBe(504);
+    await expect(response.json()).resolves.toEqual({
+      error: "This deletion could not be confirmed in time. The code was not deleted — please try again.",
+    });
+  });
 });

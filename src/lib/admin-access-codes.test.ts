@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
-const { createMock, findManyMock, transactionMock, deleteManyMock, findUniqueMock, countMock } = vi.hoisted(() => ({
+const {
+  createMock,
+  findManyMock,
+  transactionMock,
+  deleteManyMock,
+  findUniqueMock,
+  countMock,
+  executeRawUnsafeMock,
+} = vi.hoisted(() => ({
   createMock: vi.fn(),
   findManyMock: vi.fn(),
   transactionMock: vi.fn(),
   deleteManyMock: vi.fn(),
   findUniqueMock: vi.fn(),
   countMock: vi.fn(),
+  executeRawUnsafeMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -49,7 +58,14 @@ beforeEach(() => {
   deleteManyMock.mockReset();
   findUniqueMock.mockReset();
   countMock.mockReset();
-  transactionMock.mockImplementation(async (callback) => callback({ accessCode: { create: createMock } }));
+  executeRawUnsafeMock.mockReset();
+  executeRawUnsafeMock.mockResolvedValue(undefined);
+  transactionMock.mockImplementation(async (callback) =>
+    callback({
+      accessCode: { create: createMock, deleteMany: deleteManyMock },
+      $executeRawUnsafe: executeRawUnsafeMock,
+    }),
+  );
 });
 
 describe("createAccessCodes", () => {
@@ -231,6 +247,22 @@ describe("createAccessCodes", () => {
   });
 });
 
+function statementTimeoutError() {
+  const error = new Prisma.PrismaClientKnownRequestError("canceling statement due to statement timeout", {
+    code: "P2010",
+    clientVersion: "test",
+    meta: { code: "57014" },
+  });
+  return error;
+}
+
+function prismaTransactionTimeoutError() {
+  return new Prisma.PrismaClientKnownRequestError("Transaction already closed", {
+    code: "P2028",
+    clientVersion: "test",
+  });
+}
+
 describe("deleteAccessCode", () => {
   it("deletes a code that has no live admission", async () => {
     deleteManyMock.mockResolvedValue({ count: 1 });
@@ -240,6 +272,27 @@ describe("deleteAccessCode", () => {
       where: { id: "code_1", redeemedByUserId: null },
     });
     expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("runs the delete under a Postgres statement deadline, with Prisma's own transaction timeout set above it", async () => {
+    deleteManyMock.mockResolvedValue({ count: 1 });
+
+    await deleteAccessCode("code_1");
+
+    expect(executeRawUnsafeMock).toHaveBeenCalledWith(expect.stringContaining("SET LOCAL statement_timeout"));
+    // Prisma's own interactive-transaction timeout defaults to 5s -- shorter
+    // than the 6s Postgres statement deadline (DELETE_STATEMENT_TIMEOUT_MS)
+    // -- so without this explicit override, Prisma would abandon the
+    // transaction on its own clock first and surface an unhandled P2028
+    // instead of ever letting Postgres enforce the deadline this whole
+    // mechanism exists for.
+    expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 8_000 });
+  });
+
+  it("reports a definite timedOut when Prisma's own transaction timeout fires instead of Postgres's statement deadline", async () => {
+    transactionMock.mockRejectedValue(prismaTransactionTimeoutError());
+
+    await expect(deleteAccessCode("code_1")).resolves.toEqual({ kind: "timedOut" });
   });
 
   it("refuses to delete a code that is actively granting access", async () => {
@@ -254,6 +307,24 @@ describe("deleteAccessCode", () => {
     findUniqueMock.mockResolvedValue(null);
 
     await expect(deleteAccessCode("missing")).resolves.toEqual({ kind: "notFound" });
+  });
+
+  it("reports a definite timedOut, not an ambiguous outcome, when the database cancels a blocked statement", async () => {
+    // The DB itself killed this statement and rolled back its transaction --
+    // the code is definitely still there, not merely unconfirmed. This is
+    // the regression for the race a fixed client-side grace period alone
+    // could not close: a mutation genuinely blocked (e.g. on a row lock)
+    // must not be able to keep running, and possibly commit, forever.
+    transactionMock.mockRejectedValue(statementTimeoutError());
+
+    await expect(deleteAccessCode("code_1")).resolves.toEqual({ kind: "timedOut" });
+    expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("re-throws a database error unrelated to the statement deadline instead of misreporting it as a timeout", async () => {
+    transactionMock.mockRejectedValue(new Error("connection terminated unexpectedly"));
+
+    await expect(deleteAccessCode("code_1")).rejects.toThrow("connection terminated unexpectedly");
   });
 });
 
@@ -294,6 +365,15 @@ describe("deleteAccessCodes", () => {
   it("does not query the database for an empty selection", async () => {
     await expect(deleteAccessCodes([])).resolves.toEqual({ deletedCount: 0, requestedCount: 0 });
     expect(deleteManyMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a definite timedOut, not a partial count, when the database cancels a blocked statement", async () => {
+    transactionMock.mockRejectedValue(statementTimeoutError());
+
+    await expect(deleteAccessCodes(["code_1", "code_2"])).resolves.toEqual({
+      timedOut: true,
+      requestedCount: 2,
+    });
   });
 });
 
@@ -376,7 +456,10 @@ describe("getAdminAccessCodesPage", () => {
     expect(result.total).toBe(2);
   });
 
-  it("derives expiresAt from redeemedAt and validityDays for a timed, redeemed code", async () => {
+  it("passes through the persisted expiresAt for a timed, redeemed code", async () => {
+    // expiresAt is computed once, at redemption time (see redeemAccessCode
+    // in access-code.ts), and simply read back here -- not recomputed from
+    // redeemedAt/validityDays on every list read.
     countMock.mockResolvedValue(1);
     findManyMock.mockResolvedValue([
       {
@@ -386,6 +469,7 @@ describe("getAdminAccessCodesPage", () => {
         createdAt: new Date("2026-08-01T00:00:00.000Z"),
         redeemedAt: new Date("2026-08-10T00:00:00.000Z"),
         validityDays: 7,
+        expiresAt: new Date("2026-08-17T00:00:00.000Z"),
         redeemedByUser: { email: "learner@example.com" },
       },
     ]);
@@ -406,6 +490,7 @@ describe("getAdminAccessCodesPage", () => {
         createdAt: new Date("2026-08-01T00:00:00.000Z"),
         redeemedAt: null,
         validityDays: 7,
+        expiresAt: null,
         redeemedByUser: null,
       },
     ]);
@@ -453,7 +538,6 @@ describe("getAdminAccessCodesPage", () => {
 
 describe("getAdminAccessCodesForExport", () => {
   it("returns every matching row when the total is within the export cap", async () => {
-    countMock.mockResolvedValue(2);
     findManyMock.mockResolvedValue([
       {
         id: "code_1",
@@ -485,18 +569,47 @@ describe("getAdminAccessCodesForExport", () => {
     });
   });
 
-  it("refuses instead of silently truncating when the filtered total exceeds the export cap", async () => {
-    countMock.mockResolvedValue(MAX_ACCESS_CODES_EXPORT_ROWS + 1);
+  it("requests one row past the cap in a single query, not a separate count, to avoid a TOCTOU gap between counting and fetching", async () => {
+    findManyMock.mockResolvedValue([]);
+
+    await getAdminAccessCodesForExport("");
+
+    expect(countMock).not.toHaveBeenCalled();
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ take: MAX_ACCESS_CODES_EXPORT_ROWS + 1 }),
+    );
+  });
+
+  it("refuses instead of silently truncating when the sentinel row past the cap comes back", async () => {
+    findManyMock.mockResolvedValue(
+      Array.from({ length: MAX_ACCESS_CODES_EXPORT_ROWS + 1 }, (_, index) => ({
+        id: `code_${index}`,
+        code: `TCF-${index}`,
+        note: null,
+        createdAt: new Date("2026-08-10T00:00:00.000Z"),
+        redeemedAt: null,
+        validityDays: null,
+        redeemedByUser: null,
+      })),
+    );
 
     const result = await getAdminAccessCodesForExport("");
 
-    expect(result).toEqual({ truncated: true, total: MAX_ACCESS_CODES_EXPORT_ROWS + 1 });
-    expect(findManyMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ truncated: true });
   });
 
-  it("allows a total exactly at the export cap", async () => {
-    countMock.mockResolvedValue(MAX_ACCESS_CODES_EXPORT_ROWS);
-    findManyMock.mockResolvedValue([]);
+  it("allows a result exactly at the export cap", async () => {
+    findManyMock.mockResolvedValue(
+      Array.from({ length: MAX_ACCESS_CODES_EXPORT_ROWS }, (_, index) => ({
+        id: `code_${index}`,
+        code: `TCF-${index}`,
+        note: null,
+        createdAt: new Date("2026-08-10T00:00:00.000Z"),
+        redeemedAt: null,
+        validityDays: null,
+        redeemedByUser: null,
+      })),
+    );
 
     const result = await getAdminAccessCodesForExport("");
 

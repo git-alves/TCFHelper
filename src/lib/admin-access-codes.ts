@@ -3,6 +3,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveExpiresAt } from "@/lib/access-code-expiry";
 import { ADMIN_ACCESS_CODES_PAGE_SIZE } from "@/lib/access-code-limits";
 
 const MAX_NOTE_LENGTH = 280;
@@ -14,6 +15,7 @@ const ACCESS_CODE_LIST_SELECT = {
   createdAt: true,
   redeemedAt: true,
   validityDays: true,
+  expiresAt: true,
   redeemedByUser: { select: { email: true } },
 } satisfies Prisma.AccessCodeSelect;
 // Retries the *whole* batch transaction, not one statement inside it: a
@@ -29,7 +31,6 @@ const BATCH_GENERATION_ATTEMPTS = 5;
 // partway through never leaves an earlier code in the batch persisted but
 // undisclosed to the owner.
 const BATCH_TRANSACTION_TIMEOUT_MS = 15_000;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Excludes 0/O and 1/I: a code is read aloud or retyped by a learner, and
 // these are the pairs most often confused across fonts.
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -50,11 +51,12 @@ export type AdminAccessCode = {
   /** Null means lifetime access once redeemed. */
   validityDays: number | null;
   /**
-   * Derived from redeemedAt + validityDays, not read from a stored column.
-   * Present only once a timed code has actually been redeemed. Enforcement
-   * itself happens lazily in hasRedeemedAccessCode, so a code can show as
-   * expired here before the DB has caught up with that on the learner's own
-   * next request -- this keeps the admin view honest in the meantime.
+   * Set once, at redemption (see redeemAccessCode), from redeemedAt +
+   * validityDays. Present only once a timed code has actually been
+   * redeemed. Enforcement itself happens lazily in hasRedeemedAccessCode,
+   * so a code can show as expired here before the DB has caught up with
+   * that on the learner's own next request -- this keeps the admin view
+   * honest in the meantime.
    */
   expiresAt: string | null;
 };
@@ -146,10 +148,82 @@ export async function createAccessCodes(
   throw new AccessCodeGenerationFailedError();
 }
 
+// Bounds how long Postgres itself will run a delete statement -- including
+// any time spent blocked waiting on a row lock -- well under the client's
+// own abort deadline (see DELETE_TIMEOUT_MS / BULK_DELETE_TIMEOUT_MS in the
+// admin delete UI components). This is a genuine kill switch enforced by
+// the database: unlike a browser AbortController, which only stops the
+// client from waiting and never reaches the server, a Postgres statement
+// hitting its own statement_timeout is forcibly canceled and its
+// transaction rolled back. A blocked mutation therefore cannot go on
+// running -- and possibly commit -- after the deadline has passed, which is
+// what makes a client-side timeout past this point trustworthy rather than
+// merely probabilistic.
+const DELETE_STATEMENT_TIMEOUT_MS = 6_000;
+// Prisma's own interactive-transaction timeout defaults to 5s -- shorter
+// than DELETE_STATEMENT_TIMEOUT_MS above -- so without an explicit override
+// here, Prisma would abandon the transaction on its own clock before
+// Postgres ever got a chance to enforce the statement deadline this whole
+// mechanism exists for, surfacing an unhandled P2028 instead of the
+// intended definite result. This must stay above
+// DELETE_STATEMENT_TIMEOUT_MS (so Postgres's own cancellation is always
+// what actually fires) and below the client's own abort deadline (so the
+// client still gets a real response instead of timing out itself).
+const DELETE_TRANSACTION_TIMEOUT_MS = 8_000;
+
+function isStatementTimeoutError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    // 57014 is Postgres's own SQLSTATE for a canceled statement (what
+    // DELETE_STATEMENT_TIMEOUT_MS is designed to trigger). P2028 is
+    // Prisma's own interactive-transaction timeout/closure error -- a
+    // defensive second case in the unlikely event Prisma's own timeout
+    // above still fires first (e.g. under connection-pool contention),
+    // which is just as much a "could not confirm in time" outcome as the
+    // deliberate Postgres cancellation.
+    if (typeof error.meta?.code === "string" && error.meta.code === "57014") return true;
+    if (error.code === "P2028") return true;
+    if (/statement timeout/i.test(error.message)) return true;
+  }
+  return error instanceof Error && /statement timeout/i.test(error.message);
+}
+
+/**
+ * Runs `run` inside a transaction with a Postgres-enforced statement
+ * deadline. Any error surfacing from that transaction -- the deliberate
+ * cancellation this deadline exists to cause, or a genuine unrelated
+ * database error -- means the mutation cannot be confirmed to have
+ * committed, so both are folded into the same "not confirmed" result here
+ * rather than trying to exhaustively pattern-match Postgres's exact
+ * cancellation error shape (which Prisma does not document as a stable
+ * contract). A caller that needs to distinguish infrastructure failures for
+ * its own error handling should not reuse this helper.
+ */
+async function withDeleteDeadline<T>(
+  run: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
+  try {
+    const value = await prisma.$transaction(
+      async (tx) => {
+        // Not user input -- DELETE_STATEMENT_TIMEOUT_MS is a fixed internal
+        // constant, so this is safe without parameter binding (which SET
+        // does not support in Postgres in any case).
+        await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${DELETE_STATEMENT_TIMEOUT_MS}`);
+        return run(tx);
+      },
+      { timeout: DELETE_TRANSACTION_TIMEOUT_MS },
+    );
+    return { timedOut: false, value };
+  } catch (error) {
+    if (isStatementTimeoutError(error)) return { timedOut: true };
+    throw error;
+  }
+}
+
 export type DeleteAccessCodeResult =
   | { kind: "deleted" }
   | { kind: "notFound" }
-  | { kind: "activelyRedeemed" };
+  | { kind: "activelyRedeemed" }
+  | { kind: "timedOut" };
 
 /**
  * Permanently removes a code that has no live admission -- either never
@@ -161,16 +235,19 @@ export type DeleteAccessCodeResult =
  * goal is to revoke them; the code becomes deletable once detached.
  */
 export async function deleteAccessCode(id: string): Promise<DeleteAccessCodeResult> {
-  const deleted = await prisma.accessCode.deleteMany({
-    where: { id, redeemedByUserId: null },
-  });
-  if (deleted.count === 1) return { kind: "deleted" };
+  const result = await withDeleteDeadline((tx) =>
+    tx.accessCode.deleteMany({ where: { id, redeemedByUserId: null } }),
+  );
+  if (result.timedOut) return { kind: "timedOut" };
+  if (result.value.count === 1) return { kind: "deleted" };
 
   const stillExists = await prisma.accessCode.findUnique({ where: { id }, select: { id: true } });
   return stillExists ? { kind: "activelyRedeemed" } : { kind: "notFound" };
 }
 
-export type DeleteAccessCodesResult = { deletedCount: number; requestedCount: number };
+export type DeleteAccessCodesResult =
+  | { deletedCount: number; requestedCount: number }
+  | { timedOut: true; requestedCount: number };
 
 /**
  * Bulk counterpart of deleteAccessCode, sharing the exact same safety
@@ -184,11 +261,12 @@ export async function deleteAccessCodes(ids: string[]): Promise<DeleteAccessCode
   const uniqueIds = Array.from(new Set(ids));
   if (uniqueIds.length === 0) return { deletedCount: 0, requestedCount: 0 };
 
-  const deleted = await prisma.accessCode.deleteMany({
-    where: { id: { in: uniqueIds }, redeemedByUserId: null },
-  });
+  const result = await withDeleteDeadline((tx) =>
+    tx.accessCode.deleteMany({ where: { id: { in: uniqueIds }, redeemedByUserId: null } }),
+  );
+  if (result.timedOut) return { timedOut: true, requestedCount: uniqueIds.length };
 
-  return { deletedCount: deleted.count, requestedCount: uniqueIds.length };
+  return { deletedCount: result.value.count, requestedCount: uniqueIds.length };
 }
 
 function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof ACCESS_CODE_LIST_SELECT }>): AdminAccessCode {
@@ -200,10 +278,9 @@ function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof 
     redeemedAt: code.redeemedAt?.toISOString() ?? null,
     redeemedByUserEmail: code.redeemedByUser?.email ?? null,
     validityDays: code.validityDays,
-    expiresAt:
-      code.redeemedAt && code.validityDays !== null
-        ? new Date(code.redeemedAt.getTime() + code.validityDays * MS_PER_DAY).toISOString()
-        : null,
+    // resolveExpiresAt's fallback keeps this correct even for a legacy row
+    // whose expiresAt has not been self-healed yet (see access-code.ts).
+    expiresAt: resolveExpiresAt(code)?.toISOString() ?? null,
   };
 }
 
@@ -279,21 +356,29 @@ export const MAX_ACCESS_CODES_EXPORT_ROWS = 10_000;
 
 export type AdminAccessCodesExportResult =
   | { truncated: false; accessCodes: AdminAccessCode[] }
-  | { truncated: true; total: number };
+  | { truncated: true };
 
+/**
+ * A separate count() before this findMany would leave a window for a
+ * matching row to be inserted in between -- the count could pass under the
+ * cap while the findMany, racing behind it, silently omits the newly
+ * matching row from an export that claims completeness. Requesting one row
+ * past the cap in this single query sidesteps that race entirely: if it
+ * comes back, the true total is unknowably over the cap (this query alone
+ * can't say by how much) and the caller must refuse rather than guess;
+ * fewer than that and every row already in hand is provably the whole set.
+ */
 export async function getAdminAccessCodesForExport(query: string): Promise<AdminAccessCodesExportResult> {
-  const where = accessCodeSearchWhere(query);
-  const total = await prisma.accessCode.count({ where });
-  if (total > MAX_ACCESS_CODES_EXPORT_ROWS) {
-    return { truncated: true, total };
-  }
-
   const records = await prisma.accessCode.findMany({
-    where,
+    where: accessCodeSearchWhere(query),
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_ACCESS_CODES_EXPORT_ROWS,
+    take: MAX_ACCESS_CODES_EXPORT_ROWS + 1,
     select: ACCESS_CODE_LIST_SELECT,
   });
+
+  if (records.length > MAX_ACCESS_CODES_EXPORT_ROWS) {
+    return { truncated: true };
+  }
 
   return { truncated: false, accessCodes: records.map(serializeAccessCode) };
 }

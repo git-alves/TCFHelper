@@ -2,11 +2,11 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { accessCodeIsLiveWhere, resolveExpiresAt } from "@/lib/access-code-expiry";
 import { DEFAULT_USER_QUOTA_LIMITS, type UserQuotaLimits } from "@/lib/user-quota-limits";
 
 export const ADMIN_USERS_PAGE_SIZE = 25;
 const MAX_ADMIN_USERS_SEARCH_LENGTH = 120;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const ADMIN_USER_QUOTA_OVERRIDE_SELECT = {
   translationRequestsPerMinute: true,
@@ -50,7 +50,7 @@ export const ADMIN_USER_SELECT = {
     select: ADMIN_USER_QUOTA_OVERRIDE_SELECT,
   },
   redeemedAccessCodes: {
-    select: { redeemedAt: true },
+    select: { redeemedAt: true, validityDays: true, expiresAt: true },
     take: 1,
   },
 } satisfies Prisma.UserSelect;
@@ -160,6 +160,13 @@ export type AdminUserListItem = {
   isAdmin: boolean;
   isBlocked: boolean;
   activatedAt: string | null;
+  // Distinct from `activatedAt` truthiness: a timed code past its derived
+  // expiry leaves activatedAt set (it is still the true historical
+  // redemption date) but is no longer a live admission until the learner's
+  // next request lazily detaches it (see access-code.ts). A caller that
+  // needs to know "does this account currently have access" -- e.g. the
+  // table's status badge -- must use this field, not activatedAt.
+  hasLiveAdmission: boolean;
   usage: AdminUserUsage;
 };
 
@@ -169,6 +176,16 @@ export type AdminUserDetail = AdminUserListItem & {
 };
 
 function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
+  const redemption = record.redeemedAccessCodes[0];
+  // resolveExpiresAt's fallback keeps this badge correct even for a legacy
+  // row whose expiresAt has not been self-healed yet (see access-code.ts) --
+  // the display can apply the fallback per-row where the list/export
+  // filter itself, for boundedness reasons, cannot; see
+  // accessCodeIsLiveWhere for that side of the same rollout-safety story.
+  const resolvedExpiresAt = redemption !== undefined ? resolveExpiresAt(redemption) : undefined;
+  const hasLiveAdmission =
+    resolvedExpiresAt !== undefined && (resolvedExpiresAt === null || resolvedExpiresAt.getTime() > now.getTime());
+
   return {
     id: record.id,
     email: record.email,
@@ -176,7 +193,8 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
     createdAt: record.createdAt.toISOString(),
     isAdmin: record.isAdmin,
     isBlocked: record.isBlocked,
-    activatedAt: record.redeemedAccessCodes[0]?.redeemedAt?.toISOString() ?? null,
+    activatedAt: redemption?.redeemedAt?.toISOString() ?? null,
+    hasLiveAdmission,
     usage: getCurrentAdminUsage(record, now),
   };
 }
@@ -244,57 +262,35 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
 }
 
 /**
- * A timed code past its derived expiry (redeemedAt + validityDays) is still
- * attached in the database until the learner's own next request lazily
- * detaches it -- mirroring hasRedeemedAccessCode's own expiry derivation
- * (see access-code.ts). A plain "redeemedAt is not null" filter would
- * therefore misclassify an expired-but-not-yet-detached learner as
- * indefinitely activated. Prisma cannot compare two column values in a
- * WHERE clause, so live admission is resolved here in application code
- * instead: one query over currently-redeemed codes, then set membership.
+ * A currently live admission means the relation has an attached row (a
+ * detached/reset code no longer relates to the user at all, since
+ * redeemedByUserId is what defines this relation) that accessCodeIsLiveWhere
+ * considers live -- see there for what that means and, importantly, how it
+ * stays correct across a mixed-version deploy that added the expiresAt
+ * column. A timed code past its expiry is still attached until the
+ * learner's own next request lazily detaches it (hasRedeemedAccessCode), so
+ * a plain "redeemedAt is not null" filter would misclassify it as
+ * indefinitely activated -- this is why expiresAt, not redeemedAt, is what
+ * this filter compares.
+ *
+ * Because expiresAt is a real column (not date arithmetic computed ad hoc
+ * per read), this is an ordinary Prisma relation filter: one query, the
+ * same one already handling search and pagination, with no separate
+ * unbounded id list built in application memory and no window between two
+ * queries for a redemption/reset/expiry to land in and go unseen.
  */
-async function usersWithLiveAdmission(now: Date): Promise<Set<string>> {
-  const redemptions = await prisma.accessCode.findMany({
-    where: { redeemedByUserId: { not: null } },
-    select: { redeemedByUserId: true, redeemedAt: true, validityDays: true },
-  });
-  const nowMs = now.getTime();
-  const liveUserIds = new Set<string>();
+function userStatusWhere(status: AdminUserStatusFilter, now: Date): Prisma.UserWhereInput {
+  const isLive = accessCodeIsLiveWhere(now);
 
-  for (const redemption of redemptions) {
-    if (!redemption.redeemedByUserId) continue;
-    const isLive =
-      redemption.validityDays === null ||
-      redemption.redeemedAt === null ||
-      redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY > nowMs;
-    if (isLive) liveUserIds.add(redemption.redeemedByUserId);
-  }
-
-  return liveUserIds;
-}
-
-/**
- * "Activated" means a currently live admission, not merely having redeemed
- * a code at some point (a reset learner's old code no longer relates to
- * them once detached, and an expired timed code no longer counts either --
- * see usersWithLiveAdmission). The owner is excluded from "unactivated"
- * since they bypass activation entirely and would otherwise always show as
- * awaiting a code they will never redeem.
- */
-async function userStatusWhere(status: AdminUserStatusFilter, now: Date): Promise<Prisma.UserWhereInput> {
   switch (status) {
     case "blocked":
       return { isBlocked: true };
     case "admin":
       return { isAdmin: true };
-    case "activated": {
-      const liveUserIds = await usersWithLiveAdmission(now);
-      return { id: { in: Array.from(liveUserIds) } };
-    }
-    case "unactivated": {
-      const liveUserIds = await usersWithLiveAdmission(now);
-      return { isAdmin: false, id: { notIn: Array.from(liveUserIds) } };
-    }
+    case "activated":
+      return { redeemedAccessCodes: { some: isLive } };
+    case "unactivated":
+      return { isAdmin: false, redeemedAccessCodes: { none: isLive } };
     case "all":
       return {};
   }
@@ -312,7 +308,7 @@ export async function getAdminUsersPage(
   },
   now = new Date(),
 ) {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status, now) };
   const total = await prisma.user.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / ADMIN_USERS_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -350,8 +346,18 @@ export const MAX_USERS_EXPORT_ROWS = 10_000;
 
 export type AdminUsersExportResult =
   | { truncated: false; users: AdminUserListItem[] }
-  | { truncated: true; total: number };
+  | { truncated: true };
 
+/**
+ * A separate count() before this findMany would leave a window for a
+ * matching user to be created in between -- the count could pass under the
+ * cap while the findMany, racing behind it, silently omits the newly
+ * matching row from an export that claims completeness. Requesting one row
+ * past the cap in this single query sidesteps that race entirely: if it
+ * comes back, the true total is unknowably over the cap and the caller must
+ * refuse rather than guess; fewer than that and every row already in hand
+ * is provably the whole set.
+ */
 export async function getAdminUsersForExport(
   {
     query,
@@ -362,18 +368,17 @@ export async function getAdminUsersForExport(
   },
   now = new Date(),
 ): Promise<AdminUsersExportResult> {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
-  const total = await prisma.user.count({ where });
-  if (total > MAX_USERS_EXPORT_ROWS) {
-    return { truncated: true, total };
-  }
-
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status, now) };
   const records = await prisma.user.findMany({
     where,
     select: ADMIN_USER_SELECT,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_USERS_EXPORT_ROWS,
+    take: MAX_USERS_EXPORT_ROWS + 1,
   });
+
+  if (records.length > MAX_USERS_EXPORT_ROWS) {
+    return { truncated: true };
+  }
 
   return { truncated: false, users: records.map((record) => serializeUser(record, now)) };
 }

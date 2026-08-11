@@ -15,14 +15,19 @@ interface AdminAccessCodeDeleteButtonProps {
 const DELETE_TIMEOUT_MS = 10_000;
 // Observed only for an ambiguous outcome (timeout or network error, see
 // below): the browser aborting a fetch does not stop a request the server
-// already started, so a late-completing delete can still commit after that
-// abort. The caller's own router.refresh() runs unconditionally right after
-// this function resolves (see deleteCode's "finally" block) -- waiting out
-// this grace period first, instead of resolving immediately, gives that
-// refresh far higher odds of actually observing the eventual state rather
-// than reading a stale row a moment before the late delete commits
-// underneath it. It is a best-effort mitigation, not a guarantee: an
-// unusually slow server mutation can still outlast it.
+// already started. The server itself now bounds how long a delete statement
+// can run (see DELETE_STATEMENT_TIMEOUT_MS in admin-access-codes.ts) and
+// responds with a definite, non-ambiguous result well inside this client's
+// own timeout -- so a genuinely blocked mutation can no longer be the cause
+// of an outcome reaching this catch block at all. What remains here is the
+// narrower case a server deadline cannot close: the mutation actually
+// succeeded, but its response was lost in transit before the client saw it.
+// The caller's own router.refresh() runs unconditionally right after this
+// function resolves (see deleteCode's "finally" block) -- waiting out this
+// grace period first, instead of resolving immediately, gives that refresh
+// higher odds of observing that eventual state rather than reading a stale
+// row a moment before it lands. It is a best-effort mitigation for that
+// residual case, not a guarantee.
 const RECONCILE_GRACE_PERIOD_MS = 3_000;
 
 function wait(ms: number): Promise<void> {

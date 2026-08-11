@@ -39,7 +39,11 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
             ) : user.isAdmin ? (
               <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-900 dark:bg-violet-950 dark:text-violet-200">Owner access</span>
             ) : user.activatedAt ? (
-              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated {dateTime(user.activatedAt)}</span>
+              user.hasLiveAdmission ? (
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated {dateTime(user.activatedAt)}</span>
+              ) : (
+                <span className="rounded-full bg-zinc-200 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">Access expired {dateTime(user.activatedAt)}</span>
+              )
             ) : (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Awaiting access code</span>
             )}
@@ -84,6 +88,7 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
         userId={user.id}
         email={user.email}
         activationStamp={user.activatedAt}
+        hasLiveAdmission={user.hasLiveAdmission}
         isCurrentAdmin={isCurrentAdmin}
       />
 

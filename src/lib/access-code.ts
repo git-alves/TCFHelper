@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveExpiresAt } from "@/lib/access-code-expiry";
 
 const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -50,13 +51,23 @@ function redemptionLockKey(userId: string) {
 async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Promise<AdmissionResolution> {
   const admission = await tx.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { id: true, redeemedAt: true, validityDays: true },
+    select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
   });
   if (!admission) return { kind: "none" };
-  if (admission.validityDays === null || admission.redeemedAt === null) return { kind: "active" };
 
-  const expiresAt = admission.redeemedAt.getTime() + admission.validityDays * MS_PER_DAY;
-  if (Date.now() < expiresAt) return { kind: "active" };
+  const expiresAt = resolveExpiresAt(admission);
+  // A row whose expiresAt had to be derived here (see resolveExpiresAt) --
+  // written by an app instance mid-deploy, before this column existed in
+  // code -- self-heals now: the next reader sees a real, persisted value
+  // and never needs the fallback for this row again.
+  if (admission.expiresAt === null && expiresAt !== null) {
+    await tx.accessCode.updateMany({
+      where: { id: admission.id, expiresAt: null },
+      data: { expiresAt },
+    });
+  }
+  if (expiresAt === null) return { kind: "active" };
+  if (Date.now() < expiresAt.getTime()) return { kind: "active" };
 
   await tx.accessCode.updateMany({
     where: { id: admission.id, redeemedByUserId: userId, redeemedAt: { not: null } },
@@ -84,13 +95,23 @@ async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Pr
 export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
   const redemption = await prisma.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { redeemedAt: true, validityDays: true },
+    select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
   });
   if (redemption === null) return false;
-  if (redemption.validityDays === null || redemption.redeemedAt === null) return true;
 
-  const expiresAt = redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY;
-  if (Date.now() < expiresAt) return true;
+  const expiresAt = resolveExpiresAt(redemption);
+  // Self-heals a legacy/gap row the same way resolveAdmissionLocked does
+  // (see there for why) -- this is the far more common path to hit it,
+  // since it runs on every protected-route check rather than only once a
+  // code already looks expired.
+  if (redemption.expiresAt === null && expiresAt !== null) {
+    await prisma.accessCode.updateMany({
+      where: { id: redemption.id, expiresAt: null },
+      data: { expiresAt },
+    });
+  }
+  if (expiresAt === null) return true;
+  if (Date.now() < expiresAt.getTime()) return true;
 
   const resolution = await prisma.$transaction(
     async (tx) => {
@@ -128,9 +149,25 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
         const existingAdmission = await resolveAdmissionLocked(tx, userId);
         if (existingAdmission.kind === "active") return { kind: "alreadyActivated" };
 
+        // validityDays is set once at code creation and never changes
+        // afterward, so reading it here before the conditional claim below
+        // is safe -- it cannot go stale between this read and that write.
+        // Resolving id up front also means the claim itself can match on
+        // id rather than code, so the row never needs a second lookup by
+        // code after being claimed.
+        const candidate = await tx.accessCode.findUnique({
+          where: { code },
+          select: { id: true, validityDays: true },
+        });
+        if (!candidate) return { kind: "invalid" };
+
+        const redeemedAt = new Date();
+        const expiresAt =
+          candidate.validityDays === null ? null : new Date(redeemedAt.getTime() + candidate.validityDays * MS_PER_DAY);
+
         const claimed = await tx.accessCode.updateMany({
           where: {
-            code,
+            id: candidate.id,
             redeemedByUserId: null,
             // The relation intentionally keeps this timestamp even if its
             // redeemer record is ever removed. It is the durable single-use
@@ -139,22 +176,12 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
           },
           data: {
             redeemedByUserId: userId,
-            redeemedAt: new Date(),
+            redeemedAt,
+            expiresAt,
           },
         });
 
         if (claimed.count !== 1) return { kind: "invalid" };
-
-        // The route may associate the safe operational event with this opaque
-        // row ID, but must never receive or retain another copy of the bearer
-        // code itself.
-        const redeemedCode = await tx.accessCode.findUnique({
-          where: { code },
-          select: { id: true },
-        });
-        if (!redeemedCode) {
-          throw new Error("Claimed access code could not be resolved.");
-        }
 
         const welcomeMarker = await tx.user.updateMany({
           where: { id: userId, activationWelcomeShownAt: null },
@@ -164,7 +191,7 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
         return {
           kind: "redeemed",
           showWelcome: welcomeMarker.count === 1,
-          accessCodeId: redeemedCode.id,
+          accessCodeId: candidate.id,
         };
       },
       { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },

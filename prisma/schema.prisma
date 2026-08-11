@@ -284,6 +284,18 @@ model AccessCode {
   // schema language cannot express one) bounds this to
   // MAX_VALIDITY_DAYS in src/lib/access-code-limits.ts.
   validityDays     Int?
+  // Denormalized at redemption time (redeemedAt + validityDays), not
+  // recomputed on every read: it is what lets an ordinary Prisma query
+  // (e.g. the admin users list's Activated/Unactivated filter) compare a
+  // learner's live-admission expiry directly, in one bounded, consistent
+  // query, instead of loading every redeemed code into application memory
+  // to do that date arithmetic by hand. Null means either "lifetime code"
+  // or "not yet redeemed" -- ambiguity that call sites resolve the same way
+  // resolveAdmissionLocked always has, by first checking whether the code
+  // is even currently redeemed. Left untouched (not cleared) once a code is
+  // detached, matching redeemedAt's own "durable historical marker"
+  // behavior -- see resetAccessCodeActivation.
+  expiresAt        DateTime?
 
   @@index([redeemedAt])
   // Matches getAdminAccessCodesPage's orderBy([{createdAt: "desc"}, {id: "desc"}])

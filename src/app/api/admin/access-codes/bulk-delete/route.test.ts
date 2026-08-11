@@ -94,4 +94,15 @@ describe("POST /api/admin/access-codes/bulk-delete", () => {
     await expect(response.json()).resolves.toEqual({ deletedCount: 2, requestedCount: 2 });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
+
+  it("reports a definite 504 -- none deleted -- when the database could not confirm the deletion in time", async () => {
+    deleteAccessCodesMock.mockResolvedValue({ timedOut: true, requestedCount: 2 });
+
+    const response = await POST(bulkDeleteRequest({ ids: ["code_1", "code_2"] }));
+
+    expect(response.status).toBe(504);
+    await expect(response.json()).resolves.toEqual({
+      error: "This deletion could not be confirmed in time. None of the selected codes were deleted — please try again.",
+    });
+  });
 });

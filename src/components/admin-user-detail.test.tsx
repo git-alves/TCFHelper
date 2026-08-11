@@ -15,6 +15,7 @@ const baseUser = {
   isAdmin: false,
   isBlocked: false,
   activatedAt: "2026-08-10T12:05:00.000Z",
+  hasLiveAdmission: true,
   usage: {
     translation: {
       currentMinuteRequests: 2,
@@ -72,10 +73,27 @@ describe("AdminUserDetail", () => {
     expect(markup).not.toContain("Deactivate access");
   });
 
+  it("shows a distinct Access expired badge for a redeemed timed code that is no longer live, instead of the green Activated badge", () => {
+    // Mirrors the AdminUsersTable fix: activatedAt alone is a historical
+    // timestamp that survives past a timed code's derived expiry (the row
+    // stays attached until the learner's own next request lazily detaches
+    // it) -- the badge must reflect hasLiveAdmission, not activatedAt
+    // truthiness, or an expired learner reads as still having access.
+    const markup = renderToStaticMarkup(
+      createElement(AdminUserDetail, {
+        user: { ...baseUser, activatedAt: "2026-07-01T00:00:00.000Z", hasLiveAdmission: false },
+        currentAdminId: "owner_1",
+      }),
+    );
+
+    expect(markup).toContain("Access expired");
+    expect(markup).not.toContain(">Activated ");
+  });
+
   it("shows a learner who was deactivated that a new code is required", () => {
     const markup = renderToStaticMarkup(
       createElement(AdminUserDetail, {
-        user: { ...baseUser, activatedAt: null },
+        user: { ...baseUser, activatedAt: null, hasLiveAdmission: false },
         currentAdminId: "owner_1",
       }),
     );
