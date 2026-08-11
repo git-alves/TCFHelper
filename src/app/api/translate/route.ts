@@ -36,6 +36,8 @@ type QuotaReservation =
       allowed: false;
       reason: "rate" | "monthly";
       resetAt: Date;
+      usageValue: number;
+      quotaLimit: number;
     };
 
 function startOfUtcMinute(date: Date) {
@@ -110,15 +112,34 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       const monthCharacterCount =
         (continuingMonth ? existing.monthCharacterCount : 0) + characterCount;
 
-      if (
-        minuteRequestCount > limits.translationRequestsPerMinute ||
-        minuteCharacterCount > limits.translationCharactersPerMinute
-      ) {
-        return { allowed: false, reason: "rate", resetAt: minuteResetsAt };
+      if (minuteRequestCount > limits.translationRequestsPerMinute) {
+        return {
+          allowed: false,
+          reason: "rate",
+          resetAt: minuteResetsAt,
+          usageValue: minuteRequestCount,
+          quotaLimit: limits.translationRequestsPerMinute,
+        };
+      }
+
+      if (minuteCharacterCount > limits.translationCharactersPerMinute) {
+        return {
+          allowed: false,
+          reason: "rate",
+          resetAt: minuteResetsAt,
+          usageValue: minuteCharacterCount,
+          quotaLimit: limits.translationCharactersPerMinute,
+        };
       }
 
       if (monthCharacterCount > limits.translationCharactersPerMonth) {
-        return { allowed: false, reason: "monthly", resetAt: monthResetsAt };
+        return {
+          allowed: false,
+          reason: "monthly",
+          resetAt: monthResetsAt,
+          usageValue: monthCharacterCount,
+          quotaLimit: limits.translationCharactersPerMonth,
+        };
       }
 
       const data = {
@@ -246,6 +267,8 @@ export async function POST(request: Request) {
       reasonCode: quotaReservation.reason === "rate" ? "minute_limit" : "monthly_limit",
       httpStatus: 429,
       quotaWindow: quotaReservation.reason === "rate" ? "minute" : "month",
+      usageValue: quotaReservation.usageValue,
+      quotaLimit: quotaReservation.quotaLimit,
     });
     return translationResponse(
       {

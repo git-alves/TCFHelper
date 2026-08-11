@@ -200,7 +200,12 @@ describe("POST /api/essays/example", () => {
   });
 
   it("returns a daily limit with its reset time before calling either provider", async () => {
-    claimExampleGenerationMock.mockResolvedValue({ kind: "dailyLimit", resetAt: new Date("2026-08-05T00:00:00.000Z") });
+    claimExampleGenerationMock.mockResolvedValue({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-05T00:00:00.000Z"),
+      usageValue: 4,
+      quotaLimit: 3,
+    });
 
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
@@ -213,6 +218,8 @@ describe("POST /api/essays/example", () => {
       reasonCode: "daily_limit",
       httpStatus: 429,
       quotaWindow: "day",
+      usageValue: 4,
+      quotaLimit: 3,
     });
   });
 

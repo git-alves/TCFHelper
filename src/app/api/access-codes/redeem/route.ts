@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       await recordAdminEvent({
         eventType: "ACCESS_CODE_REDEEMED",
         userId: user.id,
+        accessCodeId: result.accessCodeId,
         httpStatus: 200,
       });
     }

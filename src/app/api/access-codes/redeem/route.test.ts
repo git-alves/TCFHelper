@@ -48,7 +48,7 @@ beforeEach(() => {
 
   getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: null });
   normalizeAccessCodeMock.mockImplementation((code) => code.trim().toUpperCase());
-  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: true });
+  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: true, accessCodeId: "access_code_1" });
 });
 
 describe("POST /api/access-codes/redeem", () => {
@@ -118,13 +118,15 @@ describe("POST /api/access-codes/redeem", () => {
     expect(recordAdminEventMock).toHaveBeenCalledWith({
       eventType: "ACCESS_CODE_REDEEMED",
       userId: USER_ID,
+      accessCodeId: "access_code_1",
       httpStatus: 200,
     });
+    expect(JSON.stringify(recordAdminEventMock.mock.calls)).not.toContain("INVITE-AB12");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("does not repeat the welcome handoff after a learner's access is restored", async () => {
-    redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: false });
+    redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: false, accessCodeId: "access_code_1" });
 
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 

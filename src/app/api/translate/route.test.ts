@@ -349,6 +349,8 @@ describe("POST /api/translate", () => {
       reasonCode: "minute_limit",
       httpStatus: 429,
       quotaWindow: "minute",
+      usageValue: 21,
+      quotaLimit: 20,
     });
   });
 
@@ -417,6 +419,15 @@ describe("POST /api/translate", () => {
     expect(response.headers.get("Retry-After")).toBe("4");
     expect(deeplTranslateMock).not.toHaveBeenCalled();
     expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "minute_limit",
+      httpStatus: 429,
+      quotaWindow: "minute",
+      usageValue: 20_001,
+      quotaLimit: 20_000,
+    });
   });
 
   it("stops a direct caller at the durable monthly character limit before contacting a provider", async () => {
@@ -445,6 +456,8 @@ describe("POST /api/translate", () => {
       reasonCode: "monthly_limit",
       httpStatus: 429,
       quotaWindow: "month",
+      usageValue: 100_007,
+      quotaLimit: 100_000,
     });
   });
 

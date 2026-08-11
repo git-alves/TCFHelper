@@ -39,7 +39,9 @@ beforeEach(() => {
   executeRawMock.mockReset();
 
   executeRawMock.mockResolvedValue(1);
-  findUniqueMock.mockResolvedValue(null);
+  findUniqueMock.mockImplementation((args: { where: { code?: string } }) =>
+    args.where.code ? { id: "access_code_1" } : null,
+  );
   updateManyMock.mockResolvedValue({ count: 1 });
   userUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(async (callback) =>
@@ -128,12 +130,17 @@ describe("redeemAccessCode", () => {
     await expect(redeemAccessCode(USER_ID, "INVITE-AB12")).resolves.toEqual({
       kind: "redeemed",
       showWelcome: true,
+      accessCodeId: "access_code_1",
     });
 
     expect(executeRawMock.mock.calls[0]?.[0]?.join("")).toContain("pg_advisory_xact_lock");
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { redeemedByUserId: USER_ID },
       select: { id: true, redeemedAt: true, validityDays: true },
+    });
+    expect(findUniqueMock).toHaveBeenCalledWith({
+      where: { code: "INVITE-AB12" },
+      select: { id: true },
     });
     expect(updateManyMock).toHaveBeenCalledWith({
       where: { code: "INVITE-AB12", redeemedByUserId: null, redeemedAt: null },
@@ -160,7 +167,9 @@ describe("redeemAccessCode", () => {
 
   it("detaches an expired admission and claims the replacement code in the same transaction", async () => {
     const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
-    findUniqueMock.mockResolvedValue({ id: "code_expired", redeemedAt: tenDaysAgo, validityDays: 7 });
+    findUniqueMock
+      .mockResolvedValueOnce({ id: "code_expired", redeemedAt: tenDaysAgo, validityDays: 7 })
+      .mockResolvedValueOnce({ id: "replacement_code" });
     // The original (now-expired) redemption already set this marker, so a
     // replacement code's own redemption must not re-trigger the welcome.
     userUpdateManyMock.mockResolvedValue({ count: 0 });
@@ -168,6 +177,7 @@ describe("redeemAccessCode", () => {
     await expect(redeemAccessCode(USER_ID, "NEW-CODE")).resolves.toEqual({
       kind: "redeemed",
       showWelcome: false,
+      accessCodeId: "replacement_code",
     });
 
     expect(updateManyMock).toHaveBeenCalledWith({
@@ -193,6 +203,7 @@ describe("redeemAccessCode", () => {
     await expect(redeemAccessCode(USER_ID, "NEW-INVITE")).resolves.toEqual({
       kind: "redeemed",
       showWelcome: false,
+      accessCodeId: "access_code_1",
     });
   });
 });
@@ -248,6 +259,7 @@ describe("resetAccessCodeActivation", () => {
     await expect(redeemAccessCode(USER_ID, "NEW-CODE")).resolves.toEqual({
       kind: "redeemed",
       showWelcome: false,
+      accessCodeId: "access_code_1",
     });
 
     expect(updateManyMock).toHaveBeenNthCalledWith(2, {

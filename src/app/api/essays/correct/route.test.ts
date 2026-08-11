@@ -311,6 +311,8 @@ describe("POST /api/essays/correct", () => {
     reserveCorrectionUsageMock.mockResolvedValue({
       kind: "dailyLimit",
       resetAt: new Date("2026-08-11T00:00:00.000Z"),
+      usageValue: 6,
+      quotaLimit: 5,
     });
 
     const response = await post({
@@ -337,6 +339,8 @@ describe("POST /api/essays/correct", () => {
       reasonCode: "daily_limit",
       httpStatus: 429,
       quotaWindow: "day",
+      usageValue: 6,
+      quotaLimit: 5,
     });
   });
 

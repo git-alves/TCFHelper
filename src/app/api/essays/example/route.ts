@@ -198,6 +198,8 @@ export async function POST(request: Request) {
       reasonCode: "daily_limit",
       httpStatus: 429,
       quotaWindow: "day",
+      usageValue: claim.usageValue,
+      quotaLimit: claim.quotaLimit,
     });
     return NextResponse.json(
       {

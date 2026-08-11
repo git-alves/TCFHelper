@@ -7,7 +7,7 @@ const QUOTA_TRANSACTION_TIMEOUT_MS = 3_000;
 
 export type CorrectionUsageReservation =
   | { kind: "claimed"; dayStartedAt: Date; monthStartedAt: Date }
-  | { kind: "dailyLimit"; resetAt: Date };
+  | { kind: "dailyLimit"; resetAt: Date; usageValue: number; quotaLimit: number };
 
 function startOfUtcDay(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -51,7 +51,12 @@ export async function reserveCorrectionUsage(userId: string): Promise<Correction
       const { correctionRequestsPerDay } = resolveUserQuotaLimits(overrides);
 
       if (dailyRequestCount > correctionRequestsPerDay) {
-        return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
+        return {
+          kind: "dailyLimit",
+          resetAt: startOfNextUtcDay(now),
+          usageValue: dailyRequestCount,
+          quotaLimit: correctionRequestsPerDay,
+        };
       }
 
       await tx.correctionUsage.upsert({

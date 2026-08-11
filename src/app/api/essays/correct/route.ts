@@ -265,6 +265,8 @@ export async function POST(request: Request) {
       reasonCode: "daily_limit",
       httpStatus: 429,
       quotaWindow: "day",
+      usageValue: usageReservation.usageValue,
+      quotaLimit: usageReservation.quotaLimit,
     });
     await releaseCorrectionClaim({
       userId: user.id,
