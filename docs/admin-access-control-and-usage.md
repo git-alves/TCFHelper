@@ -221,6 +221,23 @@ learner's previous window:
 
 All labels say “current UTC day/month” rather than imply historical totals.
 
+### Online-now presence
+
+The overview's "Online now" count is a heartbeat, not literal real-time
+presence: there is no push channel or background job. `User.lastActiveAt` is
+updated (throttled to at most once per `ACTIVITY_HEARTBEAT_THROTTLE_MS`, 60
+seconds, per account) as a side effect of `getCurrentAppUser()` resolving an
+already-linked, non-blocked account -- the same function every protected
+page/API route already calls, so this piggybacks on existing traffic rather
+than adding a new endpoint or client beacon. A presence write failure is
+logged and swallowed; it must never fail the real request it rode in on.
+
+The count itself is `isBlocked: false` accounts with `lastActiveAt` within
+`ONLINE_THRESHOLD_MS` (2 minutes) of the query time. The admin page polls
+`GET /api/admin/overview` every ~12 seconds client-side to keep the number
+current without a manual reload -- "real time" here means frequent polling
+against a rolling heartbeat window, not push-based presence.
+
 ### Admin surfaces
 
 `/admin` shows registered-user total, blocked count, and the normalized
@@ -260,7 +277,7 @@ not-found to non-owners. Owner-visible success/errors are `private, no-store`.
 
 | Endpoint | Contract |
 | --- | --- |
-| `GET /api/admin/overview` | Registered/blocked counts plus normalized current-window aggregates. |
+| `GET /api/admin/overview` | Registered/blocked counts, the online-now heartbeat count, plus normalized current-window aggregates. Also polled client-side for the live tile. |
 | `GET /api/admin/users?query=&page=` | Bounded search/page result with normalized usage. |
 | `GET /api/admin/users/[id]` | Detail, effective limits, raw nullable overrides; unknown ID is owner-visible 404. |
 | `PATCH /api/admin/users/[id]/block` | Strict `{ isBlocked: boolean }`; rejects blocking owner/self. |
