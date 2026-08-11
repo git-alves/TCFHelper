@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { adminJsonResponse, adminNotFoundResponse, getAdminApiUser } from "@/lib/admin-api";
-import { createAccessCodes, listAccessCodes } from "@/lib/admin-access-codes";
+import {
+  createAccessCodes,
+  getAdminAccessCodesPage,
+  parseAdminAccessCodesListQuery,
+} from "@/lib/admin-access-codes";
 import { MAX_ACCESS_CODE_BATCH_SIZE, MAX_VALIDITY_DAYS } from "@/lib/access-code-limits";
 
 const requestSchema = z
@@ -12,11 +16,16 @@ const requestSchema = z
   })
   .strict();
 
-export async function GET() {
+export async function GET(request: Request) {
   const admin = await getAdminApiUser();
   if (!admin) return adminNotFoundResponse();
 
-  return adminJsonResponse({ accessCodes: await listAccessCodes() });
+  const url = new URL(request.url);
+  const filters = parseAdminAccessCodesListQuery({
+    query: url.searchParams.get("query") ?? undefined,
+    page: url.searchParams.get("page") ?? undefined,
+  });
+  return adminJsonResponse(await getAdminAccessCodesPage(filters));
 }
 
 export async function POST(request: Request) {

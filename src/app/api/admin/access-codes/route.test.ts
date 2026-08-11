@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getAdminApiUserMock, createAccessCodesMock, listAccessCodesMock } = vi.hoisted(() => ({
-  getAdminApiUserMock: vi.fn(),
-  createAccessCodesMock: vi.fn(),
-  listAccessCodesMock: vi.fn(),
-}));
+const { getAdminApiUserMock, createAccessCodesMock, getAdminAccessCodesPageMock, parseAdminAccessCodesListQueryMock } =
+  vi.hoisted(() => ({
+    getAdminApiUserMock: vi.fn(),
+    createAccessCodesMock: vi.fn(),
+    getAdminAccessCodesPageMock: vi.fn(),
+    parseAdminAccessCodesListQueryMock: vi.fn(),
+  }));
 
 vi.mock("@/lib/admin-api", () => ({
   getAdminApiUser: getAdminApiUserMock,
@@ -14,7 +16,8 @@ vi.mock("@/lib/admin-api", () => ({
 }));
 vi.mock("@/lib/admin-access-codes", () => ({
   createAccessCodes: createAccessCodesMock,
-  listAccessCodes: listAccessCodesMock,
+  getAdminAccessCodesPage: getAdminAccessCodesPageMock,
+  parseAdminAccessCodesListQuery: parseAdminAccessCodesListQueryMock,
 }));
 vi.mock("@/lib/access-code-limits", () => ({
   MAX_ACCESS_CODE_BATCH_SIZE: 10,
@@ -43,12 +46,23 @@ function postRequest(body: unknown) {
   });
 }
 
+function getRequest(search = "") {
+  return new Request(`http://localhost/api/admin/access-codes${search}`);
+}
+
+const CODES_PAGE = { accessCodes: [CODE], total: 1, page: 1, pageCount: 1, query: "" };
+
 beforeEach(() => {
   getAdminApiUserMock.mockReset();
   createAccessCodesMock.mockReset();
-  listAccessCodesMock.mockReset();
+  getAdminAccessCodesPageMock.mockReset();
+  parseAdminAccessCodesListQueryMock.mockReset();
   getAdminApiUserMock.mockResolvedValue(ADMIN);
-  listAccessCodesMock.mockResolvedValue([CODE]);
+  getAdminAccessCodesPageMock.mockResolvedValue(CODES_PAGE);
+  parseAdminAccessCodesListQueryMock.mockImplementation(({ query, page }) => ({
+    query: query ?? "",
+    page: page ? Number(page) : 1,
+  }));
   createAccessCodesMock.mockResolvedValue([CODE]);
 });
 
@@ -56,17 +70,27 @@ describe("GET /api/admin/access-codes", () => {
   it("returns a non-disclosing 404 for a non-admin", async () => {
     getAdminApiUserMock.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(getRequest());
 
     expect(response.status).toBe(404);
     expect(await response.text()).toBe("");
   });
 
   it("lists codes for the admin", async () => {
-    const response = await GET();
+    const response = await GET(getRequest());
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ accessCodes: [CODE] });
+    expect(await response.json()).toEqual(CODES_PAGE);
+  });
+
+  it("parses query and page from the request URL", async () => {
+    await GET(getRequest("?query=learner%40example.com&page=2"));
+
+    expect(parseAdminAccessCodesListQueryMock).toHaveBeenCalledWith({
+      query: "learner@example.com",
+      page: "2",
+    });
+    expect(getAdminAccessCodesPageMock).toHaveBeenCalledWith({ query: "learner@example.com", page: 2 });
   });
 });
 

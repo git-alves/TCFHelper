@@ -1,3 +1,4 @@
+import { AdminAccessCodeDeleteButton } from "@/components/admin-access-code-delete-button";
 import { CopyButton } from "@/components/copy-button";
 import type { AdminAccessCode } from "@/lib/admin-access-codes";
 
@@ -39,11 +40,18 @@ export function AdminAccessCodesTable({ accessCodes }: { accessCodes: AdminAcces
             <th scope="col" className="px-4 py-3">Validity</th>
             <th scope="col" className="px-4 py-3">Created</th>
             <th scope="col" className="px-4 py-3">Status</th>
+            <th scope="col" className="px-4 py-3">
+              <span className="sr-only">Actions</span>
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-black/[.08] dark:divide-white/[.1]">
           {accessCodes.map((accessCode) => {
             const status = statusText(accessCode);
+            // Matches deleteAccessCode's own eligibility check: a code with
+            // no active admission (never redeemed, or already detached) can
+            // be deleted without affecting anyone's access.
+            const isDeletable = accessCode.redeemedByUserEmail === null;
             return (
               <tr key={accessCode.id}>
                 <td className="px-4 py-3">
@@ -62,6 +70,13 @@ export function AdminAccessCodesTable({ accessCodes }: { accessCodes: AdminAcces
                     <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">
                       Unredeemed
                     </span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  {isDeletable ? (
+                    <AdminAccessCodeDeleteButton accessCodeId={accessCode.id} code={accessCode.code} />
+                  ) : (
+                    <span className="text-xs text-zinc-400 dark:text-zinc-500">In use</span>
                   )}
                 </td>
               </tr>

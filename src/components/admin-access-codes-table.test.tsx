@@ -1,7 +1,10 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { AdminAccessCodesTable } from "./admin-access-codes-table";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
+
+const { AdminAccessCodesTable } = await import("./admin-access-codes-table");
 
 describe("AdminAccessCodesTable", () => {
   it("describes a detached admission without implying that the learner was deleted", () => {
@@ -25,6 +28,9 @@ describe("AdminAccessCodesTable", () => {
     expect(markup).toContain("Permanently spent on");
     expect(markup).toContain("no active admission");
     expect(markup).not.toContain("deleted account");
+    // A detached admission has no live redeemer, so the code is safe to
+    // delete without affecting anyone's access.
+    expect(markup).toContain(">Delete<");
   });
 
   it("labels a lifetime code and an active timed code's expiry", () => {
@@ -60,6 +66,10 @@ describe("AdminAccessCodesTable", () => {
     expect(markup).toContain("30 days");
     expect(markup).toContain("Redeemed by learner@example.com");
     expect(markup).toContain("expires");
+    // The unredeemed code is deletable; the actively redeemed one is not --
+    // deleting it would sever that learner's live admission.
+    expect(markup).toContain(">Delete<");
+    expect(markup).toContain(">In use<");
   });
 
   it("flags a timed code past its expiry as pending removal rather than still active", () => {
@@ -83,5 +93,10 @@ describe("AdminAccessCodesTable", () => {
 
     expect(markup).toContain("expired");
     expect(markup).toContain("removed on their next visit");
+    // Still attached in the database until the learner's next request lazily
+    // detaches it -- deleting it now would sever access that has not
+    // actually ended yet, so it must not offer Delete.
+    expect(markup).not.toContain(">Delete<");
+    expect(markup).toContain(">In use<");
   });
 });
