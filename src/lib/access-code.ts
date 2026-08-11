@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type AccessCodeRedemption =
   | { kind: "redeemed"; showWelcome: boolean }
@@ -14,6 +15,16 @@ export type AccessCodeActivationReset =
   | { kind: "reset" }
   | { kind: "notActivated" };
 
+type AdmissionLockedTx = {
+  accessCode: Pick<Prisma.TransactionClient["accessCode"], "findUnique" | "updateMany">;
+  user: Pick<Prisma.TransactionClient["user"], "updateMany">;
+};
+
+type AdmissionResolution =
+  | { kind: "none" }
+  | { kind: "active" }
+  | { kind: "expired" };
+
 /**
  * Access codes are generated in upper case. Normalizing the learner's entry
  * keeps a pasted lowercase code from being needlessly rejected, while leaving
@@ -23,18 +34,72 @@ export function normalizeAccessCode(code: string) {
   return code.trim().toUpperCase();
 }
 
-/** Returns whether the learner has consumed an access code and may use the app. */
+function redemptionLockKey(userId: string) {
+  return `access-code-redemption:${userId}`;
+}
+
+/**
+ * Must run from inside a transaction that already holds this learner's
+ * per-user advisory lock. Re-reads whichever admission is current (never a
+ * value read before the lock was taken) and, if a timed code's window has
+ * elapsed, detaches that exact row by id. This is what makes expiry safe
+ * against a redeem/reset racing in between an earlier unlocked read and this
+ * check: a concurrent redemption's new code is never mistaken for the one
+ * that was actually found expired.
+ */
+async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Promise<AdmissionResolution> {
+  const admission = await tx.accessCode.findUnique({
+    where: { redeemedByUserId: userId },
+    select: { id: true, redeemedAt: true, validityDays: true },
+  });
+  if (!admission) return { kind: "none" };
+  if (admission.validityDays === null || admission.redeemedAt === null) return { kind: "active" };
+
+  const expiresAt = admission.redeemedAt.getTime() + admission.validityDays * MS_PER_DAY;
+  if (Date.now() < expiresAt) return { kind: "active" };
+
+  await tx.accessCode.updateMany({
+    where: { id: admission.id, redeemedByUserId: userId, redeemedAt: { not: null } },
+    data: { redeemedByUserId: null },
+  });
+  // Defensive parity with the manual reset below: a redemption predating the
+  // welcome marker could in principle still have it null here. A timed
+  // code's own redemption already sets it, so this is normally a no-op.
+  await tx.user.updateMany({
+    where: { id: userId, activationWelcomeShownAt: null },
+    data: { activationWelcomeShownAt: new Date() },
+  });
+  return { kind: "expired" };
+}
+
+/**
+ * Returns whether the learner has consumed an access code and may use the
+ * app. A time-limited code's admission is detached the same way a manual
+ * "Deactivate access" is once its validity window has elapsed -- there is no
+ * background job, so this is the point where an expired grant is actually
+ * enforced. The cheap unlocked read below is only ever used to decide
+ * whether the code even looks expired; the actual detach always re-resolves
+ * under the per-user lock rather than trusting that stale read.
+ */
 export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
   const redemption = await prisma.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { id: true },
+    select: { redeemedAt: true, validityDays: true },
   });
+  if (redemption === null) return false;
+  if (redemption.validityDays === null || redemption.redeemedAt === null) return true;
 
-  return redemption !== null;
-}
+  const expiresAt = redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY;
+  if (Date.now() < expiresAt) return true;
 
-function redemptionLockKey(userId: string) {
-  return `access-code-redemption:${userId}`;
+  const resolution = await prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${redemptionLockKey(userId)})::bigint)`;
+      return resolveAdmissionLocked(tx, userId);
+    },
+    { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },
+  );
+  return resolution.kind === "active";
 }
 
 function isUniqueConstraint(error: unknown): error is Prisma.PrismaClientKnownRequestError {
@@ -55,11 +120,13 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
       async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${redemptionLockKey(userId)})::bigint)`;
 
-        const existingRedemption = await tx.accessCode.findUnique({
-          where: { redeemedByUserId: userId },
-          select: { id: true },
-        });
-        if (existingRedemption) return { kind: "alreadyActivated" };
+        // An expired admission is detached here, inside this same locked
+        // transaction, rather than left for a separate hasRedeemedAccessCode
+        // call: otherwise a stale/direct submission with a replacement code
+        // would see the expired admission as still current and report
+        // "already activated" without actually consuming the new code.
+        const existingAdmission = await resolveAdmissionLocked(tx, userId);
+        if (existingAdmission.kind === "active") return { kind: "alreadyActivated" };
 
         const claimed = await tx.accessCode.updateMany({
           where: {

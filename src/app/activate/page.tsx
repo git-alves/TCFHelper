@@ -21,10 +21,9 @@ export default async function ActivatePage() {
     return null;
   }
 
+  let isActivated: boolean;
   try {
-    if (user.isAdmin || await hasRedeemedAccessCode(user.id)) {
-      redirect("/tasks");
-    }
+    isActivated = user.isAdmin || (await hasRedeemedAccessCode(user.id));
   } catch {
     // Fail closed if activation state cannot be read. Rendering this isolated
     // page is safe; allowing a route into the app would not be.
@@ -36,6 +35,13 @@ export default async function ActivatePage() {
         </p>
       </main>
     );
+  }
+
+  // Outside the try/catch above: Next.js redirects by throwing, and a
+  // blanket catch around that throw would misreport a normal redirect as
+  // the "activation temporarily unavailable" failure instead of navigating.
+  if (isActivated) {
+    redirect("/tasks");
   }
 
   return (
