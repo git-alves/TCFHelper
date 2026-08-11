@@ -42,6 +42,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811080000_add_auth_security_sessions");
   });
 
+  it("allows the additive access-code createdAt/id index migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811090000_add_access_code_created_at_index");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
