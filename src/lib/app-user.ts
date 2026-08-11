@@ -4,6 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { type User as ClerkBackendUser, type UserJSON } from "@clerk/backend";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ACTIVITY_HEARTBEAT_THROTTLE_MS } from "@/lib/presence-limits";
 
 const APP_USER_SELECT = {
   id: true,
@@ -13,31 +14,48 @@ const APP_USER_SELECT = {
   isAdmin: true,
   isBlocked: true,
   walkthroughCompletedVersion: true,
-  lastActiveAt: true,
 } satisfies Prisma.UserSelect;
 
-// Bounds how often a heartbeat write happens for one account, regardless of
-// how many requests they make -- the admin "online now" window is a couple
-// of minutes wide, so anything finer than this is wasted write volume on
-// every protected page/API call.
-const ACTIVITY_HEARTBEAT_THROTTLE_MS = 60_000;
+// A slow or momentarily locked heartbeat write must never make an ordinary
+// protected request wait for it -- this bounds how long touchLastActive
+// delays the caller, not how long the write itself is allowed to keep
+// running server-side.
+const HEARTBEAT_WRITE_BOUND_MS = 300;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
  * Records presence for the admin "online now" count. Never allowed to fail
  * the real request it was piggybacked on: this is a cosmetic side effect,
  * not something any authorization or business decision depends on.
+ *
+ * The throttle is enforced by the update's own WHERE clause against current
+ * database state, not a value read earlier in this request -- concurrent
+ * requests for the same account (parallel API calls, a layout render racing
+ * a page render) each re-check freshly once they actually acquire the row,
+ * so an in-flight older request can never regress a newer one's write, and
+ * only genuinely stale rows are written at all.
  */
-async function touchLastActive(userId: string, lastActiveAt: Date | null): Promise<void> {
+async function touchLastActive(userId: string): Promise<void> {
   const now = new Date();
-  if (lastActiveAt && now.getTime() - lastActiveAt.getTime() < ACTIVITY_HEARTBEAT_THROTTLE_MS) {
-    return;
-  }
+  const cutoff = new Date(now.getTime() - ACTIVITY_HEARTBEAT_THROTTLE_MS);
 
-  try {
-    await prisma.user.update({ where: { id: userId }, data: { lastActiveAt: now } });
-  } catch (error) {
-    console.error("Presence heartbeat update failed", error);
-  }
+  const write = prisma.user
+    .updateMany({
+      where: {
+        id: userId,
+        isBlocked: false,
+        OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: cutoff } }],
+      },
+      data: { lastActiveAt: now },
+    })
+    .catch((error) => {
+      console.error("Presence heartbeat update failed", error);
+    });
+
+  await Promise.race([write, delay(HEARTBEAT_WRITE_BOUND_MS)]);
 }
 
 export type AppUser = Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>;
@@ -89,8 +107,14 @@ export async function getCurrentClerkUserId(): Promise<string | null> {
  * externalId, which is the existing app CUID. A matching email alone is
  * deliberately never enough to attach an identity, because legacy emails
  * were not verified by this app.
+ *
+ * `skipPresenceTouch` exists for exactly one caller: the admin overview's
+ * own client-side polling endpoint. Without it, refreshing that live tile
+ * would keep resetting the owner's own presence indefinitely -- including
+ * from a backgrounded tab -- making "online" self-sustaining rather than a
+ * signal of real activity. Every other caller should omit it.
  */
-export async function getCurrentAppUser(): Promise<AppUser | null> {
+export async function getCurrentAppUser(options?: { skipPresenceTouch?: boolean }): Promise<AppUser | null> {
   const clerkUserId = await getCurrentClerkUserId();
   if (!clerkUserId) {
     return null;
@@ -99,7 +123,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
   const mappedUser = await findAppUserByClerkId(clerkUserId);
   if (mappedUser) {
     if (mappedUser.isBlocked) return null;
-    await touchLastActive(mappedUser.id, mappedUser.lastActiveAt);
+    if (!options?.skipPresenceTouch) await touchLastActive(mappedUser.id);
     return mappedUser;
   }
 
@@ -110,7 +134,7 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   const syncedUser = await syncClerkUser(identityFromBackendUser(clerkUser));
   if (syncedUser.isBlocked) return null;
-  await touchLastActive(syncedUser.id, syncedUser.lastActiveAt);
+  if (!options?.skipPresenceTouch) await touchLastActive(syncedUser.id);
   return syncedUser;
 }
 
@@ -119,8 +143,8 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
  * receive null for anonymous, blocked, and non-admin users so pages can
  * respond with notFound() and APIs with a non-disclosing 404.
  */
-export async function getCurrentAdminUser(): Promise<AppUser | null> {
-  const user = await getCurrentAppUser();
+export async function getCurrentAdminUser(options?: { skipPresenceTouch?: boolean }): Promise<AppUser | null> {
+  const user = await getCurrentAppUser(options);
   return user?.isAdmin ? user : null;
 }
 

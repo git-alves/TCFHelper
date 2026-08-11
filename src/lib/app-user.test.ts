@@ -7,6 +7,7 @@ const {
   findFirstMock,
   createMock,
   updateMock,
+  updateManyMock,
 } = vi.hoisted(() => ({
   authMock: vi.fn(),
   currentUserMock: vi.fn(),
@@ -14,6 +15,7 @@ const {
   findFirstMock: vi.fn(),
   createMock: vi.fn(),
   updateMock: vi.fn(),
+  updateManyMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -28,6 +30,7 @@ vi.mock("@/lib/prisma", () => ({
       findFirst: findFirstMock,
       create: createMock,
       update: updateMock,
+      updateMany: updateManyMock,
     },
   },
 }));
@@ -89,6 +92,7 @@ beforeEach(() => {
   findFirstMock.mockReset();
   createMock.mockReset();
   updateMock.mockReset();
+  updateManyMock.mockReset();
 
   authMock.mockResolvedValue({ userId: "user_clerk_1" });
   findUniqueMock.mockResolvedValue(null);
@@ -96,6 +100,7 @@ beforeEach(() => {
   currentUserMock.mockResolvedValue(clerkUser());
   createMock.mockResolvedValue(APP_USER);
   updateMock.mockResolvedValue(APP_USER);
+  updateManyMock.mockResolvedValue({ count: 1 });
 });
 
 describe("getCurrentAppUser", () => {
@@ -124,51 +129,83 @@ describe("getCurrentAppUser", () => {
     expect(currentUserMock).not.toHaveBeenCalled();
   });
 
-  it("records a presence heartbeat for a mapped account with no prior activity", async () => {
-    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: null });
+  it("records a presence heartbeat as a conditional update, not an unconditional write", async () => {
+    findUniqueMock.mockResolvedValue(APP_USER);
 
     await getCurrentAppUser();
 
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: APP_USER.id },
+    // The throttle is the WHERE clause itself, re-evaluated against current
+    // DB state at write time -- not a value read earlier in this request.
+    // That is what makes it safe against a request racing another one for
+    // the same account: see the concurrency test below.
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: APP_USER.id,
+        isBlocked: false,
+        OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: expect.any(Date) } }],
+      },
       data: { lastActiveAt: expect.any(Date) },
     });
   });
 
-  it("throttles the presence heartbeat instead of writing on every request", async () => {
-    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: new Date() });
+  it("skips the presence heartbeat when explicitly asked to, for the overview's own poll", async () => {
+    findUniqueMock.mockResolvedValue(APP_USER);
 
-    await getCurrentAppUser();
+    await getCurrentAppUser({ skipPresenceTouch: true });
 
-    expect(updateMock).not.toHaveBeenCalled();
-  });
-
-  it("records a fresh presence heartbeat once the throttle window has elapsed", async () => {
-    const staleActivity = new Date(Date.now() - 5 * 60 * 1000);
-    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: staleActivity });
-
-    await getCurrentAppUser();
-
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: APP_USER.id },
-      data: { lastActiveAt: expect.any(Date) },
-    });
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
   it("does not record a presence heartbeat for a blocked account", async () => {
-    findUniqueMock.mockResolvedValue({ ...APP_USER, isBlocked: true, lastActiveAt: null });
+    findUniqueMock.mockResolvedValue({ ...APP_USER, isBlocked: true });
 
     await getCurrentAppUser();
 
-    expect(updateMock).not.toHaveBeenCalled();
+    expect(updateManyMock).not.toHaveBeenCalled();
   });
 
   it("does not let a failed presence heartbeat fail the real request", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: null });
-    updateMock.mockRejectedValue(new Error("connection lost"));
+    findUniqueMock.mockResolvedValue(APP_USER);
+    updateManyMock.mockRejectedValue(new Error("connection lost"));
 
-    await expect(getCurrentAppUser()).resolves.toEqual({ ...APP_USER, lastActiveAt: null });
+    await expect(getCurrentAppUser()).resolves.toEqual(APP_USER);
+  });
+
+  it("bounds how long a slow presence write can delay the real request", async () => {
+    findUniqueMock.mockResolvedValue(APP_USER);
+    // Never resolves within the test's lifetime -- simulates a stuck/slow
+    // write. getCurrentAppUser must still return promptly.
+    updateManyMock.mockReturnValue(new Promise(() => {}));
+
+    const start = Date.now();
+    await expect(getCurrentAppUser()).resolves.toEqual(APP_USER);
+    expect(Date.now() - start).toBeLessThan(1_000);
+  });
+
+  it("issues the same correctly-scoped conditional update from concurrent requests for the same account", async () => {
+    // Two "requests" (e.g. a layout render and a page render, or two
+    // parallel API calls) resolving the same mapped user at the same time.
+    // Neither reads a shared in-memory lastActiveAt, so neither can decide
+    // to skip or overwrite based on a stale snapshot of the other -- each
+    // independently asks the database to conditionally update, and it is
+    // Postgres's per-row update lock that serializes and re-checks the two
+    // attempts, not application code.
+    findUniqueMock.mockResolvedValue(APP_USER);
+
+    await Promise.all([getCurrentAppUser(), getCurrentAppUser()]);
+
+    expect(updateManyMock).toHaveBeenCalledTimes(2);
+    const expectedCall = {
+      where: {
+        id: APP_USER.id,
+        isBlocked: false,
+        OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: expect.any(Date) } }],
+      },
+      data: { lastActiveAt: expect.any(Date) },
+    };
+    expect(updateManyMock).toHaveBeenNthCalledWith(1, expectedCall);
+    expect(updateManyMock).toHaveBeenNthCalledWith(2, expectedCall);
   });
 
   it("admits only the owner account through the admin guard", async () => {

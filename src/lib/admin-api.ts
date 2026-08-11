@@ -10,9 +10,9 @@ const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
  * owner. Keeping the guard here prevents a later route from accidentally
  * leaking that an administrative endpoint exists through a 401 or 403.
  */
-export async function getAdminApiUser() {
+export async function getAdminApiUser(options?: { skipPresenceTouch?: boolean }) {
   try {
-    return await getCurrentAdminUser();
+    return await getCurrentAdminUser(options);
   } catch (error) {
     if (error instanceof AppUserProvisioningError) return null;
     throw error;

@@ -1,12 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
-
-// There is no push channel or background job -- "online" is a heartbeat
-// threshold, not literal real-time presence. Matches the throttle in
-// touchLastActive (app-user.ts): that write happens at least this often for
-// anyone actively using the app, so a wider gap here would undercount.
-const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+import { ONLINE_THRESHOLD_MS } from "@/lib/presence-limits";
 
 export type AdminOverviewStats = {
   users: {

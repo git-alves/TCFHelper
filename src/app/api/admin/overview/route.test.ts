@@ -39,4 +39,10 @@ describe("GET /api/admin/overview", () => {
     await expect(response.json()).resolves.toEqual({ stats: { users: { total: 1 } } });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
+
+  it("does not let its own polling keep the owner perpetually marked online", async () => {
+    await GET();
+
+    expect(getAdminApiUserMock).toHaveBeenCalledWith({ skipPresenceTouch: true });
+  });
 });
