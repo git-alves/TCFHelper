@@ -74,3 +74,33 @@ body {
     animation: none;
   }
 }
+
+/* The welcome modal's confetti pieces: each falls straight down while
+ * spinning and fading, drifting slightly less than a full rotation so the
+ * motion reads as tumbling rather than a mechanical spin. Individual pieces
+ * vary their start position, color, delay, and duration through inline
+ * custom properties -- this keyframe just consumes them. */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-0.5rem) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(3.5rem) rotate(200deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  animation: confetti-fall 1.6s ease-in var(--confetti-delay, 0s) 1 both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-piece {
+    animation: none;
+    opacity: 0;
+  }
+}
