@@ -34,7 +34,7 @@ type QuotaReservation =
   | { allowed: true }
   | {
       allowed: false;
-      reason: "rate" | "monthly";
+      reason: "minute_request_limit" | "minute_character_limit" | "monthly_character_limit";
       resetAt: Date;
       usageValue: number;
       quotaLimit: number;
@@ -115,7 +115,7 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       if (minuteRequestCount > limits.translationRequestsPerMinute) {
         return {
           allowed: false,
-          reason: "rate",
+          reason: "minute_request_limit",
           resetAt: minuteResetsAt,
           usageValue: minuteRequestCount,
           quotaLimit: limits.translationRequestsPerMinute,
@@ -125,7 +125,7 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       if (minuteCharacterCount > limits.translationCharactersPerMinute) {
         return {
           allowed: false,
-          reason: "rate",
+          reason: "minute_character_limit",
           resetAt: minuteResetsAt,
           usageValue: minuteCharacterCount,
           quotaLimit: limits.translationCharactersPerMinute,
@@ -135,7 +135,7 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       if (monthCharacterCount > limits.translationCharactersPerMonth) {
         return {
           allowed: false,
-          reason: "monthly",
+          reason: "monthly_character_limit",
           resetAt: monthResetsAt,
           usageValue: monthCharacterCount,
           quotaLimit: limits.translationCharactersPerMonth,
@@ -261,12 +261,13 @@ export async function POST(request: Request) {
 
   if (!quotaReservation.allowed) {
     const resetAt = quotaReservation.resetAt.toISOString();
+    const isMinuteLimit = quotaReservation.reason !== "monthly_character_limit";
     await recordAdminEvent({
       eventType: "TRANSLATION_QUOTA_DENIED",
       userId: user.id,
-      reasonCode: quotaReservation.reason === "rate" ? "minute_limit" : "monthly_limit",
+      reasonCode: quotaReservation.reason,
       httpStatus: 429,
-      quotaWindow: quotaReservation.reason === "rate" ? "minute" : "month",
+      quotaWindow: isMinuteLimit ? "minute" : "month",
       usageValue: quotaReservation.usageValue,
       quotaLimit: quotaReservation.quotaLimit,
     });
@@ -274,7 +275,7 @@ export async function POST(request: Request) {
       {
         error: "Translation service is temporarily unavailable.",
         code:
-          quotaReservation.reason === "rate"
+          isMinuteLimit
             ? "TRANSLATION_RATE_LIMITED"
             : "TRANSLATION_MONTHLY_QUOTA_REACHED",
         resetAt,

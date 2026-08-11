@@ -346,7 +346,7 @@ describe("POST /api/translate", () => {
     expect(recordAdminEventMock).toHaveBeenCalledWith({
       eventType: "TRANSLATION_QUOTA_DENIED",
       userId: LOCAL_USER_ID,
-      reasonCode: "minute_limit",
+      reasonCode: "minute_request_limit",
       httpStatus: 429,
       quotaWindow: "minute",
       usageValue: 21,
@@ -422,7 +422,7 @@ describe("POST /api/translate", () => {
     expect(recordAdminEventMock).toHaveBeenCalledWith({
       eventType: "TRANSLATION_QUOTA_DENIED",
       userId: LOCAL_USER_ID,
-      reasonCode: "minute_limit",
+      reasonCode: "minute_character_limit",
       httpStatus: 429,
       quotaWindow: "minute",
       usageValue: 20_001,
@@ -453,7 +453,7 @@ describe("POST /api/translate", () => {
     expect(recordAdminEventMock).toHaveBeenCalledWith({
       eventType: "TRANSLATION_QUOTA_DENIED",
       userId: LOCAL_USER_ID,
-      reasonCode: "monthly_limit",
+      reasonCode: "monthly_character_limit",
       httpStatus: 429,
       quotaWindow: "month",
       usageValue: 100_007,
