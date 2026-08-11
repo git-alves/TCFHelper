@@ -286,6 +286,10 @@ model AccessCode {
   validityDays     Int?
 
   @@index([redeemedAt])
+  // Matches getAdminAccessCodesPage's orderBy([{createdAt: "desc"}, {id: "desc"}])
+  // + skip/take exactly, so the admin list stays a fast index scan instead of
+  // an in-memory sort as the code inventory grows.
+  @@index([createdAt, id])
 }
 
 /// Owner-only operational events. This is deliberately a structured ledger,

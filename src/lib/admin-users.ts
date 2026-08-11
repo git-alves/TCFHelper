@@ -198,13 +198,26 @@ export function serializeAdminUserDetail(record: AdminUserRecord, now = new Date
   return { ...serializeUser(record, now), quotaOverride, effectiveQuotaLimits };
 }
 
-export function parseAdminUserListQuery(input: { query?: string | string[]; page?: string | string[] }) {
+export const ADMIN_USER_STATUS_FILTERS = ["all", "blocked", "admin", "activated", "unactivated"] as const;
+export type AdminUserStatusFilter = (typeof ADMIN_USER_STATUS_FILTERS)[number];
+
+function isAdminUserStatusFilter(value: string): value is AdminUserStatusFilter {
+  return (ADMIN_USER_STATUS_FILTERS as readonly string[]).includes(value);
+}
+
+export function parseAdminUserListQuery(input: {
+  query?: string | string[];
+  status?: string | string[];
+  page?: string | string[];
+}) {
   const rawQuery = typeof input.query === "string" ? input.query : "";
   const query = rawQuery.trim().slice(0, MAX_ADMIN_USERS_SEARCH_LENGTH);
+  const rawStatus = typeof input.status === "string" ? input.status : "all";
+  const status: AdminUserStatusFilter = isAdminUserStatusFilter(rawStatus) ? rawStatus : "all";
   const rawPage = typeof input.page === "string" ? Number(input.page) : 1;
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  return { query, page };
+  return { query, status, page };
 }
 
 function userSearchWhere(query: string): Prisma.UserWhereInput {
@@ -218,8 +231,38 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
   };
 }
 
-export async function getAdminUsersPage({ query, page }: { query: string; page: number }) {
-  const where = userSearchWhere(query);
+/**
+ * "Activated" mirrors the admin overview's own count query: a currently
+ * live admission, not merely having redeemed a code at some point (a reset
+ * learner's old code no longer relates to them once detached). The owner is
+ * excluded from "unactivated" since they bypass activation entirely and
+ * would otherwise always show as awaiting a code they will never redeem.
+ */
+function userStatusWhere(status: AdminUserStatusFilter): Prisma.UserWhereInput {
+  switch (status) {
+    case "blocked":
+      return { isBlocked: true };
+    case "admin":
+      return { isAdmin: true };
+    case "activated":
+      return { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } };
+    case "unactivated":
+      return { isAdmin: false, redeemedAccessCodes: { none: { redeemedAt: { not: null } } } };
+    case "all":
+      return {};
+  }
+}
+
+export async function getAdminUsersPage({
+  query,
+  status,
+  page,
+}: {
+  query: string;
+  status: AdminUserStatusFilter;
+  page: number;
+}) {
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status) };
   const total = await prisma.user.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / ADMIN_USERS_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -238,10 +281,36 @@ export async function getAdminUsersPage({ query, page }: { query: string; page: 
     page: currentPage,
     pageCount,
     query,
+    status,
   };
 }
 
 export async function getAdminUserDetail(userId: string) {
   const record = await prisma.user.findUnique({ where: { id: userId }, select: ADMIN_USER_SELECT });
   return record ? serializeAdminUserDetail(record) : null;
+}
+
+// A CSV export intentionally is not paginated -- it is "everything matching
+// the current filters," not one page of it -- but still needs a hard upper
+// bound so an unfiltered export on a runaway-large table cannot become an
+// unbounded query.
+const MAX_EXPORT_ROWS = 10_000;
+
+export async function getAdminUsersForExport({
+  query,
+  status,
+}: {
+  query: string;
+  status: AdminUserStatusFilter;
+}): Promise<AdminUserListItem[]> {
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status) };
+  const records = await prisma.user.findMany({
+    where,
+    select: ADMIN_USER_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: MAX_EXPORT_ROWS,
+  });
+  const now = new Date();
+
+  return records.map((record) => serializeUser(record, now));
 }

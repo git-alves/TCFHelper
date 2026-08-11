@@ -15,6 +15,13 @@ function pageHref(query: string, page: number) {
   return `/admin/access-codes?${params.toString()}`;
 }
 
+function exportHref(query: string) {
+  const params = new URLSearchParams();
+  if (query) params.set("query", query);
+  const queryString = params.toString();
+  return queryString ? `/api/admin/access-codes/export?${queryString}` : "/api/admin/access-codes/export";
+}
+
 export default async function AdminAccessCodesPage({ searchParams }: AdminAccessCodesPageProps) {
   try {
     if (!(await getCurrentAdminUser())) notFound();
@@ -96,11 +103,19 @@ export default async function AdminAccessCodesPage({ searchParams }: AdminAccess
           {codesPage.total === 1 ? "1 access code" : `${codesPage.total.toLocaleString("en-US")} access codes`}
           {codesPage.query ? ` matching "${codesPage.query}"` : ""}
         </p>
-        {codesPage.pageCount > 1 && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Page {codesPage.page} of {codesPage.pageCount}
-          </p>
-        )}
+        <div className="flex items-center gap-3">
+          {codesPage.pageCount > 1 && (
+            <p className="text-sm text-zinc-600 dark:text-zinc-400">
+              Page {codesPage.page} of {codesPage.pageCount}
+            </p>
+          )}
+          <a
+            href={exportHref(codesPage.query)}
+            className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
+          >
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {codesPage.accessCodes.length > 0 ? (
