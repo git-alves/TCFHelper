@@ -10,6 +10,7 @@ export async function GET(request: Request) {
   const page = await getAdminUsersPage(
     parseAdminUserListQuery({
       query: url.searchParams.get("query") ?? undefined,
+      status: url.searchParams.get("status") ?? undefined,
       page: url.searchParams.get("page") ?? undefined,
     }),
   );

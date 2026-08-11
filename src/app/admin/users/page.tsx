@@ -2,14 +2,26 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminUsersTable } from "@/components/admin-users-table";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
-import { getAdminUsersPage, parseAdminUserListQuery } from "@/lib/admin-users";
+import {
+  type AdminUserStatusFilter,
+  getAdminUsersPage,
+  parseAdminUserListQuery,
+} from "@/lib/admin-users";
 
 interface AdminUsersPageProps {
-  searchParams: Promise<{ query?: string | string[]; page?: string | string[] }>;
+  searchParams: Promise<{ query?: string | string[]; status?: string | string[]; page?: string | string[] }>;
 }
 
-function pageHref(query: string, page: number) {
-  const params = new URLSearchParams({ page: String(page) });
+const STATUS_FILTER_LABELS: Record<AdminUserStatusFilter, string> = {
+  all: "All statuses",
+  blocked: "Blocked",
+  admin: "Admin",
+  activated: "Activated",
+  unactivated: "Unactivated",
+};
+
+function pageHref(query: string, status: AdminUserStatusFilter, page: number) {
+  const params = new URLSearchParams({ status, page: String(page) });
   if (query) params.set("query", query);
   return `/admin/users?${params.toString()}`;
 }
@@ -56,15 +68,32 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
             className="mt-2 w-full rounded-lg border border-black/[.15] bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 dark:border-white/[.2]"
           />
         </div>
-        <button type="submit" className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]">Search</button>
-        {usersPage.query && (
-          <Link href="/admin/users" className="px-1 py-2 text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Clear search</Link>
+        <div>
+          <label htmlFor="user-status" className="block text-sm font-medium">Status</label>
+          <select
+            id="user-status"
+            name="status"
+            defaultValue={usersPage.status}
+            className="mt-2 rounded-lg border border-black/[.15] bg-background px-3 py-2 text-sm outline-none transition-colors focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 dark:border-white/[.2]"
+          >
+            {Object.entries(STATUS_FILTER_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <input type="hidden" name="page" value="1" />
+        <button type="submit" className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]">Apply</button>
+        {(usersPage.query || usersPage.status !== "all") && (
+          <Link href="/admin/users" className="px-1 py-2 text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Clear filters</Link>
         )}
       </form>
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           {usersPage.total === 1 ? "1 registered user" : `${usersPage.total.toLocaleString("en-US")} registered users`}
+          {usersPage.status !== "all" ? ` (${STATUS_FILTER_LABELS[usersPage.status].toLowerCase()})` : ""}
           {usersPage.query ? ` matching “${usersPage.query}”` : ""}
         </p>
         {usersPage.pageCount > 1 && <p className="text-sm text-zinc-600 dark:text-zinc-400">Page {usersPage.page} of {usersPage.pageCount}</p>}
@@ -76,10 +105,10 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           {usersPage.pageCount > 1 && (
             <nav aria-label="User pagination" className="flex items-center justify-between gap-3">
               {usersPage.page > 1 ? (
-                <Link href={pageHref(usersPage.query, usersPage.page - 1)} className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]">Previous</Link>
+                <Link href={pageHref(usersPage.query, usersPage.status, usersPage.page - 1)} className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]">Previous</Link>
               ) : <span />}
               {usersPage.page < usersPage.pageCount ? (
-                <Link href={pageHref(usersPage.query, usersPage.page + 1)} className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]">Next</Link>
+                <Link href={pageHref(usersPage.query, usersPage.status, usersPage.page + 1)} className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]">Next</Link>
               ) : <span />}
             </nav>
           )}
@@ -87,11 +116,11 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
       ) : (
         <section className="rounded-xl border border-dashed border-black/[.2] p-8 text-center dark:border-white/[.25]" aria-labelledby="empty-users-heading">
           <h2 id="empty-users-heading" className="text-base font-semibold">
-            {usersPage.query ? "No matching users" : "No registered users yet"}
+            {usersPage.query || usersPage.status !== "all" ? "No matching users" : "No registered users yet"}
           </h2>
           <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-            {usersPage.query
-              ? "Try a name or email address without extra filters."
+            {usersPage.query || usersPage.status !== "all"
+              ? "Try a different name, email, or status filter."
               : "Newly registered learners will appear here automatically."}
           </p>
         </section>

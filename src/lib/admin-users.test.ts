@@ -1,31 +1,83 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { countMock, findManyMock } = vi.hoisted(() => ({
+  countMock: vi.fn(),
+  findManyMock: vi.fn(),
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: {
-      count: vi.fn(),
-      findMany: vi.fn(),
+      count: countMock,
+      findMany: findManyMock,
       findUnique: vi.fn(),
     },
   },
 }));
 
 const {
+  getAdminUsersPage,
   getCurrentAdminUsage,
   parseAdminUserListQuery,
   serializeQuotaOverride,
 } = await import("./admin-users");
 
 describe("admin user list helpers", () => {
-  it("normalizes a search and rejects invalid page values", () => {
-    expect(parseAdminUserListQuery({ query: "  learner@example.com  ", page: "3" })).toEqual({
+  beforeEach(() => {
+    countMock.mockReset();
+    findManyMock.mockReset();
+    countMock.mockResolvedValue(0);
+    findManyMock.mockResolvedValue([]);
+  });
+
+  it("normalizes a search, status, and rejects invalid page values", () => {
+    expect(parseAdminUserListQuery({ query: "  learner@example.com  ", status: "blocked", page: "3" })).toEqual({
       query: "learner@example.com",
+      status: "blocked",
       page: 3,
     });
-    expect(parseAdminUserListQuery({ query: ["not", "valid"], page: "-7" })).toEqual({
+    expect(parseAdminUserListQuery({ query: ["not", "valid"], status: "not-a-status", page: "-7" })).toEqual({
       query: "",
+      status: "all",
       page: 1,
+    });
+  });
+
+  it("filters to blocked, admin, activated, or unactivated accounts", async () => {
+    await getAdminUsersPage({ query: "", status: "blocked", page: 1 });
+    expect(countMock).toHaveBeenLastCalledWith({ where: { isBlocked: true } });
+
+    await getAdminUsersPage({ query: "", status: "admin", page: 1 });
+    expect(countMock).toHaveBeenLastCalledWith({ where: { isAdmin: true } });
+
+    await getAdminUsersPage({ query: "", status: "activated", page: 1 });
+    expect(countMock).toHaveBeenLastCalledWith({
+      where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } },
+    });
+
+    await getAdminUsersPage({ query: "", status: "unactivated", page: 1 });
+    expect(countMock).toHaveBeenLastCalledWith({
+      where: { isAdmin: false, redeemedAccessCodes: { none: { redeemedAt: { not: null } } } },
+    });
+  });
+
+  it("does not exclude the activation-exempt owner as blocked or admin filters", async () => {
+    await getAdminUsersPage({ query: "", status: "all", page: 1 });
+    expect(countMock).toHaveBeenLastCalledWith({ where: {} });
+  });
+
+  it("combines a search query with a status filter", async () => {
+    await getAdminUsersPage({ query: "learner@example.com", status: "blocked", page: 1 });
+
+    expect(countMock).toHaveBeenLastCalledWith({
+      where: {
+        OR: [
+          { email: { contains: "learner@example.com", mode: "insensitive" } },
+          { name: { contains: "learner@example.com", mode: "insensitive" } },
+        ],
+        isBlocked: true,
+      },
     });
   });
 
