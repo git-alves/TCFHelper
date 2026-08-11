@@ -38,6 +38,10 @@ and can review the bounded [admin operational log](docs/admin-audit-log.md).
      secret key stays server-only.
    - `CLERK_WEBHOOK_SIGNING_SECRET`: the Svix signing secret for the Clerk
      webhook endpoint. Required once the Clerk user-sync webhook is enabled.
+   - `SECURITY_TELEMETRY_HMAC_SECRET`: a separate server-only random value of
+     at least 32 bytes. It makes the 30-day sign-in review fingerprints
+     non-reversible; never reuse the Clerk signing secret or expose it to the
+     browser.
    - `GEMINI_API_KEY`: a Gemini API key used for writing corrections and
      model answers.
    - `GEMINI_CORRECTION_MODEL` (optional): the model used only for writing
@@ -292,6 +296,8 @@ provides a localization. Configure Clerk with:
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` from the Clerk
   dashboard;
 - `CLERK_WEBHOOK_SIGNING_SECRET` for `/api/webhooks/clerk`;
+- `SECURITY_TELEMETRY_HMAC_SECRET`, a separate random value of at least 32
+  bytes, for short-lived sign-in review fingerprints;
 - the four `NEXT_PUBLIC_CLERK_*_URL` / fallback-redirect variables shown in
   `.env.example`.
 
@@ -303,9 +309,18 @@ Clerk, not in this repository or Vercel.
 
 Also create a Clerk Dashboard webhook for
 `https://<your-production-domain>/api/webhooks/clerk`, subscribe it to
-`user.created` and `user.updated`, and put its signing secret in
-`CLERK_WEBHOOK_SIGNING_SECRET`. The handler verifies each Svix delivery and
-does not delete learner data for a Clerk `user.deleted` event.
+`user.created`, `user.updated`, and `session.created`, and put its signing
+secret in `CLERK_WEBHOOK_SIGNING_SECRET`. The handler verifies each Svix
+delivery and does not delete learner data for a Clerk `user.deleted` event.
+The `session.created` subscription records only a masked IP address, a closed
+coarse browser/device label, and server-only HMAC fingerprints for a 30-day,
+owner-only review signal. It never stores a raw IP address, raw user agent,
+Clerk session ID, client ID, or location.
+
+After deploying that subscription, start a fresh Clerk session (sign out and
+sign in, or use Clerk's test delivery) and confirm a masked row appears under
+**Authentication** at `/admin/logs`. Returning to an existing browser session
+does not create a second `session.created` event.
 
 ### Migrating existing learners
 
@@ -425,7 +440,7 @@ Either way, set these environment variables on the Vercel project (with
 `DATABASE_URL` and API credentials marked sensitive):
 
 `DATABASE_URL`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`,
-`CLERK_WEBHOOK_SIGNING_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
+`CLERK_WEBHOOK_SIGNING_SECRET`, `SECURITY_TELEMETRY_HMAC_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `GEMINI_API_KEY`,
 `GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,

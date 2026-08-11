@@ -38,6 +38,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811070000_add_admin_event_log");
   });
 
+  it("allows the additive, short-lived auth-security session migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811080000_add_auth_security_sessions");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

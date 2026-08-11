@@ -300,30 +300,58 @@ model AccessCode {
 /// event remains interpretable after its user, essay, or access code has been
 /// deleted, and the event table never changes product ownership semantics.
 model AdminEvent {
-  id              String   @id @default(cuid())
-  occurredAt      DateTime @default(now())
-  firstOccurredAt DateTime @default(now())
-  severity        String
-  module          String
-  eventType       String
-  searchText      String
-  userId          String?
-  essayId         String?
-  accessCodeId    String?
-  provider        String?
-  reasonCode      String?
-  httpStatus      Int?
-  quotaWindow     String?
-  usageValue      Int?
-  quotaLimit      Int?
-  occurrenceCount Int      @default(1)
-  dedupeKey       String?  @unique
+  id                    String   @id @default(cuid())
+  occurredAt            DateTime @default(now())
+  firstOccurredAt       DateTime @default(now())
+  severity              String
+  module                String
+  eventType             String
+  searchText            String
+  userId                String?
+  essayId               String?
+  accessCodeId          String?
+  provider              String?
+  reasonCode            String?
+  httpStatus            Int?
+  quotaWindow           String?
+  usageValue            Int?
+  quotaLimit            Int?
+  // Authentication events expose only a vetted display mask and closed
+  // browser/device labels. The full, HMACed network/session identifiers stay
+  // in AuthSecuritySession and are never selected for the owner UI.
+  maskedIp              String?
+  browserFamily         String?
+  deviceClass           String?
+  distinctIpCount       Int?
+  securityWindowMinutes Int?
+  occurrenceCount       Int      @default(1)
+  dedupeKey             String?  @unique
 
   @@index([occurredAt, id])
   @@index([severity, occurredAt, id])
   @@index([module, occurredAt, id])
   @@index([userId, occurredAt, id])
   @@index([essayId, occurredAt, id])
+  @@index([userId, eventType, occurredAt, id])
+}
+
+/// Private, short-lived inputs for review-only sign-in anomaly detection.
+/// This relation-free table has no raw IP, user agent, Clerk session/client
+/// ID, location, or copied identity data. Both fingerprints are HMAC values
+/// with a version prefix and are never selected into an owner-facing response.
+/// Rows expire with AdminEvent after 30 days.
+model AuthSecuritySession {
+  id                   String   @id @default(cuid())
+  userId               String
+  occurredAt           DateTime
+  sessionFingerprint   String   @unique
+  ipFingerprint        String?
+  alertBucketStartedAt DateTime?
+  createdAt            DateTime @default(now())
+
+  @@unique([userId, alertBucketStartedAt])
+  @@index([userId, occurredAt])
+  @@index([occurredAt])
 }
 
 /// A cached model answer is private to its learner. The hash avoids storing a

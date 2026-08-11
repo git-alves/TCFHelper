@@ -50,6 +50,14 @@ async function main() {
   if (!process.env.CLERK_WEBHOOK_SIGNING_SECRET?.startsWith("whsec_")) {
     throw new Error("A production Clerk cutover requires CLERK_WEBHOOK_SIGNING_SECRET for the verified user-sync webhook.");
   }
+  if (
+    !process.env.SECURITY_TELEMETRY_HMAC_SECRET ||
+    Buffer.byteLength(process.env.SECURITY_TELEMETRY_HMAC_SECRET, "utf8") < 32
+  ) {
+    throw new Error(
+      "Production session telemetry requires SECURITY_TELEMETRY_HMAC_SECRET with at least 32 random bytes.",
+    );
+  }
 
   const prisma = new PrismaClient();
   try {

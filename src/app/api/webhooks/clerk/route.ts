@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyWebhook } from "@clerk/nextjs/webhooks";
 import { prisma } from "@/lib/prisma";
 import { syncClerkUserFromWebhook } from "@/lib/app-user";
+import { recordAuthSecuritySession } from "@/lib/auth-security";
 
 export const runtime = "nodejs";
 
@@ -31,6 +32,32 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Clerk webhook signature verification failed", error);
     return NextResponse.json({ error: "Invalid webhook" }, { status: 400 });
+  }
+
+  if (event.type === "session.created") {
+    try {
+      await recordAuthSecuritySession({
+        clerkUserId: event.data.user_id,
+        clerkSessionId: event.data.id,
+        occurredAt: event.data.created_at,
+        // The only raw network value considered is inside Clerk's signed
+        // envelope. No request headers, client ID, raw user agent, or Clerk
+        // activity IP is persisted or forwarded to the helper.
+        clientIp: event.event_attributes.http_request.client_ip,
+        browserName: event.data.latest_activity?.browser_name,
+        deviceType: event.data.latest_activity?.device_type,
+        isMobile: event.data.latest_activity?.is_mobile,
+        actor: event.data.actor,
+        embeddedUser: event.data.user,
+      });
+    } catch {
+      // A static platform signal is enough. Never log any verified webhook
+      // payload value because it can include network and identity metadata.
+      console.error("Clerk session telemetry processing failed");
+      return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
+    }
+
+    return NextResponse.json({ received: true });
   }
 
   if (!USER_EVENT_TYPES.has(event.type)) {

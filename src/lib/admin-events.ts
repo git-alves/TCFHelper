@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createHash } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -26,6 +27,8 @@ export const ADMIN_EVENT_TYPES = [
   "CORRECTION_PROVIDER_FAILED",
   "EXAMPLE_PROVIDER_FAILED",
   "TRANSLATION_PROVIDER_FAILED",
+  "AUTH_SESSION_CREATED",
+  "AUTH_NETWORK_REVIEW_REQUIRED",
 ] as const;
 export const ADMIN_EVENT_REASON_CODES = [
   "invalid_or_spent",
@@ -44,6 +47,17 @@ export const ADMIN_EVENT_REASON_CODES = [
 ] as const;
 export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial"] as const;
 export const ADMIN_EVENT_QUOTA_WINDOWS = ["minute", "day", "month"] as const;
+export const ADMIN_EVENT_BROWSER_FAMILIES = [
+  "Chrome",
+  "Edge",
+  "Firefox",
+  "Safari",
+  "Opera",
+  "Samsung Internet",
+  "Other browser",
+] as const;
+export const ADMIN_EVENT_DEVICE_CLASSES = ["Desktop", "Mobile", "Tablet", "Other device"] as const;
+export const ADMIN_EVENT_NETWORK_UNAVAILABLE = "Unavailable";
 
 export type AdminEventSeverity = (typeof ADMIN_EVENT_SEVERITIES)[number];
 export type AdminEventModule = (typeof ADMIN_EVENT_MODULES)[number];
@@ -51,6 +65,8 @@ export type AdminEventType = (typeof ADMIN_EVENT_TYPES)[number];
 export type AdminEventReasonCode = (typeof ADMIN_EVENT_REASON_CODES)[number];
 export type AdminEventProvider = (typeof ADMIN_EVENT_PROVIDERS)[number];
 export type AdminEventQuotaWindow = (typeof ADMIN_EVENT_QUOTA_WINDOWS)[number];
+export type AdminEventBrowserFamily = (typeof ADMIN_EVENT_BROWSER_FAMILIES)[number];
+export type AdminEventDeviceClass = (typeof ADMIN_EVENT_DEVICE_CLASSES)[number];
 
 export const ADMIN_EVENT_RETENTION_DAYS = 30;
 /** Best-effort logging may never materially delay the learner's response. */
@@ -114,6 +130,16 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
     searchText: "translation generation provider failed",
     coalesceForMs: 15 * 60_000,
   },
+  AUTH_SESSION_CREATED: {
+    severity: "INFO",
+    module: "AUTH_SECURITY",
+    searchText: "authentication sign in session started",
+  },
+  AUTH_NETWORK_REVIEW_REQUIRED: {
+    severity: "WARN",
+    module: "AUTH_SECURITY",
+    searchText: "authentication possible concurrent access review",
+  },
 };
 
 /**
@@ -133,6 +159,11 @@ export type AdminEventInput = {
   quotaWindow?: AdminEventQuotaWindow;
   usageValue?: number;
   quotaLimit?: number;
+  maskedIp?: string;
+  browserFamily?: AdminEventBrowserFamily;
+  deviceClass?: AdminEventDeviceClass;
+  distinctIpCount?: number;
+  securityWindowMinutes?: number;
 };
 
 const ADMIN_EVENT_INPUT_KEYS = new Set<keyof AdminEventInput>([
@@ -146,10 +177,18 @@ const ADMIN_EVENT_INPUT_KEYS = new Set<keyof AdminEventInput>([
   "quotaWindow",
   "usageValue",
   "quotaLimit",
+  "maskedIp",
+  "browserFamily",
+  "deviceClass",
+  "distinctIpCount",
+  "securityWindowMinutes",
 ]);
 
 /** All referenced product rows use Prisma's opaque CUID format. */
 const OPAQUE_ROW_ID_PATTERN = /^c[a-z0-9]{24}$/;
+const MASKED_IPV4_PATTERN = /^(?:\d{1,3}\.){3}\*$/;
+const MASKED_IPV6_PREFIX_PATTERN = /^[0-9a-f]{1,4}:[0-9a-f]{1,4}:[0-9a-f]{1,4}::\/48$/;
+const DEDUPE_KEY_PATTERN = /^[a-f0-9]{64}$/;
 
 function isMember<const Values extends readonly string[]>(values: Values, value: unknown): value is Values[number] {
   return typeof value === "string" && (values as readonly string[]).includes(value);
@@ -161,6 +200,20 @@ function isOptionalOpaqueRowId(value: unknown): value is string | undefined {
 
 function isOptionalSafeCount(value: unknown): value is number | undefined {
   return value === undefined || (typeof value === "number" && Number.isSafeInteger(value) && value >= 0);
+}
+
+function isOptionalMaskedIp(value: unknown): value is string | undefined {
+  return (
+    value === undefined ||
+    (typeof value === "string" &&
+      (value === ADMIN_EVENT_NETWORK_UNAVAILABLE ||
+        MASKED_IPV4_PATTERN.test(value) ||
+        MASKED_IPV6_PREFIX_PATTERN.test(value)))
+  );
+}
+
+function isOptionalReviewCount(value: unknown): value is number | undefined {
+  return value === undefined || (typeof value === "number" && Number.isSafeInteger(value) && value >= 3 && value <= 100);
 }
 
 function isOptionalHttpStatus(value: unknown): value is number | undefined {
@@ -179,17 +232,39 @@ function hasQuotaSnapshot(input: AdminEventInput, quotaWindow: AdminEventQuotaWi
   );
 }
 
+function hasNoAuthenticationContext(input: AdminEventInput) {
+  return (
+    input.maskedIp === undefined &&
+    input.browserFamily === undefined &&
+    input.deviceClass === undefined &&
+    input.distinctIpCount === undefined &&
+    input.securityWindowMinutes === undefined
+  );
+}
+
+function hasNoLegacyContext(input: AdminEventInput) {
+  return (
+    input.essayId === undefined &&
+    input.accessCodeId === undefined &&
+    input.provider === undefined &&
+    input.reasonCode === undefined &&
+    input.httpStatus === undefined &&
+    hasNoQuotaSnapshot(input)
+  );
+}
+
 function isEventFieldCombinationValid(input: AdminEventInput) {
-  if (!input.userId || input.httpStatus === undefined) return false;
+  if (!input.userId) return false;
 
   switch (input.eventType) {
     case "ACCESS_CODE_REDEEMED":
       return (
-        input.accessCodeId !== undefined &&
         input.httpStatus === 200 &&
+        input.accessCodeId !== undefined &&
         input.provider === undefined &&
         input.reasonCode === undefined &&
-        hasNoQuotaSnapshot(input)
+        hasNoQuotaSnapshot(input) &&
+        hasNoAuthenticationContext(input)
       );
     case "ACCESS_CODE_REJECTED":
       return (
@@ -197,7 +272,8 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         input.httpStatus === 400 &&
         input.provider === undefined &&
         input.reasonCode === "invalid_or_spent" &&
-        hasNoQuotaSnapshot(input)
+        hasNoQuotaSnapshot(input) &&
+        hasNoAuthenticationContext(input)
       );
     case "TRANSLATION_QUOTA_DENIED":
       return (
@@ -207,26 +283,30 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
           ((input.reasonCode === "minute_request_limit" || input.reasonCode === "minute_character_limit") &&
             hasQuotaSnapshot(input, "minute")) ||
           (input.reasonCode === "monthly_character_limit" && hasQuotaSnapshot(input, "month"))
-        )
+        ) &&
+        hasNoAuthenticationContext(input)
       );
     case "EXAMPLE_QUOTA_DENIED":
       return (
         input.httpStatus === 429 &&
         input.provider === undefined &&
         ((input.reasonCode === "cooldown" && hasNoQuotaSnapshot(input)) ||
-          (input.reasonCode === "daily_limit" && hasQuotaSnapshot(input, "day")))
+          (input.reasonCode === "daily_limit" && hasQuotaSnapshot(input, "day"))) &&
+        hasNoAuthenticationContext(input)
       );
     case "CORRECTION_QUOTA_DENIED":
       return (
         input.httpStatus === 429 &&
         input.provider === undefined &&
         input.reasonCode === "daily_limit" &&
-        hasQuotaSnapshot(input, "day")
+        hasQuotaSnapshot(input, "day") &&
+        hasNoAuthenticationContext(input)
       );
     case "CORRECTION_PROVIDER_FAILED":
     case "EXAMPLE_PROVIDER_FAILED":
       return (
         input.provider === "gemini" &&
+        input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
         isMember(
@@ -239,14 +319,35 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
             "provider_unavailable",
           ] as const,
           input.reasonCode,
-        )
+        ) &&
+        hasNoAuthenticationContext(input)
       );
     case "TRANSLATION_PROVIDER_FAILED":
       return (
         input.provider !== undefined &&
+        input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
-        isMember(["fallback_circuit_open", "transport_error", "provider_unavailable"] as const, input.reasonCode)
+        isMember(["fallback_circuit_open", "transport_error", "provider_unavailable"] as const, input.reasonCode) &&
+        hasNoAuthenticationContext(input)
+      );
+    case "AUTH_SESSION_CREATED":
+      return (
+        hasNoLegacyContext(input) &&
+        input.maskedIp !== undefined &&
+        input.browserFamily !== undefined &&
+        input.deviceClass !== undefined &&
+        input.distinctIpCount === undefined &&
+        input.securityWindowMinutes === undefined
+      );
+    case "AUTH_NETWORK_REVIEW_REQUIRED":
+      return (
+        hasNoLegacyContext(input) &&
+        input.maskedIp === undefined &&
+        input.browserFamily === undefined &&
+        input.deviceClass === undefined &&
+        input.distinctIpCount !== undefined &&
+        input.securityWindowMinutes === 10
       );
   }
 }
@@ -283,6 +384,11 @@ function isValidAdminEventInput(input: unknown): input is AdminEventInput {
     hasCompleteQuotaSnapshot &&
     isOptionalSafeCount(candidate.usageValue) &&
     isOptionalSafeCount(candidate.quotaLimit) &&
+    isOptionalMaskedIp(candidate.maskedIp) &&
+    (candidate.browserFamily === undefined || isMember(ADMIN_EVENT_BROWSER_FAMILIES, candidate.browserFamily)) &&
+    (candidate.deviceClass === undefined || isMember(ADMIN_EVENT_DEVICE_CLASSES, candidate.deviceClass)) &&
+    isOptionalReviewCount(candidate.distinctIpCount) &&
+    (candidate.securityWindowMinutes === undefined || candidate.securityWindowMinutes === 10) &&
     isEventFieldCombinationValid(candidate as AdminEventInput)
   );
 }
@@ -312,6 +418,11 @@ function snapshotAdminEventInput(input: unknown): Readonly<AdminEventInput> | nu
       quotaWindow: candidate.quotaWindow,
       usageValue: candidate.usageValue,
       quotaLimit: candidate.quotaLimit,
+      maskedIp: candidate.maskedIp,
+      browserFamily: candidate.browserFamily,
+      deviceClass: candidate.deviceClass,
+      distinctIpCount: candidate.distinctIpCount,
+      securityWindowMinutes: candidate.securityWindowMinutes,
     };
     if (!isValidAdminEventInput(snapshot)) return null;
 
@@ -355,6 +466,11 @@ function dedupeKeyFor(input: AdminEventInput, now: Date, windowMs: number) {
         input.quotaWindow ?? "",
         String(input.usageValue ?? ""),
         String(input.quotaLimit ?? ""),
+        input.maskedIp ?? "",
+        input.browserFamily ?? "",
+        input.deviceClass ?? "",
+        String(input.distinctIpCount ?? ""),
+        String(input.securityWindowMinutes ?? ""),
         String(bucket),
       ].join("\u0000"),
       "utf8",
@@ -404,7 +520,63 @@ function eventData(input: AdminEventInput, now: Date) {
     quotaWindow: input.quotaWindow ?? null,
     usageValue: input.usageValue ?? null,
     quotaLimit: input.quotaLimit ?? null,
+    maskedIp: input.maskedIp ?? null,
+    browserFamily: input.browserFamily ?? null,
+    deviceClass: input.deviceClass ?? null,
+    distinctIpCount: input.distinctIpCount ?? null,
+    securityWindowMinutes: input.securityWindowMinutes ?? null,
   };
+}
+
+type AdminEventTransactionClient = Pick<Prisma.TransactionClient, "adminEvent">;
+
+/**
+ * Durable transactional writer for the verified sign-in webhook. Unlike the
+ * best-effort writer below, a failure here must roll back the associated
+ * session-security record so Clerk can retry the verified delivery.
+ */
+export async function recordAdminEventInTransaction(
+  tx: AdminEventTransactionClient,
+  input: AdminEventInput,
+  now: Date,
+  options?: { dedupeKey?: string },
+): Promise<void> {
+  const safeInput = snapshotAdminEventInput(input);
+  const safeNow = snapshotEventTime(now);
+  const dedupeKey = options?.dedupeKey;
+  if (
+    !safeInput ||
+    !safeNow ||
+    (safeInput.eventType !== "AUTH_SESSION_CREATED" &&
+      safeInput.eventType !== "AUTH_NETWORK_REVIEW_REQUIRED")
+  ) {
+    throw new Error("Invalid transactional admin event");
+  }
+
+  if (dedupeKey !== undefined) {
+    if (
+      safeInput.eventType !== "AUTH_NETWORK_REVIEW_REQUIRED" ||
+      !DEDUPE_KEY_PATTERN.test(dedupeKey)
+    ) {
+      throw new Error("Invalid transactional admin-event dedupe key");
+    }
+
+    await tx.adminEvent.upsert({
+      where: { dedupeKey },
+      create: { ...eventData(safeInput, safeNow), dedupeKey },
+      // The per-user webhook lock normally makes this branch unreachable.
+      // Keeping it idempotent protects an alert if a retry races a prior
+      // committed delivery without turning one incident into extra rows.
+      update: {},
+    });
+    return;
+  }
+
+  if (safeInput.eventType === "AUTH_NETWORK_REVIEW_REQUIRED") {
+    throw new Error("Authentication review events require a dedupe key");
+  }
+
+  await tx.adminEvent.create({ data: eventData(safeInput, safeNow) });
 }
 
 /**
@@ -416,7 +588,12 @@ function eventData(input: AdminEventInput, now: Date) {
 export async function recordAdminEvent(input: AdminEventInput, now = new Date()): Promise<void> {
   const safeInput = snapshotAdminEventInput(input);
   const safeNow = snapshotEventTime(now);
-  if (!safeInput || !safeNow) {
+  if (
+    !safeInput ||
+    !safeNow ||
+    safeInput.eventType === "AUTH_SESSION_CREATED" ||
+    safeInput.eventType === "AUTH_NETWORK_REVIEW_REQUIRED"
+  ) {
     // Do not include input in this platform log: a bad future call may itself
     // contain exactly the sensitive value the ledger is designed to exclude.
     console.error("Admin event rejected by validation");
@@ -463,7 +640,14 @@ export function getAdminEventRetentionCutoff(now = new Date()) {
 }
 
 export async function purgeExpiredAdminEvents(now = new Date()) {
-  return prisma.adminEvent.deleteMany({ where: { occurredAt: { lt: getAdminEventRetentionCutoff(now) } } });
+  const cutoff = getAdminEventRetentionCutoff(now);
+  return prisma.$transaction(async (tx) => {
+    const [events, sessions] = await Promise.all([
+      tx.adminEvent.deleteMany({ where: { occurredAt: { lt: cutoff } } }),
+      tx.authSecuritySession.deleteMany({ where: { occurredAt: { lt: cutoff } } }),
+    ]);
+    return { count: events.count + sessions.count };
+  });
 }
 
 export type AdminEventMessageInput = {
@@ -473,6 +657,8 @@ export type AdminEventMessageInput = {
   quotaWindow: string | null;
   usageValue: number | null;
   quotaLimit: number | null;
+  distinctIpCount?: number | null;
+  securityWindowMinutes?: number | null;
   occurrenceCount: number;
 };
 
@@ -499,6 +685,18 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
   ) {
     quota = ` (${event.usageValue.toLocaleString("en-US")}/${event.quotaLimit.toLocaleString("en-US")})`;
   }
+  const distinctIpCount = event.distinctIpCount;
+  const reviewCount =
+    distinctIpCount !== undefined &&
+    Number.isSafeInteger(distinctIpCount) &&
+    distinctIpCount !== null &&
+    distinctIpCount >= 3
+      ? distinctIpCount
+      : null;
+  const securityWindowMinutes =
+    Number.isSafeInteger(event.securityWindowMinutes) && event.securityWindowMinutes === 10
+      ? event.securityWindowMinutes
+      : null;
 
   switch (eventType) {
     case "ACCESS_CODE_REDEEMED":
@@ -517,6 +715,12 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
       return `Sample text generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "TRANSLATION_PROVIDER_FAILED":
       return `Translation generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
+    case "AUTH_SESSION_CREATED":
+      return `Authenticated session started.${repeat}`;
+    case "AUTH_NETWORK_REVIEW_REQUIRED":
+      return reviewCount && securityWindowMinutes
+        ? `Possible concurrent access — review recommended (${reviewCount} distinct IP addresses within ${securityWindowMinutes} minutes).${repeat}`
+        : `Possible concurrent access — review recommended.${repeat}`;
     default:
       return "Operational event recorded.";
   }

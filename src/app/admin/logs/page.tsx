@@ -56,7 +56,7 @@ export default async function AdminLogsPage({ searchParams }: AdminLogsPageProps
           <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Admin</p>
           <h1 className="mt-1 text-3xl font-semibold tracking-tight">Operational log</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            A 30-day, structured ledger of access outcomes, quota denials, and provider failures. It never contains raw prompts, codes, or provider errors.
+            A 30-day, structured ledger of access, quota, provider, and new authenticated-session events. Session entries show only a masked network and coarse device details; raw IP addresses, user agents, and session IDs are never stored.
           </p>
         </div>
         <nav aria-label="Admin sections" className="flex flex-wrap gap-3 text-sm font-medium">
@@ -100,9 +100,13 @@ export default async function AdminLogsPage({ searchParams }: AdminLogsPageProps
             </>
           ) : (
             <section className="rounded-xl border border-dashed border-black/[.2] p-8 text-center dark:border-white/[.25]" aria-labelledby="empty-events-heading">
-              <h2 id="empty-events-heading" className="text-base font-semibold">No matching events</h2>
+              <h2 id="empty-events-heading" className="text-base font-semibold">
+                {filters.module === "AUTH_SECURITY" ? "No new authenticated sessions recorded in this range" : "No events recorded in this range yet"}
+              </h2>
               <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                Try a different filter, or return later when an approved operational outcome occurs.
+                {filters.module === "AUTH_SECURITY"
+                  ? "A row is created when Clerk starts a new session; returning in an existing session does not create another row. New session events can take a few moments to appear and this view does not include activity from before session logging was enabled."
+                  : "This log starts collecting new events after it is enabled; it does not backfill earlier activity."}
               </p>
             </section>
           )}
