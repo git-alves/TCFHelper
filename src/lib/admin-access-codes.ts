@@ -207,10 +207,21 @@ function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof 
   };
 }
 
+// A duplicated query-string key (?query=a&query=b) arrives as a string[]
+// from a Next.js page's searchParams but is already collapsed to its first
+// value by URLSearchParams#get before an API route calls this same parser.
+// Taking the first element here too keeps both surfaces resolving a
+// duplicated param identically instead of the page silently falling back to
+// "all"/"" while the API honors the first value.
+function firstParamValue(value: string | string[] | undefined): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
 export function parseAdminAccessCodesListQuery(input: { query?: string | string[]; page?: string | string[] }) {
-  const rawQuery = typeof input.query === "string" ? input.query : "";
-  const query = rawQuery.trim().slice(0, MAX_ACCESS_CODES_SEARCH_LENGTH);
-  const rawPage = typeof input.page === "string" ? Number(input.page) : 1;
+  const query = firstParamValue(input.query).trim().slice(0, MAX_ACCESS_CODES_SEARCH_LENGTH);
+  const rawPage = Number(firstParamValue(input.page) || "1");
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
   return { query, page };
@@ -260,16 +271,29 @@ export async function getAdminAccessCodesPage({ query, page }: { query: string; 
 // A CSV export intentionally is not paginated -- it is "everything matching
 // the current filter," not one page of it -- but still needs a hard upper
 // bound so an unfiltered export on a runaway-large table cannot become an
-// unbounded query.
-const MAX_EXPORT_ROWS = 10_000;
+// unbounded query. Crucially, exceeding it must never silently produce a
+// partial file: getAdminAccessCodesForExport refuses instead (see
+// AdminAccessCodesExportResult), because a CSV that quietly omits records
+// while claiming to be "the export" is worse than no export at all.
+export const MAX_ACCESS_CODES_EXPORT_ROWS = 10_000;
 
-export async function getAdminAccessCodesForExport(query: string): Promise<AdminAccessCode[]> {
+export type AdminAccessCodesExportResult =
+  | { truncated: false; accessCodes: AdminAccessCode[] }
+  | { truncated: true; total: number };
+
+export async function getAdminAccessCodesForExport(query: string): Promise<AdminAccessCodesExportResult> {
+  const where = accessCodeSearchWhere(query);
+  const total = await prisma.accessCode.count({ where });
+  if (total > MAX_ACCESS_CODES_EXPORT_ROWS) {
+    return { truncated: true, total };
+  }
+
   const records = await prisma.accessCode.findMany({
-    where: accessCodeSearchWhere(query),
+    where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_EXPORT_ROWS,
+    take: MAX_ACCESS_CODES_EXPORT_ROWS,
     select: ACCESS_CODE_LIST_SELECT,
   });
 
-  return records.map(serializeAccessCode);
+  return { truncated: false, accessCodes: records.map(serializeAccessCode) };
 }

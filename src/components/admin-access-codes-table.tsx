@@ -42,22 +42,41 @@ function isDeletable(accessCode: AdminAccessCode) {
 }
 
 const BULK_DELETE_TIMEOUT_MS = 10_000;
+// Observed only when the outcome is ambiguous (see below): the browser
+// aborting a fetch does not stop a request the server already started, so a
+// late-completing delete can still commit after that abort. The caller's
+// own router.refresh() runs unconditionally right after this function
+// resolves (see deleteSelected's "finally" block) -- waiting out this grace
+// period first, instead of resolving immediately, gives that refresh far
+// higher odds of actually observing the eventual state rather than reading
+// a stale row a moment before the late delete commits underneath it. It is
+// a best-effort mitigation, not a guarantee: an unusually slow server
+// mutation can still outlast it.
+const RECONCILE_GRACE_PERIOD_MS = 3_000;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type AccessCodesBulkDeleteOutcome =
   | { deletedCount: number; requestedCount: number }
-  | { failed: true; message: string };
+  | { failed: true; message: string; ambiguous: boolean };
 
 /**
  * Shares the single-delete control's lesson: a client-side abort does not
  * cancel a server-side delete already in progress, so every non-success
  * path (timeout, non-ok response, network error) is reported as uncertain
  * rather than a definite failure, and the caller reconciles its list
- * regardless of outcome instead of trusting what it last rendered.
+ * regardless of outcome instead of trusting what it last rendered. Only the
+ * catch-block paths (timeout, network error) are "ambiguous" -- a response
+ * that actually arrived, ok or not, reflects the server's real, already
+ * final state and needs no grace period before the caller reconciles.
  */
 export async function requestAccessCodesBulkDeletion(
   ids: string[],
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = BULK_DELETE_TIMEOUT_MS,
+  graceMs: number = RECONCILE_GRACE_PERIOD_MS,
 ): Promise<AccessCodesBulkDeleteOutcome> {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
@@ -72,6 +91,7 @@ export async function requestAccessCodesBulkDeletion(
       const body = (await response.json().catch(() => null)) as { error?: string } | null;
       return {
         failed: true,
+        ambiguous: false,
         message:
           body?.error ??
           "Could not delete the selected codes. The list has been refreshed to show its current state.",
@@ -81,8 +101,10 @@ export async function requestAccessCodesBulkDeletion(
     return (await response.json()) as { deletedCount: number; requestedCount: number };
   } catch (caught) {
     const wasTimeout = caught instanceof DOMException && caught.name === "AbortError";
+    await wait(graceMs);
     return {
       failed: true,
+      ambiguous: true,
       message: wasTimeout
         ? "The request took too long to confirm. The list has been refreshed — check its current state before trying again."
         : "Could not reach the admin service. The list has been refreshed to show its current state — please try again.",

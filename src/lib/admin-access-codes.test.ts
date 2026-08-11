@@ -29,7 +29,9 @@ const {
   deleteAccessCode,
   deleteAccessCodes,
   getAdminAccessCodesPage,
+  getAdminAccessCodesForExport,
   parseAdminAccessCodesListQuery,
+  MAX_ACCESS_CODES_EXPORT_ROWS,
   AccessCodeGenerationFailedError,
 } = await import("./admin-access-codes");
 
@@ -301,9 +303,19 @@ describe("parseAdminAccessCodesListQuery", () => {
       query: "TCF-AB12",
       page: 3,
     });
-    expect(parseAdminAccessCodesListQuery({ query: ["not", "valid"], page: "-7" })).toEqual({
+    expect(parseAdminAccessCodesListQuery({ query: undefined, page: "-7" })).toEqual({
       query: "",
       page: 1,
+    });
+  });
+
+  it("resolves a duplicated query-string param to its first value, matching URLSearchParams#get", () => {
+    // A page's searchParams collapses ?query=a&query=b into ["a", "b"], while
+    // an API route's URLSearchParams#get already resolves the same URL to
+    // "a" before this parser ever sees it -- both surfaces must agree.
+    expect(parseAdminAccessCodesListQuery({ query: ["a", "b"], page: ["2", "9"] })).toEqual({
+      query: "a",
+      page: 2,
     });
   });
 });
@@ -436,5 +448,58 @@ describe("getAdminAccessCodesPage", () => {
         ],
       },
     });
+  });
+});
+
+describe("getAdminAccessCodesForExport", () => {
+  it("returns every matching row when the total is within the export cap", async () => {
+    countMock.mockResolvedValue(2);
+    findManyMock.mockResolvedValue([
+      {
+        id: "code_1",
+        code: "TCF-AB12-CD34",
+        note: null,
+        createdAt: new Date("2026-08-10T00:00:00.000Z"),
+        redeemedAt: null,
+        validityDays: null,
+        redeemedByUser: null,
+      },
+    ]);
+
+    const result = await getAdminAccessCodesForExport("");
+
+    expect(result).toEqual({
+      truncated: false,
+      accessCodes: [
+        {
+          id: "code_1",
+          code: "TCF-AB12-CD34",
+          note: null,
+          createdAt: "2026-08-10T00:00:00.000Z",
+          redeemedAt: null,
+          redeemedByUserEmail: null,
+          validityDays: null,
+          expiresAt: null,
+        },
+      ],
+    });
+  });
+
+  it("refuses instead of silently truncating when the filtered total exceeds the export cap", async () => {
+    countMock.mockResolvedValue(MAX_ACCESS_CODES_EXPORT_ROWS + 1);
+
+    const result = await getAdminAccessCodesForExport("");
+
+    expect(result).toEqual({ truncated: true, total: MAX_ACCESS_CODES_EXPORT_ROWS + 1 });
+    expect(findManyMock).not.toHaveBeenCalled();
+  });
+
+  it("allows a total exactly at the export cap", async () => {
+    countMock.mockResolvedValue(MAX_ACCESS_CODES_EXPORT_ROWS);
+    findManyMock.mockResolvedValue([]);
+
+    const result = await getAdminAccessCodesForExport("");
+
+    expect(result.truncated).toBe(false);
   });
 });

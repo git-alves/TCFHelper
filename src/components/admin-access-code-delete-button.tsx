@@ -13,6 +13,21 @@ interface AdminAccessCodeDeleteButtonProps {
 // dialog stuck open: Cancel and Escape are disabled while isDeleting is
 // true, and without a deadline that would otherwise last forever.
 const DELETE_TIMEOUT_MS = 10_000;
+// Observed only for an ambiguous outcome (timeout or network error, see
+// below): the browser aborting a fetch does not stop a request the server
+// already started, so a late-completing delete can still commit after that
+// abort. The caller's own router.refresh() runs unconditionally right after
+// this function resolves (see deleteCode's "finally" block) -- waiting out
+// this grace period first, instead of resolving immediately, gives that
+// refresh far higher odds of actually observing the eventual state rather
+// than reading a stale row a moment before the late delete commits
+// underneath it. It is a best-effort mitigation, not a guarantee: an
+// unusually slow server mutation can still outlast it.
+const RECONCILE_GRACE_PERIOD_MS = 3_000;
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export type AccessCodeDeleteOutcome = { deleted: true } | { deleted: false; message: string };
 
@@ -30,6 +45,7 @@ export async function requestAccessCodeDeletion(
   accessCodeId: string,
   fetchImpl: typeof fetch = fetch,
   timeoutMs: number = DELETE_TIMEOUT_MS,
+  graceMs: number = RECONCILE_GRACE_PERIOD_MS,
 ): Promise<AccessCodeDeleteOutcome> {
   const controller = new AbortController();
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
@@ -56,6 +72,7 @@ export async function requestAccessCodeDeletion(
     };
   } catch (caught) {
     const wasTimeout = caught instanceof DOMException && caught.name === "AbortError";
+    await wait(graceMs);
     return {
       deleted: false,
       message: wasTimeout

@@ -13,6 +13,7 @@ vi.mock("@/lib/admin-api", () => ({
 vi.mock("@/lib/admin-users", () => ({
   getAdminUsersForExport: getAdminUsersForExportMock,
   parseAdminUserListQuery: parseAdminUserListQueryMock,
+  MAX_USERS_EXPORT_ROWS: 10_000,
 }));
 
 const { GET } = await import("./route");
@@ -30,7 +31,7 @@ beforeEach(() => {
   parseAdminUserListQueryMock.mockReset();
 
   getAdminApiUserMock.mockResolvedValue({ id: "owner_1" });
-  getAdminUsersForExportMock.mockResolvedValue([]);
+  getAdminUsersForExportMock.mockResolvedValue({ truncated: false, users: [] });
   parseAdminUserListQueryMock.mockImplementation(({ query, status }: { query?: string; status?: string }) => ({
     query: query ?? "",
     status: status ?? "all",
@@ -54,22 +55,25 @@ describe("GET /api/admin/users/export", () => {
   });
 
   it("returns a downloadable CSV with the expected headers and usage figures", async () => {
-    getAdminUsersForExportMock.mockResolvedValue([
-      {
-        id: "user_1",
-        email: "learner@example.com",
-        name: "Learner, One",
-        createdAt: "2026-08-01T00:00:00.000Z",
-        isAdmin: false,
-        isBlocked: true,
-        activatedAt: "2026-08-02T00:00:00.000Z",
-        usage: {
-          translation: { currentMinuteRequests: 0, currentMinuteCharacters: 0, currentMonthCharacters: 4200 },
-          examples: { currentDayRequests: 3 },
-          corrections: { currentDayRequests: 1, currentMonthRequests: 10 },
+    getAdminUsersForExportMock.mockResolvedValue({
+      truncated: false,
+      users: [
+        {
+          id: "user_1",
+          email: "learner@example.com",
+          name: "Learner, One",
+          createdAt: "2026-08-01T00:00:00.000Z",
+          isAdmin: false,
+          isBlocked: true,
+          activatedAt: "2026-08-02T00:00:00.000Z",
+          usage: {
+            translation: { currentMinuteRequests: 0, currentMinuteCharacters: 0, currentMonthCharacters: 4200 },
+            examples: { currentDayRequests: 3 },
+            corrections: { currentDayRequests: 1, currentMonthRequests: 10 },
+          },
         },
-      },
-    ]);
+      ],
+    });
 
     const response = await GET(exportRequest());
     const body = await response.text();
@@ -83,5 +87,17 @@ describe("GET /api/admin/users/export", () => {
     );
     expect(body).toContain('learner@example.com,"Learner, One",2026-08-01T00:00:00.000Z');
     expect(body).toContain("no,yes,4200,3,1\r\n");
+  });
+
+  it("refuses with a 413 instead of silently truncating when the filter matches too many rows", async () => {
+    getAdminUsersForExportMock.mockResolvedValue({ truncated: true, total: 12_345 });
+
+    const response = await GET(exportRequest());
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toEqual({
+      error: "This filter matches 12,345 users, more than the 10,000-row export limit. Narrow your search before exporting.",
+    });
   });
 });

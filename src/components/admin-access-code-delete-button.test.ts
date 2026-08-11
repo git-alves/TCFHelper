@@ -34,20 +34,37 @@ describe("requestAccessCodeDeletion", () => {
     // so a retry then hit a stale 404 while the row stayed visible.
     const fetchImpl = neverRespondingFetch();
 
-    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl, 5);
+    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl, 5, 5);
 
     expect(outcome.deleted).toBe(false);
     expect(outcome).toMatchObject({ message: expect.stringContaining("refreshed") });
   });
 
+  it("waits out a grace period after a timeout before resolving, so the caller's eventual refresh has a real chance to observe a late-committing delete instead of racing it", async () => {
+    const fetchImpl = neverRespondingFetch();
+
+    const start = Date.now();
+    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl, 5, 50);
+    const elapsed = Date.now() - start;
+
+    expect(outcome.deleted).toBe(false);
+    expect(elapsed).toBeGreaterThanOrEqual(50);
+  });
+
   it("treats an already-removed code (404) as a state to reconcile, not a generic failure", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
 
-    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl);
+    const start = Date.now();
+    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl, 10_000, 5_000);
+    const elapsed = Date.now() - start;
 
     expect(outcome.deleted).toBe(false);
     expect(outcome).toMatchObject({ message: expect.stringContaining("already removed") });
     expect(outcome).toMatchObject({ message: expect.stringContaining("refreshed") });
+    // A response that actually arrived is already the server's final,
+    // definite state -- no need to wait out the (deliberately huge, here)
+    // grace period reserved for an ambiguous no-response outcome.
+    expect(elapsed).toBeLessThan(1_000);
   });
 
   it("surfaces the server's message for an actively-redeemed code (409)", async () => {
@@ -66,7 +83,7 @@ describe("requestAccessCodeDeletion", () => {
   it("treats a network failure as uncertain and worth reconciling", async () => {
     const fetchImpl = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
 
-    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl);
+    const outcome = await requestAccessCodeDeletion("code_1", fetchImpl, 10_000, 5);
 
     expect(outcome.deleted).toBe(false);
     expect(outcome).toMatchObject({ message: expect.stringContaining("refreshed") });

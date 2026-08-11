@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminAccessCodeGenerator } from "@/components/admin-access-code-generator";
 import { AdminAccessCodesTable } from "@/components/admin-access-codes-table";
+import { AdminExportCsvButton } from "@/components/admin-export-csv-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { getAdminAccessCodesPage, parseAdminAccessCodesListQuery } from "@/lib/admin-access-codes";
 
@@ -109,12 +110,7 @@ export default async function AdminAccessCodesPage({ searchParams }: AdminAccess
               Page {codesPage.page} of {codesPage.pageCount}
             </p>
           )}
-          <a
-            href={exportHref(codesPage.query)}
-            className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Export CSV
-          </a>
+          <AdminExportCsvButton href={exportHref(codesPage.query)} />
         </div>
       </div>
 

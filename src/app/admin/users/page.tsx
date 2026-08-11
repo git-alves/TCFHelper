@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminUsersTable } from "@/components/admin-users-table";
+import { AdminExportCsvButton } from "@/components/admin-export-csv-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import {
   type AdminUserStatusFilter,
@@ -106,12 +107,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
         </p>
         <div className="flex items-center gap-3">
           {usersPage.pageCount > 1 && <p className="text-sm text-zinc-600 dark:text-zinc-400">Page {usersPage.page} of {usersPage.pageCount}</p>}
-          <a
-            href={exportHref(usersPage.query, usersPage.status)}
-            className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Export CSV
-          </a>
+          <AdminExportCsvButton href={exportHref(usersPage.query, usersPage.status)} />
         </div>
       </div>
 

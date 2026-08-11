@@ -183,18 +183,41 @@ describe("requestAccessCodesBulkDeletion", () => {
       });
     });
 
-    const outcome = await requestAccessCodesBulkDeletion(["code_1"], fetchImpl, 5);
+    const outcome = await requestAccessCodesBulkDeletion(["code_1"], fetchImpl, 5, 5);
 
-    expect(outcome).toMatchObject({ failed: true, message: expect.stringContaining("refreshed") });
+    expect(outcome).toMatchObject({ failed: true, ambiguous: true, message: expect.stringContaining("refreshed") });
   });
 
-  it("surfaces the server's error message for a non-ok response", async () => {
+  it("waits out a grace period after an ambiguous outcome before resolving, so the caller's eventual refresh has a real chance to observe a late-committing delete instead of racing it", async () => {
+    const fetchImpl = vi.fn((_input: string | URL | Request, init?: RequestInit) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const start = Date.now();
+    const outcome = await requestAccessCodesBulkDeletion(["code_1"], fetchImpl, 5, 50);
+    const elapsed = Date.now() - start;
+
+    expect(outcome).toMatchObject({ failed: true, ambiguous: true });
+    expect(elapsed).toBeGreaterThanOrEqual(50);
+  });
+
+  it("surfaces the server's error message for a non-ok response without waiting out a grace period", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValue(new Response(JSON.stringify({ error: "Invalid request." }), { status: 400 }));
 
-    const outcome = await requestAccessCodesBulkDeletion(["code_1"], fetchImpl);
+    const start = Date.now();
+    const outcome = await requestAccessCodesBulkDeletion(["code_1"], fetchImpl, 5, 5_000);
+    const elapsed = Date.now() - start;
 
-    expect(outcome).toEqual({ failed: true, message: "Invalid request." });
+    expect(outcome).toEqual({ failed: true, ambiguous: false, message: "Invalid request." });
+    // A response that actually arrived is already the server's final,
+    // definite state -- no need to wait out the (deliberately huge, here)
+    // grace period reserved for an ambiguous no-response outcome.
+    expect(elapsed).toBeLessThan(1_000);
   });
 });
