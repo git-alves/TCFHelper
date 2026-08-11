@@ -6,7 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { ADMIN_ACCESS_CODES_PAGE_SIZE } from "@/lib/access-code-limits";
 
 const MAX_NOTE_LENGTH = 280;
-const CODE_GENERATION_ATTEMPTS = 5;
+// Retries the *whole* batch transaction, not one statement inside it: a
+// unique-constraint violation marks a PostgreSQL interactive transaction
+// aborted, so every later statement in that same transaction (even a
+// well-formed retry with a fresh candidate code) would fail too. Collisions
+// are astronomically unlikely at this alphabet/length, so re-running the
+// entire batch with fresh candidates is effectively free in the common
+// (zero-collision) case rather than a real cost paid often.
+const BATCH_GENERATION_ATTEMPTS = 5;
 // Sized for a full-size batch of sequential inserts, not a single one --
 // createAccessCodes wraps the whole batch in one transaction so a failure
 // partway through never leaves an earlier code in the batch persisted but
@@ -69,48 +76,38 @@ export class AccessCodeGenerationFailedError extends Error {
 
 type AccessCodeCreator = Pick<Prisma.TransactionClient["accessCode"], "create">;
 
-/**
- * Retries on a random-code collision (astronomically unlikely at this
- * alphabet/length, but a single-use credential must never silently reuse
- * another code's identity) rather than letting a unique-constraint error
- * surface as a generic 500.
- */
-async function createOneAccessCode(
+/** A single insert attempt with one candidate code -- no retry of its own. */
+async function insertOneAccessCode(
   db: AccessCodeCreator,
   note: string | null,
   validityDays: number | null,
 ): Promise<AdminAccessCode> {
-  for (let attempt = 0; attempt < CODE_GENERATION_ATTEMPTS; attempt += 1) {
-    try {
-      const created = await db.create({
-        data: { code: generateCandidateCode(), note, validityDays },
-        select: { id: true, code: true, note: true, createdAt: true, redeemedAt: true, validityDays: true },
-      });
-      return {
-        id: created.id,
-        code: created.code,
-        note: created.note,
-        createdAt: created.createdAt.toISOString(),
-        redeemedAt: created.redeemedAt?.toISOString() ?? null,
-        redeemedByUserEmail: null,
-        validityDays: created.validityDays,
-        expiresAt: null,
-      };
-    } catch (error) {
-      if (!isUniqueConstraint(error)) throw error;
-    }
-  }
-
-  throw new AccessCodeGenerationFailedError();
+  const created = await db.create({
+    data: { code: generateCandidateCode(), note, validityDays },
+    select: { id: true, code: true, note: true, createdAt: true, redeemedAt: true, validityDays: true },
+  });
+  return {
+    id: created.id,
+    code: created.code,
+    note: created.note,
+    createdAt: created.createdAt.toISOString(),
+    redeemedAt: created.redeemedAt?.toISOString() ?? null,
+    redeemedByUserEmail: null,
+    validityDays: created.validityDays,
+    expiresAt: null,
+  };
 }
 
 /**
  * Generates one or more codes sharing the same note and validity period.
  * Each code is still an independently unique, single-use credential -- a
  * batch is only a generation-time convenience, not a shared/multi-use code.
- * The whole batch runs in one transaction: a failure partway through (e.g.
- * exhausting collision retries on one code) rolls the entire batch back
- * instead of leaving an undisclosed prefix of valid bearer codes persisted.
+ * The whole batch runs in one transaction: a failure partway through rolls
+ * the entire batch back instead of leaving an undisclosed prefix of valid
+ * bearer codes persisted. A collision retries that whole transaction with
+ * fresh candidates, not just the one colliding insert -- see
+ * BATCH_GENERATION_ATTEMPTS for why a single aborted-transaction-safe retry
+ * loop inside the transaction cannot work.
  */
 export async function createAccessCodes(
   note: string | null,
@@ -118,16 +115,25 @@ export async function createAccessCodes(
   count: number,
 ): Promise<AdminAccessCode[]> {
   const trimmedNote = note?.trim().slice(0, MAX_NOTE_LENGTH) || null;
-  return prisma.$transaction(
-    async (tx) => {
-      const codes: AdminAccessCode[] = [];
-      for (let i = 0; i < count; i += 1) {
-        codes.push(await createOneAccessCode(tx.accessCode, trimmedNote, validityDays));
-      }
-      return codes;
-    },
-    { timeout: BATCH_TRANSACTION_TIMEOUT_MS },
-  );
+
+  for (let attempt = 0; attempt < BATCH_GENERATION_ATTEMPTS; attempt += 1) {
+    try {
+      return await prisma.$transaction(
+        async (tx) => {
+          const codes: AdminAccessCode[] = [];
+          for (let i = 0; i < count; i += 1) {
+            codes.push(await insertOneAccessCode(tx.accessCode, trimmedNote, validityDays));
+          }
+          return codes;
+        },
+        { timeout: BATCH_TRANSACTION_TIMEOUT_MS },
+      );
+    } catch (error) {
+      if (!isUniqueConstraint(error)) throw error;
+    }
+  }
+
+  throw new AccessCodeGenerationFailedError();
 }
 
 export async function listAccessCodes(): Promise<AdminAccessCode[]> {

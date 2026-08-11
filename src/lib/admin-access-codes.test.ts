@@ -139,24 +139,39 @@ describe("createAccessCodes", () => {
     expect(createMock).toHaveBeenCalledTimes(5);
   });
 
-  it("propagates a mid-batch failure so the caller's real transaction rolls the whole batch back", async () => {
-    createMock
-      .mockResolvedValueOnce({
-        id: "code_1",
-        code: "TCF-0001-CD34",
+  it("retries the whole batch, not a doomed statement inside one transaction, after a mid-batch collision", async () => {
+    // PostgreSQL marks an interactive transaction aborted after a unique
+    // violation: every later statement in that same transaction fails too,
+    // even a well-formed retry with a fresh candidate code. So the first
+    // (aborted) attempt's surviving code must never appear in the result --
+    // only a subsequent, fully-fresh transaction attempt can succeed.
+    let transactionAttempt = 0;
+    let insertInAttempt = 0;
+    createMock.mockImplementation(async () => {
+      insertInAttempt += 1;
+      if (transactionAttempt === 1 && insertInAttempt === 2) {
+        throw uniqueConstraintError();
+      }
+      return {
+        id: `attempt${transactionAttempt}_code${insertInAttempt}`,
+        code: `TCF-${transactionAttempt}${insertInAttempt}`,
         note: null,
         createdAt: new Date(),
         redeemedAt: null,
         validityDays: null,
-      })
-      // Every attempt for the second code collides, exhausting retries.
-      .mockRejectedValue(uniqueConstraintError());
+      };
+    });
+    transactionMock.mockImplementation(async (callback) => {
+      transactionAttempt += 1;
+      insertInAttempt = 0;
+      return callback({ accessCode: { create: createMock } });
+    });
 
-    await expect(createAccessCodes(null, null, 3)).rejects.toBeInstanceOf(AccessCodeGenerationFailedError);
-    // The failure happened inside the same $transaction callback as the
-    // first code's successful insert, so Postgres rolls both back together
-    // -- there is no separate commit per code for a failure to leave behind.
-    expect(transactionMock).toHaveBeenCalledTimes(1);
+    const result = await createAccessCodes(null, null, 2);
+
+    expect(result).toHaveLength(2);
+    expect(result.every((code) => code.id.startsWith("attempt2_"))).toBe(true);
+    expect(transactionMock).toHaveBeenCalledTimes(2);
   });
 
   it("retries on a code collision instead of surfacing the constraint error", async () => {
@@ -175,6 +190,9 @@ describe("createAccessCodes", () => {
     const result = await createAccessCodes(null, null, 1);
 
     expect(result[0].code).toBe("TCF-EF56-GH78");
+    // Each attempt is its own fresh transaction (see the mid-batch test
+    // above for why retrying inside one transaction cannot work).
+    expect(transactionMock).toHaveBeenCalledTimes(3);
     expect(createMock).toHaveBeenCalledTimes(3);
   });
 
@@ -190,6 +208,7 @@ describe("createAccessCodes", () => {
 
     await expect(createAccessCodes(null, null, 1)).rejects.toBe(dbError);
     expect(createMock).toHaveBeenCalledTimes(1);
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 });
 

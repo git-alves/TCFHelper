@@ -16,3 +16,16 @@ export const MAX_ACCESS_CODE_BATCH_SIZE = ADMIN_ACCESS_CODES_PAGE_SIZE;
 // against, not a second independent number that could drift from the DB's
 // own bound.
 export const MAX_VALIDITY_DAYS = 3650;
+
+/**
+ * Parses a `<input type="number">` string into a strictly positive integer
+ * no greater than `max`, or null if it isn't one. Number(), not parseInt():
+ * parseInt stops at the first non-digit character and silently truncates
+ * "1e1" to 1 and "30.5" to 30 instead of correctly reading 10 or rejecting a
+ * non-integer -- both are strings a number input can legitimately hold.
+ */
+export function parsePositiveIntegerFormValue(value: string, max: number): number | null {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) return null;
+  return parsed;
+}

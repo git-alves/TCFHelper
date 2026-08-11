@@ -273,7 +273,7 @@ model AccessCode {
   // "Deactivate access" is: on the learner's next request after the window
   // elapses. A CHECK constraint (added in the same migration, since Prisma's
   // schema language cannot express one) bounds this to
-  // MAX_VALIDITY_DAYS in src/lib/admin-access-codes.ts.
+  // MAX_VALIDITY_DAYS in src/lib/access-code-limits.ts.
   validityDays     Int?
 
   @@index([redeemedAt])

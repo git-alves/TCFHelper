@@ -3,7 +3,7 @@
 import { type FormEvent, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
-import { MAX_ACCESS_CODE_BATCH_SIZE, MAX_VALIDITY_DAYS } from "@/lib/access-code-limits";
+import { MAX_ACCESS_CODE_BATCH_SIZE, MAX_VALIDITY_DAYS, parsePositiveIntegerFormValue } from "@/lib/access-code-limits";
 
 type GeneratedAccessCode = { code: string };
 type GenerateResponse = { accessCodes?: GeneratedAccessCode[]; error?: string };
@@ -22,14 +22,9 @@ export function AdminAccessCodeGenerator() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [justCreated, setJustCreated] = useState<GeneratedAccessCode[] | null>(null);
 
-  const parsedDays = Number.parseInt(validityDays, 10);
-  const parsedCount = Number.parseInt(count, 10);
-  const canSubmit =
-    !isSubmitting &&
-    (isLifetime || (Number.isInteger(parsedDays) && parsedDays >= 1 && parsedDays <= MAX_VALIDITY_DAYS)) &&
-    Number.isInteger(parsedCount) &&
-    parsedCount >= 1 &&
-    parsedCount <= MAX_ACCESS_CODE_BATCH_SIZE;
+  const parsedDays = parsePositiveIntegerFormValue(validityDays, MAX_VALIDITY_DAYS);
+  const parsedCount = parsePositiveIntegerFormValue(count, MAX_ACCESS_CODE_BATCH_SIZE);
+  const canSubmit = !isSubmitting && (isLifetime || parsedDays !== null) && parsedCount !== null;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -43,8 +38,10 @@ export function AdminAccessCodeGenerator() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           note: note.trim() || null,
-          validityDays: isLifetime ? null : parsedDays,
-          count: parsedCount,
+          // Non-null: canSubmit (checked above) guarantees these parsed
+          // successfully for the fields the current mode actually needs.
+          validityDays: isLifetime ? null : parsedDays!,
+          count: parsedCount!,
         }),
       });
       const payload = (await response.json().catch(() => null)) as GenerateResponse | null;
@@ -151,7 +148,7 @@ export function AdminAccessCodeGenerator() {
           disabled={!canSubmit}
           className="self-start rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc]"
         >
-          {isSubmitting ? "Generating…" : parsedCount > 1 ? `Generate ${count} codes` : "Generate code"}
+          {isSubmitting ? "Generating…" : (parsedCount ?? 0) > 1 ? `Generate ${count} codes` : "Generate code"}
         </button>
       </form>
 
