@@ -6,7 +6,6 @@ import { DEFAULT_USER_QUOTA_LIMITS, type UserQuotaLimits } from "@/lib/user-quot
 
 export const ADMIN_USERS_PAGE_SIZE = 25;
 const MAX_ADMIN_USERS_SEARCH_LENGTH = 120;
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const ADMIN_USER_QUOTA_OVERRIDE_SELECT = {
   translationRequestsPerMinute: true,
@@ -50,7 +49,7 @@ export const ADMIN_USER_SELECT = {
     select: ADMIN_USER_QUOTA_OVERRIDE_SELECT,
   },
   redeemedAccessCodes: {
-    select: { redeemedAt: true, validityDays: true },
+    select: { redeemedAt: true, expiresAt: true },
     take: 1,
   },
 } satisfies Prisma.UserSelect;
@@ -179,9 +178,7 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
   const redemption = record.redeemedAccessCodes[0];
   const hasLiveAdmission =
     redemption !== undefined &&
-    (redemption.validityDays === null ||
-      redemption.redeemedAt === null ||
-      redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY > now.getTime());
+    (redemption.expiresAt === null || redemption.expiresAt.getTime() > now.getTime());
 
   return {
     id: record.id,
@@ -259,55 +256,35 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
 }
 
 /**
- * A timed code past its derived expiry (redeemedAt + validityDays) is still
- * attached in the database until the learner's own next request lazily
- * detaches it -- mirroring hasRedeemedAccessCode's own expiry derivation
- * (see access-code.ts). A plain "redeemedAt is not null" filter would
- * therefore misclassify an expired-but-not-yet-detached learner as
- * indefinitely activated. Prisma's query builder cannot express that date
- * arithmetic in a WHERE clause, but raw SQL can -- computing it here in
- * Postgres, rather than pulling every redeemed row into Node to loop over,
- * keeps this bounded to actual work instead of an unbounded in-memory scan
- * that only grows with the table. `now` is passed as a bound parameter, not
- * interpolated into the query text.
+ * A currently live admission means the relation has an attached row (a
+ * detached/reset code no longer relates to the user at all, since
+ * redeemedByUserId is what defines this relation) whose persisted expiresAt
+ * -- set once, at redemption time, from redeemedAt + validityDays; see
+ * redeemAccessCode in access-code.ts -- is either null (lifetime) or still
+ * in the future. A timed code past that expiry is still attached until the
+ * learner's own next request lazily detaches it (hasRedeemedAccessCode), so
+ * a plain "redeemedAt is not null" filter would misclassify it as
+ * indefinitely activated -- this is why expiresAt, not redeemedAt, is what
+ * this filter compares.
+ *
+ * Because expiresAt is a real column (not date arithmetic computed ad hoc
+ * per read), this is an ordinary Prisma relation filter: one query, the
+ * same one already handling search and pagination, with no separate
+ * unbounded id list built in application memory and no window between two
+ * queries for a redemption/reset/expiry to land in and go unseen.
  */
-async function usersWithLiveAdmission(now: Date): Promise<Set<string>> {
-  const rows = await prisma.$queryRaw<{ userId: string }[]>`
-    SELECT "redeemedByUserId" AS "userId"
-    FROM "AccessCode"
-    WHERE "redeemedByUserId" IS NOT NULL
-      AND (
-        "validityDays" IS NULL
-        OR "redeemedAt" IS NULL
-        OR "redeemedAt" + ("validityDays" * INTERVAL '1 day') > ${now}
-      )
-  `;
+function userStatusWhere(status: AdminUserStatusFilter, now: Date): Prisma.UserWhereInput {
+  const isLive: Prisma.AccessCodeWhereInput = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
 
-  return new Set(rows.map((row) => row.userId));
-}
-
-/**
- * "Activated" means a currently live admission, not merely having redeemed
- * a code at some point (a reset learner's old code no longer relates to
- * them once detached, and an expired timed code no longer counts either --
- * see usersWithLiveAdmission). The owner is excluded from "unactivated"
- * since they bypass activation entirely and would otherwise always show as
- * awaiting a code they will never redeem.
- */
-async function userStatusWhere(status: AdminUserStatusFilter, now: Date): Promise<Prisma.UserWhereInput> {
   switch (status) {
     case "blocked":
       return { isBlocked: true };
     case "admin":
       return { isAdmin: true };
-    case "activated": {
-      const liveUserIds = await usersWithLiveAdmission(now);
-      return { id: { in: Array.from(liveUserIds) } };
-    }
-    case "unactivated": {
-      const liveUserIds = await usersWithLiveAdmission(now);
-      return { isAdmin: false, id: { notIn: Array.from(liveUserIds) } };
-    }
+    case "activated":
+      return { redeemedAccessCodes: { some: isLive } };
+    case "unactivated":
+      return { isAdmin: false, redeemedAccessCodes: { none: isLive } };
     case "all":
       return {};
   }
@@ -325,7 +302,7 @@ export async function getAdminUsersPage(
   },
   now = new Date(),
 ) {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status, now) };
   const total = await prisma.user.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / ADMIN_USERS_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -385,7 +362,7 @@ export async function getAdminUsersForExport(
   },
   now = new Date(),
 ): Promise<AdminUsersExportResult> {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status, now) };
   const records = await prisma.user.findMany({
     where,
     select: ADMIN_USER_SELECT,

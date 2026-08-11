@@ -88,6 +88,7 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
         userId={user.id}
         email={user.email}
         activationStamp={user.activatedAt}
+        hasLiveAdmission={user.hasLiveAdmission}
         isCurrentAdmin={isCurrentAdmin}
       />
 

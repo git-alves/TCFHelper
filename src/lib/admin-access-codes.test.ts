@@ -256,6 +256,13 @@ function statementTimeoutError() {
   return error;
 }
 
+function prismaTransactionTimeoutError() {
+  return new Prisma.PrismaClientKnownRequestError("Transaction already closed", {
+    code: "P2028",
+    clientVersion: "test",
+  });
+}
+
 describe("deleteAccessCode", () => {
   it("deletes a code that has no live admission", async () => {
     deleteManyMock.mockResolvedValue({ count: 1 });
@@ -267,12 +274,25 @@ describe("deleteAccessCode", () => {
     expect(findUniqueMock).not.toHaveBeenCalled();
   });
 
-  it("runs the delete under a Postgres statement deadline", async () => {
+  it("runs the delete under a Postgres statement deadline, with Prisma's own transaction timeout set above it", async () => {
     deleteManyMock.mockResolvedValue({ count: 1 });
 
     await deleteAccessCode("code_1");
 
     expect(executeRawUnsafeMock).toHaveBeenCalledWith(expect.stringContaining("SET LOCAL statement_timeout"));
+    // Prisma's own interactive-transaction timeout defaults to 5s -- shorter
+    // than the 6s Postgres statement deadline (DELETE_STATEMENT_TIMEOUT_MS)
+    // -- so without this explicit override, Prisma would abandon the
+    // transaction on its own clock first and surface an unhandled P2028
+    // instead of ever letting Postgres enforce the deadline this whole
+    // mechanism exists for.
+    expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 8_000 });
+  });
+
+  it("reports a definite timedOut when Prisma's own transaction timeout fires instead of Postgres's statement deadline", async () => {
+    transactionMock.mockRejectedValue(prismaTransactionTimeoutError());
+
+    await expect(deleteAccessCode("code_1")).resolves.toEqual({ kind: "timedOut" });
   });
 
   it("refuses to delete a code that is actively granting access", async () => {
@@ -436,7 +456,10 @@ describe("getAdminAccessCodesPage", () => {
     expect(result.total).toBe(2);
   });
 
-  it("derives expiresAt from redeemedAt and validityDays for a timed, redeemed code", async () => {
+  it("passes through the persisted expiresAt for a timed, redeemed code", async () => {
+    // expiresAt is computed once, at redemption time (see redeemAccessCode
+    // in access-code.ts), and simply read back here -- not recomputed from
+    // redeemedAt/validityDays on every list read.
     countMock.mockResolvedValue(1);
     findManyMock.mockResolvedValue([
       {
@@ -446,6 +469,7 @@ describe("getAdminAccessCodesPage", () => {
         createdAt: new Date("2026-08-01T00:00:00.000Z"),
         redeemedAt: new Date("2026-08-10T00:00:00.000Z"),
         validityDays: 7,
+        expiresAt: new Date("2026-08-17T00:00:00.000Z"),
         redeemedByUser: { email: "learner@example.com" },
       },
     ]);
@@ -466,6 +490,7 @@ describe("getAdminAccessCodesPage", () => {
         createdAt: new Date("2026-08-01T00:00:00.000Z"),
         redeemedAt: null,
         validityDays: 7,
+        expiresAt: null,
         redeemedByUser: null,
       },
     ]);

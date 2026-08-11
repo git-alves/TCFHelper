@@ -22,4 +22,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260811070000_add_admin_event_log",
   "20260811080000_add_auth_security_sessions",
   "20260811090000_add_access_code_created_at_index",
+  "20260811100000_add_access_code_expires_at",
 ]);

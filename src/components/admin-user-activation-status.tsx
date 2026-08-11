@@ -8,6 +8,7 @@ interface AdminUserActivationStatusProps {
   userId: string;
   email: string;
   activationStamp: string | null;
+  hasLiveAdmission: boolean;
   isCurrentAdmin: boolean;
 }
 
@@ -20,6 +21,7 @@ export function AdminUserActivationStatus({
   userId,
   email,
   activationStamp,
+  hasLiveAdmission,
   isCurrentAdmin,
 }: AdminUserActivationStatusProps) {
   const router = useRouter();
@@ -31,11 +33,18 @@ export function AdminUserActivationStatus({
   // admission only. A refreshed replacement admission has a new redemption
   // timestamp, so it wins over the old local reset without an effect-driven
   // state synchronization or a misleading stale "Awaiting" control.
-  const isActivated =
+  const isAttached =
     activationStamp !== null && deactivatedActivationStamp !== activationStamp;
+  // A timed code past its own expiry stays attached (isAttached true) until
+  // the learner's own next request lazily detaches it, so isAttached alone
+  // cannot say whether they currently have access -- only whether there is
+  // still a row here that "Deactivate access" can act on. hasLiveAdmission
+  // is what distinguishes the two; once deactivated, isAttached itself goes
+  // false and this distinction stops mattering.
+  const isLive = isAttached && hasLiveAdmission;
 
   async function deactivateAccess() {
-    if (isSaving || !isActivated || isCurrentAdmin) return;
+    if (isSaving || !isAttached || isCurrentAdmin) return;
 
     setIsSaving(true);
     setStatus("Deactivating access…");
@@ -73,23 +82,32 @@ export function AdminUserActivationStatus({
       <div className="mb-3">
         <h2 id="activation-heading" className="text-base font-semibold">Activation</h2>
         <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {isActivated
-            ? "Removes this learner’s current access-code admission. Their work stays intact, but the code they used remains permanently spent. Send a new code to restore access."
-            : "This learner is awaiting a newly issued access code. Their work and account remain intact."}
+          {!isAttached
+            ? "This learner is awaiting a newly issued access code. Their work and account remain intact."
+            : isLive
+              ? "Removes this learner’s current access-code admission. Their work stays intact, but the code they used remains permanently spent. Send a new code to restore access."
+              : "This learner’s access-code admission has already expired but has not yet been automatically cleared. Their work stays intact. Deactivating now clears it immediately; send a new code to restore access."}
         </p>
       </div>
       <span className="sr-only" role="status" aria-live="polite">
         {status}
       </span>
-      {isActivated ? (
-        <button
-          type="button"
-          onClick={() => setIsConfirming(true)}
-          disabled={isSaving}
-          className="rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
-        >
-          {isSaving ? "Deactivating access…" : "Deactivate access"}
-        </button>
+      {isAttached ? (
+        <div className="flex flex-wrap items-center gap-2">
+          {!isLive && (
+            <span className="inline-flex rounded-full bg-zinc-200 px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+              Access expired
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsConfirming(true)}
+            disabled={isSaving}
+            className="rounded-full border border-red-300 px-4 py-2 text-sm font-medium text-red-800 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
+          >
+            {isSaving ? "Deactivating access…" : "Deactivate access"}
+          </button>
+        </div>
       ) : (
         <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">
           Awaiting new code

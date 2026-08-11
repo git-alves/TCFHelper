@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { countMock, findManyMock, queryRawMock } = vi.hoisted(() => ({
+const { countMock, findManyMock } = vi.hoisted(() => ({
   countMock: vi.fn(),
   findManyMock: vi.fn(),
-  queryRawMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,7 +13,6 @@ vi.mock("@/lib/prisma", () => ({
       findMany: findManyMock,
       findUnique: vi.fn(),
     },
-    $queryRaw: queryRawMock,
   },
 }));
 
@@ -30,7 +28,7 @@ const {
 function userRecord(overrides: {
   id?: string;
   redeemedAt?: Date | null;
-  validityDays?: number | null;
+  expiresAt?: Date | null;
 }) {
   return {
     id: overrides.id ?? "user_1",
@@ -44,9 +42,9 @@ function userRecord(overrides: {
     correctionUsage: null,
     quotaOverride: null,
     redeemedAccessCodes:
-      overrides.redeemedAt === undefined && overrides.validityDays === undefined
+      overrides.redeemedAt === undefined && overrides.expiresAt === undefined
         ? []
-        : [{ redeemedAt: overrides.redeemedAt ?? null, validityDays: overrides.validityDays ?? null }],
+        : [{ redeemedAt: overrides.redeemedAt ?? null, expiresAt: overrides.expiresAt ?? null }],
   };
 }
 
@@ -54,10 +52,8 @@ describe("admin user list helpers", () => {
   beforeEach(() => {
     countMock.mockReset();
     findManyMock.mockReset();
-    queryRawMock.mockReset();
     countMock.mockResolvedValue(0);
     findManyMock.mockResolvedValue([]);
-    queryRawMock.mockResolvedValue([]);
   });
 
   it("normalizes a search, status, and rejects invalid page values", () => {
@@ -81,41 +77,30 @@ describe("admin user list helpers", () => {
     });
   });
 
-  it("filters to blocked or admin accounts without consulting access codes", async () => {
+  it("filters to blocked or admin accounts without referencing access codes", async () => {
     await getAdminUsersPage({ query: "", status: "blocked", page: 1 });
     expect(countMock).toHaveBeenLastCalledWith({ where: { isBlocked: true } });
-    expect(queryRawMock).not.toHaveBeenCalled();
 
     await getAdminUsersPage({ query: "", status: "admin", page: 1 });
     expect(countMock).toHaveBeenLastCalledWith({ where: { isAdmin: true } });
-    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
-  it("classifies activated/unactivated by currently live admission, not merely having ever redeemed, resolving it with a bounded database-side query rather than loading every redemption into memory", async () => {
+  it("classifies activated/unactivated by currently live admission, not merely having ever redeemed, via a single bounded relation filter rather than a separate id-materializing query", async () => {
     const now = new Date("2026-08-10T12:00:00.000Z");
-    queryRawMock.mockResolvedValue([
-      // Lifetime code: always live once redeemed.
-      { userId: "user_lifetime" },
-      // Timed code still inside its window.
-      { userId: "user_active_timed" },
-      // A timed code past its derived expiry is excluded by the query
-      // itself (see the SQL's WHERE clause) -- an expired user's id never
-      // appears in these rows at all.
-    ]);
+    const isLive = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
 
     await getAdminUsersPage({ query: "", status: "activated", page: 1 }, now);
-    expect(queryRawMock).toHaveBeenCalledTimes(1);
-    const [strings, ...values] = queryRawMock.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
-    expect(strings.join("")).toContain('FROM "AccessCode"');
-    expect(strings.join("")).toContain('"redeemedByUserId" IS NOT NULL');
-    expect(values).toEqual([now]);
+    // One single count() call -- no separate query materializes an id list
+    // first, so there is no window between two queries for a redemption,
+    // reset, or expiry to land in and be missed.
+    expect(countMock).toHaveBeenCalledTimes(1);
     expect(countMock).toHaveBeenLastCalledWith({
-      where: { id: { in: ["user_lifetime", "user_active_timed"] } },
+      where: { redeemedAccessCodes: { some: isLive } },
     });
 
     await getAdminUsersPage({ query: "", status: "unactivated", page: 1 }, now);
     expect(countMock).toHaveBeenLastCalledWith({
-      where: { isAdmin: false, id: { notIn: ["user_lifetime", "user_active_timed"] } },
+      where: { isAdmin: false, redeemedAccessCodes: { none: isLive } },
     });
   });
 
@@ -233,9 +218,17 @@ describe("admin user list helpers", () => {
     const now = new Date("2026-08-10T12:00:00.000Z");
     findManyMock.mockResolvedValue([
       userRecord({ id: "user_never", redeemedAt: undefined }),
-      userRecord({ id: "user_lifetime", redeemedAt: new Date("2026-01-01T00:00:00.000Z"), validityDays: null }),
-      userRecord({ id: "user_live_timed", redeemedAt: new Date("2026-08-09T00:00:00.000Z"), validityDays: 7 }),
-      userRecord({ id: "user_expired_timed", redeemedAt: new Date("2026-07-01T00:00:00.000Z"), validityDays: 7 }),
+      userRecord({ id: "user_lifetime", redeemedAt: new Date("2026-01-01T00:00:00.000Z"), expiresAt: null }),
+      userRecord({
+        id: "user_live_timed",
+        redeemedAt: new Date("2026-08-09T00:00:00.000Z"),
+        expiresAt: new Date("2026-08-16T00:00:00.000Z"),
+      }),
+      userRecord({
+        id: "user_expired_timed",
+        redeemedAt: new Date("2026-07-01T00:00:00.000Z"),
+        expiresAt: new Date("2026-07-08T00:00:00.000Z"),
+      }),
     ]);
 
     const page = await getAdminUsersPage({ query: "", status: "all", page: 1 }, now);
@@ -265,9 +258,7 @@ describe("getAdminUsersForExport", () => {
   beforeEach(() => {
     countMock.mockReset();
     findManyMock.mockReset();
-    queryRawMock.mockReset();
     findManyMock.mockResolvedValue([]);
-    queryRawMock.mockResolvedValue([]);
   });
 
   it("requests one row past the cap in a single query, not a separate count, to avoid a TOCTOU gap between counting and fetching", async () => {
