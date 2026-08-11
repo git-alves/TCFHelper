@@ -103,6 +103,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   }
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isHome = realPathname === "/";
+  const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
 
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
@@ -168,7 +169,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   {copy.nav.tasks}
                 </Link>
               )}
-              {isAdmin && (
+              {isAdmin && !isOnAdminPage && (
                 <Link href="/admin" className={DASHBOARD_BUTTON_CLASS}>
                   {copy.nav.admin}
                 </Link>
