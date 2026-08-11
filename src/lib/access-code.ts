@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveExpiresAt } from "@/lib/access-code-expiry";
 
 const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -50,11 +51,23 @@ function redemptionLockKey(userId: string) {
 async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Promise<AdmissionResolution> {
   const admission = await tx.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { id: true, expiresAt: true },
+    select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
   });
   if (!admission) return { kind: "none" };
-  if (admission.expiresAt === null) return { kind: "active" };
-  if (Date.now() < admission.expiresAt.getTime()) return { kind: "active" };
+
+  const expiresAt = resolveExpiresAt(admission);
+  // A row whose expiresAt had to be derived here (see resolveExpiresAt) --
+  // written by an app instance mid-deploy, before this column existed in
+  // code -- self-heals now: the next reader sees a real, persisted value
+  // and never needs the fallback for this row again.
+  if (admission.expiresAt === null && expiresAt !== null) {
+    await tx.accessCode.updateMany({
+      where: { id: admission.id, expiresAt: null },
+      data: { expiresAt },
+    });
+  }
+  if (expiresAt === null) return { kind: "active" };
+  if (Date.now() < expiresAt.getTime()) return { kind: "active" };
 
   await tx.accessCode.updateMany({
     where: { id: admission.id, redeemedByUserId: userId, redeemedAt: { not: null } },
@@ -82,11 +95,23 @@ async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Pr
 export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
   const redemption = await prisma.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { expiresAt: true },
+    select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
   });
   if (redemption === null) return false;
-  if (redemption.expiresAt === null) return true;
-  if (Date.now() < redemption.expiresAt.getTime()) return true;
+
+  const expiresAt = resolveExpiresAt(redemption);
+  // Self-heals a legacy/gap row the same way resolveAdmissionLocked does
+  // (see there for why) -- this is the far more common path to hit it,
+  // since it runs on every protected-route check rather than only once a
+  // code already looks expired.
+  if (redemption.expiresAt === null && expiresAt !== null) {
+    await prisma.accessCode.updateMany({
+      where: { id: redemption.id, expiresAt: null },
+      data: { expiresAt },
+    });
+  }
+  if (expiresAt === null) return true;
+  if (Date.now() < expiresAt.getTime()) return true;
 
   const resolution = await prisma.$transaction(
     async (tx) => {

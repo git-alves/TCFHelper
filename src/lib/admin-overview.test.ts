@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 const {
   userCountMock,
@@ -95,12 +96,21 @@ describe("getAdminOverviewStats", () => {
     });
   });
 
-  it("treats redeemedAt as the durable single-use marker", async () => {
+  it("treats redeemedAt as the durable single-use marker for the access-code redemption count", async () => {
     await getAdminOverviewStats(NOW);
 
     expect(accessCodeCountMock).toHaveBeenCalledWith({ where: { redeemedAt: { not: null } } });
+  });
+
+  it("counts Activated users by the same live-admission predicate the users list's own Activated filter uses", async () => {
+    // A timed code past its expiry stays attached until the learner's own
+    // next request lazily detaches it -- this must match the users list's
+    // Activated/Unactivated filter exactly, or the overview tile and the
+    // list disagree about who currently has access.
+    await getAdminOverviewStats(NOW);
+
     expect(userCountMock).toHaveBeenCalledWith({
-      where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } },
+      where: { redeemedAccessCodes: { some: accessCodeIsLiveWhere(NOW) } },
     });
   });
 

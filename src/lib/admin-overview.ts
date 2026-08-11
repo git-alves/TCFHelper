@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 import { ONLINE_THRESHOLD_MS } from "@/lib/presence-limits";
 
 export type AdminOverviewStats = {
@@ -53,7 +54,13 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { isBlocked: true } }),
-    prisma.user.count({ where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } } }),
+    // Matches the users list's own Activated filter: a currently live
+    // admission, not merely having redeemed a code at some point. A timed
+    // code past its expiry stays attached until the learner's own next
+    // request lazily detaches it, so a plain "redeemedAt is not null"
+    // count would keep counting them here after the users list itself
+    // already calls them unactivated / "Access expired".
+    prisma.user.count({ where: { redeemedAccessCodes: { some: accessCodeIsLiveWhere(now) } } }),
     // isBlocked: false is redundant in practice (touchLastActive stops
     // updating the moment an account is blocked, so its timestamp ages out
     // within the threshold on its own) but makes the count exactly correct

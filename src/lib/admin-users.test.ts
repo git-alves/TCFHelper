@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 const { countMock, findManyMock } = vi.hoisted(() => ({
   countMock: vi.fn(),
@@ -28,8 +29,11 @@ const {
 function userRecord(overrides: {
   id?: string;
   redeemedAt?: Date | null;
+  validityDays?: number | null;
   expiresAt?: Date | null;
 }) {
+  const hasRedemption =
+    overrides.redeemedAt !== undefined || overrides.validityDays !== undefined || overrides.expiresAt !== undefined;
   return {
     id: overrides.id ?? "user_1",
     email: "learner@example.com",
@@ -41,10 +45,15 @@ function userRecord(overrides: {
     exampleGenerationQuota: null,
     correctionUsage: null,
     quotaOverride: null,
-    redeemedAccessCodes:
-      overrides.redeemedAt === undefined && overrides.expiresAt === undefined
-        ? []
-        : [{ redeemedAt: overrides.redeemedAt ?? null, expiresAt: overrides.expiresAt ?? null }],
+    redeemedAccessCodes: hasRedemption
+      ? [
+          {
+            redeemedAt: overrides.redeemedAt ?? null,
+            validityDays: overrides.validityDays ?? null,
+            expiresAt: overrides.expiresAt ?? null,
+          },
+        ]
+      : [],
   };
 }
 
@@ -87,7 +96,7 @@ describe("admin user list helpers", () => {
 
   it("classifies activated/unactivated by currently live admission, not merely having ever redeemed, via a single bounded relation filter rather than a separate id-materializing query", async () => {
     const now = new Date("2026-08-10T12:00:00.000Z");
-    const isLive = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
+    const isLive = { OR: [{ expiresAt: null, validityDays: null }, { expiresAt: { gt: now } }] };
 
     await getAdminUsersPage({ query: "", status: "activated", page: 1 }, now);
     // One single count() call -- no separate query materializes an id list
@@ -101,6 +110,20 @@ describe("admin user list helpers", () => {
     await getAdminUsersPage({ query: "", status: "unactivated", page: 1 }, now);
     expect(countMock).toHaveBeenLastCalledWith({
       where: { isAdmin: false, redeemedAccessCodes: { none: isLive } },
+    });
+  });
+
+  it("wires the status filter through the same accessCodeIsLiveWhere predicate access-code-expiry.ts defines, not a hand-rolled duplicate", async () => {
+    // Keeping this one source of truth (rather than reimplementing the
+    // predicate here too) is what makes the mixed-version-rollout safety
+    // guarantee (requiring validityDays null alongside expiresAt null
+    // before trusting "lifetime" -- see access-code-expiry.test.ts) apply
+    // here automatically instead of needing to be re-verified per caller.
+    const now = new Date("2026-08-10T12:00:00.000Z");
+
+    await getAdminUsersPage({ query: "", status: "activated", page: 1 }, now);
+    expect(countMock).toHaveBeenLastCalledWith({
+      where: { redeemedAccessCodes: { some: accessCodeIsLiveWhere(now) } },
     });
   });
 
@@ -251,6 +274,35 @@ describe("admin user list helpers", () => {
       activatedAt: "2026-07-01T00:00:00.000Z",
       hasLiveAdmission: false,
     });
+  });
+
+  it("falls back to deriving hasLiveAdmission for a mixed-version-rollout row (validityDays set, expiresAt never persisted)", async () => {
+    // Complements the userStatusWhere test above: the WHERE clause itself
+    // cannot use this fallback (Prisma can't express the date arithmetic),
+    // but the per-row display can and does, via resolveExpiresAt -- so a
+    // gap row that a search/status filter didn't exclude still renders
+    // with the correct badge instead of a wrong "Activated".
+    const now = new Date("2026-08-10T12:00:00.000Z");
+    findManyMock.mockResolvedValue([
+      userRecord({
+        id: "user_gap_expired",
+        redeemedAt: new Date("2026-08-01T00:00:00.000Z"),
+        validityDays: 3,
+        expiresAt: null,
+      }),
+      userRecord({
+        id: "user_gap_live",
+        redeemedAt: new Date("2026-08-09T00:00:00.000Z"),
+        validityDays: 7,
+        expiresAt: null,
+      }),
+    ]);
+
+    const page = await getAdminUsersPage({ query: "", status: "all", page: 1 }, now);
+    const byId = Object.fromEntries(page.users.map((user) => [user.id, user]));
+
+    expect(byId.user_gap_expired).toMatchObject({ hasLiveAdmission: false });
+    expect(byId.user_gap_live).toMatchObject({ hasLiveAdmission: true });
   });
 });
 

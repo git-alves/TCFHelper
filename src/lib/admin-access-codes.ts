@@ -3,6 +3,7 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { resolveExpiresAt } from "@/lib/access-code-expiry";
 import { ADMIN_ACCESS_CODES_PAGE_SIZE } from "@/lib/access-code-limits";
 
 const MAX_NOTE_LENGTH = 280;
@@ -277,7 +278,9 @@ function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof 
     redeemedAt: code.redeemedAt?.toISOString() ?? null,
     redeemedByUserEmail: code.redeemedByUser?.email ?? null,
     validityDays: code.validityDays,
-    expiresAt: code.expiresAt?.toISOString() ?? null,
+    // resolveExpiresAt's fallback keeps this correct even for a legacy row
+    // whose expiresAt has not been self-healed yet (see access-code.ts).
+    expiresAt: resolveExpiresAt(code)?.toISOString() ?? null,
   };
 }
 

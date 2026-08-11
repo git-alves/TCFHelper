@@ -2,6 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { accessCodeIsLiveWhere, resolveExpiresAt } from "@/lib/access-code-expiry";
 import { DEFAULT_USER_QUOTA_LIMITS, type UserQuotaLimits } from "@/lib/user-quota-limits";
 
 export const ADMIN_USERS_PAGE_SIZE = 25;
@@ -49,7 +50,7 @@ export const ADMIN_USER_SELECT = {
     select: ADMIN_USER_QUOTA_OVERRIDE_SELECT,
   },
   redeemedAccessCodes: {
-    select: { redeemedAt: true, expiresAt: true },
+    select: { redeemedAt: true, validityDays: true, expiresAt: true },
     take: 1,
   },
 } satisfies Prisma.UserSelect;
@@ -176,9 +177,14 @@ export type AdminUserDetail = AdminUserListItem & {
 
 function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
   const redemption = record.redeemedAccessCodes[0];
+  // resolveExpiresAt's fallback keeps this badge correct even for a legacy
+  // row whose expiresAt has not been self-healed yet (see access-code.ts) --
+  // the display can apply the fallback per-row where the list/export
+  // filter itself, for boundedness reasons, cannot; see
+  // accessCodeIsLiveWhere for that side of the same rollout-safety story.
+  const resolvedExpiresAt = redemption !== undefined ? resolveExpiresAt(redemption) : undefined;
   const hasLiveAdmission =
-    redemption !== undefined &&
-    (redemption.expiresAt === null || redemption.expiresAt.getTime() > now.getTime());
+    resolvedExpiresAt !== undefined && (resolvedExpiresAt === null || resolvedExpiresAt.getTime() > now.getTime());
 
   return {
     id: record.id,
@@ -258,10 +264,10 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
 /**
  * A currently live admission means the relation has an attached row (a
  * detached/reset code no longer relates to the user at all, since
- * redeemedByUserId is what defines this relation) whose persisted expiresAt
- * -- set once, at redemption time, from redeemedAt + validityDays; see
- * redeemAccessCode in access-code.ts -- is either null (lifetime) or still
- * in the future. A timed code past that expiry is still attached until the
+ * redeemedByUserId is what defines this relation) that accessCodeIsLiveWhere
+ * considers live -- see there for what that means and, importantly, how it
+ * stays correct across a mixed-version deploy that added the expiresAt
+ * column. A timed code past its expiry is still attached until the
  * learner's own next request lazily detaches it (hasRedeemedAccessCode), so
  * a plain "redeemedAt is not null" filter would misclassify it as
  * indefinitely activated -- this is why expiresAt, not redeemedAt, is what
@@ -274,7 +280,7 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
  * queries for a redemption/reset/expiry to land in and go unseen.
  */
 function userStatusWhere(status: AdminUserStatusFilter, now: Date): Prisma.UserWhereInput {
-  const isLive: Prisma.AccessCodeWhereInput = { OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] };
+  const isLive = accessCodeIsLiveWhere(now);
 
   switch (status) {
     case "blocked":

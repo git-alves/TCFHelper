@@ -18,7 +18,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: transactionMock,
-    accessCode: { findUnique: findUniqueMock },
+    accessCode: { findUnique: findUniqueMock, updateMany: updateManyMock },
   },
 }));
 
@@ -64,12 +64,12 @@ describe("normalizeAccessCode", () => {
 
 describe("hasRedeemedAccessCode", () => {
   it("looks up the code redeemed by this learner", async () => {
-    findUniqueMock.mockResolvedValue({ expiresAt: null });
+    findUniqueMock.mockResolvedValue({ id: "code_1", redeemedAt: new Date(), validityDays: null, expiresAt: null });
 
     await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { redeemedByUserId: USER_ID },
-      select: { expiresAt: true },
+      select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
     });
   });
 
@@ -77,11 +77,47 @@ describe("hasRedeemedAccessCode", () => {
     await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(false);
   });
 
-  it("treats a lifetime code (null expiresAt) as never expiring", async () => {
-    findUniqueMock.mockResolvedValue({ expiresAt: null });
+  it("treats a lifetime code (null expiresAt, null validityDays) as never expiring", async () => {
+    findUniqueMock.mockResolvedValue({ id: "code_1", redeemedAt: new Date(), validityDays: null, expiresAt: null });
 
     await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
     expect(updateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("derives and self-heals a legacy row's expiry when expiresAt was never persisted (mixed-version rollout gap)", async () => {
+    // An app instance that predates the expiresAt column could have written
+    // redeemedAt/validityDays without it. Reading such a row must not treat
+    // the missing expiresAt as "lifetime" -- it must derive the real expiry
+    // and persist it, so this row is never misclassified as live again.
+    const fiveDaysAgo = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000);
+    findUniqueMock.mockResolvedValueOnce({
+      id: "code_legacy",
+      redeemedAt: fiveDaysAgo,
+      validityDays: 3,
+      expiresAt: null,
+    });
+
+    await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(false);
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: { id: "code_legacy", expiresAt: null },
+      data: { expiresAt: new Date(fiveDaysAgo.getTime() + 3 * 24 * 60 * 60 * 1000) },
+    });
+  });
+
+  it("self-heals a legacy row that is still within its derived window without treating it as expired", async () => {
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    findUniqueMock.mockResolvedValueOnce({
+      id: "code_legacy",
+      redeemedAt: oneDayAgo,
+      validityDays: 7,
+      expiresAt: null,
+    });
+
+    await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: { id: "code_legacy", expiresAt: null },
+      data: { expiresAt: new Date(oneDayAgo.getTime() + 7 * 24 * 60 * 60 * 1000) },
+    });
   });
 
   it("treats a timed code still inside its window as active", async () => {
@@ -135,7 +171,7 @@ describe("redeemAccessCode", () => {
     expect(executeRawMock.mock.calls[0]?.[0]?.join("")).toContain("pg_advisory_xact_lock");
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { redeemedByUserId: USER_ID },
-      select: { id: true, expiresAt: true },
+      select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
     });
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { code: "INVITE-AB12" },
@@ -172,7 +208,12 @@ describe("redeemAccessCode", () => {
   });
 
   it("does not spend a second code for a learner who is already activated", async () => {
-    findUniqueMock.mockResolvedValue({ id: "code_already_used", expiresAt: null });
+    findUniqueMock.mockResolvedValue({
+      id: "code_already_used",
+      redeemedAt: new Date(),
+      validityDays: null,
+      expiresAt: null,
+    });
 
     await expect(redeemAccessCode(USER_ID, "INVITE-AB12")).resolves.toEqual({
       kind: "alreadyActivated",
