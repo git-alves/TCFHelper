@@ -8,6 +8,7 @@ import { DashboardNavGuardProvider } from "@/components/dashboard-nav-guard";
 import { NavBar } from "@/components/nav-bar";
 import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
+import { getCurrentAdminUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
 import { THEME_INIT_SCRIPT } from "@/lib/app-theme";
 
@@ -37,7 +38,14 @@ export default async function RootLayout({
   children: React.ReactNode;
   settings: React.ReactNode;
 }>) {
-  const locale = await getRequestLocale();
+  const [locale, adminUser] = await Promise.all([
+    getRequestLocale(),
+    // A temporary lookup failure must not take down every page in the app --
+    // just hide the nav's Admin link, same as the home page's blocked-user
+    // check fails closed rather than failing the render.
+    getCurrentAdminUser().catch(() => null),
+  ]);
+  const isAdmin = adminUser !== null;
 
   return (
     <html
@@ -59,7 +67,7 @@ export default async function RootLayout({
             <ClerkLocaleProvider>
               <DashboardNavGuardProvider>
                 <WalkthroughTriggerProvider>
-                  <NavBar />
+                  <NavBar isAdmin={isAdmin} />
                   <div className="flex flex-1 flex-col">{children}</div>
                   {settings}
                 </WalkthroughTriggerProvider>

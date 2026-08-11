@@ -45,6 +45,7 @@ export interface AppCopy {
     dashboard: string;
     tasks: string;
     settings: string;
+    admin: string;
     logIn: string;
     closeSettingsFirst: string;
   };
@@ -295,6 +296,7 @@ export const APP_COPY = {
       dashboard: "Dashboard",
       tasks: "Tasks",
       settings: "Settings",
+      admin: "Admin",
       logIn: "Log in",
       closeSettingsFirst: "Close Settings first",
     },
@@ -570,6 +572,7 @@ export const APP_COPY = {
       dashboard: "Tableau de bord",
       tasks: "Tâches",
       settings: "Paramètres",
+      admin: "Admin",
       logIn: "Se connecter",
       closeSettingsFirst: "Fermez d’abord les paramètres",
     },
@@ -854,6 +857,7 @@ export const APP_COPY = {
       dashboard: "Panel",
       tasks: "Tareas",
       settings: "Configuración",
+      admin: "Admin",
       logIn: "Iniciar sesión",
       closeSettingsFirst: "Cierra primero la configuración",
     },
@@ -1136,6 +1140,7 @@ export const APP_COPY = {
       dashboard: "Painel",
       tasks: "Tarefas",
       settings: "Configurações",
+      admin: "Admin",
       logIn: "Entrar",
       closeSettingsFirst: "Feche as configurações primeiro",
     },
