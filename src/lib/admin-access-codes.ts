@@ -6,6 +6,16 @@ import { prisma } from "@/lib/prisma";
 import { ADMIN_ACCESS_CODES_PAGE_SIZE } from "@/lib/access-code-limits";
 
 const MAX_NOTE_LENGTH = 280;
+const MAX_ACCESS_CODES_SEARCH_LENGTH = 120;
+const ACCESS_CODE_LIST_SELECT = {
+  id: true,
+  code: true,
+  note: true,
+  createdAt: true,
+  redeemedAt: true,
+  validityDays: true,
+  redeemedByUser: { select: { email: true } },
+} satisfies Prisma.AccessCodeSelect;
 // Retries the *whole* batch transaction, not one statement inside it: a
 // unique-constraint violation marks a PostgreSQL interactive transaction
 // aborted, so every later statement in that same transaction (even a
@@ -160,22 +170,8 @@ export async function deleteAccessCode(id: string): Promise<DeleteAccessCodeResu
   return stillExists ? { kind: "activelyRedeemed" } : { kind: "notFound" };
 }
 
-export async function listAccessCodes(): Promise<AdminAccessCode[]> {
-  const codes = await prisma.accessCode.findMany({
-    orderBy: { createdAt: "desc" },
-    take: ADMIN_ACCESS_CODES_PAGE_SIZE,
-    select: {
-      id: true,
-      code: true,
-      note: true,
-      createdAt: true,
-      redeemedAt: true,
-      validityDays: true,
-      redeemedByUser: { select: { email: true } },
-    },
-  });
-
-  return codes.map((code) => ({
+function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof ACCESS_CODE_LIST_SELECT }>): AdminAccessCode {
+  return {
     id: code.id,
     code: code.code,
     note: code.note,
@@ -187,5 +183,55 @@ export async function listAccessCodes(): Promise<AdminAccessCode[]> {
       code.redeemedAt && code.validityDays !== null
         ? new Date(code.redeemedAt.getTime() + code.validityDays * MS_PER_DAY).toISOString()
         : null,
-  }));
+  };
+}
+
+export function parseAdminAccessCodesListQuery(input: { query?: string | string[]; page?: string | string[] }) {
+  const rawQuery = typeof input.query === "string" ? input.query : "";
+  const query = rawQuery.trim().slice(0, MAX_ACCESS_CODES_SEARCH_LENGTH);
+  const rawPage = typeof input.page === "string" ? Number(input.page) : 1;
+  const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
+
+  return { query, page };
+}
+
+function accessCodeSearchWhere(query: string): Prisma.AccessCodeWhereInput {
+  if (!query) return {};
+
+  return {
+    OR: [
+      { code: { contains: query, mode: "insensitive" } },
+      { note: { contains: query, mode: "insensitive" } },
+      { redeemedByUser: { email: { contains: query, mode: "insensitive" } } },
+    ],
+  };
+}
+
+/**
+ * A "long list of codes" (the exact scenario the delete control was built
+ * for) needs a way to reach codes past the first page, not just the newest
+ * ADMIN_ACCESS_CODES_PAGE_SIZE -- otherwise an older unused code has no path
+ * to deletion at all once enough newer codes exist. Mirrors
+ * getAdminUsersPage's count/clamp/skip/take shape.
+ */
+export async function getAdminAccessCodesPage({ query, page }: { query: string; page: number }) {
+  const where = accessCodeSearchWhere(query);
+  const total = await prisma.accessCode.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / ADMIN_ACCESS_CODES_PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const records = await prisma.accessCode.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (currentPage - 1) * ADMIN_ACCESS_CODES_PAGE_SIZE,
+    take: ADMIN_ACCESS_CODES_PAGE_SIZE,
+    select: ACCESS_CODE_LIST_SELECT,
+  });
+
+  return {
+    accessCodes: records.map(serializeAccessCode),
+    total,
+    page: currentPage,
+    pageCount,
+    query,
+  };
 }

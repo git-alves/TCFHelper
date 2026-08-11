@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
-const { createMock, findManyMock, transactionMock, deleteManyMock, findUniqueMock } = vi.hoisted(() => ({
+const { createMock, findManyMock, transactionMock, deleteManyMock, findUniqueMock, countMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   findManyMock: vi.fn(),
   transactionMock: vi.fn(),
   deleteManyMock: vi.fn(),
   findUniqueMock: vi.fn(),
+  countMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -17,14 +18,19 @@ vi.mock("@/lib/prisma", () => ({
       findMany: findManyMock,
       deleteMany: deleteManyMock,
       findUnique: findUniqueMock,
+      count: countMock,
     },
     $transaction: transactionMock,
   },
 }));
 
-const { createAccessCodes, deleteAccessCode, listAccessCodes, AccessCodeGenerationFailedError } = await import(
-  "./admin-access-codes"
-);
+const {
+  createAccessCodes,
+  deleteAccessCode,
+  getAdminAccessCodesPage,
+  parseAdminAccessCodesListQuery,
+  AccessCodeGenerationFailedError,
+} = await import("./admin-access-codes");
 
 function uniqueConstraintError() {
   return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
@@ -39,6 +45,7 @@ beforeEach(() => {
   transactionMock.mockReset();
   deleteManyMock.mockReset();
   findUniqueMock.mockReset();
+  countMock.mockReset();
   transactionMock.mockImplementation(async (callback) => callback({ accessCode: { create: createMock } }));
 });
 
@@ -247,8 +254,27 @@ describe("deleteAccessCode", () => {
   });
 });
 
-describe("listAccessCodes", () => {
+describe("parseAdminAccessCodesListQuery", () => {
+  it("normalizes a search and rejects invalid page values", () => {
+    expect(parseAdminAccessCodesListQuery({ query: "  TCF-AB12  ", page: "3" })).toEqual({
+      query: "TCF-AB12",
+      page: 3,
+    });
+    expect(parseAdminAccessCodesListQuery({ query: ["not", "valid"], page: "-7" })).toEqual({
+      query: "",
+      page: 1,
+    });
+  });
+});
+
+describe("getAdminAccessCodesPage", () => {
+  beforeEach(() => {
+    countMock.mockResolvedValue(0);
+    findManyMock.mockResolvedValue([]);
+  });
+
   it("serializes codes with their redeemer's email", async () => {
+    countMock.mockResolvedValue(2);
     findManyMock.mockResolvedValue([
       {
         id: "code_1",
@@ -270,9 +296,9 @@ describe("listAccessCodes", () => {
       },
     ]);
 
-    const codes = await listAccessCodes();
+    const result = await getAdminAccessCodesPage({ query: "", page: 1 });
 
-    expect(codes).toEqual([
+    expect(result.accessCodes).toEqual([
       {
         id: "code_1",
         code: "TCF-AB12-CD34",
@@ -294,9 +320,11 @@ describe("listAccessCodes", () => {
         expiresAt: null,
       },
     ]);
+    expect(result.total).toBe(2);
   });
 
   it("derives expiresAt from redeemedAt and validityDays for a timed, redeemed code", async () => {
+    countMock.mockResolvedValue(1);
     findManyMock.mockResolvedValue([
       {
         id: "code_1",
@@ -309,13 +337,14 @@ describe("listAccessCodes", () => {
       },
     ]);
 
-    const codes = await listAccessCodes();
+    const result = await getAdminAccessCodesPage({ query: "", page: 1 });
 
-    expect(codes[0].validityDays).toBe(7);
-    expect(codes[0].expiresAt).toBe("2026-08-17T00:00:00.000Z");
+    expect(result.accessCodes[0].validityDays).toBe(7);
+    expect(result.accessCodes[0].expiresAt).toBe("2026-08-17T00:00:00.000Z");
   });
 
   it("leaves expiresAt null for an unredeemed timed code", async () => {
+    countMock.mockResolvedValue(1);
     findManyMock.mockResolvedValue([
       {
         id: "code_1",
@@ -328,8 +357,43 @@ describe("listAccessCodes", () => {
       },
     ]);
 
-    const codes = await listAccessCodes();
+    const result = await getAdminAccessCodesPage({ query: "", page: 1 });
 
-    expect(codes[0].expiresAt).toBeNull();
+    expect(result.accessCodes[0].expiresAt).toBeNull();
+  });
+
+  it("paginates past the first page so an older code remains reachable", async () => {
+    countMock.mockResolvedValue(120);
+
+    const result = await getAdminAccessCodesPage({ query: "", page: 2 });
+
+    expect(result.pageCount).toBe(3);
+    expect(result.page).toBe(2);
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 50, take: 50 }),
+    );
+  });
+
+  it("clamps a page number beyond the last page instead of returning nothing", async () => {
+    countMock.mockResolvedValue(10);
+
+    const result = await getAdminAccessCodesPage({ query: "", page: 99 });
+
+    expect(result.page).toBe(1);
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ skip: 0 }));
+  });
+
+  it("searches by code, note, and redeemer email", async () => {
+    await getAdminAccessCodesPage({ query: "learner@example.com", page: 1 });
+
+    expect(countMock).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          { code: { contains: "learner@example.com", mode: "insensitive" } },
+          { note: { contains: "learner@example.com", mode: "insensitive" } },
+          { redeemedByUser: { email: { contains: "learner@example.com", mode: "insensitive" } } },
+        ],
+      },
+    });
   });
 });

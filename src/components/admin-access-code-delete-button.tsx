@@ -9,6 +9,11 @@ interface AdminAccessCodeDeleteButtonProps {
   code: string;
 }
 
+// Bounds the request so a hung/slow response can never leave the confirm
+// dialog stuck open: Cancel and Escape are disabled while isDeleting is
+// true, and without a deadline that would otherwise last forever.
+const DELETE_TIMEOUT_MS = 10_000;
+
 /**
  * Only ever rendered for a code with no live admission (see
  * deleteAccessCode): deleting a code currently granting access would sever
@@ -26,8 +31,13 @@ export function AdminAccessCodeDeleteButton({ accessCodeId, code }: AdminAccessC
 
     setIsDeleting(true);
     setError(null);
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), DELETE_TIMEOUT_MS);
     try {
-      const response = await fetch(`/api/admin/access-codes/${accessCodeId}`, { method: "DELETE" });
+      const response = await fetch(`/api/admin/access-codes/${accessCodeId}`, {
+        method: "DELETE",
+        signal: controller.signal,
+      });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
         setError(body?.error ?? "Could not delete this code. Please try again.");
@@ -36,9 +46,15 @@ export function AdminAccessCodeDeleteButton({ accessCodeId, code }: AdminAccessC
 
       setIsDeleted(true);
       router.refresh();
-    } catch {
-      setError("Could not reach the admin service. Please try again.");
+    } catch (caught) {
+      const wasTimeout = caught instanceof DOMException && caught.name === "AbortError";
+      setError(
+        wasTimeout
+          ? "The request timed out. Please try again."
+          : "Could not reach the admin service. Please try again.",
+      );
     } finally {
+      clearTimeout(timeoutHandle);
       setIsDeleting(false);
       setIsConfirming(false);
     }
@@ -52,6 +68,7 @@ export function AdminAccessCodeDeleteButton({ accessCodeId, code }: AdminAccessC
         type="button"
         onClick={() => setIsConfirming(true)}
         disabled={isDeleting}
+        aria-label={`Delete access code ${code}`}
         className="rounded-full border border-red-300 px-3 py-1.5 text-xs font-medium text-red-800 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/30"
       >
         {isDeleting ? "Deleting…" : "Delete"}
