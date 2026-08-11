@@ -14,6 +14,59 @@ interface AdminAccessCodeDeleteButtonProps {
 // true, and without a deadline that would otherwise last forever.
 const DELETE_TIMEOUT_MS = 10_000;
 
+export type AccessCodeDeleteOutcome = { deleted: true } | { deleted: false; message: string };
+
+/**
+ * Aborting the browser fetch only stops the client from waiting on a
+ * response -- it does not guarantee the server stopped processing the
+ * request. A "timed out" delete can still complete moments later, and a 404
+ * on retry can mean exactly that: the code was already removed by the
+ * earlier attempt, not that nothing happened. Every non-success path here is
+ * therefore reported as an uncertain outcome, never a definite failure, so
+ * the caller always reconciles its view of the list instead of leaving a
+ * stale row next to a misleading error.
+ */
+export async function requestAccessCodeDeletion(
+  accessCodeId: string,
+  fetchImpl: typeof fetch = fetch,
+  timeoutMs: number = DELETE_TIMEOUT_MS,
+): Promise<AccessCodeDeleteOutcome> {
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetchImpl(`/api/admin/access-codes/${accessCodeId}`, {
+      method: "DELETE",
+      signal: controller.signal,
+    });
+    if (response.ok) return { deleted: true };
+
+    if (response.status === 404) {
+      return {
+        deleted: false,
+        message: "This code was already removed. The list has been refreshed to show its current state.",
+      };
+    }
+
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    return {
+      deleted: false,
+      message:
+        body?.error ??
+        "Could not delete this code. The list has been refreshed to show its current state — please try again.",
+    };
+  } catch (caught) {
+    const wasTimeout = caught instanceof DOMException && caught.name === "AbortError";
+    return {
+      deleted: false,
+      message: wasTimeout
+        ? "The request took too long to confirm. The list has been refreshed — if this code is still listed, try deleting it again."
+        : "Could not reach the admin service. The list has been refreshed to show its current state — please try again.",
+    };
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+}
+
 /**
  * Only ever rendered for a code with no live admission (see
  * deleteAccessCode): deleting a code currently granting access would sever
@@ -31,30 +84,19 @@ export function AdminAccessCodeDeleteButton({ accessCodeId, code }: AdminAccessC
 
     setIsDeleting(true);
     setError(null);
-    const controller = new AbortController();
-    const timeoutHandle = setTimeout(() => controller.abort(), DELETE_TIMEOUT_MS);
     try {
-      const response = await fetch(`/api/admin/access-codes/${accessCodeId}`, {
-        method: "DELETE",
-        signal: controller.signal,
-      });
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error ?? "Could not delete this code. Please try again.");
-        return;
+      const outcome = await requestAccessCodeDeletion(accessCodeId);
+      if (outcome.deleted) {
+        setIsDeleted(true);
+      } else {
+        setError(outcome.message);
       }
-
-      setIsDeleted(true);
-      router.refresh();
-    } catch (caught) {
-      const wasTimeout = caught instanceof DOMException && caught.name === "AbortError";
-      setError(
-        wasTimeout
-          ? "The request timed out. Please try again."
-          : "Could not reach the admin service. Please try again.",
-      );
     } finally {
-      clearTimeout(timeoutHandle);
+      // Every outcome reconciles the list with actual server state, not
+      // just the success path: a reported failure (especially a timeout)
+      // does not guarantee the server-side delete did not still complete,
+      // so retrying against an unrefreshed, possibly-stale row is unsafe.
+      router.refresh();
       setIsDeleting(false);
       setIsConfirming(false);
     }
