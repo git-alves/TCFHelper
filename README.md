@@ -220,6 +220,14 @@ Vercel-only sensitive environment variable.
   fail before release. Apply it through its maintenance runbook instead; only
   add a future migration to the allowlist after reviewing it as additive.
 
+The one-time `npm run onboarding:backfill-pre-gate` command is intentionally a
+reviewed maintenance operation rather than an automatic deployment migration:
+it records only the pre-gate cohort's onboarding version, not access admission.
+Run `npm run onboarding:backfill-pre-gate -- --production`, then its
+count/fingerprint-confirmed apply step, from a controlled production checkout
+before releasing the welcome-routing change; see
+[admin access control and usage](docs/admin-access-control-and-usage.md).
+
 This policy is deliberately stricter than `prisma migrate deploy` alone,
 which always applies every pending migration and cannot select just one.
 
