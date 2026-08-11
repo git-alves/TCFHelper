@@ -6,7 +6,7 @@ import { AccessCodeWelcomeModal } from "@/components/access-code-welcome-modal";
 
 type RedemptionResponse = {
   activated?: boolean;
-  isNewUser?: boolean;
+  showWelcome?: boolean;
   error?: string;
 };
 
@@ -16,10 +16,10 @@ export function AccessCodeActivationForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // Set once, on a successful redemption, and never cleared: it gates the
-  // one-time welcome modal below, then its destination decides where
-  // "Start writing" sends the learner next.
-  const [activationDestination, setActivationDestination] = useState<string | null>(null);
+  // Set only when the server says this is the account's first successful
+  // admission. A learner restored with a newly issued code bypasses the
+  // welcome handoff and returns directly to writing.
+  const [welcomeDestination, setWelcomeDestination] = useState<string | null>(null);
   const canSubmit = code.trim().length > 0 && !isSubmitting;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -41,13 +41,15 @@ export function AccessCodeActivationForm() {
         return;
       }
 
-      // A learner who never started the walkthrough goes to the dashboard so
-      // it can auto-start; everyone else goes straight to tasks. Navigation
-      // itself waits for the welcome modal below to be dismissed, not this
-      // handler -- refreshing now would let the /activate page's own
-      // now-activated redirect tear the form (and the modal it is about to
-      // show) down before the learner ever sees it.
-      setActivationDestination(payload.isNewUser ? "/dashboard" : "/tasks");
+      // Navigation waits for the first-admission welcome modal to close; a
+      // refresh here would otherwise let /activate's own redirect tear it
+      // down before the learner sees it. Restored learners skip that modal.
+      if (payload.showWelcome) {
+        setWelcomeDestination("/dashboard");
+      } else {
+        router.replace("/tasks");
+        router.refresh();
+      }
     } catch {
       setError("We could not reach the activation service. Please try again.");
     } finally {
@@ -56,14 +58,14 @@ export function AccessCodeActivationForm() {
   }
 
   function handleContinue() {
-    if (!activationDestination) return;
+    if (!welcomeDestination) return;
     // Replace rather than push: an activated learner should not land back
     // on a now-obsolete activation form through the browser Back button.
-    router.replace(activationDestination);
+    router.replace(welcomeDestination);
     router.refresh();
   }
 
-  if (activationDestination) {
+  if (welcomeDestination) {
     return <AccessCodeWelcomeModal onContinue={handleContinue} />;
   }
 

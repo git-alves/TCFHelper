@@ -13,8 +13,9 @@ while keeping sign-up simple.
 
 **Success metric** — Today every listed owner job requires database access.
 At launch, the owner can find a learner, inspect current usage, change an
-effective limit, block/unblock them, and issue a code entirely in the web
-dashboard—reducing routine owner database access from that baseline to zero.
+effective limit, block/unblock or deactivate their admission, and issue a code
+entirely in the web dashboard—reducing routine owner database access from that
+baseline to zero.
 Automated acceptance also proves that non-owners receive no admin-route
 disclosure, blocked accounts cannot reach protected surfaces, and one code
 cannot activate two accounts.
@@ -36,6 +37,8 @@ cannot activate two accounts.
   in.
 - Keep Clerk sign-up open, then require a server-generated, strictly
   single-use code before a non-owner can use learner pages or APIs.
+- Let the owner deactivate a learner's current admission without reviving the
+  code they used. Restoring that learner requires a newly issued code.
 - Keep authorization server-side and per route/page, following the existing
   `getCurrentAppUser()` convention rather than adding authorization middleware.
 
@@ -44,8 +47,9 @@ cannot activate two accounts.
 - No billing, checkout, Stripe work, plan selection, or payment entitlement.
 - No role-management UI, multiple-admin workflow, self-service promotion, or
   ordinary table toggle for ownership.
-- No multi-use, expiring, revocable, bulk-imported, emailed, or SMS-delivered
-  codes in v1. The owner shares them out of band.
+- No multi-use, expiring, code-revocation/reuse, bulk-imported, emailed, or
+  SMS-delivered codes in v1. The owner shares them out of band. Deactivating
+  access detaches a learner's admission; it never makes their old code valid.
 - No historical analytics warehouse, data export, audit log, or provider-cost
   reconciliation. Existing counters are rolling enforcement data.
 - No staff access to learner essays or feedback; admin data is limited to
@@ -65,6 +69,12 @@ authenticated but unactivated learner must reach `/activate` and its
 redemption endpoint; the owner must be able to issue codes before becoming a
 learner. The owner bypasses activation but never a block. A non-owner is
 eligible only after one successful redemption.
+
+The owner can later detach a non-owner's live admission from the detail page.
+That returns the learner to `/activate` on their next protected page or API
+request while retaining their account, work, quota history, and the code's
+permanent spent marker. A newly issued code is the only way to restore access.
+The owner is activation-exempt and cannot be a reset target.
 
 Codes are server-generated, human-readable bearer credentials. V1 retains the
 code in the owner-only list so it can be copied later; the tradeoff against a
@@ -94,9 +104,10 @@ lease do not consume usage.
 | --- | --- |
 | `User.isAdmin` | Defaults false; at most one true row. The owner is promoted through an explicit operator command after a local `User` exists. |
 | `User.isBlocked` | Defaults false. Blocking never deletes a Clerk identity, essays, or quota data. |
+| `User.activationWelcomeShownAt` | Set with a first successful redemption, or while detaching a legacy active admission that predates this field. It keeps the welcome handoff one-time if an owner later deactivates and restores admission. |
 | `CorrectionUsage` | One row per learner: `dayStartedAt`/`dailyRequestCount` and `monthStartedAt`/`monthlyRequestCount`, with exact UTC window starts. |
 | `UserQuotaOverride` | One row per learner. Nullable fields: translation requests/minute, translation characters/minute, translation characters/month, examples/day, corrections/day. Null = global; zero = disabled. Delete an all-null row. |
-| `AccessCode` | Unique server-generated code, optional note, `createdAt`, `redeemedAt`, and unique nullable `redeemedByUserId`. `redeemedAt` is the permanent spent marker, so deleting a redeemer cannot make a code reusable. |
+| `AccessCode` | Unique server-generated code, optional note, `createdAt`, `redeemedAt`, and unique nullable `redeemedByUserId`. `redeemedAt` is the permanent spent marker. `redeemedByUserId` is the current live admission and may be cleared by an owner reset without making the code reusable. |
 
 The additive migration silently promotes or activates nobody. The operator
 promotes the one owner using a reviewed command that refuses a second owner.
@@ -121,7 +132,7 @@ account and issue any needed learner codes before enabling the activation gate.
 | Anonymous | Pages go to `/login` with a safe local callback; APIs return generic `401`. | Generic `404`. |
 | Provisioning failure | Existing unavailable-account recovery. | Generic `404`. |
 | Blocked Clerk session | Verified account-access modal; close signs out to `/login`. APIs return the same generic `401`. | Generic `404`. |
-| Signed in, not activated | Pages go to `/activate`; APIs return the same generic `401` as other unavailable learner sessions and no data. | Owner is activation-exempt. |
+| Signed in, not activated or admission deactivated | Pages go to `/activate`; APIs return the same generic `401` as other unavailable learner sessions and no data. | Owner is activation-exempt. |
 | Activated learner | Normal learner access. | Generic `404`. |
 | Unblocked owner | Normal admin access and optional learner access without a code. | Normal admin access. |
 
@@ -192,13 +203,18 @@ bounded 25-row pagination. Rows show identity, joined date, activation and
 blocked state, owner label, and compact current usage. The detail page avoids
 putting five override fields into a dense list.
 
-`/admin/users/[id]` adds current effective limits, nullable override form, and
-block/unblock. Blocking self or the owner is rejected. There is no editable
-admin switch; the owner label explains that ownership is operationally managed.
+`/admin/users/[id]` adds current effective limits, nullable override form,
+block/unblock, and a confirmed **Deactivate access** action for an activated
+non-owner. It removes only the live admission; it neither deletes learner data
+nor makes the old code reusable. Blocking self or the owner is rejected. There
+is no editable admin switch; the owner label explains that ownership is
+operationally managed.
 
 `/admin/access-codes` accepts an optional short note, generates/copies a code,
 and lists the newest bounded set of issued codes with created/redeemed state
-and redeemer email. It is `private, no-store`. The code format uses an
+and an active redeemer email when one remains. A detached admission is clearly
+shown as permanently spent with no active admission. It is `private, no-store`.
+The code format uses an
 unambiguous uppercase alphabet and at least four groups of four random
 characters (80 bits before the fixed `TCF-` prefix).
 
@@ -213,6 +229,7 @@ not-found to non-owners. Owner-visible success/errors are `private, no-store`.
 | `GET /api/admin/users?query=&page=` | Bounded search/page result with normalized usage. |
 | `GET /api/admin/users/[id]` | Detail, effective limits, raw nullable overrides; unknown ID is owner-visible 404. |
 | `PATCH /api/admin/users/[id]/block` | Strict `{ isBlocked: boolean }`; rejects blocking owner/self. |
+| `POST /api/admin/users/[id]/activation/reset` | Detaches an activated non-owner's current admission. The response is idempotent; it never clears `redeemedAt`, so the prior code remains permanently spent and recovery requires a newly issued code. |
 | `PATCH /api/admin/users/[id]/quota-overrides` | Strict nullable non-negative integer fields. All-null resets/removes override. |
 | `GET /api/admin/access-codes` | Newest bounded issued-code list. |
 | `POST /api/admin/access-codes` | Strict optional note; generates a code. No client-selected code. |
@@ -224,19 +241,25 @@ unused code in a single transaction. Its predicate requires both
 is a second concurrent-submission backstop. No endpoint accepts a browser
 user ID to select another learner's data.
 
+Admission reset takes that exact same per-learner transaction lock before
+clearing only `redeemedByUserId`. Reset and redemption therefore serialize:
+after a reset the original code still fails the `redeemedAt IS NULL` predicate,
+while a new code can be redeemed normally. An in-flight provider request may
+finish, but every subsequent protected page or API request re-checks admission.
+
 ### Failure paths
 
 - If access, activation, or quota storage fails, fail closed before a provider
   call or learner data response. Learners get a retryable generic error.
 - Invalid/used codes return the same message; a code is never reset when its
-  redeemer is deleted.
+  redeemer is deleted or an owner deactivates admission.
 - A quota-store failure never permits an unmetered provider call. Rendering a
   dashboard never mutates rows merely to normalize stale usage.
 - A verified blocked browser session sees the support modal; its close control
   ends the session and returns to `/login`. APIs do not disclose whether a
   caller was blocked, deleted, or simply unsigned.
-- A lost code is replaced by issuing another code; V1 has no expiry/revoke or
-  other recovery workflow.
+- A lost code or deactivated admission is recovered by issuing another code.
+  V1 has no code expiry or code-reuse workflow.
 
 ### Migration and rollout
 
@@ -286,5 +309,5 @@ operating need without a second data pipeline.
 ## Open questions
 
 None for v1. Deferred intentionally: owner transfer/multiple roles,
-grandfathering, access-code expiry/revocation/bulk issue, hash-only/reveal-once
+grandfathering, access-code expiry/reuse/bulk issue, hash-only/reveal-once
 codes, and historical analytics.

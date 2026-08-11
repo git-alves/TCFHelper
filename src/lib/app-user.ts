@@ -34,13 +34,25 @@ type ClerkUserIdentity = {
 type UserStore = Pick<Prisma.TransactionClient, "user">;
 
 /**
+ * Reads the Clerk identity and session together so a caller that must act on
+ * a specific session never couples one session's user ID to another session's
+ * ID after a browser-side account switch.
+ */
+export async function getCurrentClerkRequestIdentity(): Promise<{
+  userId: string | null;
+  sessionId: string | null;
+}> {
+  const { userId, sessionId } = await auth();
+  return { userId, sessionId };
+}
+
+/**
  * Returns the authenticated Clerk subject without creating or linking a
  * Prisma user. Read-only authenticated routes can use this when they do not
  * need the application's CUID.
  */
 export async function getCurrentClerkUserId(): Promise<string | null> {
-  const { userId } = await auth();
-  return userId;
+  return (await getCurrentClerkRequestIdentity()).userId;
 }
 
 /**

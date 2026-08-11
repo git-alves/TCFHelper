@@ -31,8 +31,9 @@ export function AdminAccessCodesTable({ accessCodes }: { accessCodes: AdminAcces
               <td className="px-4 py-3">
                 {accessCode.redeemedAt ? (
                   <span className="text-zinc-600 dark:text-zinc-400">
-                    Redeemed by {accessCode.redeemedByUserEmail ?? "a deleted account"} on{" "}
-                    {formatDate(accessCode.redeemedAt)}
+                    {accessCode.redeemedByUserEmail
+                      ? `Redeemed by ${accessCode.redeemedByUserEmail} on ${formatDate(accessCode.redeemedAt)}`
+                      : `Permanently spent on ${formatDate(accessCode.redeemedAt)} — no active admission`}
                   </span>
                 ) : (
                   <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-300">

@@ -16,4 +16,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260810120000_add_walkthrough_version",
   "20260810130000_add_admin_access_controls",
   "20260810140000_enforce_single_admin_owner",
+  "20260811020000_add_activation_welcome_state",
 ]);

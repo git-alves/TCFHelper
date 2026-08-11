@@ -22,6 +22,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260810130000_add_admin_access_controls");
   });
 
+  it("allows the additive activation-welcome state migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811020000_add_activation_welcome_state");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

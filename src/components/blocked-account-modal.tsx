@@ -11,7 +11,7 @@ const SUPPORT_EMAIL = "support@mytcflab.com";
  * the person explicitly leaves, so they can understand what happened and use
  * the support action before their Clerk session is cleared.
  */
-export function BlockedAccountModal() {
+export function BlockedAccountModal({ sessionId }: { sessionId: string }) {
   const { signOut } = useClerk();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -27,12 +27,15 @@ export function BlockedAccountModal() {
       // Navigating without clearing the active blocked Clerk session would
       // send /login straight back to this modal. Clerk owns the redirect only
       // after the session has actually been ended.
-      await signOut({ redirectUrl: "/login" });
+      // Bind sign-out to the server-verified blocked session. If another tab
+      // switches the browser to an unblocked session while this modal is open,
+      // closing this modal must never sign that newer session out.
+      await signOut({ sessionId, redirectUrl: "/login" });
     } catch {
       setIsSigningOut(false);
       setSignOutError("We could not sign you out. Please try again.");
     }
-  }, [isSigningOut, signOut]);
+  }, [isSigningOut, sessionId, signOut]);
 
   useEffect(() => {
     closeButtonRef.current?.focus();

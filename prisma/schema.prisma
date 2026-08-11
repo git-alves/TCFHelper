@@ -96,6 +96,10 @@ model User {
   // separate, explicitly-approved data migration (not on the automatic
   // additive-migration allowlist, since a backfill mutates existing rows).
   walkthroughCompletedVersion Int?
+  // Set atomically with the first successful access-code redemption. It keeps
+  // the welcome handoff one-time even if the owner later deactivates access
+  // and the learner redeems a newly issued code.
+  activationWelcomeShownAt  DateTime?
 
   subscriptions           Subscription[]
   essays                  Essay[]
@@ -250,7 +254,9 @@ model UserQuotaOverride {
 
 /// A code activates exactly one learner account. A unique redeemedByUserId
 /// makes activation idempotent and prevents a single account from consuming
-/// an extra code after it is already admitted.
+/// an extra code while it is admitted. An owner may later detach that live
+/// admission without clearing redeemedAt, so the code remains permanently
+/// spent and the learner must use a newly issued code.
 model AccessCode {
   id               String    @id @default(cuid())
   code             String    @unique
