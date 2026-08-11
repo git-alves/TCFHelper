@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type AccessCodeRedemption =
   | { kind: "redeemed"; showWelcome: boolean }
@@ -23,14 +24,26 @@ export function normalizeAccessCode(code: string) {
   return code.trim().toUpperCase();
 }
 
-/** Returns whether the learner has consumed an access code and may use the app. */
+/**
+ * Returns whether the learner has consumed an access code and may use the
+ * app. A time-limited code's admission is detached the same way a manual
+ * "Deactivate access" is once its validity window has elapsed -- there is no
+ * background job, so this is the point where an expired grant is actually
+ * enforced.
+ */
 export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
   const redemption = await prisma.accessCode.findUnique({
     where: { redeemedByUserId: userId },
-    select: { id: true },
+    select: { redeemedAt: true, validityDays: true },
   });
+  if (redemption === null) return false;
+  if (redemption.validityDays === null || redemption.redeemedAt === null) return true;
 
-  return redemption !== null;
+  const expiresAt = redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY;
+  if (Date.now() < expiresAt) return true;
+
+  await resetAccessCodeActivation(userId);
+  return false;
 }
 
 function redemptionLockKey(userId: string) {

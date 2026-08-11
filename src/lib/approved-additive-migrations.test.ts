@@ -26,6 +26,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811020000_add_activation_welcome_state");
   });
 
+  it("allows the additive access-code validity migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811050000_add_access_code_validity");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

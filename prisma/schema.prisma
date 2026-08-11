@@ -266,6 +266,13 @@ model AccessCode {
   redeemedAt       DateTime?
   redeemedByUserId String?   @unique
   redeemedByUser   User?     @relation("AccessCodeRedeemedBy", fields: [redeemedByUserId], references: [id], onDelete: SetNull)
+  // Null means lifetime access. Otherwise, the learner's admission expires
+  // this many days after redeemedAt (not after createdAt) -- an unredeemed
+  // timed code does not itself expire. There is no background job, so
+  // expiry is detected and enforced lazily, the same way a manual
+  // "Deactivate access" is: on the learner's next request after the window
+  // elapses.
+  validityDays     Int?
 
   @@index([redeemedAt])
 }

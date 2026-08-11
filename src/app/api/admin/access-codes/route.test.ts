@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getAdminApiUserMock, createAccessCodeMock, listAccessCodesMock } = vi.hoisted(() => ({
+const { getAdminApiUserMock, createAccessCodesMock, listAccessCodesMock } = vi.hoisted(() => ({
   getAdminApiUserMock: vi.fn(),
-  createAccessCodeMock: vi.fn(),
+  createAccessCodesMock: vi.fn(),
   listAccessCodesMock: vi.fn(),
 }));
 
@@ -13,7 +13,8 @@ vi.mock("@/lib/admin-api", () => ({
     Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } }),
 }));
 vi.mock("@/lib/admin-access-codes", () => ({
-  createAccessCode: createAccessCodeMock,
+  MAX_ACCESS_CODE_BATCH_SIZE: 100,
+  createAccessCodes: createAccessCodesMock,
   listAccessCodes: listAccessCodesMock,
 }));
 
@@ -27,6 +28,8 @@ const CODE = {
   createdAt: "2026-08-10T00:00:00.000Z",
   redeemedAt: null,
   redeemedByUserEmail: null,
+  validityDays: null,
+  expiresAt: null,
 };
 
 function postRequest(body: unknown) {
@@ -39,11 +42,11 @@ function postRequest(body: unknown) {
 
 beforeEach(() => {
   getAdminApiUserMock.mockReset();
-  createAccessCodeMock.mockReset();
+  createAccessCodesMock.mockReset();
   listAccessCodesMock.mockReset();
   getAdminApiUserMock.mockResolvedValue(ADMIN);
   listAccessCodesMock.mockResolvedValue([CODE]);
-  createAccessCodeMock.mockResolvedValue(CODE);
+  createAccessCodesMock.mockResolvedValue([CODE]);
 });
 
 describe("GET /api/admin/access-codes", () => {
@@ -71,28 +74,49 @@ describe("POST /api/admin/access-codes", () => {
     const response = await POST(postRequest({ note: "batch" }));
 
     expect(response.status).toBe(404);
-    expect(createAccessCodeMock).not.toHaveBeenCalled();
+    expect(createAccessCodesMock).not.toHaveBeenCalled();
   });
 
   it("rejects a payload with unexpected fields", async () => {
     const response = await POST(postRequest({ note: "batch", code: "TCF-0000-0000" }));
 
     expect(response.status).toBe(400);
-    expect(createAccessCodeMock).not.toHaveBeenCalled();
+    expect(createAccessCodesMock).not.toHaveBeenCalled();
   });
 
-  it("creates a code with a trimmed note", async () => {
+  it("creates a single lifetime code by default", async () => {
     const response = await POST(postRequest({ note: "batch" }));
 
     expect(response.status).toBe(201);
-    expect(createAccessCodeMock).toHaveBeenCalledWith("batch");
-    expect(await response.json()).toEqual({ accessCode: CODE });
+    expect(createAccessCodesMock).toHaveBeenCalledWith("batch", null, 1);
+    expect(await response.json()).toEqual({ accessCodes: [CODE] });
   });
 
   it("creates a code with no note", async () => {
     const response = await POST(postRequest({}));
 
     expect(response.status).toBe(201);
-    expect(createAccessCodeMock).toHaveBeenCalledWith(null);
+    expect(createAccessCodesMock).toHaveBeenCalledWith(null, null, 1);
+  });
+
+  it("passes a requested validity period and batch count through", async () => {
+    const response = await POST(postRequest({ note: "cohort", validityDays: 14, count: 10 }));
+
+    expect(response.status).toBe(201);
+    expect(createAccessCodesMock).toHaveBeenCalledWith("cohort", 14, 10);
+  });
+
+  it("rejects a non-positive validity period", async () => {
+    const response = await POST(postRequest({ validityDays: 0 }));
+
+    expect(response.status).toBe(400);
+    expect(createAccessCodesMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a batch count above the server cap", async () => {
+    const response = await POST(postRequest({ count: 101 }));
+
+    expect(response.status).toBe(400);
+    expect(createAccessCodesMock).not.toHaveBeenCalled();
   });
 });

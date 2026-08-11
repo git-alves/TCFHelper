@@ -62,17 +62,48 @@ describe("normalizeAccessCode", () => {
 
 describe("hasRedeemedAccessCode", () => {
   it("looks up the code redeemed by this learner", async () => {
-    findUniqueMock.mockResolvedValue({ id: "code_1" });
+    findUniqueMock.mockResolvedValue({ redeemedAt: new Date(), validityDays: null });
 
     await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
     expect(findUniqueMock).toHaveBeenCalledWith({
       where: { redeemedByUserId: USER_ID },
-      select: { id: true },
+      select: { redeemedAt: true, validityDays: true },
     });
   });
 
   it("returns false before a learner has redeemed a code", async () => {
     await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(false);
+  });
+
+  it("treats a lifetime code (null validityDays) as never expiring", async () => {
+    const longAgo = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000);
+    findUniqueMock.mockResolvedValue({ redeemedAt: longAgo, validityDays: null });
+
+    await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
+    expect(updateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("treats a timed code still inside its window as active", async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+    findUniqueMock.mockResolvedValue({ redeemedAt: twoDaysAgo, validityDays: 7 });
+
+    await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(true);
+    expect(updateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("detaches and reports false once a timed code's window has elapsed", async () => {
+    const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000);
+    // The first findUnique is hasRedeemedAccessCode's own read; the second is
+    // resetAccessCodeActivation's, called as its side effect.
+    findUniqueMock
+      .mockResolvedValueOnce({ redeemedAt: tenDaysAgo, validityDays: 7 })
+      .mockResolvedValueOnce({ id: "code_expired" });
+
+    await expect(hasRedeemedAccessCode(USER_ID)).resolves.toBe(false);
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: { id: "code_expired", redeemedByUserId: USER_ID, redeemedAt: { not: null } },
+      data: { redeemedByUserId: null },
+    });
   });
 });
 

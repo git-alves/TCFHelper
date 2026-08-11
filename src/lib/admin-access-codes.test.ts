@@ -13,7 +13,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-const { createAccessCode, listAccessCodes, AccessCodeGenerationFailedError } = await import(
+const { createAccessCodes, listAccessCodes, AccessCodeGenerationFailedError } = await import(
   "./admin-access-codes"
 );
 
@@ -29,7 +29,7 @@ beforeEach(() => {
   findManyMock.mockReset();
 });
 
-describe("createAccessCode", () => {
+describe("createAccessCodes", () => {
   it("creates an 80-bit TCF-XXXX-XXXX-XXXX-XXXX code with a trimmed note", async () => {
     createMock.mockResolvedValue({
       id: "code_1",
@@ -37,18 +37,23 @@ describe("createAccessCode", () => {
       note: "for beta cohort",
       createdAt: new Date("2026-08-10T00:00:00.000Z"),
       redeemedAt: null,
+      validityDays: null,
     });
 
-    const result = await createAccessCode("  for beta cohort  ");
+    const result = await createAccessCodes("  for beta cohort  ", null, 1);
 
-    expect(result).toEqual({
-      id: "code_1",
-      code: "TCF-AB12-CD34",
-      note: "for beta cohort",
-      createdAt: "2026-08-10T00:00:00.000Z",
-      redeemedAt: null,
-      redeemedByUserEmail: null,
-    });
+    expect(result).toEqual([
+      {
+        id: "code_1",
+        code: "TCF-AB12-CD34",
+        note: "for beta cohort",
+        createdAt: "2026-08-10T00:00:00.000Z",
+        redeemedAt: null,
+        redeemedByUserEmail: null,
+        validityDays: null,
+        expiresAt: null,
+      },
+    ]);
     expect(createMock).toHaveBeenCalledTimes(1);
     const createdData = createMock.mock.calls[0][0].data;
     expect(createdData.code).toMatch(/^TCF-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/);
@@ -61,11 +66,53 @@ describe("createAccessCode", () => {
       note: null,
       createdAt: new Date(),
       redeemedAt: null,
+      validityDays: null,
     });
 
-    await createAccessCode(null);
+    await createAccessCodes(null, null, 1);
 
     expect(createMock.mock.calls[0][0].data.note).toBeNull();
+  });
+
+  it("stores the requested validity period on every created code", async () => {
+    createMock.mockResolvedValue({
+      id: "code_1",
+      code: "TCF-AB12-CD34",
+      note: null,
+      createdAt: new Date(),
+      redeemedAt: null,
+      validityDays: 14,
+    });
+
+    const result = await createAccessCodes(null, 14, 1);
+
+    expect(createMock.mock.calls[0][0].data.validityDays).toBe(14);
+    expect(result[0].validityDays).toBe(14);
+  });
+
+  it("generates the requested number of codes sharing the same note and validity", async () => {
+    let sequence = 0;
+    createMock.mockImplementation(async () => {
+      sequence += 1;
+      return {
+        id: `code_${sequence}`,
+        code: `TCF-000${sequence}-CD34`,
+        note: "cohort",
+        createdAt: new Date(),
+        redeemedAt: null,
+        validityDays: 7,
+      };
+    });
+
+    const result = await createAccessCodes("cohort", 7, 3);
+
+    expect(result).toHaveLength(3);
+    expect(new Set(result.map((code) => code.id)).size).toBe(3);
+    expect(createMock).toHaveBeenCalledTimes(3);
+    for (const call of createMock.mock.calls) {
+      expect(call[0].data.note).toBe("cohort");
+      expect(call[0].data.validityDays).toBe(7);
+    }
   });
 
   it("retries on a code collision instead of surfacing the constraint error", async () => {
@@ -78,25 +125,26 @@ describe("createAccessCode", () => {
         note: null,
         createdAt: new Date(),
         redeemedAt: null,
+        validityDays: null,
       });
 
-    const result = await createAccessCode(null);
+    const result = await createAccessCodes(null, null, 1);
 
-    expect(result.code).toBe("TCF-EF56-GH78");
+    expect(result[0].code).toBe("TCF-EF56-GH78");
     expect(createMock).toHaveBeenCalledTimes(3);
   });
 
   it("gives up after repeated collisions instead of looping forever", async () => {
     createMock.mockRejectedValue(uniqueConstraintError());
 
-    await expect(createAccessCode(null)).rejects.toBeInstanceOf(AccessCodeGenerationFailedError);
+    await expect(createAccessCodes(null, null, 1)).rejects.toBeInstanceOf(AccessCodeGenerationFailedError);
   });
 
   it("does not retry a non-collision error", async () => {
     const dbError = new Error("connection lost");
     createMock.mockRejectedValue(dbError);
 
-    await expect(createAccessCode(null)).rejects.toBe(dbError);
+    await expect(createAccessCodes(null, null, 1)).rejects.toBe(dbError);
     expect(createMock).toHaveBeenCalledTimes(1);
   });
 });
@@ -110,6 +158,7 @@ describe("listAccessCodes", () => {
         note: "batch 1",
         createdAt: new Date("2026-08-10T00:00:00.000Z"),
         redeemedAt: new Date("2026-08-11T00:00:00.000Z"),
+        validityDays: null,
         redeemedByUser: { email: "learner@example.com" },
       },
       {
@@ -118,6 +167,7 @@ describe("listAccessCodes", () => {
         note: null,
         createdAt: new Date("2026-08-09T00:00:00.000Z"),
         redeemedAt: null,
+        validityDays: null,
         redeemedByUser: null,
       },
     ]);
@@ -132,6 +182,8 @@ describe("listAccessCodes", () => {
         createdAt: "2026-08-10T00:00:00.000Z",
         redeemedAt: "2026-08-11T00:00:00.000Z",
         redeemedByUserEmail: "learner@example.com",
+        validityDays: null,
+        expiresAt: null,
       },
       {
         id: "code_2",
@@ -140,7 +192,46 @@ describe("listAccessCodes", () => {
         createdAt: "2026-08-09T00:00:00.000Z",
         redeemedAt: null,
         redeemedByUserEmail: null,
+        validityDays: null,
+        expiresAt: null,
       },
     ]);
+  });
+
+  it("derives expiresAt from redeemedAt and validityDays for a timed, redeemed code", async () => {
+    findManyMock.mockResolvedValue([
+      {
+        id: "code_1",
+        code: "TCF-AB12-CD34",
+        note: null,
+        createdAt: new Date("2026-08-01T00:00:00.000Z"),
+        redeemedAt: new Date("2026-08-10T00:00:00.000Z"),
+        validityDays: 7,
+        redeemedByUser: { email: "learner@example.com" },
+      },
+    ]);
+
+    const codes = await listAccessCodes();
+
+    expect(codes[0].validityDays).toBe(7);
+    expect(codes[0].expiresAt).toBe("2026-08-17T00:00:00.000Z");
+  });
+
+  it("leaves expiresAt null for an unredeemed timed code", async () => {
+    findManyMock.mockResolvedValue([
+      {
+        id: "code_1",
+        code: "TCF-AB12-CD34",
+        note: null,
+        createdAt: new Date("2026-08-01T00:00:00.000Z"),
+        redeemedAt: null,
+        validityDays: 7,
+        redeemedByUser: null,
+      },
+    ]);
+
+    const codes = await listAccessCodes();
+
+    expect(codes[0].expiresAt).toBeNull();
   });
 });
