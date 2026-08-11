@@ -67,31 +67,6 @@ export function AdminEventLogFilters({ filters }: { filters: AdminEventLogFilter
             <option value="custom">Custom UTC interval</option>
           </select>
         </label>
-        <fieldset className="flex flex-col gap-2 text-sm font-medium">
-          <legend>Severity</legend>
-          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Severity">
-            {[
-              { value: "all", label: "All", symbol: null },
-              { value: "INFO", label: "INFO", symbol: "🟢" },
-              { value: "WARN", label: "WARN", symbol: "🟡" },
-              { value: "ERROR", label: "ERROR", symbol: "🔴" },
-            ].map((severity) => (
-              <label key={severity.value} className="cursor-pointer">
-                <input
-                  type="radio"
-                  name="severity"
-                  value={severity.value}
-                  defaultChecked={(filters.severity ?? "all") === severity.value}
-                  className="peer sr-only"
-                />
-                <span className="inline-flex rounded-full border border-black/[.15] px-3 py-2 text-xs font-medium text-zinc-700 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500/25 peer-checked:border-violet-700 peer-checked:bg-violet-700 peer-checked:text-white dark:border-white/[.2] dark:text-zinc-300 dark:peer-checked:border-violet-300 dark:peer-checked:bg-violet-300 dark:peer-checked:text-zinc-950">
-                  {severity.symbol && <span aria-hidden="true">{severity.symbol} </span>}
-                  {severity.label}
-                </span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
         <label className="flex flex-col gap-2 text-sm font-medium">
           Area
           <select
@@ -118,6 +93,31 @@ export function AdminEventLogFilters({ filters }: { filters: AdminEventLogFilter
             <option value="100">100</option>
           </select>
         </label>
+        <fieldset className="m-0 flex flex-col gap-2 border-0 p-0 text-sm font-medium lg:col-span-4">
+          <legend className="p-0">Severity</legend>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Severity">
+            {[
+              { value: "all", label: "All", symbol: null },
+              { value: "INFO", label: "INFO", symbol: "🟢" },
+              { value: "WARN", label: "WARN", symbol: "🟡" },
+              { value: "ERROR", label: "ERROR", symbol: "🔴" },
+            ].map((severity) => (
+              <label key={severity.value} className="cursor-pointer">
+                <input
+                  type="radio"
+                  name="severity"
+                  value={severity.value}
+                  defaultChecked={(filters.severity ?? "all") === severity.value}
+                  className="peer sr-only"
+                />
+                <span className="flex w-full items-center justify-center rounded-full border border-black/[.15] px-3 py-2 text-xs font-medium text-zinc-700 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-violet-500/25 peer-checked:border-violet-700 peer-checked:bg-violet-700 peer-checked:text-white dark:border-white/[.2] dark:text-zinc-300 dark:peer-checked:border-violet-300 dark:peer-checked:bg-violet-300 dark:peer-checked:text-zinc-950">
+                  {severity.symbol && <span aria-hidden="true">{severity.symbol} </span>}
+                  {severity.label}
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
       </div>
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] lg:items-end">
         <label className="flex flex-col gap-2 text-sm font-medium">

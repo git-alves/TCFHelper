@@ -50,6 +50,9 @@ describe("adminEventLogFilterHref", () => {
     expect(markup).toContain("ERROR");
     expect(markup).toContain("All modules");
     expect(markup).toContain("AI services");
+    expect(markup).toContain("lg:col-span-4");
+    expect(markup).toContain("grid grid-cols-2 gap-2 sm:grid-cols-4");
+    expect(markup).toContain("flex w-full items-center justify-center");
   });
 
   it("preserves seconds in UTC custom fields rendered with step=1", () => {
