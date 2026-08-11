@@ -51,4 +51,24 @@ describe("adminEventLogFilterHref", () => {
     expect(markup).toContain("All modules");
     expect(markup).toContain("AI services");
   });
+
+  it("preserves seconds in UTC custom fields rendered with step=1", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminEventLogFilters, {
+        filters: {
+          range: "custom",
+          from: "2026-08-10T12:34:56.000Z",
+          to: "2026-08-11T12:34:57.000Z",
+          severity: null,
+          module: null,
+          q: "",
+          page: 1,
+          limit: 20,
+        },
+      }),
+    );
+
+    expect(markup).toContain('value="2026-08-10T12:34:56"');
+    expect(markup).toContain('value="2026-08-11T12:34:57"');
+  });
 });

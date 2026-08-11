@@ -29,7 +29,7 @@ export function adminEventLogFilterHref(filters: FilterValues, page = 1) {
 }
 
 function utcDateTimeInputValue(value: string | null) {
-  return value ? value.slice(0, 16) : "";
+  return value ? value.slice(0, 19) : "";
 }
 
 /**

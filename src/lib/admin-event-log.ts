@@ -17,6 +17,9 @@ export const ADMIN_EVENT_LOG_DEFAULT_PAGE_SIZE = 20;
 export const ADMIN_EVENT_LOG_MAX_QUERY_LENGTH = 120;
 export const ADMIN_EVENT_LOG_MAX_PAGE = 1_000;
 export const ADMIN_EVENT_LOG_MAX_CUSTOM_RANGE_DAYS = 30;
+// The email lookup is a convenience bridge to immutable event userIds. It
+// must remain bounded, but it must never quietly drop matching users.
+export const ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES = 100;
 
 const ADMIN_EVENT_LOG_SEARCH_PARAM_KEYS = new Set([
   "range",
@@ -63,6 +66,14 @@ export class AdminEventLogQueryError extends Error {
   constructor() {
     super("Invalid log query.");
     this.name = "AdminEventLogQueryError";
+  }
+}
+
+/** A valid query whose email fragment would produce incomplete results. */
+export class AdminEventLogSearchTooBroadError extends Error {
+  constructor() {
+    super("Search is too broad. Use a more specific email or identifier.");
+    this.name = "AdminEventLogSearchTooBroadError";
   }
 }
 
@@ -308,7 +319,11 @@ async function matchingUserIds(query: string) {
   const users = await prisma.user.findMany({
     where: { email: { contains: query, mode: "insensitive" } },
     select: { id: true },
+    take: ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES + 1,
   });
+  if (users.length > ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES) {
+    throw new AdminEventLogSearchTooBroadError();
+  }
   return users.map((user) => user.id);
 }
 

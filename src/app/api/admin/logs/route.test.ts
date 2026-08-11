@@ -15,8 +15,10 @@ vi.mock("@/lib/admin-api", () => ({
 }));
 vi.mock("@/lib/admin-event-log", () => {
   class AdminEventLogQueryError extends Error {}
+  class AdminEventLogSearchTooBroadError extends Error {}
   return {
     AdminEventLogQueryError,
+    AdminEventLogSearchTooBroadError,
     adminEventLogSearchParamsFromUrl: readUrlParamsMock,
     parseAdminEventLogQuery: parseQueryMock,
     getAdminEventLogPage: readLogPageMock,
@@ -24,7 +26,7 @@ vi.mock("@/lib/admin-event-log", () => {
 });
 
 const { GET } = await import("./route");
-const { AdminEventLogQueryError } = await import("@/lib/admin-event-log");
+const { AdminEventLogQueryError, AdminEventLogSearchTooBroadError } = await import("@/lib/admin-event-log");
 
 const ADMIN = { id: "owner_1", isAdmin: true };
 const QUERY = { range: "today" };
@@ -85,5 +87,15 @@ describe("GET /api/admin/logs", () => {
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({ error: "Invalid log query." });
     expect(readLogPageMock).not.toHaveBeenCalled();
+  });
+
+  it("returns an explicit private no-store outcome when email matching would be incomplete", async () => {
+    readLogPageMock.mockRejectedValue(new AdminEventLogSearchTooBroadError());
+
+    const response = await GET(new Request("http://localhost/api/admin/logs?q=a"));
+
+    expect(response.status).toBe(422);
+    expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+    await expect(response.json()).resolves.toEqual({ error: "Search is too broad. Use a more specific email or identifier." });
   });
 });

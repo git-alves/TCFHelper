@@ -159,8 +159,8 @@ All filtering and pagination happen server-side. URL state is:
 | `range` | `today`, `last-7-days`, `current-month`, or `custom`; all preset boundaries are UTC. |
 | `from`, `to` | Required only for `custom`, parsed as UTC instants, with a half-open `[from, to)` interval. The interval must be positive, no longer than 30 days, and within the retention boundary. |
 | `severity` | `all`, `INFO`, `WARN`, or `ERROR`. |
-| `module` | `all` or a registered module. The UI labels the implemented categories as Essay service and Quotas & access; Authentication and System & integrations remain reserved until their separately approved telemetry exists. |
-| `q` | A bounded normalized query over a local user CUID, current linked email, persisted essay ID, fixed event type/reason/display tokens, and no arbitrary metadata. |
+| `module` | `all` or a registered module. The UI labels the implemented categories as AI services and Quotas & access; Authentication and System & integrations remain reserved until their separately approved telemetry exists. |
+| `q` | A bounded normalized query over a local user CUID, current linked email, persisted essay ID, fixed event type/reason/display tokens, and no arbitrary metadata. If its email fragment resolves to more than 100 local users, the page/API explicitly returns “Search is too broad” rather than show partial results. |
 | `page` | Positive integer, default `1`. |
 | `limit` | Exactly `20`, `50`, or `100`, default `20`. |
 

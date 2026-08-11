@@ -27,8 +27,10 @@ vi.mock("@/lib/admin-events", () => ({
 }));
 
 const {
+  ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES,
   ADMIN_EVENT_LOG_MAX_CUSTOM_RANGE_DAYS,
   AdminEventLogQueryError,
+  AdminEventLogSearchTooBroadError,
   adminEventLogHref,
   adminEventLogSearchParamsFromUrl,
   getAdminEventLogPage,
@@ -175,12 +177,29 @@ describe("getAdminEventLogPage", () => {
     expect(userFindManyMock).toHaveBeenCalledWith({
       where: { email: { contains: "learner@example.com", mode: "insensitive" } },
       select: { id: true },
+      take: ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES + 1,
     });
     expect(countMock.mock.calls[0][0].where.OR).toContainEqual({ userId: { in: ["user_by_email"] } });
     expect(eventFindManyMock.mock.calls[0][0].select).not.toHaveProperty("searchText");
     expect(page.events[0]).not.toHaveProperty("searchText");
     expect(JSON.stringify(page.events[0])).not.toContain("never expose this");
     expect(formatMessageMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "TRANSLATION_QUOTA_DENIED" }));
+  });
+
+  it("rejects an email fragment with too many candidates instead of silently dropping matches", async () => {
+    userFindManyMock.mockResolvedValue(
+      Array.from({ length: ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES + 1 }, (_, index) => ({ id: `user_${index}` })),
+    );
+    const query = parseAdminEventLogQuery({ range: "today", q: "a" }, NOW);
+
+    await expect(getAdminEventLogPage(query, NOW)).rejects.toThrow(AdminEventLogSearchTooBroadError);
+    expect(userFindManyMock).toHaveBeenCalledWith({
+      where: { email: { contains: "a", mode: "insensitive" } },
+      select: { id: true },
+      take: ADMIN_EVENT_LOG_MAX_EMAIL_CANDIDATES + 1,
+    });
+    expect(countMock).not.toHaveBeenCalled();
+    expect(eventFindManyMock).not.toHaveBeenCalled();
   });
 
   it("uses deterministic descending order and clamps pagination before querying the selected page", async () => {
