@@ -22,6 +22,17 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/admin-events", () => ({
   ADMIN_EVENT_SEVERITIES: ["INFO", "WARN", "ERROR"],
   ADMIN_EVENT_MODULES: ["ESSAY_SERVICE", "QUOTA_ACCESS", "AUTH_SECURITY", "SYSTEM_INTEGRATION"],
+  ADMIN_EVENT_BROWSER_FAMILIES: [
+    "Chrome",
+    "Edge",
+    "Firefox",
+    "Safari",
+    "Opera",
+    "Samsung Internet",
+    "Other browser",
+  ],
+  ADMIN_EVENT_DEVICE_CLASSES: ["Desktop", "Mobile", "Tablet", "Other device"],
+  ADMIN_EVENT_NETWORK_UNAVAILABLE: "Unavailable",
   ADMIN_EVENT_TYPES: [
     "ACCESS_CODE_REDEEMED",
     "ACCESS_CODE_REJECTED",
@@ -31,6 +42,8 @@ vi.mock("@/lib/admin-events", () => ({
     "CORRECTION_PROVIDER_FAILED",
     "EXAMPLE_PROVIDER_FAILED",
     "TRANSLATION_PROVIDER_FAILED",
+    "AUTH_SESSION_CREATED",
+    "AUTH_NETWORK_REVIEW_REQUIRED",
   ],
   ADMIN_EVENT_REASON_CODES: [
     "invalid_or_spent",
@@ -83,6 +96,11 @@ function record(overrides: Record<string, unknown> = {}) {
     quotaWindow: "minute",
     usageValue: 10,
     quotaLimit: 10,
+    maskedIp: null,
+    browserFamily: null,
+    deviceClass: null,
+    distinctIpCount: null,
+    securityWindowMinutes: null,
     occurrenceCount: 2,
     ...overrides,
   };
@@ -258,6 +276,53 @@ describe("getAdminEventLogPage", () => {
     expect(formatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: "UNKNOWN_EVENT", provider: null, reasonCode: null }),
     );
+  });
+
+  it("returns only the safe authentication summary, never fingerprint or raw network data", async () => {
+    countMock.mockResolvedValue(1);
+    eventFindManyMock.mockResolvedValue([
+      record({
+        id: "c123456789012345678901234",
+        severity: "INFO",
+        module: "AUTH_SECURITY",
+        eventType: "AUTH_SESSION_CREATED",
+        userId: "c123456789012345678901234",
+        reasonCode: null,
+        httpStatus: null,
+        quotaWindow: null,
+        usageValue: null,
+        quotaLimit: null,
+        maskedIp: "203.0.113.*",
+        browserFamily: "Chrome",
+        deviceClass: "Desktop",
+        distinctIpCount: null,
+        securityWindowMinutes: null,
+        searchText: "authentication sign in session started",
+        ipFingerprint: "v1:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        sessionFingerprint: "v1:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
+      }),
+    ]);
+
+    const page = await getAdminEventLogPage(
+      parseAdminEventLogQuery({ range: "today", module: "AUTH_SECURITY" }, NOW),
+      NOW,
+    );
+
+    expect(eventFindManyMock.mock.calls[0]?.[0].select).toMatchObject({
+      maskedIp: true,
+      browserFamily: true,
+      deviceClass: true,
+    });
+    expect(eventFindManyMock.mock.calls[0]?.[0].select).not.toHaveProperty("ipFingerprint");
+    expect(eventFindManyMock.mock.calls[0]?.[0].select).not.toHaveProperty("sessionFingerprint");
+    expect(page.events[0]).toMatchObject({
+      maskedIp: "203.0.113.*",
+      browserFamily: "Chrome",
+      deviceClass: "Desktop",
+    });
+    expect(JSON.stringify(page.events[0])).not.toContain("203.0.113.9");
+    expect(JSON.stringify(page.events[0])).not.toContain("v1:");
+    expect(JSON.stringify(page.events[0])).not.toContain("sessionFingerprint");
   });
 
   it("rejects an email fragment with too many candidates instead of silently dropping matches", async () => {

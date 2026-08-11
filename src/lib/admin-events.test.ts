@@ -1,18 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createMock, upsertMock, deleteManyMock } = vi.hoisted(() => ({
+const { createMock, upsertMock, deleteManyMock, deleteSecuritySessionsMock, transactionMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   upsertMock: vi.fn(),
   deleteManyMock: vi.fn(),
+  deleteSecuritySessionsMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
+    $transaction: transactionMock,
     adminEvent: {
       create: createMock,
       upsert: upsertMock,
       deleteMany: deleteManyMock,
+    },
+    authSecuritySession: {
+      deleteMany: deleteSecuritySessionsMock,
     },
   },
 }));
@@ -25,6 +31,7 @@ const {
   getAdminEventRetentionCutoff,
   purgeExpiredAdminEvents,
   recordAdminEvent,
+  recordAdminEventInTransaction,
 } = await import("./admin-events");
 
 const USER_ID = "c123456789012345678901234";
@@ -34,9 +41,18 @@ beforeEach(() => {
   createMock.mockReset();
   upsertMock.mockReset();
   deleteManyMock.mockReset();
+  deleteSecuritySessionsMock.mockReset();
+  transactionMock.mockReset();
   createMock.mockResolvedValue({ id: "event_1" });
   upsertMock.mockResolvedValue({ id: "event_1" });
   deleteManyMock.mockResolvedValue({ count: 3 });
+  deleteSecuritySessionsMock.mockResolvedValue({ count: 2 });
+  transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      adminEvent: { deleteMany: deleteManyMock },
+      authSecuritySession: { deleteMany: deleteSecuritySessionsMock },
+    }),
+  );
 });
 
 afterEach(() => {
@@ -255,6 +271,81 @@ describe("recordAdminEvent", () => {
     await expect(write).resolves.toBeUndefined();
     expect(errorSpy).toHaveBeenCalledWith("Admin event persistence timed out", "ACCESS_CODE_REJECTED");
   });
+
+  it("reserves session-security events for the durable transactional writer", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "AUTH_SESSION_CREATED",
+      userId: USER_ID,
+      maskedIp: "203.0.113.*",
+      browserFamily: "Chrome",
+      deviceClass: "Desktop",
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
+});
+
+describe("recordAdminEventInTransaction", () => {
+  it("writes only a closed safe session summary", async () => {
+    const now = new Date("2026-08-11T12:00:00.000Z");
+
+    await recordAdminEventInTransaction(
+      { adminEvent: { create: createMock, upsert: upsertMock } } as never,
+      {
+        eventType: "AUTH_SESSION_CREATED",
+        userId: USER_ID,
+        maskedIp: "203.0.113.*",
+        browserFamily: "Chrome",
+        deviceClass: "Desktop",
+      },
+      now,
+    );
+
+    expect(createMock).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventType: "AUTH_SESSION_CREATED",
+        severity: "INFO",
+        module: "AUTH_SECURITY",
+        maskedIp: "203.0.113.*",
+        browserFamily: "Chrome",
+        deviceClass: "Desktop",
+      }),
+    });
+    expect(JSON.stringify(createMock.mock.calls)).not.toContain("203.0.113.9");
+  });
+
+  it("requires a hashed incident key for a review warning", async () => {
+    const now = new Date("2026-08-11T12:00:00.000Z");
+    const input = {
+      eventType: "AUTH_NETWORK_REVIEW_REQUIRED" as const,
+      userId: USER_ID,
+      distinctIpCount: 3,
+      securityWindowMinutes: 10,
+    };
+
+    await expect(
+      recordAdminEventInTransaction({ adminEvent: { create: createMock, upsert: upsertMock } } as never, input, now),
+    ).rejects.toThrow("dedupe key");
+
+    await recordAdminEventInTransaction(
+      { adminEvent: { create: createMock, upsert: upsertMock } } as never,
+      input,
+      now,
+      { dedupeKey: "a".repeat(64) },
+    );
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { dedupeKey: "a".repeat(64) },
+      create: expect.objectContaining({
+        eventType: "AUTH_NETWORK_REVIEW_REQUIRED",
+        distinctIpCount: 3,
+        securityWindowMinutes: 10,
+      }),
+      update: {},
+    });
+  });
 });
 
 describe("admin-event retention", () => {
@@ -268,9 +359,12 @@ describe("admin-event retention", () => {
   it("deletes only rows older than the retention cutoff", async () => {
     const now = new Date("2026-08-31T12:34:56.000Z");
 
-    await expect(purgeExpiredAdminEvents(now)).resolves.toEqual({ count: 3 });
+    await expect(purgeExpiredAdminEvents(now)).resolves.toEqual({ count: 5 });
 
     expect(deleteManyMock).toHaveBeenCalledWith({
+      where: { occurredAt: { lt: new Date("2026-08-01T12:34:56.000Z") } },
+    });
+    expect(deleteSecuritySessionsMock).toHaveBeenCalledWith({
       where: { occurredAt: { lt: new Date("2026-08-01T12:34:56.000Z") } },
     });
   });

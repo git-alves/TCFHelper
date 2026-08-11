@@ -1,24 +1,26 @@
-# Admin operational log
+# Admin operational and sign-in review log
 
 **Problem** — MyTCFLab's owner can see current rolling usage, but cannot
 answer why a learner was denied service or whether a provider/access-code
 operation recently failed without inspecting deployment logs. Copying raw
 application logs into the dashboard would create a second, unbounded store of
 learner content, bearer credentials, provider errors, and client metadata.
-The beta needs a bounded operational record for the owner, not a security
-forensics system or a billing ledger.
+The owner also needs a deliberately narrow sign-in review signal for possible
+account sharing without turning the product into a security forensics system
+or a billing ledger.
 
 **Job to be done** — When I operate MyTCFLab, let me find recent, meaningful
-service failures, quota denials, and code-redemption outcomes in the owner
-dashboard, so I can resolve a learner problem without database or deployment
-log access and without collecting secrets or unnecessary personal data.
+service failures, quota denials, code-redemption outcomes, and recent
+sign-in review signals in the owner dashboard, so I can resolve a learner
+problem without database or deployment log access and without collecting
+secrets or unnecessary personal data.
 
 **Success metric** — At launch, the owner can filter the last 30 days of
 safe operational events by date, severity, module, learner, or known event
 wording from `/admin/logs`; non-owners cannot discover the surface. Automated
 acceptance proves that a raw access code, essay/draft text, upstream error,
-IP address, user agent, request body, stack trace, and API key cannot be
-persisted in an event row.
+full IP address, user agent, Clerk session/client ID, request body, stack
+trace, and API key cannot be persisted in an owner-visible event row.
 
 Related owner access, admission, quotas, and usage reporting are specified in
 the [admin access-control and usage dashboard](admin-access-control-and-usage.md).
@@ -32,7 +34,11 @@ the [admin access-control and usage dashboard](admin-access-control-and-usage.md
   matching owner-only API. The only allowed row updates are safe coalescing;
   the only allowed deletion is the retention purge.
 - Record a deliberately small, closed set of safe provider-failure,
-  quota-denial, and access-code-outcome events for 30 days.
+  quota-denial, access-code-outcome, and verified session-created events for
+  30 days.
+- Let the owner review—not automatically act on—a bounded signal of three
+  distinct HMACed IP addresses for the same learner within a rolling ten
+  minutes. A review signal is not proof of password sharing.
 - Render readable messages from trusted event definitions rather than storing
   a free-form message supplied by a browser, provider, or exception.
 - Support server-side UTC date filtering, severity/module filtering, safe
@@ -47,9 +53,9 @@ the [admin access-control and usage dashboard](admin-access-control-and-usage.md
 - No raw access code, code hash derived from an entered code, essay/draft
   text, prompt, provider exception text, request/response body, stack trace,
   API key, full IP address, user agent, device identifier, or session ID.
-- No login, sign-in failure, device-change, IP-change, or account-sharing
-  telemetry in v1. `lastActiveAt` remains a presence heartbeat, not a login
-  ledger.
+- No login failure, raw device-change/IP-change history, location, session
+  replay tool, or automated account-sharing enforcement. `lastActiveAt`
+  remains a presence heartbeat, not a login ledger.
 - No AI-token/currency cost estimate, provider price table, or aggregate
   performance tile in v1.
 - No database-outage, failed-migration, subscription, or platform-deployment
@@ -61,16 +67,18 @@ the [admin access-control and usage dashboard](admin-access-control-and-usage.md
 ## Decision
 
 Use an owner-only `AdminEvent` table as a 30-day structured operational
-ledger. A server-only TypeScript registry and matching database checks control
-every stored value and generate the dashboard text. This is chosen over a raw
+ledger plus a private, relation-free `AuthSecuritySession` companion table for
+the HMAC-only inputs required to detect a bounded sign-in pattern. A
+server-only TypeScript registry and matching database checks control every
+owner-visible value and generate the dashboard text. This is chosen over a raw
 `message` or JSON payload because a fixed registry makes it possible to prove
 that user content, secrets, and untrusted provider text cannot reach the owner
 UI.
 
 The ledger covers only events whose operational meaning is known locally:
-provider failures, operation-specific quota denials, and access-code
-redemption outcomes. It does not claim to be complete security telemetry or a
-provider-billing record. The owner sees it through the existing per-route
+provider failures, operation-specific quota denials, access-code redemption
+outcomes, and verified Clerk `session.created` events. It does not claim to be
+complete security telemetry or a provider-billing record. The owner sees it through the existing per-route
 admin guard; pages and APIs return generic `404` to anonymous, blocked,
 non-owner, or provisioning-failed callers.
 
@@ -92,11 +100,13 @@ foreign-key cascade.
 | --- | --- |
 | `id`, `occurredAt`, `firstOccurredAt` | Opaque event ID, most-recent observation, and first observation for a coalesced event. All timestamps are UTC. |
 | `severity` | Closed registry value: `INFO`, `WARN`, or `ERROR`. |
-| `module` | Closed registry value: `ESSAY_SERVICE`, `QUOTA_ACCESS`, `AUTH_SECURITY`, or `SYSTEM_INTEGRATION`. The latter two are reserved in v1; no session/IP or migration events are emitted. |
+| `module` | Closed registry value: `ESSAY_SERVICE`, `QUOTA_ACCESS`, `AUTH_SECURITY`, or `SYSTEM_INTEGRATION`. `AUTH_SECURITY` has the two limited session-review events below; System & integrations remains reserved. |
 | `eventType`, `reasonCode` | Closed, server-owned vocabulary. They are never a raw exception, request value, or browser string. |
 | `searchText` | Server-generated search tokens made only from the fixed event label and safe registry fields. It is not a general message or free-form payload. |
 | `userId`, `essayId`, `accessCodeId` | Nullable opaque local IDs. `essayId` is set only after an Essay exists; `accessCodeId` is an ID, never `AccessCode.code`. The list may join the user's current email for search/display, but does not snapshot an email into the log. |
 | `provider`, `httpStatus`, `quotaWindow`, `usageValue`, `quotaLimit` | Optional, bounded operational facts. `provider`, status, window, and reason must come from the registry; counts are only the operation's safe quota values. |
+| `maskedIp`, `browserFamily`, `deviceClass` | Session-created events only: `a.b.c.*`, an IPv6 `/48` prefix, or `Unavailable`; plus closed browser/device families. These never contain a full IP, raw user agent, OS, location, or version. |
+| `distinctIpCount`, `securityWindowMinutes` | Review-warning events only: the number of distinct HMACed full addresses in the qualifying window and the fixed `10`-minute window. |
 | `occurrenceCount`, `dedupeKey` | Repeated noisy outcomes may coalesce. A server-only SHA-256 digest over trusted safe fields and a UTC time bucket makes a duplicate increment/update one row instead of promising an exact per-attempt history. |
 
 There is no `message` column and no arbitrary JSON column. Database checks
@@ -105,6 +115,14 @@ reason/provider/status/window values, and matching optional fields); the
 TypeScript registry is the corresponding writer and display source. The model
 uses strings rather than a PostgreSQL enum, but adding an event kind still
 requires a reviewed additive check-constraint migration.
+
+`AuthSecuritySession` is not selected by `/admin/logs` or its API. It holds
+only the local user CUID, source session timestamp, versioned HMAC of the
+Clerk session ID, optional versioned HMAC of a normalized full IP, and an
+internal alert-window anchor. It stores no raw IP, user agent, Clerk
+session/client ID, copied email, embedded Clerk user, city, country, or raw
+payload. The HMAC key is a separate server-only
+`SECURITY_TELEMETRY_HMAC_SECRET`, not the Clerk signing secret or cron secret.
 
 ### V1 event registry and semantics
 
@@ -116,6 +134,8 @@ requires a reviewed additive check-constraint migration.
 | `QUOTA_ACCESS` | `WARN` | `CORRECTION_QUOTA_DENIED`, `EXAMPLE_QUOTA_DENIED`, `TRANSLATION_QUOTA_DENIED` | Exact operation, safe denial reason, UTC quota window, effective limit, attempted/current safe unit, and reset boundary when known. A translation/example denial is never labelled “blocked from submitting an essay.” |
 | `QUOTA_ACCESS` | `INFO` | `ACCESS_CODE_REDEEMED` | First successful redemption only: local user ID and internal access-code ID. Owner bypasses and an already-activated retry do not create a success event. |
 | `QUOTA_ACCESS` | `WARN` | `ACCESS_CODE_REJECTED` | Generic `invalid_or_spent` result for the authenticated local user, coalesced in a short UTC bucket. It stores neither the submitted code nor a code-derived hash and does not promise “attempt #N.” |
+| `AUTH_SECURITY` | `INFO` | `AUTH_SESSION_CREATED` | A verified Clerk `session.created` delivery, linked to a local user only when the normal verified identity path succeeds. It shows a masked network and coarse browser/device label. |
+| `AUTH_SECURITY` | `WARN` | `AUTH_NETWORK_REVIEW_REQUIRED` | Three or more distinct, non-null HMACed IP addresses within a rolling ten minutes for one learner. It says “Possible concurrent access — review recommended”; it does not claim password sharing. |
 
 The current access-code model deliberately makes missing and spent codes
 indistinguishable. Its optional validity period begins at redemption, so an
@@ -144,6 +164,19 @@ learner result, and the writer never recursively tries to log its own failure.
 - A database outage or failed migration cannot reliably write an event into
   the same database. Vercel/GitHub/deployment monitoring remains authoritative
   for those paths; v1 makes no durability claim for them.
+- Session-created events are different: Clerk's verified webhook is processed
+  in one database transaction with its private HMAC session row and visible
+  safe event. A write failure returns `500` only to Clerk so it retries; it
+  never changes the learner's already-completed sign-in.
+- Session source time, not webhook receipt time, is used for the rolling
+  window. Deliveries older than the 30-day cutoff, malformed timestamps,
+  unlinked identities, and impersonated sessions are acknowledged without a
+  telemetry row. A missing or invalid signed IP records `Unavailable` and
+  never contributes to a review warning.
+- Review alerts are de-duplicated while a per-learner transaction lock is
+  held. VPNs, travel, mobile-network changes, IPv6 privacy addresses, and
+  shared Wi-Fi can produce false positives, so the signal never auto-blocks,
+  signs out, revokes access, or notifies a learner.
 
 Consequently, this ledger aids diagnosis but is not an exact count of all
 requests or all platform failures.
@@ -162,7 +195,7 @@ All filtering and pagination happen server-side. URL state is:
 | `range` | `today`, `last-7-days`, `current-month`, or `custom`; all preset boundaries are UTC. |
 | `from`, `to` | Required only for `custom`, parsed as UTC instants, with a half-open `[from, to)` interval. The interval must be positive, no longer than 30 days, and within the retention boundary. |
 | `severity` | `all`, `INFO`, `WARN`, or `ERROR`. |
-| `module` | `all` or a registered module. The UI labels the implemented categories as AI services and Quotas & access; Authentication and System & integrations remain reserved until their separately approved telemetry exists. |
+| `module` | `all` or a registered module. The UI labels the implemented categories as AI services, Quotas & access, Authentication, and System & integrations. Authentication filters the limited verified-session entries above. |
 | `q` | A bounded normalized query over a local user CUID, current linked email, persisted essay ID, fixed event type/reason/display tokens, and no arbitrary metadata. If its email fragment resolves to more than 100 local users, the page/API explicitly returns “Search is too broad” rather than show partial results. |
 | `page` | Positive integer, default `1`. |
 | `limit` | Exactly `20`, `50`, or `100`, default `20`. |
@@ -183,10 +216,11 @@ the current email after an address change.
 
 ### Retention, Cron, and failure handling
 
-A protected daily Vercel Cron endpoint deletes events with `occurredAt` older
-than `now - 30 days`. The endpoint accepts only the deployment's configured
-Cron secret, runs outside normal learner requests and migrations, and emits a
-safe platform log of the number of rows removed or an execution failure.
+A protected daily Vercel Cron endpoint deletes `AdminEvent` and
+`AuthSecuritySession` rows with `occurredAt` older than `now - 30 days`. The
+endpoint accepts only the deployment's configured Cron secret, runs outside
+normal learner requests and migrations, and emits a safe platform log of the
+number of rows removed or an execution failure.
 
 Every list query additionally applies `occurredAt >= now - 30 days`. If the
 database or Cron is unavailable, the job fails visibly to platform monitoring,
@@ -212,7 +246,16 @@ are not needed.
    learner outcome, and duplicate noisy events coalesce.
 3. Deploy `/api/admin/logs` and `/admin/logs` with owner-guard, validation,
    no-store headers, text-visible badges, filters, and pagination tests.
-4. Provision the Cron secret and scheduled endpoint, verify a controlled
+4. For session review, add `session.created` to the existing verified Clerk
+   webhook and configure a distinct random `SECURITY_TELEMETRY_HMAC_SECRET`
+   (at least 32 bytes) in production. Do not rotate that key during the
+   30-day retention window without a dual-read migration plan. Before
+   handoff, start a controlled fresh Clerk session (or send a Clerk test
+   delivery), wait for webhook delivery, and verify one masked row at
+   `/admin/logs?range=last-7-days&module=AUTH_SECURITY&page=1&limit=20`.
+   Returning to an already-active browser session is not a fresh session and
+   intentionally produces no additional row.
+5. Provision the Cron secret and scheduled endpoint, verify a controlled
    retention run in production, and monitor its platform-only failure path.
 
 If the application release is rolled back, leave the additive table and its
@@ -234,11 +277,10 @@ denials because the owner needs a quick, learner-correlated dashboard view.
 Those logs remain the right source for infrastructure, deployment, and
 migration failures that cannot safely or reliably self-record in Postgres.
 
-**Add session/IP/device telemetry and account-sharing alerts now** — rejected
-because a request heartbeat is not a login, webhook delivery is asynchronous,
-and identifiers need a separate privacy/retention policy and false-positive
-response design. A later feature may use verified Clerk session events and
-short-lived pseudonymous signals, never raw network/device data by default.
+**Store raw session/IP/device telemetry for account-sharing alerts** —
+rejected. The approved implementation uses only verified Clerk session-created
+events, short-lived versioned HMACs for comparison, a display mask, closed
+coarse labels, and review-only warning copy. It cannot prove password sharing.
 
 **Estimate AI cost from quota counters** — rejected because quota counters are
 application enforcement values, not provider billing usage. Accurate cost
@@ -247,7 +289,7 @@ source, and treatment of translation fallback behavior.
 
 ## Open questions
 
-None for the approved safe v1. Any addition of Clerk session events, IP/device
-signals, account-sharing detection, provider performance/cost telemetry, or
-platform/migration event ingestion requires a separate privacy and operational
-decision before implementation.
+None for the approved scope. Any raw or more granular session/device/location
+collection, sign-in failure tracking, notification, automatic enforcement,
+provider performance/cost telemetry, or platform/migration ingestion requires
+a separate privacy and operational decision before implementation.

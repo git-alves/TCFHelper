@@ -71,4 +71,64 @@ describe("AdminEventLogTable", () => {
     expect(markup).not.toContain("Raw message");
     expect(markup).not.toContain("Metadata");
   });
+
+  it("renders a masked sign-in summary and review-only context", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminEventLogTable, {
+        events: [
+          {
+            id: "event_3",
+            occurredAt: "2026-08-11T12:30:00.000Z",
+            firstOccurredAt: "2026-08-11T12:30:00.000Z",
+            severity: "WARN",
+            module: "AUTH_SECURITY",
+            eventType: "AUTH_NETWORK_REVIEW_REQUIRED",
+            userId: "user_1",
+            essayId: null,
+            accessCodeId: null,
+            provider: null,
+            reasonCode: null,
+            httpStatus: null,
+            quotaWindow: null,
+            usageValue: null,
+            quotaLimit: null,
+            distinctIpCount: 3,
+            securityWindowMinutes: 10,
+            occurrenceCount: 1,
+            message: "Possible concurrent access — review recommended (3 distinct IP addresses within 10 minutes).",
+          },
+          {
+            id: "event_4",
+            occurredAt: "2026-08-11T12:31:00.000Z",
+            firstOccurredAt: "2026-08-11T12:31:00.000Z",
+            severity: "INFO",
+            module: "AUTH_SECURITY",
+            eventType: "AUTH_SESSION_CREATED",
+            userId: "user_1",
+            essayId: null,
+            accessCodeId: null,
+            provider: null,
+            reasonCode: null,
+            httpStatus: null,
+            quotaWindow: null,
+            usageValue: null,
+            quotaLimit: null,
+            maskedIp: "203.0.113.*",
+            browserFamily: "Chrome",
+            deviceClass: "Desktop",
+            occurrenceCount: 1,
+            message: "Authenticated session started.",
+          },
+        ],
+      }),
+    );
+
+    expect(markup).toContain("Authentication");
+    expect(markup).toContain("203.0.113.*");
+    expect(markup).toContain("Chrome on desktop");
+    expect(markup).toContain("Distinct IP addresses");
+    expect(markup).toContain("Review window");
+    expect(markup).not.toContain("203.0.113.9");
+    expect(markup).not.toContain("fingerprint");
+  });
 });

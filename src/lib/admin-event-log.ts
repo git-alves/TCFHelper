@@ -2,6 +2,9 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import {
+  ADMIN_EVENT_BROWSER_FAMILIES,
+  ADMIN_EVENT_DEVICE_CLASSES,
+  ADMIN_EVENT_NETWORK_UNAVAILABLE,
   ADMIN_EVENT_MODULES,
   ADMIN_EVENT_PROVIDERS,
   ADMIN_EVENT_QUOTA_WINDOWS,
@@ -270,6 +273,11 @@ const ADMIN_EVENT_SELECT = {
   quotaWindow: true,
   usageValue: true,
   quotaLimit: true,
+  maskedIp: true,
+  browserFamily: true,
+  deviceClass: true,
+  distinctIpCount: true,
+  securityWindowMinutes: true,
   occurrenceCount: true,
 } satisfies Prisma.AdminEventSelect;
 
@@ -317,6 +325,58 @@ function safeQuotaContext(record: AdminEventRecord) {
   };
 }
 
+function safeMaskedIp(value: string | null) {
+  return value !== null &&
+    (value === ADMIN_EVENT_NETWORK_UNAVAILABLE ||
+      /^(?:\d{1,3}\.){3}\*$/.test(value) ||
+      /^[0-9a-f]{1,4}:[0-9a-f]{1,4}:[0-9a-f]{1,4}::\/48$/.test(value))
+    ? value
+    : null;
+}
+
+function safeBrowserFamily(value: string | null) {
+  return value !== null && isKnownValue(ADMIN_EVENT_BROWSER_FAMILIES, value) ? value : null;
+}
+
+function safeDeviceClass(value: string | null) {
+  return value !== null && isKnownValue(ADMIN_EVENT_DEVICE_CLASSES, value) ? value : null;
+}
+
+function safeReviewContext(record: AdminEventRecord) {
+  if (record.eventType === "AUTH_SESSION_CREATED") {
+    return {
+      maskedIp: safeMaskedIp(record.maskedIp),
+      browserFamily: safeBrowserFamily(record.browserFamily),
+      deviceClass: safeDeviceClass(record.deviceClass),
+      distinctIpCount: null,
+      securityWindowMinutes: null,
+    };
+  }
+  if (
+    record.eventType === "AUTH_NETWORK_REVIEW_REQUIRED" &&
+    record.distinctIpCount !== null &&
+    Number.isSafeInteger(record.distinctIpCount) &&
+    record.distinctIpCount >= 3 &&
+    record.distinctIpCount <= 100 &&
+    record.securityWindowMinutes === 10
+  ) {
+    return {
+      maskedIp: null,
+      browserFamily: null,
+      deviceClass: null,
+      distinctIpCount: record.distinctIpCount,
+      securityWindowMinutes: record.securityWindowMinutes,
+    };
+  }
+  return {
+    maskedIp: null,
+    browserFamily: null,
+    deviceClass: null,
+    distinctIpCount: null,
+    securityWindowMinutes: null,
+  };
+}
+
 export type AdminEventLogItem = {
   id: string;
   occurredAt: string;
@@ -333,6 +393,11 @@ export type AdminEventLogItem = {
   quotaWindow: string | null;
   usageValue: number | null;
   quotaLimit: number | null;
+  maskedIp?: string | null;
+  browserFamily?: string | null;
+  deviceClass?: string | null;
+  distinctIpCount?: number | null;
+  securityWindowMinutes?: number | null;
   occurrenceCount: number;
   message: string;
 };
@@ -356,12 +421,15 @@ function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
       ? record.reasonCode
       : null;
   const quota = safeQuotaContext(record);
+  const security = safeReviewContext(record);
   const occurrenceCount = safeOccurrenceCount(record.occurrenceCount);
   const messageInput = {
     eventType,
     provider,
     reasonCode,
     ...quota,
+    distinctIpCount: security.distinctIpCount,
+    securityWindowMinutes: security.securityWindowMinutes,
     occurrenceCount,
   };
 
@@ -381,6 +449,11 @@ function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
     quotaWindow: quota.quotaWindow,
     usageValue: quota.usageValue,
     quotaLimit: quota.quotaLimit,
+    maskedIp: security.maskedIp,
+    browserFamily: security.browserFamily,
+    deviceClass: security.deviceClass,
+    distinctIpCount: security.distinctIpCount,
+    securityWindowMinutes: security.securityWindowMinutes,
     occurrenceCount,
     message: formatAdminEventMessage(messageInput),
   };

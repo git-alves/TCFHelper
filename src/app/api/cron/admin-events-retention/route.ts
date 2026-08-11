@@ -9,7 +9,8 @@ function isAuthorizedCron(request: NextRequest) {
 }
 
 /**
- * Enforces the owner-approved 30-day operational-event retention policy.
+ * Enforces the owner-approved 30-day operational-event and private
+ * session-review retention policy.
  * Vercel invokes this daily in UTC and supplies CRON_SECRET as a bearer token;
  * the route deliberately has no cookie/admin-session fallback, so a browser
  * user cannot accidentally run destructive retention work.

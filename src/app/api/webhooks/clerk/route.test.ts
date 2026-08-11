@@ -1,16 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { verifyWebhookMock, transactionMock, createManyMock, syncClerkUserMock } = vi.hoisted(() => ({
+const {
+  verifyWebhookMock,
+  transactionMock,
+  createManyMock,
+  syncClerkUserMock,
+  recordAuthSecuritySessionMock,
+} = vi.hoisted(() => ({
   verifyWebhookMock: vi.fn(),
   transactionMock: vi.fn(),
   createManyMock: vi.fn(),
   syncClerkUserMock: vi.fn(),
+  recordAuthSecuritySessionMock: vi.fn(),
 }));
 
 vi.mock("@clerk/nextjs/webhooks", () => ({ verifyWebhook: verifyWebhookMock }));
 vi.mock("@/lib/prisma", () => ({ prisma: { $transaction: transactionMock } }));
 vi.mock("@/lib/app-user", () => ({ syncClerkUserFromWebhook: syncClerkUserMock }));
+vi.mock("@/lib/auth-security", () => ({ recordAuthSecuritySession: recordAuthSecuritySessionMock }));
 
 const { POST } = await import("./route");
 
@@ -29,15 +37,31 @@ const userEvent = {
   event_attributes: { http_request: { client_ip: "127.0.0.1", user_agent: "test" } },
 };
 
+const sessionEvent = {
+  type: "session.created",
+  object: "event",
+  data: {
+    id: "sess_clerk_1",
+    user_id: "user_clerk_1",
+    created_at: 1_786_000_000_000,
+    actor: null,
+    user: { id: "user_clerk_1" },
+    latest_activity: { browser_name: "Chrome", device_type: "desktop", is_mobile: false },
+  },
+  event_attributes: { http_request: { client_ip: "203.0.113.9", user_agent: "raw user agent must not pass" } },
+};
+
 beforeEach(() => {
   verifyWebhookMock.mockReset();
   transactionMock.mockReset();
   createManyMock.mockReset();
   syncClerkUserMock.mockReset();
+  recordAuthSecuritySessionMock.mockReset();
 
   verifyWebhookMock.mockResolvedValue(userEvent);
   createManyMock.mockResolvedValue({ count: 1 });
   syncClerkUserMock.mockResolvedValue(undefined);
+  recordAuthSecuritySessionMock.mockResolvedValue({ kind: "recorded", alerted: false });
   transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
     callback({ clerkWebhookEvent: { createMany: createManyMock } }),
   );
@@ -88,14 +112,40 @@ describe("POST /api/webhooks/clerk", () => {
     expect(syncClerkUserMock).not.toHaveBeenCalled();
   });
 
-  it("acknowledges irrelevant verified events without creating a local identity", async () => {
-    verifyWebhookMock.mockResolvedValue({ ...userEvent, type: "session.created" });
+  it("records a verified Clerk session through the privacy-preserving helper", async () => {
+    verifyWebhookMock.mockResolvedValue(sessionEvent);
 
     const response = await POST(webhookRequest());
 
     expect(response.status).toBe(200);
     expect(transactionMock).not.toHaveBeenCalled();
     expect(syncClerkUserMock).not.toHaveBeenCalled();
+    expect(recordAuthSecuritySessionMock).toHaveBeenCalledWith({
+      clerkUserId: "user_clerk_1",
+      clerkSessionId: "sess_clerk_1",
+      occurredAt: 1_786_000_000_000,
+      clientIp: "203.0.113.9",
+      browserName: "Chrome",
+      deviceType: "desktop",
+      isMobile: false,
+      actor: null,
+      embeddedUser: { id: "user_clerk_1" },
+    });
+    expect(recordAuthSecuritySessionMock.mock.calls[0]?.[0]).not.toHaveProperty("userAgent");
+    expect(JSON.stringify(recordAuthSecuritySessionMock.mock.calls[0]?.[0])).not.toContain("raw user agent");
+  });
+
+  it("returns a retryable generic failure when verified session persistence fails", async () => {
+    verifyWebhookMock.mockResolvedValue(sessionEvent);
+    recordAuthSecuritySessionMock.mockRejectedValue(new Error("network value must not be logged"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await POST(webhookRequest());
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: "Webhook processing failed" });
+    expect(errorSpy).toHaveBeenCalledWith("Clerk session telemetry processing failed");
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain("network value");
   });
 
   it("does not treat Clerk account deletion as permission to cascade-delete learner data", async () => {

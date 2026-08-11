@@ -74,4 +74,24 @@ describe("/admin/logs", () => {
     expect(markup).toContain('data-query="a"');
     expect(markup).not.toContain('data-testid="event-log-table"');
   });
+
+  it("explains that Authentication records only new Clerk sessions, not a returned existing session", async () => {
+    const authenticationQuery = { ...QUERY, module: "AUTH_SECURITY" };
+    parseAdminEventLogQueryMock.mockReturnValue(authenticationQuery);
+    getAdminEventLogPageMock.mockResolvedValue({
+      events: [],
+      total: 0,
+      page: 1,
+      pageCount: 1,
+      filters: authenticationQuery,
+      retentionCutoff: "2026-07-12T12:00:00.000Z",
+    });
+
+    const page = await AdminLogsPage({ searchParams: Promise.resolve({ module: "AUTH_SECURITY" }) });
+    const markup = renderToStaticMarkup(page);
+
+    expect(markup).toContain("No new authenticated sessions recorded in this range");
+    expect(markup).toContain("returning in an existing session does not create another row");
+    expect(markup).toContain("raw IP addresses, user agents, and session IDs are never stored");
+  });
 });

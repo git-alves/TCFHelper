@@ -43,6 +43,20 @@ function contextItems(event: AdminEventLogItem) {
     const limit = event.quotaLimit === null ? "—" : event.quotaLimit.toLocaleString("en-US");
     items.push({ label: `${event.quotaWindow} quota`, value: `${usage} / ${limit}` });
   }
+  if (event.maskedIp) {
+    items.push({ label: "Network", value: event.maskedIp });
+  }
+  if (event.browserFamily || event.deviceClass) {
+    const browser = event.browserFamily ?? "Other browser";
+    const device = event.deviceClass ? event.deviceClass.toLowerCase() : "other device";
+    items.push({ label: "Device", value: `${browser} on ${device}` });
+  }
+  if (event.distinctIpCount !== null && event.distinctIpCount !== undefined) {
+    items.push({ label: "Distinct IP addresses", value: String(event.distinctIpCount) });
+  }
+  if (event.securityWindowMinutes !== null && event.securityWindowMinutes !== undefined) {
+    items.push({ label: "Review window", value: `${event.securityWindowMinutes} minutes` });
+  }
   return items;
 }
 
@@ -97,7 +111,12 @@ export function AdminEventLogTable({ events }: { events: AdminEventLogItem[] }) 
                               {item.value}
                             </Link>
                           ) : (
-                            <span className={item.label === "Essay" || item.label === "Access-code record" ? "font-mono" : undefined}>{item.value}</span>
+                            <span
+                              className={item.label === "Essay" || item.label === "Access-code record" ? "font-mono" : undefined}
+                              aria-label={item.label === "Network" ? `Masked IP address ${item.value}` : undefined}
+                            >
+                              {item.value}
+                            </span>
                           )}
                         </li>
                       ))}
