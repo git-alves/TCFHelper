@@ -97,7 +97,11 @@ describe("POST /api/access-codes/redeem", () => {
     const response = await POST(redemptionRequest({ code: " invite-ab12 " }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: true });
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/dashboard",
+    });
     expect(normalizeAccessCodeMock).toHaveBeenCalledWith("invite-ab12");
     expect(redeemAccessCodeMock).toHaveBeenCalledWith(USER_ID, "INVITE-AB12");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
@@ -112,13 +116,17 @@ describe("POST /api/access-codes/redeem", () => {
     await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
   });
 
-  it("sends an established learner straight to tasks even on their first redemption", async () => {
+  it("shows the one-time welcome to an established learner, then sends them to tasks", async () => {
     getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 1 });
 
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/tasks",
+    });
   });
 
   it("does not disclose whether an unavailable code is missing or already used", async () => {

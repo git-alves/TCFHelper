@@ -7,6 +7,7 @@ import { AccessCodeWelcomeModal } from "@/components/access-code-welcome-modal";
 type RedemptionResponse = {
   activated?: boolean;
   showWelcome?: boolean;
+  welcomeDestination?: "/dashboard" | "/tasks";
   error?: string;
 };
 
@@ -17,8 +18,8 @@ export function AccessCodeActivationForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   // Set only when the server says this is the account's first successful
-  // admission. A learner restored with a newly issued code bypasses the
-  // welcome handoff and returns directly to writing.
+  // admission. The server also chooses its post-modal destination so learners
+  // with an already-completed walkthrough continue directly to Tasks.
   const [welcomeDestination, setWelcomeDestination] = useState<string | null>(null);
   const canSubmit = code.trim().length > 0 && !isSubmitting;
 
@@ -43,9 +44,13 @@ export function AccessCodeActivationForm() {
 
       // Navigation waits for the first-admission welcome modal to close; a
       // refresh here would otherwise let /activate's own redirect tear it
-      // down before the learner sees it. Restored learners skip that modal.
+      // down before the learner sees it. Restored learners skip that modal;
+      // an established learner's first admission still sees it, then goes to
+      // Tasks rather than being sent through the Dashboard tour again.
       if (payload.showWelcome) {
-        setWelcomeDestination("/dashboard");
+        setWelcomeDestination(
+          payload.welcomeDestination === "/dashboard" ? "/dashboard" : "/tasks",
+        );
       } else {
         router.replace("/tasks");
         router.refresh();

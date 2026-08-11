@@ -64,16 +64,20 @@ export async function POST(request: Request) {
 
     // Redeeming twice from a double-click or stale tab is a harmless,
     // successful activation. The transaction marks a durable user-level
-    // welcome state only for the first successful admission. The welcome
-    // handoff also remains limited to learners who still need the dashboard
-    // walkthrough; an established learner goes straight back to tasks.
-    return response({
-      activated: true,
-      showWelcome:
-        result.kind === "redeemed" &&
-        result.showWelcome &&
-        user.walkthroughCompletedVersion === null,
-    });
+    // welcome state only for the first successful admission. Showing that
+    // once is independent of its CTA: new learners begin the walkthrough on
+    // Dashboard, while established learners continue to Tasks.
+    const showWelcome = result.kind === "redeemed" && result.showWelcome;
+    return response(
+      showWelcome
+        ? {
+            activated: true,
+            showWelcome: true,
+            welcomeDestination:
+              user.walkthroughCompletedVersion === null ? "/dashboard" : "/tasks",
+          }
+        : { activated: true, showWelcome: false },
+    );
   } catch {
     // Do not let a database outage turn into an unmetered/partially recorded
     // activation. The learner can safely retry because redemption is atomic.

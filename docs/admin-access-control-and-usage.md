@@ -76,6 +76,11 @@ request while retaining their account, work, quota history, and the code's
 permanent spent marker. A newly issued code is the only way to restore access.
 The owner is activation-exempt and cannot be a reset target.
 
+The first successful code admission shows the welcome handoff once. Its CTA
+opens `/dashboard` only for a learner who still needs the walkthrough;
+established learners see the same confirmation once, then continue to
+`/tasks`. A restored admission never repeats it.
+
 Codes are server-generated, human-readable bearer credentials. V1 retains the
 code in the owner-only list so it can be copied later; the tradeoff against a
 hash-only/reveal-once system is intentional. Codes therefore need at least
