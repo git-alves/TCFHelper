@@ -7,7 +7,6 @@ export type AdminOverviewStats = {
   users: {
     total: number;
     blocked: number;
-    admins: number;
     activated: number;
     onlineNow: number;
   };
@@ -43,7 +42,6 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
   const [
     totalUsers,
     blockedUsers,
-    adminUsers,
     activatedUsers,
     onlineNowUsers,
     totalAccessCodes,
@@ -55,7 +53,6 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { isBlocked: true } }),
-    prisma.user.count({ where: { isAdmin: true } }),
     prisma.user.count({ where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } } }),
     // isBlocked: false is redundant in practice (touchLastActive stops
     // updating the moment an account is blocked, so its timestamp ages out
@@ -93,7 +90,6 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     users: {
       total: totalUsers,
       blocked: blockedUsers,
-      admins: adminUsers,
       activated: activatedUsers,
       onlineNow: onlineNowUsers,
     },

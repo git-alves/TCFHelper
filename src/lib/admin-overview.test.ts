@@ -38,11 +38,10 @@ beforeEach(() => {
 
   userCountMock.mockImplementation(
     async (args?: {
-      where?: { isBlocked?: boolean; isAdmin?: boolean; redeemedAccessCodes?: unknown; lastActiveAt?: unknown };
+      where?: { isBlocked?: boolean; redeemedAccessCodes?: unknown; lastActiveAt?: unknown };
     }) => {
       if (args?.where?.lastActiveAt) return 4;
       if (args?.where?.isBlocked) return 2;
-      if (args?.where?.isAdmin) return 1;
       if (args?.where?.redeemedAccessCodes) return 30;
       return 50;
     },
@@ -61,7 +60,7 @@ describe("getAdminOverviewStats", () => {
   it("aggregates registered users, access codes, and current-window usage", async () => {
     const stats = await getAdminOverviewStats(NOW);
 
-    expect(stats.users).toEqual({ total: 50, blocked: 2, admins: 1, activated: 30, onlineNow: 4 });
+    expect(stats.users).toEqual({ total: 50, blocked: 2, activated: 30, onlineNow: 4 });
     expect(stats.accessCodes).toEqual({ total: 40, redeemed: 30, unredeemed: 10 });
     expect(stats.usage.translation).toEqual({ charactersThisMonth: 12_345, activeUsersThisMonth: 8 });
     expect(stats.usage.examples).toEqual({ requestsToday: 20, activeUsersToday: 5 });
