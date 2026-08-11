@@ -7,6 +7,10 @@ import { useEffect, useId, useState } from "react";
 // ONLINE_THRESHOLD_MS). Polling every ~12s is what "real time" means here:
 // frequent enough to feel live without hammering the endpoint.
 const POLL_INTERVAL_MS = 12_000;
+// Bounds a single poll attempt so a hung request can never leave a stale
+// count presented as live indefinitely -- well under POLL_INTERVAL_MS, so a
+// timed-out attempt still leaves room for the next scheduled one.
+const POLL_TIMEOUT_MS = 8_000;
 
 interface AdminOnlineNowTileProps {
   initialCount: number;
@@ -58,6 +62,7 @@ export function AdminOnlineNowTile({ initialCount }: AdminOnlineNowTileProps) {
 
       isPolling = true;
       controller = new AbortController();
+      const timeoutHandle = setTimeout(() => controller?.abort(), POLL_TIMEOUT_MS);
       try {
         const response = await fetch("/api/admin/overview", {
           headers: { Accept: "application/json" },
@@ -76,10 +81,16 @@ export function AdminOnlineNowTile({ initialCount }: AdminOnlineNowTileProps) {
         } else {
           setIsStale(true);
         }
-      } catch (error) {
-        const wasAborted = error instanceof DOMException && error.name === "AbortError";
-        if (!stopped && !wasAborted) setIsStale(true);
+      } catch {
+        // Whether a real network failure, a non-ok status, or the
+        // POLL_TIMEOUT_MS abort firing, the attempt failed to confirm
+        // freshness -- all equally warrant staying/going stale. Only the
+        // unmount-triggered abort must not update state, and stopped
+        // (already set to true by cleanup before that abort fires) covers
+        // that.
+        if (!stopped) setIsStale(true);
       } finally {
+        clearTimeout(timeoutHandle);
         isPolling = false;
         scheduleNext();
       }
@@ -94,6 +105,12 @@ export function AdminOnlineNowTile({ initialCount }: AdminOnlineNowTileProps) {
         clearTimeout(timeoutId);
         timeoutId = undefined;
       }
+      // The count is definitely untrusted after any time away. Mark it
+      // stale immediately rather than waiting for the catch-up fetch to
+      // resolve (or time out): otherwise a tab hidden past the online
+      // window would keep showing its old count as live for as long as
+      // that fetch takes, including the full POLL_TIMEOUT_MS if it hangs.
+      setIsStale(true);
       void runPoll();
     }
 
@@ -121,14 +138,23 @@ export function AdminOnlineNowTile({ initialCount }: AdminOnlineNowTileProps) {
         />
         <p className="text-sm text-zinc-500 dark:text-zinc-400">Online now</p>
       </div>
-      <p className="mt-1 text-3xl font-semibold tracking-tight" aria-live="polite" aria-describedby={descriptionId}>
+      <p
+        className="mt-1 text-3xl font-semibold tracking-tight"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-describedby={descriptionId}
+      >
         <span className="sr-only">Online now: </span>
         {count.toLocaleString("en-US")}
       </p>
       <p id={descriptionId} className="sr-only">
         Active in the last 2 minutes.
       </p>
-      {isStale && <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">Count may be outdated</p>}
+      {isStale && (
+        <p role="status" className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          Count may be outdated
+        </p>
+      )}
     </div>
   );
 }

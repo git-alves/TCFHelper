@@ -129,8 +129,8 @@ describe("getCurrentAppUser", () => {
     expect(currentUserMock).not.toHaveBeenCalled();
   });
 
-  it("records a presence heartbeat as a conditional update, not an unconditional write", async () => {
-    findUniqueMock.mockResolvedValue(APP_USER);
+  it("records a presence heartbeat as a conditional update when no prior activity is known", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: null });
 
     await getCurrentAppUser();
 
@@ -138,6 +138,30 @@ describe("getCurrentAppUser", () => {
     // DB state at write time -- not a value read earlier in this request.
     // That is what makes it safe against a request racing another one for
     // the same account: see the concurrency test below.
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: APP_USER.id,
+        isBlocked: false,
+        OR: [{ lastActiveAt: null }, { lastActiveAt: { lt: expect.any(Date) } }],
+      },
+      data: { lastActiveAt: expect.any(Date) },
+    });
+  });
+
+  it("skips the database round trip entirely when the already-fetched activity is fresh", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: new Date() });
+
+    await getCurrentAppUser();
+
+    expect(updateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("still issues the conditional update when the already-fetched activity is stale", async () => {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: fiveMinutesAgo });
+
+    await getCurrentAppUser();
+
     expect(updateManyMock).toHaveBeenCalledWith({
       where: {
         id: APP_USER.id,

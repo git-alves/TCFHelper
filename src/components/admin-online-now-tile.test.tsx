@@ -21,6 +21,7 @@ describe("AdminOnlineNowTile", () => {
     const markup = renderToStaticMarkup(createElement(AdminOnlineNowTile, { initialCount: 7 }));
 
     expect(markup).toContain('aria-live="polite"');
+    expect(markup).toContain('aria-atomic="true"');
     expect(markup).toContain("Online now:");
   });
 

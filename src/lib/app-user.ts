@@ -14,6 +14,7 @@ const APP_USER_SELECT = {
   isAdmin: true,
   isBlocked: true,
   walkthroughCompletedVersion: true,
+  lastActiveAt: true,
 } satisfies Prisma.UserSelect;
 
 // A slow or momentarily locked heartbeat write must never make an ordinary
@@ -31,16 +32,26 @@ function delay(ms: number): Promise<void> {
  * the real request it was piggybacked on: this is a cosmetic side effect,
  * not something any authorization or business decision depends on.
  *
- * The throttle is enforced by the update's own WHERE clause against current
- * database state, not a value read earlier in this request -- concurrent
- * requests for the same account (parallel API calls, a layout render racing
- * a page render) each re-check freshly once they actually acquire the row,
- * so an in-flight older request can never regress a newer one's write, and
- * only genuinely stale rows are written at all.
+ * `lastActiveAt` is the value already fetched earlier in this same request
+ * (a free read, not an extra query) and is used only as a fast skip: when it
+ * is clearly fresh, no database round trip happens at all. That skip can
+ * never cause an incorrect *write* to be missed under concurrency -- it only
+ * ever avoids attempting one. Once a write is attempted, the conditional
+ * updateMany's WHERE clause is what actually enforces correctness, re-
+ * checking live database state under Postgres's own per-row update lock
+ * rather than trusting this (possibly stale, possibly shared-with-another-
+ * concurrent-request) snapshot. So a request that skipped because it saw a
+ * fresh value never needed to write anyway, and a request that proceeds to
+ * write is still safe against another request doing the same thing at the
+ * same time.
  */
-async function touchLastActive(userId: string): Promise<void> {
+async function touchLastActive(userId: string, lastActiveAt: Date | null): Promise<void> {
   const now = new Date();
   const cutoff = new Date(now.getTime() - ACTIVITY_HEARTBEAT_THROTTLE_MS);
+
+  if (lastActiveAt && lastActiveAt >= cutoff) {
+    return;
+  }
 
   const write = prisma.user
     .updateMany({
@@ -123,7 +134,7 @@ export async function getCurrentAppUser(options?: { skipPresenceTouch?: boolean 
   const mappedUser = await findAppUserByClerkId(clerkUserId);
   if (mappedUser) {
     if (mappedUser.isBlocked) return null;
-    if (!options?.skipPresenceTouch) await touchLastActive(mappedUser.id);
+    if (!options?.skipPresenceTouch) await touchLastActive(mappedUser.id, mappedUser.lastActiveAt);
     return mappedUser;
   }
 
@@ -134,7 +145,7 @@ export async function getCurrentAppUser(options?: { skipPresenceTouch?: boolean 
 
   const syncedUser = await syncClerkUser(identityFromBackendUser(clerkUser));
   if (syncedUser.isBlocked) return null;
-  if (!options?.skipPresenceTouch) await touchLastActive(syncedUser.id);
+  if (!options?.skipPresenceTouch) await touchLastActive(syncedUser.id, syncedUser.lastActiveAt);
   return syncedUser;
 }
 
