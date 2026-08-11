@@ -285,12 +285,12 @@ finish, but every subsequent protected page or API request re-checks admission.
   V1 has no code expiry or code-reuse workflow.
 - The pre-gate command requires an explicit `--production` confirmation and a
   database connection, refuses to run in a Vercel build or a non-UTC database
-  session, and stops after a walkthrough-version change or if its reviewed
-  dry-run count/fingerprint no longer matches the applying transaction. If the
-  app release fails after a successful backfill, no learner is activated or
-  locked out; only the legacy cohort's tour state is recorded. Correct a future
-  classification mistake only against the documented cutoff cohort, never by
-  clearing every current version.
+  session (including UTC-equivalent `GMT`), and stops after a walkthrough-version
+  change or if its reviewed dry-run count/fingerprint no longer matches the
+  applying transaction. If the app release fails after a successful backfill,
+  no learner is activated or locked out; only the legacy cohort's tour state is
+  recorded. Correct a future classification mistake only against the documented
+  cutoff cohort, never by clearing every current version.
 
 ### Migration and rollout
 

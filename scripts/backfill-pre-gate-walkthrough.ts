@@ -116,7 +116,7 @@ async function assertUtcTimeZone(db: DatabaseSession) {
   const timeZone = rows[0]?.timeZone;
   if (!isUtcTimeZone(timeZone)) {
     throw new Error(
-      `Refusing to run because the database session time zone is ${timeZone ?? "unknown"}, not UTC. Verify production timestamp storage before this reviewed backfill.`,
+      `Refusing to run because the database session time zone is ${timeZone ?? "unknown"}, not a UTC-compatible zero-offset zone. Verify production timestamp storage before this reviewed backfill.`,
     );
   }
 }

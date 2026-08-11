@@ -38,6 +38,8 @@ describe("pre-gate walkthrough backfill", () => {
   it("accepts only the UTC database timestamp convention used by the approved cutoff", () => {
     expect(isUtcTimeZone("UTC")).toBe(true);
     expect(isUtcTimeZone("Etc/UTC")).toBe(true);
+    expect(isUtcTimeZone("GMT")).toBe(true);
+    expect(isUtcTimeZone("Etc/GMT")).toBe(true);
     expect(isUtcTimeZone("America/New_York")).toBe(false);
     expect(isUtcTimeZone(undefined)).toBe(false);
   });

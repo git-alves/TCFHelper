@@ -22,7 +22,10 @@ export const PRE_GATE_WALKTHROUGH_BACKFILL_DATA = {
 } as const;
 
 export function isUtcTimeZone(timeZone: string | undefined): boolean {
-  return timeZone === "UTC" || timeZone === "Etc/UTC";
+  // PostgreSQL reports the zero-offset standard zone as GMT on some managed
+  // providers. These names are equivalent for TIMESTAMP WITHOUT TIME ZONE
+  // comparisons; regional zones are intentionally not accepted.
+  return timeZone === "UTC" || timeZone === "Etc/UTC" || timeZone === "GMT" || timeZone === "Etc/GMT";
 }
 
 export function preGateWalkthroughBackfillWhere(): Prisma.UserWhereInput {
