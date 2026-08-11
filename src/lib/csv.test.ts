@@ -25,4 +25,25 @@ describe("toCsv", () => {
   it("renders no rows as just the header", () => {
     expect(toCsv(["Code"], [])).toBe("Code\r\n");
   });
+
+  it("neutralizes a leading formula-trigger character with a quote prefix", () => {
+    expect(toCsv(["Name"], [["=1+1"]])).toBe("Name\r\n'=1+1\r\n");
+    expect(toCsv(["Name"], [["+1+1"]])).toBe("Name\r\n'+1+1\r\n");
+    expect(toCsv(["Name"], [["-1+1"]])).toBe("Name\r\n'-1+1\r\n");
+    expect(toCsv(["Name"], [["@SUM(A1)"]])).toBe("Name\r\n'@SUM(A1)\r\n");
+  });
+
+  it("neutralizes a formula trigger hidden behind leading whitespace", () => {
+    expect(toCsv(["Name"], [[" =cmd(1)"]])).toBe("Name\r\n' =cmd(1)\r\n");
+    expect(toCsv(["Name"], [["\t=1+1"]])).toBe("Name\r\n'\t=1+1\r\n");
+  });
+
+  it("still quotes a neutralized field that also contains a comma", () => {
+    expect(toCsv(["Name"], [["=A1, B1"]])).toBe('Name\r\n"\'=A1, B1"\r\n');
+  });
+
+  it("does not touch a value that merely contains a trigger character later on", () => {
+    expect(toCsv(["Name"], [["Jane - Smith"]])).toBe("Name\r\nJane - Smith\r\n");
+    expect(toCsv(["Name"], [["contact@example.com"]])).toBe("Name\r\ncontact@example.com\r\n");
+  });
 });

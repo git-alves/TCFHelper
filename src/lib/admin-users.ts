@@ -6,6 +6,7 @@ import { DEFAULT_USER_QUOTA_LIMITS, type UserQuotaLimits } from "@/lib/user-quot
 
 export const ADMIN_USERS_PAGE_SIZE = 25;
 const MAX_ADMIN_USERS_SEARCH_LENGTH = 120;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 const ADMIN_USER_QUOTA_OVERRIDE_SELECT = {
   translationRequestsPerMinute: true,
@@ -205,16 +206,27 @@ function isAdminUserStatusFilter(value: string): value is AdminUserStatusFilter 
   return (ADMIN_USER_STATUS_FILTERS as readonly string[]).includes(value);
 }
 
+// A duplicated query-string key (?status=a&status=b) arrives as a string[]
+// from a Next.js page's searchParams but is already collapsed to its first
+// value by URLSearchParams#get before an API route calls this same parser.
+// Taking the first element here too keeps both surfaces resolving a
+// duplicated param identically instead of the page silently falling back to
+// "all"/"" while the API honors the first value.
+function firstParamValue(value: string | string[] | undefined): string {
+  if (typeof value === "string") return value;
+  if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+  return "";
+}
+
 export function parseAdminUserListQuery(input: {
   query?: string | string[];
   status?: string | string[];
   page?: string | string[];
 }) {
-  const rawQuery = typeof input.query === "string" ? input.query : "";
-  const query = rawQuery.trim().slice(0, MAX_ADMIN_USERS_SEARCH_LENGTH);
-  const rawStatus = typeof input.status === "string" ? input.status : "all";
+  const query = firstParamValue(input.query).trim().slice(0, MAX_ADMIN_USERS_SEARCH_LENGTH);
+  const rawStatus = firstParamValue(input.status) || "all";
   const status: AdminUserStatusFilter = isAdminUserStatusFilter(rawStatus) ? rawStatus : "all";
-  const rawPage = typeof input.page === "string" ? Number(input.page) : 1;
+  const rawPage = Number(firstParamValue(input.page) || "1");
   const page = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
   return { query, status, page };
@@ -232,37 +244,75 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
 }
 
 /**
- * "Activated" mirrors the admin overview's own count query: a currently
- * live admission, not merely having redeemed a code at some point (a reset
- * learner's old code no longer relates to them once detached). The owner is
- * excluded from "unactivated" since they bypass activation entirely and
- * would otherwise always show as awaiting a code they will never redeem.
+ * A timed code past its derived expiry (redeemedAt + validityDays) is still
+ * attached in the database until the learner's own next request lazily
+ * detaches it -- mirroring hasRedeemedAccessCode's own expiry derivation
+ * (see access-code.ts). A plain "redeemedAt is not null" filter would
+ * therefore misclassify an expired-but-not-yet-detached learner as
+ * indefinitely activated. Prisma cannot compare two column values in a
+ * WHERE clause, so live admission is resolved here in application code
+ * instead: one query over currently-redeemed codes, then set membership.
  */
-function userStatusWhere(status: AdminUserStatusFilter): Prisma.UserWhereInput {
+async function usersWithLiveAdmission(now: Date): Promise<Set<string>> {
+  const redemptions = await prisma.accessCode.findMany({
+    where: { redeemedByUserId: { not: null } },
+    select: { redeemedByUserId: true, redeemedAt: true, validityDays: true },
+  });
+  const nowMs = now.getTime();
+  const liveUserIds = new Set<string>();
+
+  for (const redemption of redemptions) {
+    if (!redemption.redeemedByUserId) continue;
+    const isLive =
+      redemption.validityDays === null ||
+      redemption.redeemedAt === null ||
+      redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY > nowMs;
+    if (isLive) liveUserIds.add(redemption.redeemedByUserId);
+  }
+
+  return liveUserIds;
+}
+
+/**
+ * "Activated" means a currently live admission, not merely having redeemed
+ * a code at some point (a reset learner's old code no longer relates to
+ * them once detached, and an expired timed code no longer counts either --
+ * see usersWithLiveAdmission). The owner is excluded from "unactivated"
+ * since they bypass activation entirely and would otherwise always show as
+ * awaiting a code they will never redeem.
+ */
+async function userStatusWhere(status: AdminUserStatusFilter, now: Date): Promise<Prisma.UserWhereInput> {
   switch (status) {
     case "blocked":
       return { isBlocked: true };
     case "admin":
       return { isAdmin: true };
-    case "activated":
-      return { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } };
-    case "unactivated":
-      return { isAdmin: false, redeemedAccessCodes: { none: { redeemedAt: { not: null } } } };
+    case "activated": {
+      const liveUserIds = await usersWithLiveAdmission(now);
+      return { id: { in: Array.from(liveUserIds) } };
+    }
+    case "unactivated": {
+      const liveUserIds = await usersWithLiveAdmission(now);
+      return { isAdmin: false, id: { notIn: Array.from(liveUserIds) } };
+    }
     case "all":
       return {};
   }
 }
 
-export async function getAdminUsersPage({
-  query,
-  status,
-  page,
-}: {
-  query: string;
-  status: AdminUserStatusFilter;
-  page: number;
-}) {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status) };
+export async function getAdminUsersPage(
+  {
+    query,
+    status,
+    page,
+  }: {
+    query: string;
+    status: AdminUserStatusFilter;
+    page: number;
+  },
+  now = new Date(),
+) {
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
   const total = await prisma.user.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / ADMIN_USERS_PAGE_SIZE));
   const currentPage = Math.min(page, pageCount);
@@ -273,7 +323,6 @@ export async function getAdminUsersPage({
     skip: (currentPage - 1) * ADMIN_USERS_PAGE_SIZE,
     take: ADMIN_USERS_PAGE_SIZE,
   });
-  const now = new Date();
 
   return {
     users: records.map((record) => serializeUser(record, now)),
@@ -293,24 +342,38 @@ export async function getAdminUserDetail(userId: string) {
 // A CSV export intentionally is not paginated -- it is "everything matching
 // the current filters," not one page of it -- but still needs a hard upper
 // bound so an unfiltered export on a runaway-large table cannot become an
-// unbounded query.
-const MAX_EXPORT_ROWS = 10_000;
+// unbounded query. Crucially, exceeding it must never silently produce a
+// partial file: getAdminUsersForExport refuses instead (see
+// AdminUsersExportResult), because a CSV that quietly omits records while
+// claiming to be "the export" is worse than no export at all.
+export const MAX_USERS_EXPORT_ROWS = 10_000;
 
-export async function getAdminUsersForExport({
-  query,
-  status,
-}: {
-  query: string;
-  status: AdminUserStatusFilter;
-}): Promise<AdminUserListItem[]> {
-  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status) };
+export type AdminUsersExportResult =
+  | { truncated: false; users: AdminUserListItem[] }
+  | { truncated: true; total: number };
+
+export async function getAdminUsersForExport(
+  {
+    query,
+    status,
+  }: {
+    query: string;
+    status: AdminUserStatusFilter;
+  },
+  now = new Date(),
+): Promise<AdminUsersExportResult> {
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
+  const total = await prisma.user.count({ where });
+  if (total > MAX_USERS_EXPORT_ROWS) {
+    return { truncated: true, total };
+  }
+
   const records = await prisma.user.findMany({
     where,
     select: ADMIN_USER_SELECT,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_EXPORT_ROWS,
+    take: MAX_USERS_EXPORT_ROWS,
   });
-  const now = new Date();
 
-  return records.map((record) => serializeUser(record, now));
+  return { truncated: false, users: records.map((record) => serializeUser(record, now)) };
 }
