@@ -273,6 +273,7 @@ export interface AppCopy {
       taskSwitchDescription: string;
       topicSwitchDescription: string;
       dashboardSwitchDescription: string;
+      adminSwitchDescription: string;
       exampleOverwriteDescription: string;
       exampleOverwriteConfirm: string;
       clearDraftDescription: string;
@@ -553,6 +554,7 @@ export const APP_COPY = {
         title: "Discard your current work?",
         taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
         dashboardSwitchDescription: "Going to the dashboard will discard your current topic, draft, and feedback.",
+        adminSwitchDescription: "Going to Admin will discard your current topic, draft, and feedback.",
         topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
         exampleOverwriteDescription: "Generating an example will replace your current draft.",
         exampleOverwriteConfirm: "Replace draft",
@@ -838,6 +840,7 @@ export const APP_COPY = {
         taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
         dashboardSwitchDescription:
           "Accéder au tableau de bord supprimera votre sujet, brouillon et commentaires actuels.",
+        adminSwitchDescription: "Accéder à l’administration supprimera votre sujet, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
         exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
         exampleOverwriteConfirm: "Remplacer le brouillon",
@@ -1121,6 +1124,7 @@ export const APP_COPY = {
         taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
         dashboardSwitchDescription:
           "Al ir al panel se descartarán el tema, el borrador y los comentarios actuales.",
+        adminSwitchDescription: "Al ir a Administración se descartarán el tema, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
         exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
         exampleOverwriteConfirm: "Reemplazar borrador",
@@ -1403,6 +1407,7 @@ export const APP_COPY = {
         title: "Descartar seu trabalho atual?",
         taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
         dashboardSwitchDescription: "Ir para o painel descartará o tema, o rascunho e os comentários atuais.",
+        adminSwitchDescription: "Ir para a administração descartará o tema, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
         exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
         exampleOverwriteConfirm: "Substituir rascunho",

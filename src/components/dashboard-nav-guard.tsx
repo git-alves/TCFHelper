@@ -2,13 +2,13 @@
 
 import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
-type DashboardNavGuard = () => void;
+type DashboardNavGuard = (destination: string) => void;
 
 interface DashboardNavGuardContextValue {
   register: (guard: DashboardNavGuard | null) => void;
   /** Returns true when a guard handled the click (so the caller must not
    * navigate itself); false when there was nothing to guard. */
-  requestNavigation: () => boolean;
+  requestNavigation: (destination: string) => boolean;
   /** True while the workspace has a correction in flight: the nav bar
    * disables its Dashboard control rather than letting a learner navigate
    * away from an already-submitted, unabortable request. */
@@ -41,9 +41,9 @@ export function DashboardNavGuardProvider({ children }: { children: ReactNode })
     setIsWorkspaceMounted(guard !== null);
   }, []);
 
-  const requestNavigation = useCallback(() => {
+  const requestNavigation = useCallback((destination: string) => {
     if (!guardRef.current) return false;
-    guardRef.current();
+    guardRef.current(destination);
     return true;
   }, []);
 

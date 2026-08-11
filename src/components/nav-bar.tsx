@@ -118,10 +118,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
     ? copy.workspace.editor.correctingStatus
     : copy.nav.closeSettingsFirst;
 
-  function handleDashboardClick(event: MouseEvent<HTMLAnchorElement>) {
-    if (event.defaultPrevented || event.button !== 0) return;
-    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-    if (requestNavigation()) event.preventDefault();
+  function guardedNavigationHandler(destination: string) {
+    return (event: MouseEvent<HTMLAnchorElement>) => {
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (requestNavigation(destination)) event.preventDefault();
+    };
   }
 
   return (
@@ -158,7 +160,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   <Link
                     href="/dashboard"
                     data-walkthrough="nav-dashboard"
-                    onClick={handleDashboardClick}
+                    onClick={guardedNavigationHandler("/dashboard")}
                     className={DASHBOARD_BUTTON_CLASS}
                   >
                     {copy.nav.dashboard}
@@ -170,9 +172,24 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                 </Link>
               )}
               {isAdmin && !isOnAdminPage && (
-                <Link href="/admin" className={DASHBOARD_BUTTON_CLASS}>
-                  {copy.nav.admin}
-                </Link>
+                // Same in-flight-work protection as Dashboard above: reachable
+                // from /tasks, so it must not let an owner leave a draft or an
+                // unabortable in-flight correction behind unconfirmed.
+                onTasks && isDashboardBlocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.admin} — ${dashboardBlockedReason}`}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
+                    {copy.nav.admin}
+                  </button>
+                ) : (
+                  <Link href="/admin" onClick={guardedNavigationHandler("/admin")} className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.admin}
+                  </Link>
+                )
               )}
               {isWalkthroughAvailable && (
                 <button
