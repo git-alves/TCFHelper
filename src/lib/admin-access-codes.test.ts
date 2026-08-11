@@ -1,15 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
-const { createMock, findManyMock } = vi.hoisted(() => ({
+const { createMock, findManyMock, transactionMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   findManyMock: vi.fn(),
+  transactionMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     accessCode: { create: createMock, findMany: findManyMock },
+    $transaction: transactionMock,
   },
 }));
 
@@ -27,6 +29,8 @@ function uniqueConstraintError() {
 beforeEach(() => {
   createMock.mockReset();
   findManyMock.mockReset();
+  transactionMock.mockReset();
+  transactionMock.mockImplementation(async (callback) => callback({ accessCode: { create: createMock } }));
 });
 
 describe("createAccessCodes", () => {
@@ -113,6 +117,46 @@ describe("createAccessCodes", () => {
       expect(call[0].data.note).toBe("cohort");
       expect(call[0].data.validityDays).toBe(7);
     }
+  });
+
+  it("wraps a whole batch in a single transaction rather than one per code", async () => {
+    let sequence = 0;
+    createMock.mockImplementation(async () => {
+      sequence += 1;
+      return {
+        id: `code_${sequence}`,
+        code: `TCF-000${sequence}-CD34`,
+        note: null,
+        createdAt: new Date(),
+        redeemedAt: null,
+        validityDays: null,
+      };
+    });
+
+    await createAccessCodes(null, null, 5);
+
+    expect(transactionMock).toHaveBeenCalledTimes(1);
+    expect(createMock).toHaveBeenCalledTimes(5);
+  });
+
+  it("propagates a mid-batch failure so the caller's real transaction rolls the whole batch back", async () => {
+    createMock
+      .mockResolvedValueOnce({
+        id: "code_1",
+        code: "TCF-0001-CD34",
+        note: null,
+        createdAt: new Date(),
+        redeemedAt: null,
+        validityDays: null,
+      })
+      // Every attempt for the second code collides, exhausting retries.
+      .mockRejectedValue(uniqueConstraintError());
+
+    await expect(createAccessCodes(null, null, 3)).rejects.toBeInstanceOf(AccessCodeGenerationFailedError);
+    // The failure happened inside the same $transaction callback as the
+    // first code's successful insert, so Postgres rolls both back together
+    // -- there is no separate commit per code for a failure to leave behind.
+    expect(transactionMock).toHaveBeenCalledTimes(1);
   });
 
   it("retries on a code collision instead of surfacing the constraint error", async () => {

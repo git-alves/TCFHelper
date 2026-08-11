@@ -3,8 +3,7 @@
 import { type FormEvent, useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { CopyButton } from "@/components/copy-button";
-
-const MAX_BATCH_SIZE = 100;
+import { MAX_ACCESS_CODE_BATCH_SIZE, MAX_VALIDITY_DAYS } from "@/lib/access-code-limits";
 
 type GeneratedAccessCode = { code: string };
 type GenerateResponse = { accessCodes?: GeneratedAccessCode[]; error?: string };
@@ -27,10 +26,10 @@ export function AdminAccessCodeGenerator() {
   const parsedCount = Number.parseInt(count, 10);
   const canSubmit =
     !isSubmitting &&
-    (isLifetime || (Number.isInteger(parsedDays) && parsedDays >= 1)) &&
+    (isLifetime || (Number.isInteger(parsedDays) && parsedDays >= 1 && parsedDays <= MAX_VALIDITY_DAYS)) &&
     Number.isInteger(parsedCount) &&
     parsedCount >= 1 &&
-    parsedCount <= MAX_BATCH_SIZE;
+    parsedCount <= MAX_ACCESS_CODE_BATCH_SIZE;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -94,7 +93,7 @@ export function AdminAccessCodeGenerator() {
               type="number"
               inputMode="numeric"
               min={1}
-              max={MAX_BATCH_SIZE}
+              max={MAX_ACCESS_CODE_BATCH_SIZE}
               value={count}
               onChange={(event) => setCount(event.target.value)}
               disabled={isSubmitting}
@@ -132,6 +131,7 @@ export function AdminAccessCodeGenerator() {
                 type="number"
                 inputMode="numeric"
                 min={1}
+                max={MAX_VALIDITY_DAYS}
                 value={validityDays}
                 onChange={(event) => {
                   setIsLifetime(false);

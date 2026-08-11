@@ -3,13 +3,15 @@ import "server-only";
 import { randomInt } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { ADMIN_ACCESS_CODES_PAGE_SIZE } from "@/lib/access-code-limits";
 
-export const ADMIN_ACCESS_CODES_PAGE_SIZE = 50;
-// A generation request is an interactive owner action, not a bulk-import
-// tool; this bounds an accidental extra zero rather than a real use case.
-export const MAX_ACCESS_CODE_BATCH_SIZE = 100;
 const MAX_NOTE_LENGTH = 280;
 const CODE_GENERATION_ATTEMPTS = 5;
+// Sized for a full-size batch of sequential inserts, not a single one --
+// createAccessCodes wraps the whole batch in one transaction so a failure
+// partway through never leaves an earlier code in the batch persisted but
+// undisclosed to the owner.
+const BATCH_TRANSACTION_TIMEOUT_MS = 15_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // Excludes 0/O and 1/I: a code is read aloud or retyped by a learner, and
 // these are the pairs most often confused across fonts.
@@ -65,16 +67,22 @@ export class AccessCodeGenerationFailedError extends Error {
   }
 }
 
+type AccessCodeCreator = Pick<Prisma.TransactionClient["accessCode"], "create">;
+
 /**
  * Retries on a random-code collision (astronomically unlikely at this
  * alphabet/length, but a single-use credential must never silently reuse
  * another code's identity) rather than letting a unique-constraint error
  * surface as a generic 500.
  */
-async function createOneAccessCode(note: string | null, validityDays: number | null): Promise<AdminAccessCode> {
+async function createOneAccessCode(
+  db: AccessCodeCreator,
+  note: string | null,
+  validityDays: number | null,
+): Promise<AdminAccessCode> {
   for (let attempt = 0; attempt < CODE_GENERATION_ATTEMPTS; attempt += 1) {
     try {
-      const created = await prisma.accessCode.create({
+      const created = await db.create({
         data: { code: generateCandidateCode(), note, validityDays },
         select: { id: true, code: true, note: true, createdAt: true, redeemedAt: true, validityDays: true },
       });
@@ -100,6 +108,9 @@ async function createOneAccessCode(note: string | null, validityDays: number | n
  * Generates one or more codes sharing the same note and validity period.
  * Each code is still an independently unique, single-use credential -- a
  * batch is only a generation-time convenience, not a shared/multi-use code.
+ * The whole batch runs in one transaction: a failure partway through (e.g.
+ * exhausting collision retries on one code) rolls the entire batch back
+ * instead of leaving an undisclosed prefix of valid bearer codes persisted.
  */
 export async function createAccessCodes(
   note: string | null,
@@ -107,11 +118,16 @@ export async function createAccessCodes(
   count: number,
 ): Promise<AdminAccessCode[]> {
   const trimmedNote = note?.trim().slice(0, MAX_NOTE_LENGTH) || null;
-  const codes: AdminAccessCode[] = [];
-  for (let i = 0; i < count; i += 1) {
-    codes.push(await createOneAccessCode(trimmedNote, validityDays));
-  }
-  return codes;
+  return prisma.$transaction(
+    async (tx) => {
+      const codes: AdminAccessCode[] = [];
+      for (let i = 0; i < count; i += 1) {
+        codes.push(await createOneAccessCode(tx.accessCode, trimmedNote, validityDays));
+      }
+      return codes;
+    },
+    { timeout: BATCH_TRANSACTION_TIMEOUT_MS },
+  );
 }
 
 export async function listAccessCodes(): Promise<AdminAccessCode[]> {

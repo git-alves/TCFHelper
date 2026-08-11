@@ -271,7 +271,9 @@ model AccessCode {
   // timed code does not itself expire. There is no background job, so
   // expiry is detected and enforced lazily, the same way a manual
   // "Deactivate access" is: on the learner's next request after the window
-  // elapses.
+  // elapses. A CHECK constraint (added in the same migration, since Prisma's
+  // schema language cannot express one) bounds this to
+  // MAX_VALIDITY_DAYS in src/lib/admin-access-codes.ts.
   validityDays     Int?
 
   @@index([redeemedAt])

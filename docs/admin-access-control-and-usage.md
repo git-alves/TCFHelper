@@ -47,9 +47,14 @@ cannot activate two accounts.
 - No billing, checkout, Stripe work, plan selection, or payment entitlement.
 - No role-management UI, multiple-admin workflow, self-service promotion, or
   ordinary table toggle for ownership.
-- No multi-use, expiring, code-revocation/reuse, bulk-imported, emailed, or
+- No multi-use, code-reuse, code-revocation-that-revives-the-code, emailed, or
   SMS-delivered codes in v1. The owner shares them out of band. Deactivating
-  access detaches a learner's admission; it never makes their old code valid.
+  access (or a timed code's window elapsing) detaches a learner's admission;
+  it never makes their old code valid again. A code may be generated with a
+  fixed validity period (access expires N days after redemption, not after
+  generation) or as a batch of up to `MAX_ACCESS_CODE_BATCH_SIZE` codes
+  sharing one note and validity period -- each code in a batch is still an
+  independently unique, single-use credential, not a shared/multi-use code.
 - No historical analytics warehouse, data export, audit log, or provider-cost
   reconciliation. Existing counters are rolling enforcement data.
 - No staff access to learner essays or feedback; admin data is limited to
@@ -233,13 +238,19 @@ nor makes the old code reusable. Blocking self or the owner is rejected. There
 is no editable admin switch; the owner label explains that ownership is
 operationally managed.
 
-`/admin/access-codes` accepts an optional short note, generates/copies a code,
-and lists the newest bounded set of issued codes with created/redeemed state
-and an active redeemer email when one remains. A detached admission is clearly
-shown as permanently spent with no active admission. It is `private, no-store`.
-The code format uses an
-unambiguous uppercase alphabet and at least four groups of four random
-characters (80 bits before the fixed `TCF-` prefix).
+`/admin/access-codes` accepts an optional short note, an optional validity
+period in days (omitted/null means lifetime access once redeemed), and an
+optional quantity (up to `MAX_ACCESS_CODE_BATCH_SIZE`, which equals the list
+page size so a whole batch is always recoverable after a reload) to generate
+one or more codes sharing that note and validity period. It lists the newest
+bounded set of issued codes with created/redeemed state, an active redeemer
+email when one remains, each code's validity, and its derived expiry once
+redeemed. A detached admission is clearly shown as permanently spent with no
+active admission; a timed code past its derived expiry but not yet detached
+is shown as expired and pending removal, not as still active. It is
+`private, no-store`. The code format uses an unambiguous uppercase alphabet
+and at least four groups of four random characters (80 bits before the fixed
+`TCF-` prefix).
 
 ### API contract
 
@@ -255,7 +266,7 @@ not-found to non-owners. Owner-visible success/errors are `private, no-store`.
 | `POST /api/admin/users/[id]/activation/reset` | Detaches an activated non-owner's current admission. The response is idempotent; it never clears `redeemedAt`, so the prior code remains permanently spent and recovery requires a newly issued code. |
 | `PATCH /api/admin/users/[id]/quota-overrides` | Strict nullable non-negative integer fields. All-null resets/removes override. |
 | `GET /api/admin/access-codes` | Newest bounded issued-code list. |
-| `POST /api/admin/access-codes` | Strict optional note; generates a code. No client-selected code. |
+| `POST /api/admin/access-codes` | Strict optional note, validity period in days (bounded, DB-CHECK-enforced), and count (bounded to the list page size); generates one or more codes sharing those settings in a single transaction. No client-selected code. |
 | `POST /api/access-codes/redeem` | Authenticated, unblocked learner submits one code. Invalid and already-spent codes share one generic error; repeat success for an already-activated account is idempotent. |
 
 Redemption serializes attempts for one learner and conditionally claims an
@@ -270,6 +281,15 @@ after a reset the original code still fails the `redeemedAt IS NULL` predicate,
 while a new code can be redeemed normally. An in-flight provider request may
 finish, but every subsequent protected page or API request re-checks admission.
 
+A timed code's expiry check and detach share that identical per-learner lock
+through the same resolver, invoked both from `hasRedeemedAccessCode` (the
+lazy enforcement point every protected page/API already calls) and from
+inside `redeemAccessCode`'s own transaction. Detaching only ever targets the
+exact admission row that was found expired under the lock, re-read fresh
+rather than trusted from an earlier unlocked check -- a concurrent
+redemption's replacement code can never be mistaken for the one that
+actually expired.
+
 ### Failure paths
 
 - If access, activation, or quota storage fails, fail closed before a provider
@@ -282,7 +302,15 @@ finish, but every subsequent protected page or API request re-checks admission.
   ends the session and returns to `/login`. APIs do not disclose whether a
   caller was blocked, deleted, or simply unsigned.
 - A lost code or deactivated admission is recovered by issuing another code.
-  V1 has no code expiry or code-reuse workflow.
+  A code itself is never reused once redeemed (`redeemedAt` is a permanent
+  marker), even after its admission is detached, whether that detach was a
+  manual "Deactivate access" or a timed code's validity window elapsing.
+- A timed code's own generation never expires while unredeemed -- validity
+  counts from `redeemedAt`, not `createdAt`. There is no background job, so
+  an elapsed window is only actually enforced the next time the learner's
+  account is touched, not the instant the deadline passes; the admin
+  access-codes table surfaces that lag explicitly rather than implying
+  continued access.
 - The pre-gate command requires an explicit `--production` confirmation and a
   database connection, refuses to run in a Vercel build or a non-UTC database
   session (including UTC-equivalent `GMT`), and stops after a walkthrough-version
@@ -359,5 +387,8 @@ legacy local account and a genuinely new learner for this launch.
 ## Open questions
 
 None for v1. Deferred intentionally: owner transfer/multiple roles,
-access/admission grandfathering, access-code expiry/reuse/bulk issue,
-hash-only/reveal-once codes, and historical analytics.
+access/admission grandfathering, code reuse, hash-only/reveal-once codes,
+and historical analytics. Access-code expiry (per-code validity period,
+counted from redemption) and bulk issuance (up to
+`MAX_ACCESS_CODE_BATCH_SIZE` codes sharing one note/validity) shipped after
+the initial v1 scope.

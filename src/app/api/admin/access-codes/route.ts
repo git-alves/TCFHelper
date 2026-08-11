@@ -1,12 +1,13 @@
 import { z } from "zod";
 import { adminJsonResponse, adminNotFoundResponse, getAdminApiUser } from "@/lib/admin-api";
-import { MAX_ACCESS_CODE_BATCH_SIZE, createAccessCodes, listAccessCodes } from "@/lib/admin-access-codes";
+import { createAccessCodes, listAccessCodes } from "@/lib/admin-access-codes";
+import { MAX_ACCESS_CODE_BATCH_SIZE, MAX_VALIDITY_DAYS } from "@/lib/access-code-limits";
 
 const requestSchema = z
   .object({
     note: z.string().max(280).nullable().optional(),
     // Null/omitted means lifetime access once redeemed.
-    validityDays: z.number().int().min(1).nullable().optional(),
+    validityDays: z.number().int().min(1).max(MAX_VALIDITY_DAYS).nullable().optional(),
     count: z.number().int().min(1).max(MAX_ACCESS_CODE_BATCH_SIZE).optional(),
   })
   .strict();

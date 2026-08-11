@@ -13,9 +13,12 @@ vi.mock("@/lib/admin-api", () => ({
     Response.json(body, { status, headers: { "Cache-Control": "private, no-store" } }),
 }));
 vi.mock("@/lib/admin-access-codes", () => ({
-  MAX_ACCESS_CODE_BATCH_SIZE: 100,
   createAccessCodes: createAccessCodesMock,
   listAccessCodes: listAccessCodesMock,
+}));
+vi.mock("@/lib/access-code-limits", () => ({
+  MAX_ACCESS_CODE_BATCH_SIZE: 50,
+  MAX_VALIDITY_DAYS: 3650,
 }));
 
 const { GET, POST } = await import("./route");
@@ -113,8 +116,15 @@ describe("POST /api/admin/access-codes", () => {
     expect(createAccessCodesMock).not.toHaveBeenCalled();
   });
 
+  it("rejects a validity period above the server maximum", async () => {
+    const response = await POST(postRequest({ validityDays: 3651 }));
+
+    expect(response.status).toBe(400);
+    expect(createAccessCodesMock).not.toHaveBeenCalled();
+  });
+
   it("rejects a batch count above the server cap", async () => {
-    const response = await POST(postRequest({ count: 101 }));
+    const response = await POST(postRequest({ count: 51 }));
 
     expect(response.status).toBe(400);
     expect(createAccessCodesMock).not.toHaveBeenCalled();
