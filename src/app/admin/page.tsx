@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminOnlineNowTile } from "@/components/admin-online-now-tile";
 import { AdminStatTile } from "@/components/admin-stat-tile";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { getAdminOverviewStats } from "@/lib/admin-overview";
@@ -71,7 +72,8 @@ export default async function AdminOverviewPage() {
         <h2 id="registered-users-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
           Registered users
         </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+          <AdminOnlineNowTile initialCount={stats.users.onlineNow} />
           <AdminStatTile label="Total" value={stats.users.total} />
           <AdminStatTile label="Activated" value={stats.users.activated} />
           <AdminStatTile label="Blocked" value={stats.users.blocked} />

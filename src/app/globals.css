@@ -104,3 +104,26 @@ body {
     opacity: 0;
   }
 }
+
+/* The admin "online now" indicator: a soft glow pulse rather than a size or
+ * opacity change on the dot itself, so the count next to it stays the clear
+ * focal point and the dot doesn't visually disappear at any point. */
+@keyframes online-now-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0);
+  }
+}
+
+.online-now-dot {
+  animation: online-now-pulse 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .online-now-dot {
+    animation: none;
+  }
+}

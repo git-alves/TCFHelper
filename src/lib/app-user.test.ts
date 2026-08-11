@@ -124,6 +124,53 @@ describe("getCurrentAppUser", () => {
     expect(currentUserMock).not.toHaveBeenCalled();
   });
 
+  it("records a presence heartbeat for a mapped account with no prior activity", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: null });
+
+    await getCurrentAppUser();
+
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: APP_USER.id },
+      data: { lastActiveAt: expect.any(Date) },
+    });
+  });
+
+  it("throttles the presence heartbeat instead of writing on every request", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: new Date() });
+
+    await getCurrentAppUser();
+
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("records a fresh presence heartbeat once the throttle window has elapsed", async () => {
+    const staleActivity = new Date(Date.now() - 5 * 60 * 1000);
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: staleActivity });
+
+    await getCurrentAppUser();
+
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: APP_USER.id },
+      data: { lastActiveAt: expect.any(Date) },
+    });
+  });
+
+  it("does not record a presence heartbeat for a blocked account", async () => {
+    findUniqueMock.mockResolvedValue({ ...APP_USER, isBlocked: true, lastActiveAt: null });
+
+    await getCurrentAppUser();
+
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a failed presence heartbeat fail the real request", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    findUniqueMock.mockResolvedValue({ ...APP_USER, lastActiveAt: null });
+    updateMock.mockRejectedValue(new Error("connection lost"));
+
+    await expect(getCurrentAppUser()).resolves.toEqual({ ...APP_USER, lastActiveAt: null });
+  });
+
   it("admits only the owner account through the admin guard", async () => {
     findUniqueMock.mockResolvedValue({ ...APP_USER, isAdmin: true });
 

@@ -2,12 +2,19 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 
+// There is no push channel or background job -- "online" is a heartbeat
+// threshold, not literal real-time presence. Matches the throttle in
+// touchLastActive (app-user.ts): that write happens at least this often for
+// anyone actively using the app, so a wider gap here would undercount.
+const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+
 export type AdminOverviewStats = {
   users: {
     total: number;
     blocked: number;
     admins: number;
     activated: number;
+    onlineNow: number;
   };
   accessCodes: {
     total: number;
@@ -43,6 +50,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     blockedUsers,
     adminUsers,
     activatedUsers,
+    onlineNowUsers,
     totalAccessCodes,
     redeemedAccessCodes,
     translationMonthAgg,
@@ -54,6 +62,13 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     prisma.user.count({ where: { isBlocked: true } }),
     prisma.user.count({ where: { isAdmin: true } }),
     prisma.user.count({ where: { redeemedAccessCodes: { some: { redeemedAt: { not: null } } } } }),
+    // isBlocked: false is redundant in practice (touchLastActive stops
+    // updating the moment an account is blocked, so its timestamp ages out
+    // within the threshold on its own) but makes the count exactly correct
+    // even in that narrow blocked-while-still-recently-active window.
+    prisma.user.count({
+      where: { isBlocked: false, lastActiveAt: { gte: new Date(now.getTime() - ONLINE_THRESHOLD_MS) } },
+    }),
     prisma.accessCode.count(),
     prisma.accessCode.count({ where: { redeemedAt: { not: null } } }),
     prisma.translationQuota.aggregate({
@@ -85,6 +100,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       blocked: blockedUsers,
       admins: adminUsers,
       activated: activatedUsers,
+      onlineNow: onlineNowUsers,
     },
     accessCodes: {
       total: totalAccessCodes,

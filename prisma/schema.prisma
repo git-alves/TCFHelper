@@ -101,6 +101,13 @@ model User {
   // the welcome handoff one-time even if the owner later deactivates access
   // and the learner redeems a newly issued code.
   activationWelcomeShownAt  DateTime?
+  // Presence for the admin "online now" count. Updated (throttled -- see
+  // ACTIVITY_HEARTBEAT_THROTTLE_MS in app-user.ts) whenever an already-linked,
+  // non-blocked account resolves a request. Null means never observed active.
+  // There is no background job or push channel; the admin overview treats
+  // "active within the last couple of minutes" as online, so this is a
+  // heartbeat, not literal real-time presence.
+  lastActiveAt                DateTime?
 
   subscriptions           Subscription[]
   essays                  Essay[]
@@ -112,6 +119,8 @@ model User {
   translationQuota        TranslationQuota?
   quotaOverride           UserQuotaOverride?
   redeemedAccessCodes     AccessCode[]          @relation("AccessCodeRedeemedBy")
+
+  @@index([lastActiveAt])
 }
 
 model Subscription {

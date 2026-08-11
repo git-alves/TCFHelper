@@ -13,7 +13,32 @@ const APP_USER_SELECT = {
   isAdmin: true,
   isBlocked: true,
   walkthroughCompletedVersion: true,
+  lastActiveAt: true,
 } satisfies Prisma.UserSelect;
+
+// Bounds how often a heartbeat write happens for one account, regardless of
+// how many requests they make -- the admin "online now" window is a couple
+// of minutes wide, so anything finer than this is wasted write volume on
+// every protected page/API call.
+const ACTIVITY_HEARTBEAT_THROTTLE_MS = 60_000;
+
+/**
+ * Records presence for the admin "online now" count. Never allowed to fail
+ * the real request it was piggybacked on: this is a cosmetic side effect,
+ * not something any authorization or business decision depends on.
+ */
+async function touchLastActive(userId: string, lastActiveAt: Date | null): Promise<void> {
+  const now = new Date();
+  if (lastActiveAt && now.getTime() - lastActiveAt.getTime() < ACTIVITY_HEARTBEAT_THROTTLE_MS) {
+    return;
+  }
+
+  try {
+    await prisma.user.update({ where: { id: userId }, data: { lastActiveAt: now } });
+  } catch (error) {
+    console.error("Presence heartbeat update failed", error);
+  }
+}
 
 export type AppUser = Prisma.UserGetPayload<{ select: typeof APP_USER_SELECT }>;
 
@@ -73,7 +98,9 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
 
   const mappedUser = await findAppUserByClerkId(clerkUserId);
   if (mappedUser) {
-    return mappedUser.isBlocked ? null : mappedUser;
+    if (mappedUser.isBlocked) return null;
+    await touchLastActive(mappedUser.id, mappedUser.lastActiveAt);
+    return mappedUser;
   }
 
   const clerkUser = await currentUser();
@@ -82,7 +109,9 @@ export async function getCurrentAppUser(): Promise<AppUser | null> {
   }
 
   const syncedUser = await syncClerkUser(identityFromBackendUser(clerkUser));
-  return syncedUser.isBlocked ? null : syncedUser;
+  if (syncedUser.isBlocked) return null;
+  await touchLastActive(syncedUser.id, syncedUser.lastActiveAt);
+  return syncedUser;
 }
 
 /**
