@@ -170,6 +170,27 @@ export async function deleteAccessCode(id: string): Promise<DeleteAccessCodeResu
   return stillExists ? { kind: "activelyRedeemed" } : { kind: "notFound" };
 }
 
+export type DeleteAccessCodesResult = { deletedCount: number; requestedCount: number };
+
+/**
+ * Bulk counterpart of deleteAccessCode, sharing the exact same safety
+ * condition in one atomic statement -- a code between two people's page
+ * loads becoming actively redeemed (or already deleted) is simply excluded
+ * from the count, not treated as an error. The caller is expected to treat
+ * deletedCount < requestedCount as reason to reconcile its list rather than
+ * assume every requested id was removed.
+ */
+export async function deleteAccessCodes(ids: string[]): Promise<DeleteAccessCodesResult> {
+  const uniqueIds = Array.from(new Set(ids));
+  if (uniqueIds.length === 0) return { deletedCount: 0, requestedCount: 0 };
+
+  const deleted = await prisma.accessCode.deleteMany({
+    where: { id: { in: uniqueIds }, redeemedByUserId: null },
+  });
+
+  return { deletedCount: deleted.count, requestedCount: uniqueIds.length };
+}
+
 function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof ACCESS_CODE_LIST_SELECT }>): AdminAccessCode {
   return {
     id: code.id,

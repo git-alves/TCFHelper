@@ -27,6 +27,7 @@ vi.mock("@/lib/prisma", () => ({
 const {
   createAccessCodes,
   deleteAccessCode,
+  deleteAccessCodes,
   getAdminAccessCodesPage,
   parseAdminAccessCodesListQuery,
   AccessCodeGenerationFailedError,
@@ -251,6 +252,46 @@ describe("deleteAccessCode", () => {
     findUniqueMock.mockResolvedValue(null);
 
     await expect(deleteAccessCode("missing")).resolves.toEqual({ kind: "notFound" });
+  });
+});
+
+describe("deleteAccessCodes", () => {
+  it("deletes every requested code that has no live admission, in one atomic statement", async () => {
+    deleteManyMock.mockResolvedValue({ count: 3 });
+
+    await expect(deleteAccessCodes(["code_1", "code_2", "code_3"])).resolves.toEqual({
+      deletedCount: 3,
+      requestedCount: 3,
+    });
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: { id: { in: ["code_1", "code_2", "code_3"] }, redeemedByUserId: null },
+    });
+  });
+
+  it("de-duplicates repeated ids before counting how many were requested", async () => {
+    deleteManyMock.mockResolvedValue({ count: 1 });
+
+    await expect(deleteAccessCodes(["code_1", "code_1"])).resolves.toEqual({
+      deletedCount: 1,
+      requestedCount: 1,
+    });
+  });
+
+  it("reports a partial result when some requested codes are no longer deletable", async () => {
+    // e.g. one of the two was redeemed by a learner between page load and
+    // this request -- the safety condition on the delete itself excludes it
+    // rather than failing the whole batch.
+    deleteManyMock.mockResolvedValue({ count: 1 });
+
+    await expect(deleteAccessCodes(["code_1", "code_2"])).resolves.toEqual({
+      deletedCount: 1,
+      requestedCount: 2,
+    });
+  });
+
+  it("does not query the database for an empty selection", async () => {
+    await expect(deleteAccessCodes([])).resolves.toEqual({ deletedCount: 0, requestedCount: 0 });
+    expect(deleteManyMock).not.toHaveBeenCalled();
   });
 });
 
