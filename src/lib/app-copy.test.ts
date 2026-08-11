@@ -211,6 +211,7 @@ describe("APP_COPY", () => {
         copy.workspace.dialog.taskSwitchDescription,
         copy.workspace.dialog.topicSwitchDescription,
         copy.workspace.dialog.dashboardSwitchDescription,
+        copy.workspace.dialog.adminSwitchDescription,
         copy.workspace.dialog.exampleOverwriteDescription,
         copy.workspace.dialog.exampleOverwriteConfirm,
         copy.workspace.dialog.clearDraftDescription,

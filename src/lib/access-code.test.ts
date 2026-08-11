@@ -4,11 +4,13 @@ const {
   transactionMock,
   findUniqueMock,
   updateManyMock,
+  userUpdateManyMock,
   executeRawMock,
 } = vi.hoisted(() => ({
   transactionMock: vi.fn(),
   findUniqueMock: vi.fn(),
   updateManyMock: vi.fn(),
+  userUpdateManyMock: vi.fn(),
   executeRawMock: vi.fn(),
 }));
 
@@ -20,7 +22,12 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-const { hasRedeemedAccessCode, normalizeAccessCode, redeemAccessCode } = await import("./access-code");
+const {
+  hasRedeemedAccessCode,
+  normalizeAccessCode,
+  redeemAccessCode,
+  resetAccessCodeActivation,
+} = await import("./access-code");
 
 const USER_ID = "cuid_learner_1";
 
@@ -28,11 +35,13 @@ beforeEach(() => {
   transactionMock.mockReset();
   findUniqueMock.mockReset();
   updateManyMock.mockReset();
+  userUpdateManyMock.mockReset();
   executeRawMock.mockReset();
 
   executeRawMock.mockResolvedValue(1);
   findUniqueMock.mockResolvedValue(null);
   updateManyMock.mockResolvedValue({ count: 1 });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
   transactionMock.mockImplementation(async (callback) =>
     callback({
       $executeRaw: executeRawMock,
@@ -40,6 +49,7 @@ beforeEach(() => {
         findUnique: findUniqueMock,
         updateMany: updateManyMock,
       },
+      user: { updateMany: userUpdateManyMock },
     }),
   );
 });
@@ -68,7 +78,10 @@ describe("hasRedeemedAccessCode", () => {
 
 describe("redeemAccessCode", () => {
   it("claims an unused code inside a serialized transaction", async () => {
-    await expect(redeemAccessCode(USER_ID, "INVITE-AB12")).resolves.toEqual({ kind: "redeemed" });
+    await expect(redeemAccessCode(USER_ID, "INVITE-AB12")).resolves.toEqual({
+      kind: "redeemed",
+      showWelcome: true,
+    });
 
     expect(executeRawMock.mock.calls[0]?.[0]?.join("")).toContain("pg_advisory_xact_lock");
     expect(findUniqueMock).toHaveBeenCalledWith({
@@ -81,6 +94,10 @@ describe("redeemAccessCode", () => {
         redeemedByUserId: USER_ID,
         redeemedAt: expect.any(Date),
       },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: USER_ID, activationWelcomeShownAt: null },
+      data: { activationWelcomeShownAt: expect.any(Date) },
     });
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 3_000 });
   });
@@ -98,5 +115,79 @@ describe("redeemAccessCode", () => {
     updateManyMock.mockResolvedValue({ count: 0 });
 
     await expect(redeemAccessCode(USER_ID, "INVITE-AB12")).resolves.toEqual({ kind: "invalid" });
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not repeat the welcome handoff for a restored learner", async () => {
+    userUpdateManyMock.mockResolvedValue({ count: 0 });
+
+    await expect(redeemAccessCode(USER_ID, "NEW-INVITE")).resolves.toEqual({
+      kind: "redeemed",
+      showWelcome: false,
+    });
+  });
+});
+
+describe("resetAccessCodeActivation", () => {
+  it("serializes with redemption and detaches only the active admission", async () => {
+    findUniqueMock.mockResolvedValue({ id: "code_spent" });
+
+    await expect(resetAccessCodeActivation(USER_ID)).resolves.toEqual({ kind: "reset" });
+
+    expect(executeRawMock.mock.calls[0]?.[0]?.join("")).toContain("pg_advisory_xact_lock");
+    expect(findUniqueMock).toHaveBeenCalledWith({
+      where: { redeemedByUserId: USER_ID },
+      select: { id: true },
+    });
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: {
+        id: "code_spent",
+        redeemedByUserId: USER_ID,
+        redeemedAt: { not: null },
+      },
+      data: { redeemedByUserId: null },
+    });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: USER_ID, activationWelcomeShownAt: null },
+      data: { activationWelcomeShownAt: expect.any(Date) },
+    });
+    expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 3_000 });
+  });
+
+  it("is idempotent when the learner is already awaiting a new code", async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    await expect(resetAccessCodeActivation(USER_ID)).resolves.toEqual({ kind: "notActivated" });
+    expect(updateManyMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps the old code permanently unavailable while a newly issued code can activate", async () => {
+    findUniqueMock
+      .mockResolvedValueOnce({ id: "old_code" })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    updateManyMock
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 });
+    userUpdateManyMock
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+
+    await expect(resetAccessCodeActivation(USER_ID)).resolves.toEqual({ kind: "reset" });
+    await expect(redeemAccessCode(USER_ID, "OLD-CODE")).resolves.toEqual({ kind: "invalid" });
+    await expect(redeemAccessCode(USER_ID, "NEW-CODE")).resolves.toEqual({
+      kind: "redeemed",
+      showWelcome: false,
+    });
+
+    expect(updateManyMock).toHaveBeenNthCalledWith(2, {
+      where: { code: "OLD-CODE", redeemedByUserId: null, redeemedAt: null },
+      data: { redeemedByUserId: USER_ID, redeemedAt: expect.any(Date) },
+    });
+    expect(updateManyMock).toHaveBeenNthCalledWith(3, {
+      where: { code: "NEW-CODE", redeemedByUserId: null, redeemedAt: null },
+      data: { redeemedByUserId: USER_ID, redeemedAt: expect.any(Date) },
+    });
   });
 });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { normalizeAccessCode, redeemAccessCode } from "@/lib/access-code";
+import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   // The sole owner is activation-exempt. Returning the same success shape
   // prevents a pasted code from consuming an invite the owner does not need.
   if (user.isAdmin) {
-    return response({ activated: true, isNewUser: user.walkthroughCompletedVersion === null });
+    return response({ activated: true, showWelcome: false });
   }
 
   const body = await request.json().catch(() => null);
@@ -63,11 +64,23 @@ export async function POST(request: Request) {
     }
 
     // Redeeming twice from a double-click or stale tab is a harmless,
-    // successful activation. This also keeps the browser flow idempotent.
-    // A learner who never started the walkthrough is treated as new -- the
-    // welcome modal's CTA sends them to the dashboard so it can auto-start,
-    // rather than to tasks where no tour would greet them.
-    return response({ activated: true, isNewUser: user.walkthroughCompletedVersion === null });
+    // successful activation. The transaction marks a durable user-level
+    // welcome state only for the first successful admission. Showing that
+    // once is independent of its CTA: new learners begin the walkthrough on
+    // Dashboard, while established learners continue to Tasks.
+    const showWelcome = result.kind === "redeemed" && result.showWelcome;
+    return response(
+      showWelcome
+        ? {
+            activated: true,
+            showWelcome: true,
+            welcomeDestination:
+              shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)
+                ? "/dashboard"
+                : "/tasks",
+          }
+        : { activated: true, showWelcome: false },
+    );
   } catch {
     // Do not let a database outage turn into an unmetered/partially recorded
     // activation. The learner can safely retry because redemption is atomic.

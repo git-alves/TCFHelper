@@ -44,7 +44,7 @@ beforeEach(() => {
 
   getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: null });
   normalizeAccessCodeMock.mockImplementation((code) => code.trim().toUpperCase());
-  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed" });
+  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: true });
 });
 
 describe("POST /api/access-codes/redeem", () => {
@@ -59,12 +59,12 @@ describe("POST /api/access-codes/redeem", () => {
   });
 
   it("does not consume a code for the activation-exempt owner", async () => {
-    getCurrentAppUserMock.mockResolvedValue({ id: "owner_1", isAdmin: true, walkthroughCompletedVersion: 1 });
+    getCurrentAppUserMock.mockResolvedValue({ id: "owner_1", isAdmin: true });
 
     const response = await POST(redemptionRequest({ code: "TCF-AB12-CD34-EF56-GH78" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: false });
+    await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
     expect(normalizeAccessCodeMock).not.toHaveBeenCalled();
     expect(redeemAccessCodeMock).not.toHaveBeenCalled();
   });
@@ -97,19 +97,49 @@ describe("POST /api/access-codes/redeem", () => {
     const response = await POST(redemptionRequest({ code: " invite-ab12 " }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: true });
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/dashboard",
+    });
     expect(normalizeAccessCodeMock).toHaveBeenCalledWith("invite-ab12");
     expect(redeemAccessCodeMock).toHaveBeenCalledWith(USER_ID, "INVITE-AB12");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
-  it("flags a learner who already engaged with the walkthrough as not new", async () => {
+  it("does not repeat the welcome handoff after a learner's access is restored", async () => {
+    redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: false });
+
+    const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
+  });
+
+  it("shows the one-time welcome to a backfilled pre-gate learner, then sends them to tasks", async () => {
     getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 1 });
 
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: false });
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/tasks",
+    });
+  });
+
+  it("sends a learner below the current walkthrough version to dashboard", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 0 });
+
+    const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      activated: true,
+      showWelcome: true,
+      welcomeDestination: "/dashboard",
+    });
   });
 
   it("does not disclose whether an unavailable code is missing or already used", async () => {
@@ -130,7 +160,7 @@ describe("POST /api/access-codes/redeem", () => {
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: true });
+    await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
   });
 
   it("returns a retryable error when durable redemption fails", async () => {

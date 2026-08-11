@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getCurrentClerkUserId } from "@/lib/app-user";
+import { getCurrentClerkRequestIdentity } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 
 /**
@@ -10,14 +10,18 @@ import { prisma } from "@/lib/prisma";
  * recovery modal before Clerk can follow a protected-page callback back into
  * a loop.
  */
-export async function isCurrentRequestBlocked(): Promise<boolean> {
-  const clerkUserId = await getCurrentClerkUserId();
-  if (!clerkUserId) return false;
+export async function getCurrentBlockedSessionId(): Promise<string | null> {
+  const { userId: clerkUserId, sessionId } = await getCurrentClerkRequestIdentity();
+  if (!clerkUserId || !sessionId) return null;
 
   const user = await prisma.user.findUnique({
     where: { clerkUserId },
     select: { isBlocked: true },
   });
 
-  return user?.isBlocked === true;
+  return user?.isBlocked === true ? sessionId : null;
+}
+
+export async function isCurrentRequestBlocked(): Promise<boolean> {
+  return (await getCurrentBlockedSessionId()) !== null;
 }

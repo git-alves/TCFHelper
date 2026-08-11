@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { BlockedAccountModal } from "@/components/blocked-account-modal";
-import { isCurrentRequestBlocked } from "@/lib/blocked-user";
+import { getCurrentBlockedSessionId } from "@/lib/blocked-user";
 
 // This is the only place a blocked session can see the account-access modal.
 // It must remain server-verified so an ordinary signed-in visitor cannot use
@@ -8,9 +8,10 @@ import { isCurrentRequestBlocked } from "@/lib/blocked-user";
 export default async function BlockedPage() {
   // `/blocked` is public, so it must not expose a blocked-account state to
   // an ordinary signed-in learner who opens it directly.
-  if (!(await isCurrentRequestBlocked().catch(() => false))) {
+  const sessionId = await getCurrentBlockedSessionId().catch(() => null);
+  if (!sessionId) {
     redirect("/");
   }
 
-  return <BlockedAccountModal />;
+  return <BlockedAccountModal sessionId={sessionId} />;
 }

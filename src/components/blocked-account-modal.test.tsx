@@ -12,7 +12,9 @@ import { BlockedAccountModal } from "./blocked-account-modal";
 
 describe("BlockedAccountModal", () => {
   it("presents the supplied recovery copy, support action, and an explicit sign-in close control", () => {
-    const markup = renderToStaticMarkup(createElement(BlockedAccountModal));
+    const markup = renderToStaticMarkup(
+      createElement(BlockedAccountModal, { sessionId: "sess_blocked_1" }),
+    );
 
     expect(markup).toContain('role="alertdialog"');
     expect(markup).toContain('aria-modal="true"');

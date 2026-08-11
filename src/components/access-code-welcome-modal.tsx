@@ -16,11 +16,9 @@ const CONFETTI_PIECES = [
   { left: "92%", color: "#34d399", delay: "0.08s" },
 ];
 
-// Celebrates a learner's one-time access-code redemption. AccessCode
-// redemption is single-use per account (see AccessCode.redeemedByUserId's
-// unique constraint), so this modal only ever gets mounted once in an
-// account's lifetime -- no persisted "have I shown this before" flag is
-// needed.
+// Celebrates a learner's first access-code admission. A durable user-level
+// marker is set atomically with redemption, so the modal remains one-time if
+// an owner later deactivates access and the learner redeems a new code.
 export function AccessCodeWelcomeModal({ onContinue }: AccessCodeWelcomeModalProps) {
   const continueRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);

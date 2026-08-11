@@ -19,6 +19,7 @@
     "stripe:setup": "tsx scripts/stripe-setup.ts",
     "clerk:import": "tsx scripts/import-users-to-clerk.ts",
     "admin:promote": "tsx scripts/promote-admin.ts",
+    "onboarding:backfill-pre-gate": "tsx scripts/backfill-pre-gate-walkthrough.ts",
     "db:verify:clerk-cutover": "tsx scripts/verify-clerk-cutover.ts",
     "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },

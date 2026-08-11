@@ -41,7 +41,7 @@ const baseUser = {
 };
 
 describe("AdminUserDetail", () => {
-  it("makes the quota fallback and the risky block action understandable", () => {
+  it("makes quota, activation reset, and the risky block action understandable", () => {
     const markup = renderToStaticMarkup(
       createElement(AdminUserDetail, { user: baseUser, currentAdminId: "owner_1" }),
     );
@@ -49,6 +49,9 @@ describe("AdminUserDetail", () => {
     expect(markup).toContain("Quota overrides");
     expect(markup).toContain("Leave a field blank to use the global default");
     expect(markup).toContain("Enter <strong>0</strong> to pause only that API");
+    expect(markup).toContain("Activation");
+    expect(markup).toContain("Deactivate access");
+    expect(markup).toContain("code they used remains permanently spent");
     expect(markup).toContain("Block user");
     expect(markup).toContain("Current API usage");
   });
@@ -66,5 +69,20 @@ describe("AdminUserDetail", () => {
     expect(markup).not.toContain("Awaiting access code");
     expect(markup).toContain("cannot be blocked");
     expect(markup).not.toContain("Block user");
+    expect(markup).not.toContain("Deactivate access");
+  });
+
+  it("shows a learner who was deactivated that a new code is required", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminUserDetail, {
+        user: { ...baseUser, activatedAt: null },
+        currentAdminId: "owner_1",
+      }),
+    );
+
+    expect(markup).toContain("Awaiting access code");
+    expect(markup).toContain("Awaiting new code");
+    expect(markup).toContain("awaiting a newly issued access code");
+    expect(markup).not.toContain("Deactivate access");
   });
 });

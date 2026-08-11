@@ -34,7 +34,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "clear";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type ExampleLevel = "B2" | "C1" | "C2";
@@ -512,19 +512,20 @@ export function WritingWorkspace() {
   }
 
   // Unlike resetForTask, confirming here navigates away (this workspace
-  // lives at /tasks; the dashboard is a separate page) rather than resetting
-  // in place, so there's nothing to explicitly clear — the whole component
-  // unmounts. cancelPendingCorrection above still protects the in-place
-  // resets (task switches) that stay on this page.
+  // lives at /tasks; every guarded destination is a separate page) rather
+  // than resetting in place, so there's nothing to explicitly clear — the
+  // whole component unmounts. cancelPendingCorrection above still protects
+  // the in-place resets (task switches) that stay on this page.
   //
   // The isCorrecting check is a defensive backstop, not the primary guard:
   // the nav bar's disabled rendering can lag one paint behind isCorrecting
   // becoming true (it learns about it through the busy flag published
   // below), so this refuses to act even if a click slips through during
   // that window rather than relying solely on the button being disabled.
-  function goToDashboard() {
+  function goToDestination(destination: string) {
     if (isCorrecting) return;
-    runOrConfirm("dashboard", () => router.push("/dashboard"));
+    const kind: PendingSwitchKind = destination === "/admin" ? "admin" : "dashboard";
+    runOrConfirm(kind, () => router.push(destination));
   }
 
   // A ref instead of a `[registerDashboardNavGuard]`-only dependency: the
@@ -536,13 +537,13 @@ export function WritingWorkspace() {
   // when a nav-bar click fires (e.g. immediately after typing a draft),
   // leaving the ref pointing at a stale closure that would wrongly treat
   // the workspace as empty and skip the discard confirmation.
-  const goToDashboardRef = useRef(goToDashboard);
+  const goToDestinationRef = useRef(goToDestination);
   useLayoutEffect(() => {
-    goToDashboardRef.current = goToDashboard;
+    goToDestinationRef.current = goToDestination;
   });
 
   useEffect(() => {
-    registerDashboardNavGuard(() => goToDashboardRef.current());
+    registerDashboardNavGuard((destination) => goToDestinationRef.current(destination));
     return () => registerDashboardNavGuard(null);
   }, [registerDashboardNavGuard]);
 
@@ -1423,9 +1424,11 @@ export function WritingWorkspace() {
                 ? copy.workspace.dialog.exampleOverwriteDescription
                 : pendingSwitch?.kind === "dashboard"
                   ? copy.workspace.dialog.dashboardSwitchDescription
-                  : pendingSwitch?.kind === "clear"
-                    ? copy.workspace.dialog.clearDraftDescription
-                    : ""
+                  : pendingSwitch?.kind === "admin"
+                    ? copy.workspace.dialog.adminSwitchDescription
+                    : pendingSwitch?.kind === "clear"
+                      ? copy.workspace.dialog.clearDraftDescription
+                      : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"

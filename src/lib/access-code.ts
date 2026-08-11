@@ -6,9 +6,13 @@ import { prisma } from "@/lib/prisma";
 const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
 
 export type AccessCodeRedemption =
-  | { kind: "redeemed" }
+  | { kind: "redeemed"; showWelcome: boolean }
   | { kind: "alreadyActivated" }
   | { kind: "invalid" };
+
+export type AccessCodeActivationReset =
+  | { kind: "reset" }
+  | { kind: "notActivated" };
 
 /**
  * Access codes are generated in upper case. Normalizing the learner's entry
@@ -41,7 +45,9 @@ function isUniqueConstraint(error: unknown): error is Prisma.PrismaClientKnownRe
  * Atomically consumes an unused code for one learner. The per-learner lock
  * prevents two simultaneous submissions with different codes from consuming
  * both; the conditional update independently protects the code from being
- * redeemed by two different learners.
+ * redeemed by two different learners. The welcome marker is written in the
+ * same transaction, so only the first successful admission gets the welcome
+ * handoff even if access is later reset and restored.
  */
 export async function redeemAccessCode(userId: string, code: string): Promise<AccessCodeRedemption> {
   try {
@@ -70,7 +76,14 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
           },
         });
 
-        return claimed.count === 1 ? { kind: "redeemed" } : { kind: "invalid" };
+        if (claimed.count !== 1) return { kind: "invalid" };
+
+        const welcomeMarker = await tx.user.updateMany({
+          where: { id: userId, activationWelcomeShownAt: null },
+          data: { activationWelcomeShownAt: new Date() },
+        });
+
+        return { kind: "redeemed", showWelcome: welcomeMarker.count === 1 };
       },
       { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },
     );
@@ -83,4 +96,48 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
     }
     throw error;
   }
+}
+
+/**
+ * Removes a learner's current access-code admission without making the code
+ * reusable. This shares redemption's per-learner advisory lock so a reset and
+ * a newly issued-code redemption cannot race past one another. `redeemedAt`
+ * is deliberately immutable: it is the durable single-use marker.
+ */
+export async function resetAccessCodeActivation(userId: string): Promise<AccessCodeActivationReset> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${redemptionLockKey(userId)})::bigint)`;
+
+      const activeAdmission = await tx.accessCode.findUnique({
+        where: { redeemedByUserId: userId },
+        select: { id: true },
+      });
+      if (!activeAdmission) return { kind: "notActivated" };
+
+      const detached = await tx.accessCode.updateMany({
+        where: {
+          id: activeAdmission.id,
+          redeemedByUserId: userId,
+          // Never clear this permanent spent marker. A later new code may
+          // admit the learner, but this original code can never be reused.
+          redeemedAt: { not: null },
+        },
+        data: { redeemedByUserId: null },
+      });
+
+      if (detached.count !== 1) return { kind: "notActivated" };
+
+      // Accounts activated before the welcome marker existed have no value
+      // here. Mark the selected, pre-existing admission while detaching it so
+      // a restored learner never sees a supposedly one-time welcome again.
+      await tx.user.updateMany({
+        where: { id: userId, activationWelcomeShownAt: null },
+        data: { activationWelcomeShownAt: new Date() },
+      });
+
+      return { kind: "reset" };
+    },
+    { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },
+  );
 }

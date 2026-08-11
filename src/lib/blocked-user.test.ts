@@ -1,26 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentClerkUserIdMock, findUniqueMock } = vi.hoisted(() => ({
-  getCurrentClerkUserIdMock: vi.fn(),
+const { getCurrentClerkRequestIdentityMock, findUniqueMock } = vi.hoisted(() => ({
+  getCurrentClerkRequestIdentityMock: vi.fn(),
   findUniqueMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/app-user", () => ({ getCurrentClerkUserId: getCurrentClerkUserIdMock }));
+vi.mock("@/lib/app-user", () => ({
+  getCurrentClerkRequestIdentity: getCurrentClerkRequestIdentityMock,
+}));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findUnique: findUniqueMock } } }));
 
-const { isCurrentRequestBlocked } = await import("./blocked-user");
+const { getCurrentBlockedSessionId, isCurrentRequestBlocked } = await import("./blocked-user");
 
 beforeEach(() => {
-  getCurrentClerkUserIdMock.mockReset();
+  getCurrentClerkRequestIdentityMock.mockReset();
   findUniqueMock.mockReset();
-  getCurrentClerkUserIdMock.mockResolvedValue("user_clerk_1");
+  getCurrentClerkRequestIdentityMock.mockResolvedValue({
+    userId: "user_clerk_1",
+    sessionId: "sess_blocked_1",
+  });
   findUniqueMock.mockResolvedValue(null);
 });
 
 describe("isCurrentRequestBlocked", () => {
   it("does not query the local account store for an anonymous request", async () => {
-    getCurrentClerkUserIdMock.mockResolvedValue(null);
+    getCurrentClerkRequestIdentityMock.mockResolvedValue({ userId: null, sessionId: null });
 
     await expect(isCurrentRequestBlocked()).resolves.toBe(false);
     expect(findUniqueMock).not.toHaveBeenCalled();
@@ -40,5 +45,18 @@ describe("isCurrentRequestBlocked", () => {
     findUniqueMock.mockResolvedValue({ isBlocked: false });
 
     await expect(isCurrentRequestBlocked()).resolves.toBe(false);
+  });
+
+  it("returns the exact verified blocked session for a scoped browser sign-out", async () => {
+    findUniqueMock.mockResolvedValue({ isBlocked: true });
+
+    await expect(getCurrentBlockedSessionId()).resolves.toBe("sess_blocked_1");
+  });
+
+  it("does not resolve a session ID when Clerk has no active session", async () => {
+    getCurrentClerkRequestIdentityMock.mockResolvedValue({ userId: "user_clerk_1", sessionId: null });
+
+    await expect(getCurrentBlockedSessionId()).resolves.toBeNull();
+    expect(findUniqueMock).not.toHaveBeenCalled();
   });
 });

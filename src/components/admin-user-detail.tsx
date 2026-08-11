@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminQuotaOverrideForm } from "@/components/admin-quota-override-form";
+import { AdminUserActivationStatus } from "@/components/admin-user-activation-status";
 import { AdminUserAccountStatus } from "@/components/admin-user-account-status";
 import type { AdminUserDetail as AdminUserDetailRecord } from "@/lib/admin-users";
 import { DEFAULT_USER_QUOTA_LIMITS } from "@/lib/user-quota-limits";
@@ -77,6 +78,13 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
         email={user.email}
         overrides={user.quotaOverride}
         globalDefaults={DEFAULT_USER_QUOTA_LIMITS}
+      />
+
+      <AdminUserActivationStatus
+        userId={user.id}
+        email={user.email}
+        activationStamp={user.activatedAt}
+        isCurrentAdmin={isCurrentAdmin}
       />
 
       <AdminUserAccountStatus
