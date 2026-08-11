@@ -71,7 +71,7 @@ const TASKS_BUTTON_CLASS =
 const DASHBOARD_BUTTON_CLASS =
   "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
-export function NavBar() {
+export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
   const pathname = usePathname();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
@@ -166,6 +166,11 @@ export function NavBar() {
               ) : (
                 <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
                   {copy.nav.tasks}
+                </Link>
+              )}
+              {isAdmin && (
+                <Link href="/admin" className={DASHBOARD_BUTTON_CLASS}>
+                  {copy.nav.admin}
                 </Link>
               )}
               {isWalkthroughAvailable && (
