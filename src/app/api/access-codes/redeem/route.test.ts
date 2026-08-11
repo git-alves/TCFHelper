@@ -42,7 +42,7 @@ beforeEach(() => {
   normalizeAccessCodeMock.mockReset();
   redeemAccessCodeMock.mockReset();
 
-  getCurrentAppUserMock.mockResolvedValue({ id: USER_ID });
+  getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: null });
   normalizeAccessCodeMock.mockImplementation((code) => code.trim().toUpperCase());
   redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed" });
 });
@@ -59,12 +59,12 @@ describe("POST /api/access-codes/redeem", () => {
   });
 
   it("does not consume a code for the activation-exempt owner", async () => {
-    getCurrentAppUserMock.mockResolvedValue({ id: "owner_1", isAdmin: true });
+    getCurrentAppUserMock.mockResolvedValue({ id: "owner_1", isAdmin: true, walkthroughCompletedVersion: 1 });
 
     const response = await POST(redemptionRequest({ code: "TCF-AB12-CD34-EF56-GH78" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true });
+    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: false });
     expect(normalizeAccessCodeMock).not.toHaveBeenCalled();
     expect(redeemAccessCodeMock).not.toHaveBeenCalled();
   });
@@ -97,10 +97,19 @@ describe("POST /api/access-codes/redeem", () => {
     const response = await POST(redemptionRequest({ code: " invite-ab12 " }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true });
+    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: true });
     expect(normalizeAccessCodeMock).toHaveBeenCalledWith("invite-ab12");
     expect(redeemAccessCodeMock).toHaveBeenCalledWith(USER_ID, "INVITE-AB12");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+  });
+
+  it("flags a learner who already engaged with the walkthrough as not new", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 1 });
+
+    const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: false });
   });
 
   it("does not disclose whether an unavailable code is missing or already used", async () => {
@@ -121,7 +130,7 @@ describe("POST /api/access-codes/redeem", () => {
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 
     expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ activated: true });
+    await expect(response.json()).resolves.toEqual({ activated: true, isNewUser: true });
   });
 
   it("returns a retryable error when durable redemption fails", async () => {

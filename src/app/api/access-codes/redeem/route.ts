@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   // The sole owner is activation-exempt. Returning the same success shape
   // prevents a pasted code from consuming an invite the owner does not need.
   if (user.isAdmin) {
-    return response({ activated: true });
+    return response({ activated: true, isNewUser: user.walkthroughCompletedVersion === null });
   }
 
   const body = await request.json().catch(() => null);
@@ -64,7 +64,10 @@ export async function POST(request: Request) {
 
     // Redeeming twice from a double-click or stale tab is a harmless,
     // successful activation. This also keeps the browser flow idempotent.
-    return response({ activated: true });
+    // A learner who never started the walkthrough is treated as new -- the
+    // welcome modal's CTA sends them to the dashboard so it can auto-start,
+    // rather than to tasks where no tour would greet them.
+    return response({ activated: true, isNewUser: user.walkthroughCompletedVersion === null });
   } catch {
     // Do not let a database outage turn into an unmetered/partially recorded
     // activation. The learner can safely retry because redemption is atomic.

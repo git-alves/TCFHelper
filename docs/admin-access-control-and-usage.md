@@ -31,8 +31,9 @@ cannot activate two accounts.
   not a counter.
 - Let the owner override all three API allowances. Blank inherits the global
   default; `0` intentionally disables that API for one learner.
-- Let the owner block/unblock a learner. A blocked learner is quietly returned
-  to the public entry point, with no suspension explanation.
+- Let the owner block/unblock a learner. A blocked learner sees a clear,
+  centered support modal; closing it signs them out and returns them to sign
+  in.
 - Keep Clerk sign-up open, then require a server-generated, strictly
   single-use code before a non-owner can use learner pages or APIs.
 - Keep authorization server-side and per route/page, following the existing
@@ -119,16 +120,18 @@ account and issue any needed learner codes before enabling the activation gate.
 | --- | --- | --- |
 | Anonymous | Pages go to `/login` with a safe local callback; APIs return generic `401`. | Generic `404`. |
 | Provisioning failure | Existing unavailable-account recovery. | Generic `404`. |
-| Blocked Clerk session | Silent sign-out bridge then `/`; APIs return the same generic `401`. | Generic `404`. |
+| Blocked Clerk session | Verified account-access modal; close signs out to `/login`. APIs return the same generic `401`. | Generic `404`. |
 | Signed in, not activated | Pages go to `/activate`; APIs return the same generic `401` as other unavailable learner sessions and no data. | Owner is activation-exempt. |
 | Activated learner | Normal learner access. | Generic `404`. |
 | Unblocked owner | Normal admin access and optional learner access without a code. | Normal admin access. |
 
-The blocked bridge is necessary: redirecting a still-signed-in Clerk session
-to `/login?callbackUrl=/tasks` can loop back into the protected route. A small
-client bridge signs out, then sends the browser to `/` without explaining why.
-The public home must resolve application availability rather than raw Clerk
-session state, so it does not offer a blocked account a dead-end learner CTA.
+The blocked-account modal is necessary: redirecting a still-signed-in Clerk
+session directly to `/login?callbackUrl=/tasks` can loop back into the
+protected route. It appears only after a server-side blocked-session check,
+offers `mailto:support@mytcflab.com`, and clears Clerk only when the person
+closes it before sending them to `/login`. The public home routes a verified
+blocked session to that same modal, so every browser entry point behaves the
+same way.
 
 `getCurrentAppUser()` stays the blocking boundary. An equivalent
 `getCurrentActivatedAppUser()` checks redemption only afterwards; it admits an
@@ -229,8 +232,9 @@ user ID to select another learner's data.
   redeemer is deleted.
 - A quota-store failure never permits an unmetered provider call. Rendering a
   dashboard never mutates rows merely to normalize stale usage.
-- A blocked session is silently ended and returns to `/`; APIs do not disclose
-  whether it was blocked, deleted, or simply unsigned.
+- A verified blocked browser session sees the support modal; its close control
+  ends the session and returns to `/login`. APIs do not disclose whether a
+  caller was blocked, deleted, or simply unsigned.
 - A lost code is replaced by issuing another code; V1 has no expiry/revoke or
   other recovery workflow.
 
@@ -271,9 +275,9 @@ access-control model.
 **Expose an admin toggle** — rejected because the product has one owner. A
 normal toggle can create two owners or lock the sole recovery path out.
 
-**Explain blocking to the learner** — rejected by product decision. Silent
-return to marketing avoids inviting state probing or a support conversation
-through this surface.
+**Leave blocked people without a recovery path** — rejected. The browser-only
+modal provides the existing support email and a reliable way back to sign in,
+while APIs continue to avoid disclosing account state.
 
 **Build historical analytics now** — rejected because rolling quota counters
 are not immutable events. Truthful current-window reporting meets the

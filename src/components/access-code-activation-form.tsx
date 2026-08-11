@@ -2,9 +2,11 @@
 
 import { type FormEvent, useId, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AccessCodeWelcomeModal } from "@/components/access-code-welcome-modal";
 
 type RedemptionResponse = {
   activated?: boolean;
+  isNewUser?: boolean;
   error?: string;
 };
 
@@ -14,6 +16,10 @@ export function AccessCodeActivationForm() {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Set once, on a successful redemption, and never cleared: it gates the
+  // one-time welcome modal below, then its destination decides where
+  // "Start writing" sends the learner next.
+  const [activationDestination, setActivationDestination] = useState<string | null>(null);
   const canSubmit = code.trim().length > 0 && !isSubmitting;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -35,15 +41,30 @@ export function AccessCodeActivationForm() {
         return;
       }
 
-      // Replace rather than push: an activated learner should not land back
-      // on a now-obsolete activation form through the browser Back button.
-      router.replace("/tasks");
-      router.refresh();
+      // A learner who never started the walkthrough goes to the dashboard so
+      // it can auto-start; everyone else goes straight to tasks. Navigation
+      // itself waits for the welcome modal below to be dismissed, not this
+      // handler -- refreshing now would let the /activate page's own
+      // now-activated redirect tear the form (and the modal it is about to
+      // show) down before the learner ever sees it.
+      setActivationDestination(payload.isNewUser ? "/dashboard" : "/tasks");
     } catch {
       setError("We could not reach the activation service. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  function handleContinue() {
+    if (!activationDestination) return;
+    // Replace rather than push: an activated learner should not land back
+    // on a now-obsolete activation form through the browser Back button.
+    router.replace(activationDestination);
+    router.refresh();
+  }
+
+  if (activationDestination) {
+    return <AccessCodeWelcomeModal onContinue={handleContinue} />;
   }
 
   return (

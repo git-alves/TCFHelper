@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { BlockedSessionSignOut } from "@/components/blocked-session-sign-out";
+import { redirect } from "next/navigation";
 import { HomeHero } from "@/components/home-hero";
 import { isCurrentRequestBlocked } from "@/lib/blocked-user";
 
@@ -11,7 +11,10 @@ export default async function Home() {
     isCurrentRequestBlocked().catch(() => false),
   ]);
 
-  if (isBlocked) return <BlockedSessionSignOut />;
+  // Keep every verified blocked entry point on the same recovery surface.
+  // The modal itself signs out only when the person closes it, after they
+  // have had an opportunity to contact support.
+  if (isBlocked) redirect("/blocked");
 
   return <HomeHero isAuthenticated={Boolean(userId)} />;
 }

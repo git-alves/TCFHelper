@@ -1,5 +1,5 @@
 import { SignIn } from "@clerk/nextjs";
-import { BlockedSessionSignOut } from "@/components/blocked-session-sign-out";
+import { redirect } from "next/navigation";
 import { isCurrentRequestBlocked } from "@/lib/blocked-user";
 import { getSafeRedirectPath } from "@/lib/safe-redirect";
 
@@ -8,11 +8,11 @@ interface LoginPageProps {
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  // A blocked account still has a valid Clerk cookie until it is explicitly
-  // cleared. Handle it before mounting SignIn, whose normal signed-in
-  // redirect could otherwise return the visitor to the protected callback.
+  // A blocked account still has a valid Clerk cookie. Route it to the one
+  // verified recovery modal before mounting SignIn, whose normal signed-in
+  // redirect could otherwise return the visitor to a protected callback.
   if (await isCurrentRequestBlocked().catch(() => false)) {
-    return <BlockedSessionSignOut />;
+    redirect("/blocked");
   }
 
   const { callbackUrl } = await searchParams;

@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
 
 const { isCurrentRequestBlockedMock, redirectMock } = vi.hoisted(() => ({
   isCurrentRequestBlockedMock: vi.fn(),
   redirectMock: vi.fn(),
 }));
 
-vi.mock("@/components/blocked-session-sign-out", () => ({
-  BlockedSessionSignOut: () => null,
+vi.mock("@/components/blocked-account-modal", () => ({
+  BlockedAccountModal: () => <div data-testid="blocked-account-modal" />,
 }));
 vi.mock("@/lib/blocked-user", () => ({
   isCurrentRequestBlocked: isCurrentRequestBlockedMock,
@@ -24,14 +25,15 @@ beforeEach(() => {
 });
 
 describe("/blocked", () => {
-  it("mounts the silent sign-out bridge only for a verified blocked session", async () => {
+  it("mounts the recovery modal only for a verified blocked session", async () => {
     isCurrentRequestBlockedMock.mockResolvedValue(true);
 
-    await expect(BlockedPage()).resolves.not.toBeNull();
+    const page = await BlockedPage();
+    expect(renderToStaticMarkup(page)).toContain('data-testid="blocked-account-modal"');
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
-  it("does not sign out an unblocked visitor who opens the bridge URL directly", async () => {
+  it("does not show the modal to an unblocked visitor who opens the public URL directly", async () => {
     isCurrentRequestBlockedMock.mockResolvedValue(false);
 
     await expect(BlockedPage()).rejects.toThrow("NEXT_REDIRECT");
