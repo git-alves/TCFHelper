@@ -3,7 +3,11 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import {
   ADMIN_EVENT_MODULES,
+  ADMIN_EVENT_PROVIDERS,
+  ADMIN_EVENT_QUOTA_WINDOWS,
+  ADMIN_EVENT_REASON_CODES,
   ADMIN_EVENT_SEVERITIES,
+  ADMIN_EVENT_TYPES,
   formatAdminEventMessage,
   getAdminEventRetentionCutoff,
   type AdminEventModule,
@@ -271,6 +275,48 @@ const ADMIN_EVENT_SELECT = {
 
 type AdminEventRecord = Prisma.AdminEventGetPayload<{ select: typeof ADMIN_EVENT_SELECT }>;
 
+const OPAQUE_ROW_ID_PATTERN = /^c[a-z0-9]{24}$/;
+const UNKNOWN_EVENT_TYPE = "UNKNOWN_EVENT";
+const UNKNOWN_EVENT_VALUE = "UNKNOWN";
+
+function isKnownValue<T extends readonly string[]>(values: T, value: string): value is T[number] {
+  return (values as readonly string[]).includes(value);
+}
+
+function safeOpaqueId(value: string | null) {
+  return value !== null && OPAQUE_ROW_ID_PATTERN.test(value) ? value : null;
+}
+
+function safeHttpStatus(value: number | null) {
+  return value !== null && Number.isInteger(value) && value >= 100 && value <= 599 ? value : null;
+}
+
+function safeOccurrenceCount(value: number) {
+  return Number.isSafeInteger(value) && value >= 1 ? value : 1;
+}
+
+function safeQuotaContext(record: AdminEventRecord) {
+  const hasSafeWindow =
+    record.quotaWindow !== null && isKnownValue(ADMIN_EVENT_QUOTA_WINDOWS, record.quotaWindow);
+  const hasSafeCounts =
+    record.usageValue !== null &&
+    record.quotaLimit !== null &&
+    Number.isSafeInteger(record.usageValue) &&
+    Number.isSafeInteger(record.quotaLimit) &&
+    record.usageValue >= 0 &&
+    record.quotaLimit >= 0;
+
+  if (!hasSafeWindow || !hasSafeCounts) {
+    return { quotaWindow: null, usageValue: null, quotaLimit: null };
+  }
+
+  return {
+    quotaWindow: record.quotaWindow,
+    usageValue: record.usageValue,
+    quotaLimit: record.quotaLimit,
+  };
+}
+
 export type AdminEventLogItem = {
   id: string;
   occurredAt: string;
@@ -292,24 +338,51 @@ export type AdminEventLogItem = {
 };
 
 function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
+  const eventType = isKnownValue(ADMIN_EVENT_TYPES, record.eventType)
+    ? record.eventType
+    : UNKNOWN_EVENT_TYPE;
+  const severity = isKnownValue(ADMIN_EVENT_SEVERITIES, record.severity)
+    ? record.severity
+    : UNKNOWN_EVENT_VALUE;
+  const eventModule = isKnownValue(ADMIN_EVENT_MODULES, record.module)
+    ? record.module
+    : UNKNOWN_EVENT_VALUE;
+  const provider =
+    record.provider !== null && isKnownValue(ADMIN_EVENT_PROVIDERS, record.provider)
+      ? record.provider
+      : null;
+  const reasonCode =
+    record.reasonCode !== null && isKnownValue(ADMIN_EVENT_REASON_CODES, record.reasonCode)
+      ? record.reasonCode
+      : null;
+  const quota = safeQuotaContext(record);
+  const occurrenceCount = safeOccurrenceCount(record.occurrenceCount);
+  const messageInput = {
+    eventType,
+    provider,
+    reasonCode,
+    ...quota,
+    occurrenceCount,
+  };
+
   return {
-    id: record.id,
+    id: safeOpaqueId(record.id) ?? "unknown-event",
     occurredAt: record.occurredAt.toISOString(),
     firstOccurredAt: record.firstOccurredAt.toISOString(),
-    severity: record.severity,
-    module: record.module,
-    eventType: record.eventType,
-    userId: record.userId,
-    essayId: record.essayId,
-    accessCodeId: record.accessCodeId,
-    provider: record.provider,
-    reasonCode: record.reasonCode,
-    httpStatus: record.httpStatus,
-    quotaWindow: record.quotaWindow,
-    usageValue: record.usageValue,
-    quotaLimit: record.quotaLimit,
-    occurrenceCount: record.occurrenceCount,
-    message: formatAdminEventMessage(record),
+    severity,
+    module: eventModule,
+    eventType,
+    userId: safeOpaqueId(record.userId),
+    essayId: safeOpaqueId(record.essayId),
+    accessCodeId: safeOpaqueId(record.accessCodeId),
+    provider,
+    reasonCode,
+    httpStatus: safeHttpStatus(record.httpStatus),
+    quotaWindow: quota.quotaWindow,
+    usageValue: quota.usageValue,
+    quotaLimit: quota.quotaLimit,
+    occurrenceCount,
+    message: formatAdminEventMessage(messageInput),
   };
 }
 

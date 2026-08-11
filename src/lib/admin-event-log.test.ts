@@ -22,6 +22,33 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/admin-events", () => ({
   ADMIN_EVENT_SEVERITIES: ["INFO", "WARN", "ERROR"],
   ADMIN_EVENT_MODULES: ["ESSAY_SERVICE", "QUOTA_ACCESS", "AUTH_SECURITY", "SYSTEM_INTEGRATION"],
+  ADMIN_EVENT_TYPES: [
+    "ACCESS_CODE_REDEEMED",
+    "ACCESS_CODE_REJECTED",
+    "TRANSLATION_QUOTA_DENIED",
+    "EXAMPLE_QUOTA_DENIED",
+    "CORRECTION_QUOTA_DENIED",
+    "CORRECTION_PROVIDER_FAILED",
+    "EXAMPLE_PROVIDER_FAILED",
+    "TRANSLATION_PROVIDER_FAILED",
+  ],
+  ADMIN_EVENT_REASON_CODES: [
+    "invalid_or_spent",
+    "minute_request_limit",
+    "minute_character_limit",
+    "monthly_character_limit",
+    "daily_limit",
+    "cooldown",
+    "not_configured",
+    "rate_limited",
+    "transport_error",
+    "upstream_http_error",
+    "invalid_response",
+    "fallback_circuit_open",
+    "provider_unavailable",
+  ],
+  ADMIN_EVENT_PROVIDERS: ["gemini", "deepl", "unofficial", "deepl_or_unofficial"],
+  ADMIN_EVENT_QUOTA_WINDOWS: ["minute", "day", "month"],
   getAdminEventRetentionCutoff: (now: Date) => new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000),
   formatAdminEventMessage: formatMessageMock,
 }));
@@ -51,7 +78,7 @@ function record(overrides: Record<string, unknown> = {}) {
     essayId: null,
     accessCodeId: null,
     provider: null,
-    reasonCode: "minute_limit",
+    reasonCode: "minute_request_limit",
     httpStatus: null,
     quotaWindow: "minute",
     usageValue: 10,
@@ -184,6 +211,53 @@ describe("getAdminEventLogPage", () => {
     expect(page.events[0]).not.toHaveProperty("searchText");
     expect(JSON.stringify(page.events[0])).not.toContain("never expose this");
     expect(formatMessageMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "TRANSLATION_QUOTA_DENIED" }));
+  });
+
+  it("redacts malformed persisted values before they can reach the API response", async () => {
+    countMock.mockResolvedValue(1);
+    eventFindManyMock.mockResolvedValue([
+      record({
+        id: "raw-event-id-and-provider-secret",
+        severity: "RAW SEVERITY",
+        module: "RAW MODULE",
+        eventType: "RAW EVENT TYPE: learner draft",
+        userId: "raw-user@example.com",
+        essayId: "raw essay text",
+        accessCodeId: "TCF-PRO-2026",
+        provider: "https://provider.example/secret",
+        reasonCode: "raw upstream exception",
+        httpStatus: 999,
+        quotaWindow: "forever",
+        usageValue: -1,
+        quotaLimit: 0,
+        occurrenceCount: 0,
+      }),
+    ]);
+
+    const page = await getAdminEventLogPage(parseAdminEventLogQuery({ range: "today" }, NOW), NOW);
+    const event = page.events[0];
+
+    expect(event).toMatchObject({
+      id: "unknown-event",
+      severity: "UNKNOWN",
+      module: "UNKNOWN",
+      eventType: "UNKNOWN_EVENT",
+      userId: null,
+      essayId: null,
+      accessCodeId: null,
+      provider: null,
+      reasonCode: null,
+      httpStatus: null,
+      quotaWindow: null,
+      usageValue: null,
+      quotaLimit: null,
+      occurrenceCount: 1,
+    });
+    expect(JSON.stringify(event)).not.toContain("raw");
+    expect(JSON.stringify(event)).not.toContain("TCF-PRO-2026");
+    expect(formatMessageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ eventType: "UNKNOWN_EVENT", provider: null, reasonCode: null }),
+    );
   });
 
   it("rejects an email fragment with too many candidates instead of silently dropping matches", async () => {
