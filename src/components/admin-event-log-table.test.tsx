@@ -54,7 +54,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: "access_code_row_1",
             provider: null,
-            reasonCode: "minute_limit",
+            reasonCode: "minute_request_limit",
             httpStatus: null,
             quotaWindow: "minute",
             usageValue: 10,

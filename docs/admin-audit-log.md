@@ -61,10 +61,11 @@ the [admin access-control and usage dashboard](admin-access-control-and-usage.md
 ## Decision
 
 Use an owner-only `AdminEvent` table as a 30-day structured operational
-ledger. A server-only TypeScript registry controls every stored value and
-generates the dashboard text. This is chosen over a raw `message` or JSON
-payload because a fixed registry makes it possible to prove that user content,
-secrets, and untrusted provider text cannot reach the owner UI.
+ledger. A server-only TypeScript registry and matching database checks control
+every stored value and generate the dashboard text. This is chosen over a raw
+`message` or JSON payload because a fixed registry makes it possible to prove
+that user content, secrets, and untrusted provider text cannot reach the owner
+UI.
 
 The ledger covers only events whose operational meaning is known locally:
 provider failures, operation-specific quota denials, and access-code
@@ -99,9 +100,11 @@ foreign-key cascade.
 | `occurrenceCount`, `dedupeKey` | Repeated noisy outcomes may coalesce. A server-only SHA-256 digest over trusted safe fields and a UTC time bucket makes a duplicate increment/update one row instead of promising an exact per-attempt history. |
 
 There is no `message` column and no arbitrary JSON column. Database checks
-constrain severity/module; the TypeScript registry constrains event type,
-reason, display template, and permitted optional fields. Adding an event kind
-does not require a production database enum migration.
+enforce the closed event shape (including opaque IDs, fixed search text,
+reason/provider/status/window values, and matching optional fields); the
+TypeScript registry is the corresponding writer and display source. The model
+uses strings rather than a PostgreSQL enum, but adding an event kind still
+requires a reviewed additive check-constraint migration.
 
 ### V1 event registry and semantics
 
