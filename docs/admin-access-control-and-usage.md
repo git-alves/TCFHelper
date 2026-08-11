@@ -55,8 +55,11 @@ cannot activate two accounts.
   generation) or as a batch of up to `MAX_ACCESS_CODE_BATCH_SIZE` codes
   sharing one note and validity period -- each code in a batch is still an
   independently unique, single-use credential, not a shared/multi-use code.
-- No historical analytics warehouse, data export, audit log, or provider-cost
-  reconciliation. Existing counters are rolling enforcement data.
+- No historical analytics warehouse, data export, or provider-cost
+  reconciliation. Existing counters are rolling enforcement data. The
+  separately scoped [admin operational log](admin-audit-log.md) is a
+  30-day, owner-only structured ledger; it is not a general security archive,
+  provider-cost ledger, or replacement for platform/deployment logs.
 - No staff access to learner essays or feedback; admin data is limited to
   identity, access state, limits, and usage.
 - No global quota editing UI. Global defaults remain code-owned.
@@ -241,7 +244,8 @@ against a rolling heartbeat window, not push-based presence.
 ### Admin surfaces
 
 `/admin` shows registered-user total, blocked count, and the normalized
-current-window aggregate for each API. It links to Users and Access codes.
+current-window aggregate for each API. It links to Users, Access codes, and
+the separately specified [admin operational log](admin-audit-log.md).
 
 `/admin/users` uses server-side, case-insensitive name/email search and
 bounded 25-row pagination. Rows show identity, joined date, activation and

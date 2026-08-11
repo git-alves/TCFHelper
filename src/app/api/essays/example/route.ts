@@ -22,6 +22,7 @@ import {
   ModelAnswerRateLimitedError,
   generatePreferredModelAnswer,
 } from "@/lib/model-answer-generator";
+import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const EXAMPLE_LEVELS = ["B2", "C1", "C2"] as const;
@@ -48,15 +49,21 @@ const requestSchema = z
     }
   });
 
-// Maps a generation failure to a fixed, closed set of log labels. Only the
-// HTTP status (a small closed set of numbers) is included — never the
-// upstream provider's own free-text error message, which is not a trusted
-// value and could echo back request content.
-function classifyExampleGenerationFailure(error: unknown): string {
-  if (error instanceof ModelAnswerInvalidOutputError) return "invalid_output_length";
-  if (error instanceof GeminiRequestError) return `gemini_request_failed_${error.status}`;
-  if (error instanceof GeminiTransportError) return "gemini_transport_failed";
-  return "gemini_generation_failed";
+// Maps a generation failure to the shared closed event vocabulary. Never
+// record an upstream provider message: it is not trusted and could echo
+// request content.
+function classifyExampleGenerationFailure(error: unknown): AdminEventReasonCode {
+  if (error instanceof ModelAnswerInvalidOutputError) return "invalid_response";
+  if (error instanceof GeminiRequestError) return "upstream_http_error";
+  if (error instanceof GeminiTransportError) return "transport_error";
+  return "provider_unavailable";
+}
+
+function boundedGeminiHttpStatus(error: unknown): number | undefined {
+  if (!(error instanceof GeminiRequestError)) return undefined;
+  return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
+    ? error.status
+    : undefined;
 }
 
 export async function POST(request: Request) {
@@ -122,6 +129,13 @@ export async function POST(request: Request) {
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.
   if (!hasConfiguredModelAnswerProvider()) {
+    await recordAdminEvent({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: user.id,
+      provider: "gemini",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
     return NextResponse.json(
       { error: "The example generator is not configured.", code: "EXAMPLE_GENERATOR_UNAVAILABLE" },
       { status: 503, headers: NO_STORE_HEADERS },
@@ -155,6 +169,12 @@ export async function POST(request: Request) {
   }
 
   if (claim.kind === "cooldown") {
+    await recordAdminEvent({
+      eventType: "EXAMPLE_QUOTA_DENIED",
+      userId: user.id,
+      reasonCode: "cooldown",
+      httpStatus: 429,
+    });
     return NextResponse.json(
       {
         error: "The example generator is busy. Please try again shortly.",
@@ -172,6 +192,15 @@ export async function POST(request: Request) {
   }
 
   if (claim.kind === "dailyLimit") {
+    await recordAdminEvent({
+      eventType: "EXAMPLE_QUOTA_DENIED",
+      userId: user.id,
+      reasonCode: "daily_limit",
+      httpStatus: 429,
+      quotaWindow: "day",
+      usageValue: claim.usageValue,
+      quotaLimit: claim.quotaLimit,
+    });
     return NextResponse.json(
       {
         error: "The daily example limit has been reached. Please try again tomorrow.",
@@ -221,6 +250,13 @@ export async function POST(request: Request) {
       console.error("Example generation lease cleanup failed");
     });
     if (error instanceof ModelAnswerNotConfiguredError) {
+      await recordAdminEvent({
+        eventType: "EXAMPLE_PROVIDER_FAILED",
+        userId: user.id,
+        provider: "gemini",
+        reasonCode: "not_configured",
+        httpStatus: 503,
+      });
       return NextResponse.json(
         { error: "The example generator is not configured.", code: "EXAMPLE_GENERATOR_UNAVAILABLE" },
         { status: 503, headers: NO_STORE_HEADERS },
@@ -228,6 +264,13 @@ export async function POST(request: Request) {
     }
 
     if (error instanceof ModelAnswerRateLimitedError) {
+      await recordAdminEvent({
+        eventType: "EXAMPLE_PROVIDER_FAILED",
+        userId: user.id,
+        provider: "gemini",
+        reasonCode: "rate_limited",
+        httpStatus: 429,
+      });
       return NextResponse.json(
         { error: "The example generator is busy. Please try again shortly.", code: "EXAMPLE_RATE_LIMITED" },
         { status: 429, headers: NO_STORE_HEADERS },
@@ -240,7 +283,15 @@ export async function POST(request: Request) {
     // status alone (a small closed set of numbers) is safe to include and
     // is what actually distinguishes an auth/config problem from a
     // transient upstream outage in the Vercel function log.
-    console.error("Example generation failed:", classifyExampleGenerationFailure(error));
+    const reasonCode = classifyExampleGenerationFailure(error);
+    await recordAdminEvent({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: user.id,
+      provider: "gemini",
+      reasonCode,
+      httpStatus: boundedGeminiHttpStatus(error) ?? 502,
+    });
+    console.error("Example generation failed:", reasonCode);
     return NextResponse.json(
       { error: "Something went wrong while generating the example." },
       { status: 502, headers: NO_STORE_HEADERS },

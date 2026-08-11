@@ -42,7 +42,7 @@ function startOfNextUtcDay(date: Date) {
 export type ExampleGenerationClaim =
   | { kind: "claimed"; claimToken: string }
   | { kind: "cached"; content: string }
-  | { kind: "dailyLimit"; resetAt: Date }
+  | { kind: "dailyLimit"; resetAt: Date; usageValue: number; quotaLimit: number }
   | { kind: "inProgress"; retryAt: Date }
   | { kind: "cooldown"; retryAt: Date };
 
@@ -122,13 +122,24 @@ export async function claimExampleGeneration(
       // Checked before, and independent of, the refundable count below: a
       // string of refunded failures must not let this claim through forever.
       const dailyAttemptCount = (continuingDay ? existing.dailyAttemptCount : 0) + 1;
-      if (dailyAttemptCount > Math.min(DAILY_ATTEMPT_CAP, limits.exampleGenerationsPerDay)) {
-        return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
+      const dailyAttemptLimit = Math.min(DAILY_ATTEMPT_CAP, limits.exampleGenerationsPerDay);
+      if (dailyAttemptCount > dailyAttemptLimit) {
+        return {
+          kind: "dailyLimit",
+          resetAt: startOfNextUtcDay(now),
+          usageValue: dailyAttemptCount,
+          quotaLimit: dailyAttemptLimit,
+        };
       }
 
       const dailyRequestCount = (continuingDay ? existing.dailyRequestCount : 0) + 1;
       if (dailyRequestCount > limits.exampleGenerationsPerDay) {
-        return { kind: "dailyLimit", resetAt: startOfNextUtcDay(now) };
+        return {
+          kind: "dailyLimit",
+          resetAt: startOfNextUtcDay(now),
+          usageValue: dailyRequestCount,
+          quotaLimit: limits.exampleGenerationsPerDay,
+        };
       }
 
       await tx.exampleGenerationQuota.upsert({

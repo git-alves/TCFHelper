@@ -223,6 +223,8 @@ describe("claimExampleGeneration", () => {
     await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
       kind: "dailyLimit",
       resetAt: new Date("2026-08-06T00:00:00.000Z"),
+      usageValue: 3,
+      quotaLimit: 2,
     });
     expect(overrideFindMock).toHaveBeenCalledWith({
       where: { userId: "learner_1" },
@@ -283,7 +285,12 @@ describe("claimExampleGeneration", () => {
 
     const result = await claimExampleGeneration(...cacheKey);
 
-    expect(result).toEqual({ kind: "dailyLimit", resetAt: new Date("2026-08-06T00:00:00.000Z") });
+    expect(result).toEqual({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-06T00:00:00.000Z"),
+      usageValue: 1_001,
+      quotaLimit: 1_000,
+    });
     expect(quotaUpsertMock).not.toHaveBeenCalled();
     expect(leaseUpsertMock).not.toHaveBeenCalled();
 
@@ -306,6 +313,8 @@ describe("claimExampleGeneration", () => {
     await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
       kind: "dailyLimit",
       resetAt: new Date("2026-08-06T00:00:00.000Z"),
+      usageValue: 2,
+      quotaLimit: 1,
     });
     expect(quotaUpsertMock).not.toHaveBeenCalled();
     expect(leaseUpsertMock).not.toHaveBeenCalled();
@@ -327,6 +336,8 @@ describe("claimExampleGeneration", () => {
     await expect(claimExampleGeneration(...cacheKey)).resolves.toEqual({
       kind: "dailyLimit",
       resetAt: new Date("2026-08-06T00:00:00.000Z"),
+      usageValue: 1_001,
+      quotaLimit: 1_000,
     });
     expect(quotaUpsertMock).not.toHaveBeenCalled();
     expect(leaseUpsertMock).not.toHaveBeenCalled();

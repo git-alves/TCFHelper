@@ -90,6 +90,8 @@ describe("reserveCorrectionUsage", () => {
     await expect(reserveCorrectionUsage(userId)).resolves.toEqual({
       kind: "dailyLimit",
       resetAt: new Date("2026-08-11T00:00:00.000Z"),
+      usageValue: 2,
+      quotaLimit: 1,
     });
     expect(usageUpsertMock).not.toHaveBeenCalled();
   });

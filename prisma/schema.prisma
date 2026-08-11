@@ -288,6 +288,44 @@ model AccessCode {
   @@index([redeemedAt])
 }
 
+/// Owner-only operational events. This is deliberately a structured ledger,
+/// not a free-form application-log mirror: every persisted field is selected
+/// from a closed server-side registry and checked by the additive SQL
+/// migration so prompts, bearer credentials, raw provider errors, and request
+/// metadata cannot enter the admin dashboard.
+///
+/// `occurredAt` is the most recent observation. Noisy events may be safely
+/// coalesced through `dedupeKey`, with `occurrenceCount` preserving that they
+/// repeated. Rows intentionally do not use foreign keys: a short-retention
+/// event remains interpretable after its user, essay, or access code has been
+/// deleted, and the event table never changes product ownership semantics.
+model AdminEvent {
+  id              String   @id @default(cuid())
+  occurredAt      DateTime @default(now())
+  firstOccurredAt DateTime @default(now())
+  severity        String
+  module          String
+  eventType       String
+  searchText      String
+  userId          String?
+  essayId         String?
+  accessCodeId    String?
+  provider        String?
+  reasonCode      String?
+  httpStatus      Int?
+  quotaWindow     String?
+  usageValue      Int?
+  quotaLimit      Int?
+  occurrenceCount Int      @default(1)
+  dedupeKey       String?  @unique
+
+  @@index([occurredAt, id])
+  @@index([severity, occurredAt, id])
+  @@index([module, occurredAt, id])
+  @@index([userId, occurredAt, id])
+  @@index([essayId, occurredAt, id])
+}
+
 /// A cached model answer is private to its learner. The hash avoids storing a
 /// custom prompt a second time while making repeat requests free of provider
 /// usage.

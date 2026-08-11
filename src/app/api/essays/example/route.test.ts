@@ -15,6 +15,7 @@ const {
   ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputErrorMock,
+  recordAdminEventMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   class ModelAnswerNotConfiguredErrorMock extends Error {}
@@ -35,6 +36,7 @@ const {
     ModelAnswerNotConfiguredErrorMock,
     ModelAnswerRateLimitedErrorMock,
     ModelAnswerInvalidOutputErrorMock,
+    recordAdminEventMock: vi.fn(),
   };
 });
 
@@ -60,6 +62,7 @@ vi.mock("@/lib/model-answer-generator", () => ({
   ModelAnswerRateLimitedError: ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputError: ModelAnswerInvalidOutputErrorMock,
 }));
+vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock }));
 
 const { POST } = await import("./route");
 
@@ -75,6 +78,7 @@ beforeEach(() => {
   refundExampleGenerationLeaseMock.mockReset();
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredModelAnswerProviderMock.mockReset();
+  recordAdminEventMock.mockReset();
 
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   findCachedExampleMock.mockResolvedValue(null);
@@ -196,13 +200,27 @@ describe("POST /api/essays/example", () => {
   });
 
   it("returns a daily limit with its reset time before calling either provider", async () => {
-    claimExampleGenerationMock.mockResolvedValue({ kind: "dailyLimit", resetAt: new Date("2026-08-05T00:00:00.000Z") });
+    claimExampleGenerationMock.mockResolvedValue({
+      kind: "dailyLimit",
+      resetAt: new Date("2026-08-05T00:00:00.000Z"),
+      usageValue: 4,
+      quotaLimit: 3,
+    });
 
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
     expect(response.status).toBe(429);
     await expect(response.json()).resolves.toMatchObject({ code: "EXAMPLE_DAILY_LIMIT_REACHED" });
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "EXAMPLE_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "daily_limit",
+      httpStatus: 429,
+      quotaWindow: "day",
+      usageValue: 4,
+      quotaLimit: 3,
+    });
   });
 
   it("does not call a provider when the same cache key already has an active lease", async () => {
@@ -226,6 +244,12 @@ describe("POST /api/essays/example", () => {
     await expect(response.json()).resolves.toMatchObject({ code: "EXAMPLE_RATE_LIMITED" });
     expect(response.headers.get("Retry-After")).toBeTruthy();
     expect(generatePreferredModelAnswerMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "EXAMPLE_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "cooldown",
+      httpStatus: 429,
+    });
   });
 
   it("does not reserve a fresh call when no free provider is configured", async () => {
@@ -235,6 +259,13 @@ describe("POST /api/essays/example", () => {
 
     expect(response.status).toBe(503);
     expect(claimExampleGenerationMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "gemini",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
   });
 
   it("still returns a generated answer when caching it fails, without refunding the spent slot", async () => {
@@ -262,6 +293,20 @@ describe("POST /api/essays/example", () => {
     // the slot they reserved rather than merely clean up the lease.
     expect(refundExampleGenerationLeaseMock).toHaveBeenCalledTimes(2);
     expect(releaseExampleGenerationLeaseMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenNthCalledWith(1, {
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "gemini",
+      reasonCode: "rate_limited",
+      httpStatus: 429,
+    });
+    expect(recordAdminEventMock).toHaveBeenNthCalledWith(2, {
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "gemini",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
   });
 
   describe("failure log classification", () => {
@@ -285,7 +330,14 @@ describe("POST /api/essays/example", () => {
       const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
       expect(response.status).toBe(502);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "gemini_request_failed_400");
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "upstream_http_error");
+      expect(recordAdminEventMock).toHaveBeenCalledWith({
+        eventType: "EXAMPLE_PROVIDER_FAILED",
+        userId: LOCAL_USER_ID,
+        provider: "gemini",
+        reasonCode: "upstream_http_error",
+        httpStatus: 400,
+      });
     });
 
     it("logs a fixed label for an unusable-length answer", async () => {
@@ -294,7 +346,7 @@ describe("POST /api/essays/example", () => {
       const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
       expect(response.status).toBe(502);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "invalid_output_length");
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "invalid_response");
     });
 
     it("distinguishes a Gemini transport failure from a status-based one, so a network outage stays diagnosable", async () => {
@@ -303,7 +355,7 @@ describe("POST /api/essays/example", () => {
       const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
       expect(response.status).toBe(502);
-      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "gemini_transport_failed");
+      expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "transport_error");
     });
 
   });

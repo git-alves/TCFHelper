@@ -12,6 +12,7 @@ import {
   recordFallbackSuccess,
 } from "@/lib/translation-fallback-circuit";
 import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
+import { recordAdminEvent } from "@/lib/admin-events";
 
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -33,8 +34,10 @@ type QuotaReservation =
   | { allowed: true }
   | {
       allowed: false;
-      reason: "rate" | "monthly";
+      reason: "minute_request_limit" | "minute_character_limit" | "monthly_character_limit";
       resetAt: Date;
+      usageValue: number;
+      quotaLimit: number;
     };
 
 function startOfUtcMinute(date: Date) {
@@ -109,15 +112,34 @@ async function reserveTranslationQuota(userId: string, characterCount: number): 
       const monthCharacterCount =
         (continuingMonth ? existing.monthCharacterCount : 0) + characterCount;
 
-      if (
-        minuteRequestCount > limits.translationRequestsPerMinute ||
-        minuteCharacterCount > limits.translationCharactersPerMinute
-      ) {
-        return { allowed: false, reason: "rate", resetAt: minuteResetsAt };
+      if (minuteRequestCount > limits.translationRequestsPerMinute) {
+        return {
+          allowed: false,
+          reason: "minute_request_limit",
+          resetAt: minuteResetsAt,
+          usageValue: minuteRequestCount,
+          quotaLimit: limits.translationRequestsPerMinute,
+        };
+      }
+
+      if (minuteCharacterCount > limits.translationCharactersPerMinute) {
+        return {
+          allowed: false,
+          reason: "minute_character_limit",
+          resetAt: minuteResetsAt,
+          usageValue: minuteCharacterCount,
+          quotaLimit: limits.translationCharactersPerMinute,
+        };
       }
 
       if (monthCharacterCount > limits.translationCharactersPerMonth) {
-        return { allowed: false, reason: "monthly", resetAt: monthResetsAt };
+        return {
+          allowed: false,
+          reason: "monthly_character_limit",
+          resetAt: monthResetsAt,
+          usageValue: monthCharacterCount,
+          quotaLimit: limits.translationCharactersPerMonth,
+        };
       }
 
       const data = {
@@ -239,11 +261,21 @@ export async function POST(request: Request) {
 
   if (!quotaReservation.allowed) {
     const resetAt = quotaReservation.resetAt.toISOString();
+    const isMinuteLimit = quotaReservation.reason !== "monthly_character_limit";
+    await recordAdminEvent({
+      eventType: "TRANSLATION_QUOTA_DENIED",
+      userId: user.id,
+      reasonCode: quotaReservation.reason,
+      httpStatus: 429,
+      quotaWindow: isMinuteLimit ? "minute" : "month",
+      usageValue: quotaReservation.usageValue,
+      quotaLimit: quotaReservation.quotaLimit,
+    });
     return translationResponse(
       {
         error: "Translation service is temporarily unavailable.",
         code:
-          quotaReservation.reason === "rate"
+          isMinuteLimit
             ? "TRANSLATION_RATE_LIMITED"
             : "TRANSLATION_MONTHLY_QUOTA_REACHED",
         resetAt,
@@ -263,6 +295,7 @@ export async function POST(request: Request) {
   }
 
   const translationRequest = createTranslationSignal(request.signal);
+  const attemptedProvider = deeplApiKey ? "deepl_or_unofficial" : "unofficial";
 
   try {
     if (deeplApiKey) {
@@ -286,6 +319,13 @@ export async function POST(request: Request) {
     }
 
     if (await isFallbackCircuitOpen()) {
+      await recordAdminEvent({
+        eventType: "TRANSLATION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: attemptedProvider,
+        reasonCode: "fallback_circuit_open",
+        httpStatus: 503,
+      });
       return translationResponse(
         {
           error: "Translation service is temporarily unavailable.",
@@ -313,11 +353,25 @@ export async function POST(request: Request) {
     }
 
     if (translationRequest.timedOut()) {
+      await recordAdminEvent({
+        eventType: "TRANSLATION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: attemptedProvider,
+        reasonCode: "transport_error",
+        httpStatus: 504,
+      });
       return translationResponse({ error: "Translation request timed out." }, 504);
     }
 
     // Do not log the thrown error: an implementation may include the request
     // URL, which contains a server-only API key.
+    await recordAdminEvent({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: user.id,
+      provider: attemptedProvider,
+      reasonCode: "provider_unavailable",
+      httpStatus: 502,
+    });
     console.error("Translation request failed before a response was received");
     return translationResponse({ error: "Translation service is temporarily unavailable." }, 502);
   } finally {

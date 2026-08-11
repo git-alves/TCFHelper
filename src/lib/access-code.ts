@@ -7,7 +7,7 @@ const ACCESS_CODE_TRANSACTION_TIMEOUT_MS = 3_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export type AccessCodeRedemption =
-  | { kind: "redeemed"; showWelcome: boolean }
+  | { kind: "redeemed"; showWelcome: boolean; accessCodeId: string }
   | { kind: "alreadyActivated" }
   | { kind: "invalid" };
 
@@ -145,12 +145,27 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
 
         if (claimed.count !== 1) return { kind: "invalid" };
 
+        // The route may associate the safe operational event with this opaque
+        // row ID, but must never receive or retain another copy of the bearer
+        // code itself.
+        const redeemedCode = await tx.accessCode.findUnique({
+          where: { code },
+          select: { id: true },
+        });
+        if (!redeemedCode) {
+          throw new Error("Claimed access code could not be resolved.");
+        }
+
         const welcomeMarker = await tx.user.updateMany({
           where: { id: userId, activationWelcomeShownAt: null },
           data: { activationWelcomeShownAt: new Date() },
         });
 
-        return { kind: "redeemed", showWelcome: welcomeMarker.count === 1 };
+        return {
+          kind: "redeemed",
+          showWelcome: welcomeMarker.count === 1,
+          accessCodeId: redeemedCode.id,
+        };
       },
       { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },
     );

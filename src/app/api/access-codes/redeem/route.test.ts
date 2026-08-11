@@ -5,6 +5,7 @@ const {
   AppUserProvisioningErrorMock,
   normalizeAccessCodeMock,
   redeemAccessCodeMock,
+  recordAdminEventMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
@@ -13,6 +14,7 @@ const {
     AppUserProvisioningErrorMock,
     normalizeAccessCodeMock: vi.fn(),
     redeemAccessCodeMock: vi.fn(),
+    recordAdminEventMock: vi.fn(),
   };
 });
 
@@ -24,6 +26,7 @@ vi.mock("@/lib/access-code", () => ({
   normalizeAccessCode: normalizeAccessCodeMock,
   redeemAccessCode: redeemAccessCodeMock,
 }));
+vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock }));
 
 const { POST } = await import("./route");
 
@@ -41,10 +44,11 @@ beforeEach(() => {
   getCurrentAppUserMock.mockReset();
   normalizeAccessCodeMock.mockReset();
   redeemAccessCodeMock.mockReset();
+  recordAdminEventMock.mockReset();
 
   getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: null });
   normalizeAccessCodeMock.mockImplementation((code) => code.trim().toUpperCase());
-  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: true });
+  redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: true, accessCodeId: "access_code_1" });
 });
 
 describe("POST /api/access-codes/redeem", () => {
@@ -67,6 +71,7 @@ describe("POST /api/access-codes/redeem", () => {
     await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
     expect(normalizeAccessCodeMock).not.toHaveBeenCalled();
     expect(redeemAccessCodeMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).not.toHaveBeenCalled();
   });
 
   it("fails closed while the Clerk identity cannot be provisioned", async () => {
@@ -91,6 +96,12 @@ describe("POST /api/access-codes/redeem", () => {
       code: "INVALID_ACCESS_CODE",
     });
     expect(redeemAccessCodeMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "ACCESS_CODE_REJECTED",
+      userId: USER_ID,
+      reasonCode: "invalid_or_spent",
+      httpStatus: 400,
+    });
   });
 
   it("normalizes and redeems a valid submitted code", async () => {
@@ -104,11 +115,18 @@ describe("POST /api/access-codes/redeem", () => {
     });
     expect(normalizeAccessCodeMock).toHaveBeenCalledWith("invite-ab12");
     expect(redeemAccessCodeMock).toHaveBeenCalledWith(USER_ID, "INVITE-AB12");
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "ACCESS_CODE_REDEEMED",
+      userId: USER_ID,
+      accessCodeId: "access_code_1",
+      httpStatus: 200,
+    });
+    expect(JSON.stringify(recordAdminEventMock.mock.calls)).not.toContain("INVITE-AB12");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 
   it("does not repeat the welcome handoff after a learner's access is restored", async () => {
-    redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: false });
+    redeemAccessCodeMock.mockResolvedValue({ kind: "redeemed", showWelcome: false, accessCodeId: "access_code_1" });
 
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
 
@@ -152,6 +170,13 @@ describe("POST /api/access-codes/redeem", () => {
       error: "That access code is invalid or has already been redeemed.",
       code: "ACCESS_CODE_INVALID",
     });
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "ACCESS_CODE_REJECTED",
+      userId: USER_ID,
+      reasonCode: "invalid_or_spent",
+      httpStatus: 400,
+    });
+    expect(JSON.stringify(recordAdminEventMock.mock.calls)).not.toContain("INVITE-AB12");
   });
 
   it("treats an already activated learner as a successful, idempotent submission", async () => {
@@ -161,6 +186,7 @@ describe("POST /api/access-codes/redeem", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
+    expect(recordAdminEventMock).not.toHaveBeenCalled();
   });
 
   it("returns a retryable error when durable redemption fails", async () => {

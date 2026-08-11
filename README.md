@@ -12,7 +12,8 @@ be done, success gate, and deliberately excluded scope. There is no billing
 or plan-purchase flow: Clerk sign-up remains open, while a learner redeems an
 owner-issued access code before reaching the app. The owner controls admission
 and current usage through the
-[admin access-control specification](docs/admin-access-control-and-usage.md).
+[admin access-control specification](docs/admin-access-control-and-usage.md)
+and can review the bounded [admin operational log](docs/admin-audit-log.md).
 
 ## Stack
 

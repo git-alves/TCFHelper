@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { normalizeAccessCode, redeemAccessCode } from "@/lib/access-code";
+import { recordAdminEvent } from "@/lib/admin-events";
 import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -46,6 +47,12 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
   const parsed = requestSchema.safeParse(body);
   if (!parsed.success) {
+    await recordAdminEvent({
+      eventType: "ACCESS_CODE_REJECTED",
+      userId: user.id,
+      reasonCode: "invalid_or_spent",
+      httpStatus: 400,
+    });
     return response({ error: "Enter a valid access code.", code: "INVALID_ACCESS_CODE" }, 400);
   }
 
@@ -54,6 +61,12 @@ export async function POST(request: Request) {
     if (result.kind === "invalid") {
       // Deliberately collapse a missing code and one already redeemed by
       // someone else. A code must not become an account-enumeration oracle.
+      await recordAdminEvent({
+        eventType: "ACCESS_CODE_REJECTED",
+        userId: user.id,
+        reasonCode: "invalid_or_spent",
+        httpStatus: 400,
+      });
       return response(
         {
           error: "That access code is invalid or has already been redeemed.",
@@ -69,6 +82,14 @@ export async function POST(request: Request) {
     // once is independent of its CTA: new learners begin the walkthrough on
     // Dashboard, while established learners continue to Tasks.
     const showWelcome = result.kind === "redeemed" && result.showWelcome;
+    if (result.kind === "redeemed") {
+      await recordAdminEvent({
+        eventType: "ACCESS_CODE_REDEEMED",
+        userId: user.id,
+        accessCodeId: result.accessCodeId,
+        httpStatus: 200,
+      });
+    }
     return response(
       showWelcome
         ? {

@@ -34,6 +34,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811060000_add_user_last_active");
   });
 
+  it("allows the empty, additive admin-event ledger migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260811070000_add_admin_event_log");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
