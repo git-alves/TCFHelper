@@ -289,3 +289,28 @@ export async function getAdminUserDetail(userId: string) {
   const record = await prisma.user.findUnique({ where: { id: userId }, select: ADMIN_USER_SELECT });
   return record ? serializeAdminUserDetail(record) : null;
 }
+
+// A CSV export intentionally is not paginated -- it is "everything matching
+// the current filters," not one page of it -- but still needs a hard upper
+// bound so an unfiltered export on a runaway-large table cannot become an
+// unbounded query.
+const MAX_EXPORT_ROWS = 10_000;
+
+export async function getAdminUsersForExport({
+  query,
+  status,
+}: {
+  query: string;
+  status: AdminUserStatusFilter;
+}): Promise<AdminUserListItem[]> {
+  const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...userStatusWhere(status) };
+  const records = await prisma.user.findMany({
+    where,
+    select: ADMIN_USER_SELECT,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: MAX_EXPORT_ROWS,
+  });
+  const now = new Date();
+
+  return records.map((record) => serializeUser(record, now));
+}

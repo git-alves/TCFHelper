@@ -26,6 +26,14 @@ function pageHref(query: string, status: AdminUserStatusFilter, page: number) {
   return `/admin/users?${params.toString()}`;
 }
 
+function exportHref(query: string, status: AdminUserStatusFilter) {
+  const params = new URLSearchParams();
+  if (status !== "all") params.set("status", status);
+  if (query) params.set("query", query);
+  const queryString = params.toString();
+  return queryString ? `/api/admin/users/export?${queryString}` : "/api/admin/users/export";
+}
+
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
   let admin;
   try {
@@ -96,7 +104,15 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           {usersPage.status !== "all" ? ` (${STATUS_FILTER_LABELS[usersPage.status].toLowerCase()})` : ""}
           {usersPage.query ? ` matching “${usersPage.query}”` : ""}
         </p>
-        {usersPage.pageCount > 1 && <p className="text-sm text-zinc-600 dark:text-zinc-400">Page {usersPage.page} of {usersPage.pageCount}</p>}
+        <div className="flex items-center gap-3">
+          {usersPage.pageCount > 1 && <p className="text-sm text-zinc-600 dark:text-zinc-400">Page {usersPage.page} of {usersPage.pageCount}</p>}
+          <a
+            href={exportHref(usersPage.query, usersPage.status)}
+            className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
+          >
+            Export CSV
+          </a>
+        </div>
       </div>
 
       {usersPage.users.length > 0 ? (

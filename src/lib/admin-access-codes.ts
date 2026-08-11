@@ -256,3 +256,20 @@ export async function getAdminAccessCodesPage({ query, page }: { query: string; 
     query,
   };
 }
+
+// A CSV export intentionally is not paginated -- it is "everything matching
+// the current filter," not one page of it -- but still needs a hard upper
+// bound so an unfiltered export on a runaway-large table cannot become an
+// unbounded query.
+const MAX_EXPORT_ROWS = 10_000;
+
+export async function getAdminAccessCodesForExport(query: string): Promise<AdminAccessCode[]> {
+  const records = await prisma.accessCode.findMany({
+    where: accessCodeSearchWhere(query),
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: MAX_EXPORT_ROWS,
+    select: ACCESS_CODE_LIST_SELECT,
+  });
+
+  return records.map(serializeAccessCode);
+}
