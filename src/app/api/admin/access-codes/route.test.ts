@@ -17,7 +17,7 @@ vi.mock("@/lib/admin-access-codes", () => ({
   listAccessCodes: listAccessCodesMock,
 }));
 vi.mock("@/lib/access-code-limits", () => ({
-  MAX_ACCESS_CODE_BATCH_SIZE: 50,
+  MAX_ACCESS_CODE_BATCH_SIZE: 10,
   MAX_VALIDITY_DAYS: 3650,
 }));
 
@@ -124,7 +124,7 @@ describe("POST /api/admin/access-codes", () => {
   });
 
   it("rejects a batch count above the server cap", async () => {
-    const response = await POST(postRequest({ count: 51 }));
+    const response = await POST(postRequest({ count: 11 }));
 
     expect(response.status).toBe(400);
     expect(createAccessCodesMock).not.toHaveBeenCalled();

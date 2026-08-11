@@ -240,9 +240,10 @@ operationally managed.
 
 `/admin/access-codes` accepts an optional short note, an optional validity
 period in days (omitted/null means lifetime access once redeemed), and an
-optional quantity (up to `MAX_ACCESS_CODE_BATCH_SIZE`, which equals the list
-page size so a whole batch is always recoverable after a reload) to generate
-one or more codes sharing that note and validity period. It lists the newest
+optional quantity (up to `MAX_ACCESS_CODE_BATCH_SIZE`, the confirmed product
+scope for one batch; it also sits well inside the list page size, so a whole
+batch is always recoverable after a reload) to generate one or more codes
+sharing that note and validity period. It lists the newest
 bounded set of issued codes with created/redeemed state, an active redeemer
 email when one remains, each code's validity, and its derived expiry once
 redeemed. A detached admission is clearly shown as permanently spent with no
