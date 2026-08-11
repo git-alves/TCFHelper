@@ -12,6 +12,7 @@ import {
   recordFallbackSuccess,
 } from "@/lib/translation-fallback-circuit";
 import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
+import { recordAdminEvent } from "@/lib/admin-events";
 
 const TRANSLATION_TIMEOUT_MS = 8_000;
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -239,6 +240,13 @@ export async function POST(request: Request) {
 
   if (!quotaReservation.allowed) {
     const resetAt = quotaReservation.resetAt.toISOString();
+    await recordAdminEvent({
+      eventType: "TRANSLATION_QUOTA_DENIED",
+      userId: user.id,
+      reasonCode: quotaReservation.reason === "rate" ? "minute_limit" : "monthly_limit",
+      httpStatus: 429,
+      quotaWindow: quotaReservation.reason === "rate" ? "minute" : "month",
+    });
     return translationResponse(
       {
         error: "Translation service is temporarily unavailable.",
@@ -263,6 +271,7 @@ export async function POST(request: Request) {
   }
 
   const translationRequest = createTranslationSignal(request.signal);
+  const attemptedProvider = deeplApiKey ? "deepl_or_unofficial" : "unofficial";
 
   try {
     if (deeplApiKey) {
@@ -286,6 +295,13 @@ export async function POST(request: Request) {
     }
 
     if (await isFallbackCircuitOpen()) {
+      await recordAdminEvent({
+        eventType: "TRANSLATION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: attemptedProvider,
+        reasonCode: "fallback_circuit_open",
+        httpStatus: 503,
+      });
       return translationResponse(
         {
           error: "Translation service is temporarily unavailable.",
@@ -313,11 +329,25 @@ export async function POST(request: Request) {
     }
 
     if (translationRequest.timedOut()) {
+      await recordAdminEvent({
+        eventType: "TRANSLATION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: attemptedProvider,
+        reasonCode: "transport_error",
+        httpStatus: 504,
+      });
       return translationResponse({ error: "Translation request timed out." }, 504);
     }
 
     // Do not log the thrown error: an implementation may include the request
     // URL, which contains a server-only API key.
+    await recordAdminEvent({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: user.id,
+      provider: attemptedProvider,
+      reasonCode: "provider_unavailable",
+      httpStatus: 502,
+    });
     console.error("Translation request failed before a response was received");
     return translationResponse({ error: "Translation service is temporarily unavailable." }, 502);
   } finally {

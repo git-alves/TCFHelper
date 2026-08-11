@@ -14,6 +14,7 @@ const {
   isFallbackCircuitOpenMock,
   recordFallbackFailureMock,
   recordFallbackSuccessMock,
+  recordAdminEventMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
@@ -30,6 +31,7 @@ const {
     isFallbackCircuitOpenMock: vi.fn(),
     recordFallbackFailureMock: vi.fn(),
     recordFallbackSuccessMock: vi.fn(),
+    recordAdminEventMock: vi.fn(),
   };
 });
 
@@ -54,6 +56,7 @@ vi.mock("@/lib/translation-fallback-circuit", () => ({
   recordFallbackFailure: recordFallbackFailureMock,
   recordFallbackSuccess: recordFallbackSuccessMock,
 }));
+vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock }));
 
 const { POST } = await import("./route");
 const { DeepLQuotaExceededError } = await import("@/lib/deepl-translate");
@@ -95,6 +98,7 @@ beforeEach(() => {
   isFallbackCircuitOpenMock.mockReset();
   recordFallbackFailureMock.mockReset();
   recordFallbackSuccessMock.mockReset();
+  recordAdminEventMock.mockReset();
 
   vi.stubEnv("DEEPL_API_KEY", "deepl-server-secret");
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
@@ -263,7 +267,8 @@ describe("POST /api/translate", () => {
   });
 
   it("does not use the scraper fallback for a non-quota DeepL failure", async () => {
-    deeplTranslateMock.mockRejectedValue(new Error("DeepL translation request failed (403)"));
+    const unsafeProviderError = new Error("DeepL translation request failed (403): learner text must not reach logs");
+    deeplTranslateMock.mockRejectedValue(unsafeProviderError);
 
     const response = await post({ text: "Bonjour.", targetLocale: "es" });
 
@@ -272,6 +277,14 @@ describe("POST /api/translate", () => {
       error: "Translation service is temporarily unavailable.",
     });
     expect(scraperTranslateMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "deepl_or_unofficial",
+      reasonCode: "provider_unavailable",
+      httpStatus: 502,
+    });
+    expect(JSON.stringify(recordAdminEventMock.mock.calls)).not.toContain(unsafeProviderError.message);
   });
 
   it("skips the scraper and reports unavailable when the fallback circuit is open", async () => {
@@ -286,6 +299,13 @@ describe("POST /api/translate", () => {
       code: "TRANSLATION_FALLBACK_UNAVAILABLE",
     });
     expect(scraperTranslateMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "unofficial",
+      reasonCode: "fallback_circuit_open",
+      httpStatus: 503,
+    });
   });
 
   it("records a fallback failure and reports unavailable when the scraper itself fails", async () => {
@@ -323,6 +343,13 @@ describe("POST /api/translate", () => {
     expect(response.headers.get("Retry-After")).toBe("4");
     expect(deeplTranslateMock).not.toHaveBeenCalled();
     expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "minute_limit",
+      httpStatus: 429,
+      quotaWindow: "minute",
+    });
   });
 
   it("uses a learner-specific translation override inside the quota transaction", async () => {
@@ -412,6 +439,13 @@ describe("POST /api/translate", () => {
     expect(Number(response.headers.get("Retry-After"))).toBeGreaterThan(0);
     expect(deeplTranslateMock).not.toHaveBeenCalled();
     expect(quotaUpsertMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "monthly_limit",
+      httpStatus: 429,
+      quotaWindow: "month",
+    });
   });
 
   it("resets prior UTC windows instead of permanently blocking a learner", async () => {
@@ -509,6 +543,7 @@ describe("POST /api/translate", () => {
     const response = await responsePromise;
     expect(response.status).toBe(499);
     await expect(response.json()).resolves.toEqual({ error: "Translation request was cancelled." });
+    expect(recordAdminEventMock).not.toHaveBeenCalled();
   });
 
   it("times out a stalled upstream request", async () => {
@@ -536,5 +571,12 @@ describe("POST /api/translate", () => {
     const response = await responsePromise;
     expect(response.status).toBe(504);
     await expect(response.json()).resolves.toEqual({ error: "Translation request timed out." });
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "deepl_or_unofficial",
+      reasonCode: "transport_error",
+      httpStatus: 504,
+    });
   });
 });

@@ -4,7 +4,15 @@ import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
-import { gradeEssayWithGemini, hasConfiguredGemini } from "@/lib/gemini";
+import {
+  GeminiCorrectionParseError,
+  GeminiNotConfiguredError,
+  GeminiRateLimitedError,
+  GeminiRequestError,
+  GeminiTransportError,
+  gradeEssayWithGemini,
+  hasConfiguredGemini,
+} from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
@@ -17,6 +25,7 @@ import {
 } from "@/lib/correction-claim";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { reserveCorrectionUsage } from "@/lib/correction-usage";
+import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
@@ -90,6 +99,22 @@ function correctionDailyLimitResponse(resetAt: Date) {
     },
     { status: 429, headers: NO_STORE_HEADERS },
   );
+}
+
+function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode {
+  if (error instanceof GeminiNotConfiguredError) return "not_configured";
+  if (error instanceof GeminiRateLimitedError) return "rate_limited";
+  if (error instanceof GeminiCorrectionParseError) return "invalid_response";
+  if (error instanceof GeminiRequestError) return "upstream_http_error";
+  if (error instanceof GeminiTransportError) return "transport_error";
+  return "provider_unavailable";
+}
+
+function boundedGeminiHttpStatus(error: unknown): number | undefined {
+  if (!(error instanceof GeminiRequestError)) return undefined;
+  return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
+    ? error.status
+    : undefined;
 }
 
 export async function POST(request: Request) {
@@ -195,6 +220,13 @@ export async function POST(request: Request) {
   // Gemini. Release only this caller's lease so a later configured retry can
   // claim it normally.
   if (!hasConfiguredGemini()) {
+    await recordAdminEvent({
+      eventType: "CORRECTION_PROVIDER_FAILED",
+      userId: user.id,
+      provider: "gemini",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
     await releaseCorrectionClaim({
       userId: user.id,
       correctionKeyHash: claim.correctionKeyHash,
@@ -227,6 +259,13 @@ export async function POST(request: Request) {
   }
 
   if (usageReservation.kind === "dailyLimit") {
+    await recordAdminEvent({
+      eventType: "CORRECTION_QUOTA_DENIED",
+      userId: user.id,
+      reasonCode: "daily_limit",
+      httpStatus: 429,
+      quotaWindow: "day",
+    });
     await releaseCorrectionClaim({
       userId: user.id,
       correctionKeyHash: claim.correctionKeyHash,
@@ -241,9 +280,33 @@ export async function POST(request: Request) {
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
   let shouldReleaseClaim = true;
   try {
-    const rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
+    let rawFeedback: unknown;
+    try {
+      rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
+    } catch (error) {
+      const reasonCode = classifyCorrectionProviderFailure(error);
+      await recordAdminEvent({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: "gemini",
+        reasonCode,
+        httpStatus: boundedGeminiHttpStatus(error) ?? 502,
+      });
+      console.error("Essay correction provider failed", reasonCode);
+      return NextResponse.json(
+        { error: "Something went wrong while grading your essay." },
+        { status: 502, headers: NO_STORE_HEADERS },
+      );
+    }
     const parsedFeedback = essayFeedbackSchema.safeParse(rawFeedback);
     if (!parsedFeedback.success) {
+      await recordAdminEvent({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: user.id,
+        provider: "gemini",
+        reasonCode: "invalid_response",
+        httpStatus: 502,
+      });
       return NextResponse.json(
         { error: "Could not parse feedback. Please try again." },
         { status: 502 },

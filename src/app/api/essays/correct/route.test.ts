@@ -8,12 +8,27 @@ const {
   essayCreateMock,
   gradeEssayWithGeminiMock,
   hasConfiguredGeminiMock,
+  GeminiCorrectionParseErrorMock,
+  GeminiNotConfiguredErrorMock,
+  GeminiRateLimitedErrorMock,
+  GeminiRequestErrorMock,
+  GeminiTransportErrorMock,
   claimCorrectionMock,
   completeCorrectionClaimMock,
   releaseCorrectionClaimMock,
   reserveCorrectionUsageMock,
+  recordAdminEventMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
+  class GeminiCorrectionParseErrorMock extends Error {}
+  class GeminiNotConfiguredErrorMock extends Error {}
+  class GeminiRateLimitedErrorMock extends Error {}
+  class GeminiRequestErrorMock extends Error {
+    constructor(readonly status: number) {
+      super(`request failed (${status})`);
+    }
+  }
+  class GeminiTransportErrorMock extends Error {}
 
   return {
     getCurrentActivatedAppUserMock: vi.fn(),
@@ -23,10 +38,16 @@ const {
     essayCreateMock: vi.fn(),
     gradeEssayWithGeminiMock: vi.fn(),
     hasConfiguredGeminiMock: vi.fn(),
+    GeminiCorrectionParseErrorMock,
+    GeminiNotConfiguredErrorMock,
+    GeminiRateLimitedErrorMock,
+    GeminiRequestErrorMock,
+    GeminiTransportErrorMock,
     claimCorrectionMock: vi.fn(),
     completeCorrectionClaimMock: vi.fn(),
     releaseCorrectionClaimMock: vi.fn(),
     reserveCorrectionUsageMock: vi.fn(),
+    recordAdminEventMock: vi.fn(),
   };
 });
 
@@ -45,6 +66,11 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/gemini", () => ({
   gradeEssayWithGemini: gradeEssayWithGeminiMock,
   hasConfiguredGemini: hasConfiguredGeminiMock,
+  GeminiCorrectionParseError: GeminiCorrectionParseErrorMock,
+  GeminiNotConfiguredError: GeminiNotConfiguredErrorMock,
+  GeminiRateLimitedError: GeminiRateLimitedErrorMock,
+  GeminiRequestError: GeminiRequestErrorMock,
+  GeminiTransportError: GeminiTransportErrorMock,
 }));
 vi.mock("@/lib/correction-claim", () => ({
   claimCorrection: claimCorrectionMock,
@@ -54,6 +80,7 @@ vi.mock("@/lib/correction-claim", () => ({
 vi.mock("@/lib/correction-usage", () => ({
   reserveCorrectionUsage: reserveCorrectionUsageMock,
 }));
+vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock }));
 
 const { POST } = await import("./route");
 
@@ -86,6 +113,7 @@ beforeEach(() => {
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
   reserveCorrectionUsageMock.mockReset();
+  recordAdminEventMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   hasConfiguredGeminiMock.mockReturnValue(true);
   gradeEssayWithGeminiMock.mockResolvedValue(feedback);
@@ -303,6 +331,13 @@ describe("POST /api/essays/correct", () => {
       correctionKeyHash: "correction_hash_1",
       claimToken: "claim_1",
     });
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "CORRECTION_QUOTA_DENIED",
+      userId: LOCAL_USER_ID,
+      reasonCode: "daily_limit",
+      httpStatus: 429,
+      quotaWindow: "day",
+    });
   });
 
   it("does not consume correction quota while Gemini is not configured", async () => {
@@ -326,6 +361,13 @@ describe("POST /api/essays/correct", () => {
       userId: LOCAL_USER_ID,
       correctionKeyHash: "correction_hash_1",
       claimToken: "claim_1",
+    });
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "CORRECTION_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "gemini",
+      reasonCode: "not_configured",
+      httpStatus: 503,
     });
   });
 
@@ -391,6 +433,13 @@ describe("POST /api/essays/correct", () => {
 
     expect(response.status).toBe(502);
     expect(reserveCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID);
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "CORRECTION_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "gemini",
+      reasonCode: "invalid_response",
+      httpStatus: 502,
+    });
   });
 
   it("returns the existing correction without calling a provider for an unchanged custom draft", async () => {
@@ -748,7 +797,8 @@ describe("POST /api/essays/correct", () => {
     });
 
     it("returns a 502 when Gemini itself fails", async () => {
-      gradeEssayWithGeminiMock.mockRejectedValue(new Error("Gemini request failed (500)."));
+      const unsafeProviderError = new Error("Gemini request failed (500): learner draft should not reach logs.");
+      gradeEssayWithGeminiMock.mockRejectedValue(unsafeProviderError);
 
       const response = await post({
         taskType: "TASK_1",
@@ -762,6 +812,33 @@ describe("POST /api/essays/correct", () => {
         userId: LOCAL_USER_ID,
         correctionKeyHash: "correction_hash_1",
         claimToken: "claim_1",
+      });
+      expect(recordAdminEventMock).toHaveBeenCalledWith({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: LOCAL_USER_ID,
+        provider: "gemini",
+        reasonCode: "provider_unavailable",
+        httpStatus: 502,
+      });
+      expect(JSON.stringify(recordAdminEventMock.mock.calls)).not.toContain(unsafeProviderError.message);
+    });
+
+    it("keeps a known Gemini rate limit in the shared closed vocabulary", async () => {
+      gradeEssayWithGeminiMock.mockRejectedValue(new GeminiRateLimitedErrorMock());
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(502);
+      expect(recordAdminEventMock).toHaveBeenCalledWith({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: LOCAL_USER_ID,
+        provider: "gemini",
+        reasonCode: "rate_limited",
+        httpStatus: 502,
       });
     });
 
