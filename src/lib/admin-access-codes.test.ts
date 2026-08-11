@@ -1,21 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Prisma } from "@prisma/client";
 
-const { createMock, findManyMock, transactionMock } = vi.hoisted(() => ({
+const { createMock, findManyMock, transactionMock, deleteManyMock, findUniqueMock } = vi.hoisted(() => ({
   createMock: vi.fn(),
   findManyMock: vi.fn(),
   transactionMock: vi.fn(),
+  deleteManyMock: vi.fn(),
+  findUniqueMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    accessCode: { create: createMock, findMany: findManyMock },
+    accessCode: {
+      create: createMock,
+      findMany: findManyMock,
+      deleteMany: deleteManyMock,
+      findUnique: findUniqueMock,
+    },
     $transaction: transactionMock,
   },
 }));
 
-const { createAccessCodes, listAccessCodes, AccessCodeGenerationFailedError } = await import(
+const { createAccessCodes, deleteAccessCode, listAccessCodes, AccessCodeGenerationFailedError } = await import(
   "./admin-access-codes"
 );
 
@@ -30,6 +37,8 @@ beforeEach(() => {
   createMock.mockReset();
   findManyMock.mockReset();
   transactionMock.mockReset();
+  deleteManyMock.mockReset();
+  findUniqueMock.mockReset();
   transactionMock.mockImplementation(async (callback) => callback({ accessCode: { create: createMock } }));
 });
 
@@ -209,6 +218,32 @@ describe("createAccessCodes", () => {
     await expect(createAccessCodes(null, null, 1)).rejects.toBe(dbError);
     expect(createMock).toHaveBeenCalledTimes(1);
     expect(transactionMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("deleteAccessCode", () => {
+  it("deletes a code that has no live admission", async () => {
+    deleteManyMock.mockResolvedValue({ count: 1 });
+
+    await expect(deleteAccessCode("code_1")).resolves.toEqual({ kind: "deleted" });
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: { id: "code_1", redeemedByUserId: null },
+    });
+    expect(findUniqueMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses to delete a code that is actively granting access", async () => {
+    deleteManyMock.mockResolvedValue({ count: 0 });
+    findUniqueMock.mockResolvedValue({ id: "code_1" });
+
+    await expect(deleteAccessCode("code_1")).resolves.toEqual({ kind: "activelyRedeemed" });
+  });
+
+  it("reports an unknown code as not found rather than actively redeemed", async () => {
+    deleteManyMock.mockResolvedValue({ count: 0 });
+    findUniqueMock.mockResolvedValue(null);
+
+    await expect(deleteAccessCode("missing")).resolves.toEqual({ kind: "notFound" });
   });
 });
 

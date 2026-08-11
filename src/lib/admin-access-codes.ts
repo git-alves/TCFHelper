@@ -136,6 +136,30 @@ export async function createAccessCodes(
   throw new AccessCodeGenerationFailedError();
 }
 
+export type DeleteAccessCodeResult =
+  | { kind: "deleted" }
+  | { kind: "notFound" }
+  | { kind: "activelyRedeemed" };
+
+/**
+ * Permanently removes a code that has no live admission -- either never
+ * redeemed, or already detached (a manual "Deactivate access" or an elapsed
+ * timed code's window). A code currently granting access is never deleted:
+ * hasRedeemedAccessCode resolves a learner's admission through this exact
+ * row, so deleting it out from under an active redemption would sever their
+ * access. Use "Deactivate access" on the learner's detail page first if the
+ * goal is to revoke them; the code becomes deletable once detached.
+ */
+export async function deleteAccessCode(id: string): Promise<DeleteAccessCodeResult> {
+  const deleted = await prisma.accessCode.deleteMany({
+    where: { id, redeemedByUserId: null },
+  });
+  if (deleted.count === 1) return { kind: "deleted" };
+
+  const stillExists = await prisma.accessCode.findUnique({ where: { id }, select: { id: true } });
+  return stillExists ? { kind: "activelyRedeemed" } : { kind: "notFound" };
+}
+
 export async function listAccessCodes(): Promise<AdminAccessCode[]> {
   const codes = await prisma.accessCode.findMany({
     orderBy: { createdAt: "desc" },
