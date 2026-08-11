@@ -50,7 +50,7 @@ export const ADMIN_USER_SELECT = {
     select: ADMIN_USER_QUOTA_OVERRIDE_SELECT,
   },
   redeemedAccessCodes: {
-    select: { redeemedAt: true },
+    select: { redeemedAt: true, validityDays: true },
     take: 1,
   },
 } satisfies Prisma.UserSelect;
@@ -160,6 +160,13 @@ export type AdminUserListItem = {
   isAdmin: boolean;
   isBlocked: boolean;
   activatedAt: string | null;
+  // Distinct from `activatedAt` truthiness: a timed code past its derived
+  // expiry leaves activatedAt set (it is still the true historical
+  // redemption date) but is no longer a live admission until the learner's
+  // next request lazily detaches it (see access-code.ts). A caller that
+  // needs to know "does this account currently have access" -- e.g. the
+  // table's status badge -- must use this field, not activatedAt.
+  hasLiveAdmission: boolean;
   usage: AdminUserUsage;
 };
 
@@ -169,6 +176,13 @@ export type AdminUserDetail = AdminUserListItem & {
 };
 
 function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
+  const redemption = record.redeemedAccessCodes[0];
+  const hasLiveAdmission =
+    redemption !== undefined &&
+    (redemption.validityDays === null ||
+      redemption.redeemedAt === null ||
+      redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY > now.getTime());
+
   return {
     id: record.id,
     email: record.email,
@@ -176,7 +190,8 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
     createdAt: record.createdAt.toISOString(),
     isAdmin: record.isAdmin,
     isBlocked: record.isBlocked,
-    activatedAt: record.redeemedAccessCodes[0]?.redeemedAt?.toISOString() ?? null,
+    activatedAt: redemption?.redeemedAt?.toISOString() ?? null,
+    hasLiveAdmission,
     usage: getCurrentAdminUsage(record, now),
   };
 }
@@ -249,28 +264,26 @@ function userSearchWhere(query: string): Prisma.UserWhereInput {
  * detaches it -- mirroring hasRedeemedAccessCode's own expiry derivation
  * (see access-code.ts). A plain "redeemedAt is not null" filter would
  * therefore misclassify an expired-but-not-yet-detached learner as
- * indefinitely activated. Prisma cannot compare two column values in a
- * WHERE clause, so live admission is resolved here in application code
- * instead: one query over currently-redeemed codes, then set membership.
+ * indefinitely activated. Prisma's query builder cannot express that date
+ * arithmetic in a WHERE clause, but raw SQL can -- computing it here in
+ * Postgres, rather than pulling every redeemed row into Node to loop over,
+ * keeps this bounded to actual work instead of an unbounded in-memory scan
+ * that only grows with the table. `now` is passed as a bound parameter, not
+ * interpolated into the query text.
  */
 async function usersWithLiveAdmission(now: Date): Promise<Set<string>> {
-  const redemptions = await prisma.accessCode.findMany({
-    where: { redeemedByUserId: { not: null } },
-    select: { redeemedByUserId: true, redeemedAt: true, validityDays: true },
-  });
-  const nowMs = now.getTime();
-  const liveUserIds = new Set<string>();
+  const rows = await prisma.$queryRaw<{ userId: string }[]>`
+    SELECT "redeemedByUserId" AS "userId"
+    FROM "AccessCode"
+    WHERE "redeemedByUserId" IS NOT NULL
+      AND (
+        "validityDays" IS NULL
+        OR "redeemedAt" IS NULL
+        OR "redeemedAt" + ("validityDays" * INTERVAL '1 day') > ${now}
+      )
+  `;
 
-  for (const redemption of redemptions) {
-    if (!redemption.redeemedByUserId) continue;
-    const isLive =
-      redemption.validityDays === null ||
-      redemption.redeemedAt === null ||
-      redemption.redeemedAt.getTime() + redemption.validityDays * MS_PER_DAY > nowMs;
-    if (isLive) liveUserIds.add(redemption.redeemedByUserId);
-  }
-
-  return liveUserIds;
+  return new Set(rows.map((row) => row.userId));
 }
 
 /**
@@ -350,8 +363,18 @@ export const MAX_USERS_EXPORT_ROWS = 10_000;
 
 export type AdminUsersExportResult =
   | { truncated: false; users: AdminUserListItem[] }
-  | { truncated: true; total: number };
+  | { truncated: true };
 
+/**
+ * A separate count() before this findMany would leave a window for a
+ * matching user to be created in between -- the count could pass under the
+ * cap while the findMany, racing behind it, silently omits the newly
+ * matching row from an export that claims completeness. Requesting one row
+ * past the cap in this single query sidesteps that race entirely: if it
+ * comes back, the true total is unknowably over the cap and the caller must
+ * refuse rather than guess; fewer than that and every row already in hand
+ * is provably the whole set.
+ */
 export async function getAdminUsersForExport(
   {
     query,
@@ -363,17 +386,16 @@ export async function getAdminUsersForExport(
   now = new Date(),
 ): Promise<AdminUsersExportResult> {
   const where: Prisma.UserWhereInput = { ...userSearchWhere(query), ...(await userStatusWhere(status, now)) };
-  const total = await prisma.user.count({ where });
-  if (total > MAX_USERS_EXPORT_ROWS) {
-    return { truncated: true, total };
-  }
-
   const records = await prisma.user.findMany({
     where,
     select: ADMIN_USER_SELECT,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_USERS_EXPORT_ROWS,
+    take: MAX_USERS_EXPORT_ROWS + 1,
   });
+
+  if (records.length > MAX_USERS_EXPORT_ROWS) {
+    return { truncated: true };
+  }
 
   return { truncated: false, users: records.map((record) => serializeUser(record, now)) };
 }

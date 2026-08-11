@@ -90,14 +90,14 @@ describe("GET /api/admin/users/export", () => {
   });
 
   it("refuses with a 413 instead of silently truncating when the filter matches too many rows", async () => {
-    getAdminUsersForExportMock.mockResolvedValue({ truncated: true, total: 12_345 });
+    getAdminUsersForExportMock.mockResolvedValue({ truncated: true });
 
     const response = await GET(exportRequest());
 
     expect(response.status).toBe(413);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({
-      error: "This filter matches 12,345 users, more than the 10,000-row export limit. Narrow your search before exporting.",
+      error: "This filter matches more than 10,000 users, the export limit. Narrow your search before exporting.",
     });
   });
 });

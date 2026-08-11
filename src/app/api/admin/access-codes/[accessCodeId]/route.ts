@@ -61,6 +61,15 @@ export async function DELETE(
       409,
     );
   }
+  if (result.kind === "timedOut") {
+    // The database itself canceled this statement (see
+    // DELETE_STATEMENT_TIMEOUT_MS), so its transaction rolled back -- this
+    // code was definitely not deleted, not merely unconfirmed.
+    return adminJsonResponse(
+      { error: "This deletion could not be confirmed in time. The code was not deleted — please try again." },
+      504,
+    );
+  }
 
   return adminJsonResponse({ deleted: true });
 }

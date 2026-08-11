@@ -95,14 +95,14 @@ describe("GET /api/admin/access-codes/export", () => {
   });
 
   it("refuses with a 413 instead of silently truncating when the filter matches too many rows", async () => {
-    getAdminAccessCodesForExportMock.mockResolvedValue({ truncated: true, total: 12_345 });
+    getAdminAccessCodesForExportMock.mockResolvedValue({ truncated: true });
 
     const response = await GET(exportRequest());
 
     expect(response.status).toBe(413);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     await expect(response.json()).resolves.toEqual({
-      error: "This filter matches 12,345 codes, more than the 10,000-row export limit. Narrow your search before exporting.",
+      error: "This filter matches more than 10,000 codes, the export limit. Narrow your search before exporting.",
     });
   });
 });

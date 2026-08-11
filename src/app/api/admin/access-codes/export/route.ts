@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   if (result.truncated) {
     return Response.json(
       {
-        error: `This filter matches ${result.total.toLocaleString("en-US")} codes, more than the ${MAX_ACCESS_CODES_EXPORT_ROWS.toLocaleString("en-US")}-row export limit. Narrow your search before exporting.`,
+        error: `This filter matches more than ${MAX_ACCESS_CODES_EXPORT_ROWS.toLocaleString("en-US")} codes, the export limit. Narrow your search before exporting.`,
       },
       { status: 413, headers: NO_STORE_HEADERS },
     );

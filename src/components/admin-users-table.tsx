@@ -45,8 +45,10 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                       <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-950 dark:text-red-200">Blocked</span>
                     ) : user.isAdmin ? (
                       <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-900 dark:bg-violet-950 dark:text-violet-200">Owner access</span>
-                    ) : user.activatedAt ? (
+                    ) : user.hasLiveAdmission ? (
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated</span>
+                    ) : user.activatedAt ? (
+                      <span className="rounded-full bg-zinc-200 px-2 py-0.5 text-xs font-medium text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">Access expired</span>
                     ) : (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Needs code</span>
                     )}

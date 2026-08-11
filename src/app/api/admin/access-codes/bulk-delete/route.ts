@@ -64,5 +64,15 @@ export async function POST(request: Request) {
   }
 
   const result = await deleteAccessCodes(parsed.data.ids);
+  if ("timedOut" in result) {
+    // The database itself canceled this statement, so its transaction
+    // rolled back -- none of the selected codes were deleted, not merely
+    // unconfirmed.
+    return adminJsonResponse(
+      { error: "This deletion could not be confirmed in time. None of the selected codes were deleted — please try again." },
+      504,
+    );
+  }
+
   return adminJsonResponse(result);
 }

@@ -146,10 +146,61 @@ export async function createAccessCodes(
   throw new AccessCodeGenerationFailedError();
 }
 
+// Bounds how long Postgres itself will run a delete statement -- including
+// any time spent blocked waiting on a row lock -- well under the client's
+// own abort deadline (see DELETE_TIMEOUT_MS / BULK_DELETE_TIMEOUT_MS in the
+// admin delete UI components). This is a genuine kill switch enforced by
+// the database: unlike a browser AbortController, which only stops the
+// client from waiting and never reaches the server, a Postgres statement
+// hitting its own statement_timeout is forcibly canceled and its
+// transaction rolled back. A blocked mutation therefore cannot go on
+// running -- and possibly commit -- after the deadline has passed, which is
+// what makes a client-side timeout past this point trustworthy rather than
+// merely probabilistic.
+const DELETE_STATEMENT_TIMEOUT_MS = 6_000;
+
+function isStatementTimeoutError(error: unknown): boolean {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (typeof error.meta?.code === "string" && error.meta.code === "57014") return true;
+    if (/statement timeout/i.test(error.message)) return true;
+  }
+  return error instanceof Error && /statement timeout/i.test(error.message);
+}
+
+/**
+ * Runs `run` inside a transaction with a Postgres-enforced statement
+ * deadline. Any error surfacing from that transaction -- the deliberate
+ * cancellation this deadline exists to cause, or a genuine unrelated
+ * database error -- means the mutation cannot be confirmed to have
+ * committed, so both are folded into the same "not confirmed" result here
+ * rather than trying to exhaustively pattern-match Postgres's exact
+ * cancellation error shape (which Prisma does not document as a stable
+ * contract). A caller that needs to distinguish infrastructure failures for
+ * its own error handling should not reuse this helper.
+ */
+async function withDeleteDeadline<T>(
+  run: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<{ timedOut: false; value: T } | { timedOut: true }> {
+  try {
+    const value = await prisma.$transaction(async (tx) => {
+      // Not user input -- DELETE_STATEMENT_TIMEOUT_MS is a fixed internal
+      // constant, so this is safe without parameter binding (which SET
+      // does not support in Postgres in any case).
+      await tx.$executeRawUnsafe(`SET LOCAL statement_timeout = ${DELETE_STATEMENT_TIMEOUT_MS}`);
+      return run(tx);
+    });
+    return { timedOut: false, value };
+  } catch (error) {
+    if (isStatementTimeoutError(error)) return { timedOut: true };
+    throw error;
+  }
+}
+
 export type DeleteAccessCodeResult =
   | { kind: "deleted" }
   | { kind: "notFound" }
-  | { kind: "activelyRedeemed" };
+  | { kind: "activelyRedeemed" }
+  | { kind: "timedOut" };
 
 /**
  * Permanently removes a code that has no live admission -- either never
@@ -161,16 +212,19 @@ export type DeleteAccessCodeResult =
  * goal is to revoke them; the code becomes deletable once detached.
  */
 export async function deleteAccessCode(id: string): Promise<DeleteAccessCodeResult> {
-  const deleted = await prisma.accessCode.deleteMany({
-    where: { id, redeemedByUserId: null },
-  });
-  if (deleted.count === 1) return { kind: "deleted" };
+  const result = await withDeleteDeadline((tx) =>
+    tx.accessCode.deleteMany({ where: { id, redeemedByUserId: null } }),
+  );
+  if (result.timedOut) return { kind: "timedOut" };
+  if (result.value.count === 1) return { kind: "deleted" };
 
   const stillExists = await prisma.accessCode.findUnique({ where: { id }, select: { id: true } });
   return stillExists ? { kind: "activelyRedeemed" } : { kind: "notFound" };
 }
 
-export type DeleteAccessCodesResult = { deletedCount: number; requestedCount: number };
+export type DeleteAccessCodesResult =
+  | { deletedCount: number; requestedCount: number }
+  | { timedOut: true; requestedCount: number };
 
 /**
  * Bulk counterpart of deleteAccessCode, sharing the exact same safety
@@ -184,11 +238,12 @@ export async function deleteAccessCodes(ids: string[]): Promise<DeleteAccessCode
   const uniqueIds = Array.from(new Set(ids));
   if (uniqueIds.length === 0) return { deletedCount: 0, requestedCount: 0 };
 
-  const deleted = await prisma.accessCode.deleteMany({
-    where: { id: { in: uniqueIds }, redeemedByUserId: null },
-  });
+  const result = await withDeleteDeadline((tx) =>
+    tx.accessCode.deleteMany({ where: { id: { in: uniqueIds }, redeemedByUserId: null } }),
+  );
+  if (result.timedOut) return { timedOut: true, requestedCount: uniqueIds.length };
 
-  return { deletedCount: deleted.count, requestedCount: uniqueIds.length };
+  return { deletedCount: result.value.count, requestedCount: uniqueIds.length };
 }
 
 function serializeAccessCode(code: Prisma.AccessCodeGetPayload<{ select: typeof ACCESS_CODE_LIST_SELECT }>): AdminAccessCode {
@@ -279,21 +334,29 @@ export const MAX_ACCESS_CODES_EXPORT_ROWS = 10_000;
 
 export type AdminAccessCodesExportResult =
   | { truncated: false; accessCodes: AdminAccessCode[] }
-  | { truncated: true; total: number };
+  | { truncated: true };
 
+/**
+ * A separate count() before this findMany would leave a window for a
+ * matching row to be inserted in between -- the count could pass under the
+ * cap while the findMany, racing behind it, silently omits the newly
+ * matching row from an export that claims completeness. Requesting one row
+ * past the cap in this single query sidesteps that race entirely: if it
+ * comes back, the true total is unknowably over the cap (this query alone
+ * can't say by how much) and the caller must refuse rather than guess;
+ * fewer than that and every row already in hand is provably the whole set.
+ */
 export async function getAdminAccessCodesForExport(query: string): Promise<AdminAccessCodesExportResult> {
-  const where = accessCodeSearchWhere(query);
-  const total = await prisma.accessCode.count({ where });
-  if (total > MAX_ACCESS_CODES_EXPORT_ROWS) {
-    return { truncated: true, total };
-  }
-
   const records = await prisma.accessCode.findMany({
-    where,
+    where: accessCodeSearchWhere(query),
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: MAX_ACCESS_CODES_EXPORT_ROWS,
+    take: MAX_ACCESS_CODES_EXPORT_ROWS + 1,
     select: ACCESS_CODE_LIST_SELECT,
   });
+
+  if (records.length > MAX_ACCESS_CODES_EXPORT_ROWS) {
+    return { truncated: true };
+  }
 
   return { truncated: false, accessCodes: records.map(serializeAccessCode) };
 }

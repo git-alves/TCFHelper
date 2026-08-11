@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { countMock, findManyMock, accessCodeFindManyMock } = vi.hoisted(() => ({
+const { countMock, findManyMock, queryRawMock } = vi.hoisted(() => ({
   countMock: vi.fn(),
   findManyMock: vi.fn(),
-  accessCodeFindManyMock: vi.fn(),
+  queryRawMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -14,27 +14,50 @@ vi.mock("@/lib/prisma", () => ({
       findMany: findManyMock,
       findUnique: vi.fn(),
     },
-    accessCode: {
-      findMany: accessCodeFindManyMock,
-    },
+    $queryRaw: queryRawMock,
   },
 }));
 
 const {
   getAdminUsersPage,
+  getAdminUsersForExport,
   getCurrentAdminUsage,
   parseAdminUserListQuery,
   serializeQuotaOverride,
+  MAX_USERS_EXPORT_ROWS,
 } = await import("./admin-users");
+
+function userRecord(overrides: {
+  id?: string;
+  redeemedAt?: Date | null;
+  validityDays?: number | null;
+}) {
+  return {
+    id: overrides.id ?? "user_1",
+    email: "learner@example.com",
+    name: null,
+    createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    isAdmin: false,
+    isBlocked: false,
+    translationQuota: null,
+    exampleGenerationQuota: null,
+    correctionUsage: null,
+    quotaOverride: null,
+    redeemedAccessCodes:
+      overrides.redeemedAt === undefined && overrides.validityDays === undefined
+        ? []
+        : [{ redeemedAt: overrides.redeemedAt ?? null, validityDays: overrides.validityDays ?? null }],
+  };
+}
 
 describe("admin user list helpers", () => {
   beforeEach(() => {
     countMock.mockReset();
     findManyMock.mockReset();
-    accessCodeFindManyMock.mockReset();
+    queryRawMock.mockReset();
     countMock.mockResolvedValue(0);
     findManyMock.mockResolvedValue([]);
-    accessCodeFindManyMock.mockResolvedValue([]);
+    queryRawMock.mockResolvedValue([]);
   });
 
   it("normalizes a search, status, and rejects invalid page values", () => {
@@ -61,30 +84,31 @@ describe("admin user list helpers", () => {
   it("filters to blocked or admin accounts without consulting access codes", async () => {
     await getAdminUsersPage({ query: "", status: "blocked", page: 1 });
     expect(countMock).toHaveBeenLastCalledWith({ where: { isBlocked: true } });
-    expect(accessCodeFindManyMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
 
     await getAdminUsersPage({ query: "", status: "admin", page: 1 });
     expect(countMock).toHaveBeenLastCalledWith({ where: { isAdmin: true } });
-    expect(accessCodeFindManyMock).not.toHaveBeenCalled();
+    expect(queryRawMock).not.toHaveBeenCalled();
   });
 
-  it("classifies activated/unactivated by currently live admission, not merely having ever redeemed", async () => {
+  it("classifies activated/unactivated by currently live admission, not merely having ever redeemed, resolving it with a bounded database-side query rather than loading every redemption into memory", async () => {
     const now = new Date("2026-08-10T12:00:00.000Z");
-    accessCodeFindManyMock.mockResolvedValue([
+    queryRawMock.mockResolvedValue([
       // Lifetime code: always live once redeemed.
-      { redeemedByUserId: "user_lifetime", redeemedAt: new Date("2026-01-01T00:00:00.000Z"), validityDays: null },
+      { userId: "user_lifetime" },
       // Timed code still inside its window.
-      { redeemedByUserId: "user_active_timed", redeemedAt: new Date("2026-08-09T00:00:00.000Z"), validityDays: 7 },
-      // Timed code past its derived expiry, but not yet lazily detached --
-      // must NOT count as a live admission even though redeemedAt is set.
-      { redeemedByUserId: "user_expired_timed", redeemedAt: new Date("2026-07-01T00:00:00.000Z"), validityDays: 7 },
+      { userId: "user_active_timed" },
+      // A timed code past its derived expiry is excluded by the query
+      // itself (see the SQL's WHERE clause) -- an expired user's id never
+      // appears in these rows at all.
     ]);
 
     await getAdminUsersPage({ query: "", status: "activated", page: 1 }, now);
-    expect(accessCodeFindManyMock).toHaveBeenLastCalledWith({
-      where: { redeemedByUserId: { not: null } },
-      select: { redeemedByUserId: true, redeemedAt: true, validityDays: true },
-    });
+    expect(queryRawMock).toHaveBeenCalledTimes(1);
+    const [strings, ...values] = queryRawMock.mock.calls[0] as [TemplateStringsArray, ...unknown[]];
+    expect(strings.join("")).toContain('FROM "AccessCode"');
+    expect(strings.join("")).toContain('"redeemedByUserId" IS NOT NULL');
+    expect(values).toEqual([now]);
     expect(countMock).toHaveBeenLastCalledWith({
       where: { id: { in: ["user_lifetime", "user_active_timed"] } },
     });
@@ -203,5 +227,74 @@ describe("admin user list helpers", () => {
         correctionRequestsPerDay: null,
       }),
     ).toMatchObject({ translationRequestsPerMinute: 0 });
+  });
+
+  it("keeps activatedAt (historical) distinct from hasLiveAdmission (current) for an expired timed code", async () => {
+    const now = new Date("2026-08-10T12:00:00.000Z");
+    findManyMock.mockResolvedValue([
+      userRecord({ id: "user_never", redeemedAt: undefined }),
+      userRecord({ id: "user_lifetime", redeemedAt: new Date("2026-01-01T00:00:00.000Z"), validityDays: null }),
+      userRecord({ id: "user_live_timed", redeemedAt: new Date("2026-08-09T00:00:00.000Z"), validityDays: 7 }),
+      userRecord({ id: "user_expired_timed", redeemedAt: new Date("2026-07-01T00:00:00.000Z"), validityDays: 7 }),
+    ]);
+
+    const page = await getAdminUsersPage({ query: "", status: "all", page: 1 }, now);
+    const byId = Object.fromEntries(page.users.map((user) => [user.id, user]));
+
+    expect(byId.user_never).toMatchObject({ activatedAt: null, hasLiveAdmission: false });
+    expect(byId.user_lifetime).toMatchObject({
+      activatedAt: "2026-01-01T00:00:00.000Z",
+      hasLiveAdmission: true,
+    });
+    expect(byId.user_live_timed).toMatchObject({
+      activatedAt: "2026-08-09T00:00:00.000Z",
+      hasLiveAdmission: true,
+    });
+    // The historical redemption date is preserved even though the code's
+    // window has since elapsed -- only hasLiveAdmission reflects that it no
+    // longer grants access. A UI that used activatedAt truthiness alone (as
+    // the users table badge once did) would wrongly call this "Activated".
+    expect(byId.user_expired_timed).toMatchObject({
+      activatedAt: "2026-07-01T00:00:00.000Z",
+      hasLiveAdmission: false,
+    });
+  });
+});
+
+describe("getAdminUsersForExport", () => {
+  beforeEach(() => {
+    countMock.mockReset();
+    findManyMock.mockReset();
+    queryRawMock.mockReset();
+    findManyMock.mockResolvedValue([]);
+    queryRawMock.mockResolvedValue([]);
+  });
+
+  it("requests one row past the cap in a single query, not a separate count, to avoid a TOCTOU gap between counting and fetching", async () => {
+    await getAdminUsersForExport({ query: "", status: "all" });
+
+    expect(countMock).not.toHaveBeenCalled();
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ take: MAX_USERS_EXPORT_ROWS + 1 }));
+  });
+
+  it("refuses instead of silently truncating when the sentinel row past the cap comes back", async () => {
+    findManyMock.mockResolvedValue(
+      Array.from({ length: MAX_USERS_EXPORT_ROWS + 1 }, (_, index) => userRecord({ id: `user_${index}` })),
+    );
+
+    const result = await getAdminUsersForExport({ query: "", status: "all" });
+
+    expect(result).toEqual({ truncated: true });
+  });
+
+  it("returns every row when the result is within the cap", async () => {
+    findManyMock.mockResolvedValue([userRecord({ id: "user_1" })]);
+
+    const result = await getAdminUsersForExport({ query: "", status: "all" });
+
+    expect(result.truncated).toBe(false);
+    if (!result.truncated) {
+      expect(result.users).toHaveLength(1);
+    }
   });
 });
