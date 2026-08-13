@@ -225,6 +225,81 @@ Vercel-only sensitive environment variable.
   fail before release. Apply it through its maintenance runbook instead; only
   add a future migration to the allowlist after reviewing it as additive.
 
+### Starter-topic bank rollout
+
+The managed OFFICIAL_EXAM starter-topic bank (`src/lib/starter-topics.ts`) is
+never mutated in place when a prompt is corrected: `syncSeedTopics`
+(`src/lib/seed-topic-sync.ts`) retires the existing row (sets `retiredAt`,
+leaves its `id`/`source`/`prompt` untouched) and creates a new one, so an
+essay that already references the old row by id keeps its original topic
+text and id. This preserves *what was assigned*, not the rubric version it
+is graded under: correction selects a Tâche's rubric solely by `taskType`
+(`essay-correction-prompt.ts`), not by topic row, so an essay against a
+retired, pre-correction-format topic (e.g. an old opinion-style Tâche 2
+prompt) is still graded by the current rubric. Whether to version the
+rubric per topic is an open product decision, not something `retiredAt`
+attempts to solve.
+
+That sync deliberately does **not** run inside `vercel-build`, or as any
+step tied to a specific deploy or CI run. `vercel-build` runs entirely
+before Vercel promotes the new build to production traffic; a row retired
+from in there would be invisible to the *new* deployment's picker (which
+filters on `retiredAt: null`) while the *previous* deployment -- still live
+and serving requests until cutover completes -- has no such filter and
+would list both the retired and replacement topic as duplicates, or
+indefinitely if the build then failed. Tying it to a step inside
+`.github/workflows/deploy.yml` would also only cover one of the two deploy
+paths above (Option A, Vercel's own Git integration, has no GitHub Actions
+job to attach a post-deploy step to at all), and would depend on that
+specific CI/deploy run actually being the one whose commit ends up live --
+GitHub does not guarantee two triggered workflow runs finish in the order
+they started, so a slower run for an older commit could still retire a row
+after a newer commit's picker is already serving traffic.
+
+Instead, `npm run db:seed:deploy` (`scripts/deploy-seed-topics.ts`) is a
+deliberate, human-run maintenance step, run once an operator has confirmed
+in the Vercel dashboard that the deployment carrying a corrected
+starter-topic prompt is actually promoted to production:
+
+```sh
+RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
+  vercel env run -e production -- npm run db:seed:deploy
+```
+
+`vercel env run -e production` injects production environment variables
+(including `DATABASE_URL`) directly into the command's process without ever
+writing them to disk, unlike `vercel env pull`. The two leading env vars
+still matter: the script only proceeds with `VERCEL_ENV` explicitly set to
+`production` -- required, not merely permitted, since (unlike the build-time
+migration scripts) nothing sets `VERCEL_ENV` automatically on an operator's
+own machine. Run it from a fresh checkout of
+the exact commit shown as live in the Vercel dashboard; a stale local
+checkout's `STARTER_TOPICS` would retire the current, corrected bank back to
+an older one. `npm run db:seed` (`scripts/seed-topics.ts`) remains the fully
+unguarded local/maintenance entrypoint. Both go through the same Postgres
+advisory lock (`runLockedSeedTopicSync`) as each other and as any concurrent
+run of themselves, so re-running the step is always safe -- a run against
+already-current prompts is a no-op.
+
+Running it only after confirming cutover, rather than racing it against
+cutover, is what avoids the duplicate-listing window above -- and it needs
+no scheduler, so it carries none of a periodic cron's own hazards (Vercel
+Hobby permits cron only once daily, and a cron cannot be timed to a specific
+deploy's cutover in the first place). This does not make a *later* rollback
+free: rolling back to a pre-`retiredAt` deployment after this step has run
+restores a picker that filters only on `source`, so it lists both the
+retired and replacement `OFFICIAL_EXAM` rows as duplicates until you roll
+forward again -- the database change itself is not undone by a code
+rollback. This is a display-only duplication, not a data-integrity issue:
+either duplicate still has its own stable id and unmodified prompt text, so
+an essay against either one is still stored and correctable against
+exactly the topic text it was written for (subject to the same
+taskType-only rubric-selection caveat above, which is unaffected by
+rollback either way). It is the same "additive changes are
+forward-compatible only, not rollback-compatible" caveat that applies to
+this repo's other schema changes -- see "Production migration policy"
+above.
+
 The one-time `npm run onboarding:backfill-pre-gate` command is intentionally a
 reviewed maintenance operation rather than an automatic deployment migration:
 it records only the pre-gate cohort's onboarding version, not access admission.
@@ -444,8 +519,9 @@ Either way, set these environment variables on the Vercel project (with
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `GEMINI_API_KEY`,
 `GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`,
-`STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`,
+`CRON_SECRET` (Production scope only -- required for the admin-event
+retention cron to authenticate; see `.env.example`).
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary

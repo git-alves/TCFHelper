@@ -7,19 +7,21 @@
  *
  * This always runs against whatever DATABASE_URL is configured, with no
  * production/environment guard -- for the guarded wrapper Vercel's build
- * actually invokes, see deploy-seed-topics.ts.
+ * actually invokes, see deploy-seed-topics.ts. It still goes through the
+ * same advisory-lock helper that wrapper uses, so a manual run can't race a
+ * concurrent deploy (or another manual run).
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { syncSeedTopics } from "../src/lib/seed-topic-sync";
+import { runLockedSeedTopicSync } from "../src/lib/seed-topic-sync";
 import { STARTER_TOPICS } from "../src/lib/starter-topics";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const { created, updated, unchanged } = await syncSeedTopics(prisma, STARTER_TOPICS);
+  const { created, retired, unchanged } = await runLockedSeedTopicSync(prisma, STARTER_TOPICS);
 
-  console.log(`Seed complete: ${created} created, ${updated} updated, ${unchanged} already current.`);
+  console.log(`Seed complete: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`);
 }
 
 main()

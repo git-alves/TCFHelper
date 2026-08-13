@@ -22,7 +22,7 @@
     "admin:promote": "tsx scripts/promote-admin.ts",
     "onboarding:backfill-pre-gate": "tsx scripts/backfill-pre-gate-walkthrough.ts",
     "db:verify:clerk-cutover": "tsx scripts/verify-clerk-cutover.ts",
-    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:seed:deploy && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
+    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
     "@clerk/backend": "^3.15.0",

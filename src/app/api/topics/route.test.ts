@@ -51,7 +51,7 @@ describe("GET /api/topics", () => {
 
     expect(response.status).toBe(200);
     expect(findManyMock).toHaveBeenCalledWith({
-      where: { taskType: "TASK_1", source: "OFFICIAL_EXAM" },
+      where: { taskType: "TASK_1", source: "OFFICIAL_EXAM", retiredAt: null },
       select: { id: true, title: true, prompt: true },
     });
   });

@@ -169,6 +169,18 @@ model Topic {
   // immutable Topic rather than mutating the context of saved essays.
   externalRef String?     @unique
   createdAt   DateTime    @default(now())
+  // Set when a managed OFFICIAL_EXAM starter topic's prompt text is
+  // corrected: the existing row is retired (this timestamp set) rather than
+  // its prompt mutated in place, and a new row with the corrected prompt is
+  // created alongside it -- see seed-topic-sync.ts. A plain additive,
+  // nullable column rather than a new TopicSource value on purpose: old code
+  // still running during a rolling deploy never reads this field, so it
+  // keeps accepting a freshly-retired row exactly as before (source is
+  // untouched) instead of rejecting it as an unrecognized enum value until
+  // traffic has fully cut over to the new deployment. Only the topic
+  // picker (retiredAt: null) and the seed sync's own "find the current
+  // version" lookup filter on it.
+  retiredAt   DateTime?
 
   essays Essay[]
 

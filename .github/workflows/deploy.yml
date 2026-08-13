@@ -10,6 +10,15 @@ on:
 permissions:
   contents: read
 
+# Two overlapping production deploys (e.g. two pushes to main in quick
+# succession) would otherwise both run to completion, wasting a build.
+# vercel-build never seeds or retires starter topics itself (see README's
+# "Starter-topic bank rollout"), so this is purely about not wasting a build,
+# not about write ordering.
+concurrency:
+  group: ${{ github.workflow }}-production
+  cancel-in-progress: true
+
 jobs:
   deploy:
     if: >-

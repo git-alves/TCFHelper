@@ -236,6 +236,31 @@ describe("POST /api/essays/correct", () => {
     );
   });
 
+  it("still grades against a retired topic's own, never-mutated prompt", async () => {
+    // A client that loaded the picker before this topic was retired (its
+    // prompt corrected -- see seed-topic-sync.ts) still holds this topicId.
+    // source stays OFFICIAL_EXAM for a retired row specifically so this
+    // keeps resolving and grading exactly as it did before retirement, even
+    // for an app version that predates retiredAt existing at all.
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+      retiredAt: new Date("2026-08-01T00:00:00.000Z"),
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    const requestToGemini = gradeEssayWithGeminiMock.mock.calls[0][0];
+    expect(requestToGemini.userPrompt).toContain("Écrivez à votre voisin pour décrire votre quartier.");
+  });
+
   it("accepts a bank topic ID without duplicating its prompt in the request", async () => {
     findUniqueMock.mockResolvedValue({
       id: "topic_1",

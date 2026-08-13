@@ -35,10 +35,13 @@ export async function GET(request: Request) {
 
   const topics = await prisma.topic.findMany({
     // A learner-supplied prompt is stored so its essay has durable context,
-    // but it must never become visible in the shared seeded topic bank.
+    // but it must never become visible in the shared seeded topic bank. A
+    // retired starter topic (see seed-topic-sync.ts) stays gradeable for
+    // whoever already has its id, but must not be offered here again.
     where: {
       taskType: taskType as TaskType,
       source: TopicSource.OFFICIAL_EXAM,
+      retiredAt: null,
     },
     select: { id: true, title: true, prompt: true },
   });
