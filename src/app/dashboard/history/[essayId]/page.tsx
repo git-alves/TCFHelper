@@ -78,7 +78,7 @@ export default async function CorrectionHistoryDetailPage({ params }: Correction
         <h2 className="font-semibold">{copy.workspace.correctionModal.commentsHeading}</h2>
         {detail.cefrLevel && (
           <p className="mt-3 text-sm font-medium text-violet-700 dark:text-violet-300">
-            {copy.workspace.correctionModal.estimatedLevel({ level: detail.cefrLevel })}
+            {copy.workspace.correctionModal.secureLevel({ level: detail.cefrLevel })}
           </p>
         )}
         <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-200">{detail.summary}</p>

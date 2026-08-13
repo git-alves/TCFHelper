@@ -92,8 +92,14 @@ const feedback = {
     linguistics: { score: 70, feedback: "Mostly accurate, watch verb agreement." },
     vocabulary: { score: 65, feedback: "Simple but appropriate vocabulary." },
   },
-  cefrLevel: "B1",
-  cefrRationale: "The response is understandable, but limited development and range keep it at B1.",
+  cefr: {
+    estimatedLevel: "B1",
+    conservativeLevel: "B1",
+    confidence: "Medium",
+    rationale: "The response is understandable, but limited development and range keep it at B1.",
+    evidence: "Clear, understandable sentences with accurate everyday vocabulary.",
+    blocker: "Limited development and range keep it at B1.",
+  },
   meetsWordCount: false,
   wordCountNote: "This response is below the target range.",
   errors: [],
@@ -287,7 +293,9 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ essayId: "essay_1", feedback });
     expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain("originalStart");
-    expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain("main blocker to the next band");
+    expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain(
+      "main blocker preventing the next CEFR level",
+    );
     expect(essayCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -297,7 +305,7 @@ describe("POST /api/essays/correct", () => {
               grammarNotes: expect.objectContaining({
                 modelVersion: feedback.modelVersion,
                 scores: feedback.scores,
-                cefrRationale: feedback.cefrRationale,
+                cefr: feedback.cefr,
               }),
             }),
           },
@@ -760,12 +768,12 @@ describe("POST /api/essays/correct", () => {
         ...feedback,
         errors: [
           {
-            original: "j'ai acheter",
+            originalText: "j'ai acheter",
             originalStart: null,
-            correction: "j'ai acheté",
+            correctedText: "j'ai acheté",
             correctionStart: 5,
             explanation: "The past participle should end in -é.",
-            category: "grammar",
+            errorType: "grammar",
           },
         ],
       });

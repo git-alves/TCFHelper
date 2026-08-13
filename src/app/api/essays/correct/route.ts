@@ -278,7 +278,7 @@ export async function POST(request: Request) {
     return correctionDailyLimitResponse(usageReservation.resetAt);
   }
 
-  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
+  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage, taskType, resolvedTopicPrompt);
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
   let shouldReleaseClaim = true;
   try {
@@ -345,14 +345,14 @@ export async function POST(request: Request) {
             status: EssayStatus.SUBMITTED,
             feedback: {
               create: {
-                level: feedback.cefrLevel,
+                level: feedback.cefr.conservativeLevel,
                 feedbackLocale: locale,
                 summary: feedback.summary,
                 meetsWordCount: feedback.meetsWordCount,
                 grammarNotes: {
                   correctedText: feedback.correctedText,
                   modelVersion: feedback.modelVersion,
-                  cefrRationale: feedback.cefrRationale,
+                  cefr: feedback.cefr,
                   wordCountNote: feedback.wordCountNote,
                   errors: feedback.errors,
                   scores: feedback.scores,

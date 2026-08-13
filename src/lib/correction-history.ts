@@ -2,17 +2,43 @@ import "server-only";
 
 import { EssayStatus, type CefrLevel, type Prisma, type TaskType } from "@prisma/client";
 import { z } from "zod";
-import type { AppLocale } from "@/lib/app-locale";
-import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
+import { getAppCopy } from "@/lib/app-copy";
+import { DEFAULT_APP_LOCALE, isAppLocale, type AppLocale } from "@/lib/app-locale";
+import { ERROR_CATEGORIES, essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { prisma } from "@/lib/prisma";
 
 const storedCorrectionFieldsSchema = essayFeedbackSchema.pick({
   correctedText: true,
   modelVersion: true,
   scores: true,
-  cefrRationale: true,
+  cefr: true,
   wordCountNote: true,
   errors: true,
+});
+
+// The shape grammarNotes was stored in before the "hybrid grid" prompt
+// rewrite: a single blended cefrRationale string (no separate estimated
+// level, confidence, evidence, or blocker) and original/correction/category
+// -named error fields. Kept only so an essay corrected before that rewrite
+// still renders its full corrected text, errors, and model version instead
+// of degrading straight to a bare summary the moment the new schema can't
+// parse its JSON as-is.
+const legacyStoredCorrectionFieldsSchema = z.object({
+  correctedText: essayFeedbackSchema.shape.correctedText,
+  modelVersion: essayFeedbackSchema.shape.modelVersion,
+  scores: essayFeedbackSchema.shape.scores,
+  cefrRationale: z.string().min(1),
+  wordCountNote: essayFeedbackSchema.shape.wordCountNote,
+  errors: z.array(
+    z.object({
+      original: z.string(),
+      originalStart: z.number().int().min(0).nullish(),
+      correction: z.string(),
+      correctionStart: z.number().int().min(0).nullish(),
+      explanation: z.string(),
+      category: z.enum(ERROR_CATEGORIES),
+    }),
+  ),
 });
 
 const storedSuggestionsSchema = z.array(z.string());
@@ -100,8 +126,12 @@ function submittedCorrectionWhere(userId: string): Prisma.EssayWhereInput {
 
 /**
  * The detailed correction fields live in legacy JSON columns. Parse them on
- * the server before they reach a history UI; old rows that predate the modal's
- * richer contract deliberately fall back to a limited-details presentation.
+ * the server before they reach a history UI. A row stored under the current
+ * shape parses directly; one stored under the pre-"hybrid grid" shape is
+ * migrated onto the current shape (see legacyStoredCorrectionFieldsSchema)
+ * so it keeps its full detail. Only a row whose JSON matches neither shape
+ * -- genuinely incomplete or corrupted -- falls back to a limited-details
+ * presentation.
  */
 export function parseStoredEssayFeedback({
   level,
@@ -109,26 +139,74 @@ export function parseStoredEssayFeedback({
   grammarNotes,
   suggestions,
   meetsWordCount,
+  feedbackLocale,
 }: {
   level: CefrLevel | null;
   summary: string;
   grammarNotes: unknown;
   suggestions: unknown;
   meetsWordCount: boolean;
+  feedbackLocale: string | null;
 }): EssayFeedback | null {
-  const storedFields = storedCorrectionFieldsSchema.safeParse(grammarNotes);
   const storedSuggestions = storedSuggestionsSchema.safeParse(suggestions);
-  if (!storedFields.success || !storedSuggestions.success || !level) return null;
+  if (!storedSuggestions.success || !level) return null;
+
+  const storedFields = storedCorrectionFieldsSchema.safeParse(grammarNotes);
+  const migratedFields = storedFields.success
+    ? null
+    : migrateLegacyStoredFields(grammarNotes, level, isAppLocale(feedbackLocale) ? feedbackLocale : DEFAULT_APP_LOCALE);
+  const fields = storedFields.success ? storedFields.data : migratedFields;
+  if (!fields) return null;
 
   const parsed = essayFeedbackSchema.safeParse({
-    ...storedFields.data,
-    cefrLevel: level,
+    ...fields,
     summary,
     suggestions: storedSuggestions.data,
     meetsWordCount,
   });
 
   return parsed.success ? parsed.data : null;
+}
+
+function migrateLegacyStoredFields(
+  grammarNotes: unknown,
+  level: CefrLevel,
+  feedbackLocale: AppLocale,
+): z.infer<typeof storedCorrectionFieldsSchema> | null {
+  const legacy = legacyStoredCorrectionFieldsSchema.safeParse(grammarNotes);
+  if (!legacy.success) return null;
+
+  const legacyDetailUnavailable = getAppCopy(feedbackLocale).workspace.correctionModal.legacyCefrDetailUnavailable;
+
+  return {
+    correctedText: legacy.data.correctedText,
+    modelVersion: legacy.data.modelVersion,
+    scores: legacy.data.scores,
+    // estimatedLevel/conservativeLevel/confidence/evidence/blocker didn't
+    // exist yet -- the persisted level column stands in for both levels (it
+    // was always the conservative one). confidence, evidence, and blocker
+    // were genuinely never assessed, so this says so explicitly rather than
+    // fabricating a specific confidence level or duplicating the one real
+    // field (the old blended rationale) under two more headings as if it
+    // had been independently derived for each.
+    cefr: {
+      estimatedLevel: level,
+      conservativeLevel: level,
+      confidence: "Unknown",
+      rationale: legacy.data.cefrRationale,
+      evidence: legacyDetailUnavailable,
+      blocker: legacyDetailUnavailable,
+    },
+    wordCountNote: legacy.data.wordCountNote,
+    errors: legacy.data.errors.map((error) => ({
+      originalText: error.original,
+      originalStart: error.originalStart,
+      correctedText: error.correction,
+      correctionStart: error.correctionStart,
+      explanation: error.explanation,
+      errorType: error.category,
+    })),
+  };
 }
 
 /**

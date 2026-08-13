@@ -33,6 +33,7 @@ afterEach(() => {
 
 const params = {
   task: TASK_INSTRUCTIONS.TASK_2,
+  taskType: "TASK_2" as const,
   level: "C1" as const,
   topicPrompt: "Le télétravail est-il bénéfique ?",
 };
@@ -163,6 +164,7 @@ describe("generateModelAnswer", () => {
     await generateModelAnswer({
       ...params,
       task: TASK_INSTRUCTIONS.TASK_3,
+      taskType: "TASK_3" as const,
       topicPrompt: taskThreeTopicWithDocuments,
     });
 
@@ -178,6 +180,29 @@ describe("generateModelAnswer", () => {
     // The title counts toward the same total the validator measures -- the
     // prompt must not claim otherwise.
     expect(promptText).not.toContain("not counted");
+  });
+
+  it("uses Task-3-specific, level-calibrated guidance instead of generic level prose", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({
+      ...params,
+      task: TASK_INSTRUCTIONS.TASK_3,
+      taskType: "TASK_3" as const,
+      level: "C2",
+      topicPrompt: taskThreeTopicWithDocuments,
+    });
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).toContain("exceptionally sophisticated and controlled argumentation");
+    // Not the task-agnostic fallback previously shared by every task.
+    expect(promptText).not.toContain("a highly nuanced, idiomatic response with sophisticated structure");
   });
 
   it("omits the Task 3 document-synthesis structure for other tasks", async () => {
@@ -205,6 +230,7 @@ describe("generateModelAnswer", () => {
     await generateModelAnswer({
       ...params,
       task: TASK_INSTRUCTIONS.TASK_3,
+      taskType: "TASK_3" as const,
       topicPrompt: "Le télétravail devrait-il être généralisé ?",
     });
 
@@ -229,8 +255,14 @@ describe("gradeEssayWithGemini", () => {
       linguistics: { score: 70, feedback: "Mostly accurate." },
       vocabulary: { score: 65, feedback: "Simple but appropriate." },
     },
-    cefrLevel: "B1",
-    cefrRationale: "Simple accurate sentences support B1, while limited range blocks B2.",
+    cefr: {
+      estimatedLevel: "B1",
+      conservativeLevel: "B1",
+      confidence: "Medium",
+      rationale: "Simple accurate sentences support B1, while limited range blocks B2.",
+      evidence: "Consistent, accurate present-tense sentences.",
+      blocker: "Limited sentence variety keeps it below B2.",
+    },
     meetsWordCount: false,
     wordCountNote: "Below the target range.",
     errors: [],
@@ -280,8 +312,20 @@ describe("gradeEssayWithGemini", () => {
       minimum: 0,
       maximum: 100,
     });
-    expect(body.generationConfig.responseSchema.properties.cefrRationale).toEqual({ type: "STRING" });
-    expect(body.generationConfig.responseSchema.required).toContain("cefrRationale");
+    expect(body.generationConfig.responseSchema.properties.cefr.properties.rationale).toEqual({ type: "STRING" });
+    expect(body.generationConfig.responseSchema.required).toContain("cefr");
+    // The schema's own field descriptions reinforce the Demonstrated/Secure
+    // semantics and the never-exceeds ordering directly where the model
+    // fills these values in, not just in the system prompt.
+    expect(body.generationConfig.responseSchema.properties.cefr.properties.estimatedLevel.description).toContain(
+      "Demonstrated level",
+    );
+    expect(body.generationConfig.responseSchema.properties.cefr.properties.conservativeLevel.description).toContain(
+      "Secure level",
+    );
+    expect(body.generationConfig.responseSchema.properties.cefr.properties.conservativeLevel.description).toContain(
+      "never exceed",
+    );
     // originalStart/correctionStart are nullable, not just non-required:
     // Gemini fills every declared property either way, so a schema that
     // only marks them non-required would still have Gemini return `null`

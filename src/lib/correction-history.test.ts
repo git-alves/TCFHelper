@@ -27,18 +27,24 @@ const feedback = {
     linguistics: { score: 72, feedback: "Verb forms need attention." },
     vocabulary: { score: 76, feedback: "Vocabulary is appropriate." },
   },
-  cefrLevel: "B2" as const,
-  cefrRationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+  cefr: {
+    estimatedLevel: "B2" as const,
+    conservativeLevel: "B2" as const,
+    confidence: "Medium" as const,
+    rationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+    evidence: "Clear organization and mostly accurate vocabulary throughout.",
+    blocker: "Recurring verb-form errors limit accuracy.",
+  },
   meetsWordCount: true,
   wordCountNote: "The response meets the target length.",
   errors: [
     {
-      original: "Je va",
+      originalText: "Je va",
       originalStart: 0,
-      correction: "Je vais",
+      correctedText: "Je vais",
       correctionStart: 0,
       explanation: "Use the first-person singular form.",
-      category: "grammar" as const,
+      errorType: "grammar" as const,
     },
   ],
   suggestions: ["Use more varied connectors."],
@@ -47,7 +53,7 @@ const feedback = {
 
 function storedFeedback(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    level: feedback.cefrLevel,
+    level: feedback.cefr.conservativeLevel,
     feedbackLocale: "en",
     summary: feedback.summary,
     meetsWordCount: feedback.meetsWordCount,
@@ -55,7 +61,7 @@ function storedFeedback(overrides: Partial<Record<string, unknown>> = {}) {
       correctedText: feedback.correctedText,
       modelVersion: feedback.modelVersion,
       scores: feedback.scores,
-      cefrRationale: feedback.cefrRationale,
+      cefr: feedback.cefr,
       wordCountNote: feedback.wordCountNote,
       errors: feedback.errors,
     },
@@ -83,6 +89,45 @@ describe("parseStoredEssayFeedback", () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it("migrates a pre-hybrid-grid payload instead of degrading it to a limited summary", () => {
+    const legacyGrammarNotes = {
+      correctedText: feedback.correctedText,
+      modelVersion: feedback.modelVersion,
+      scores: feedback.scores,
+      cefrRationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+      wordCountNote: feedback.wordCountNote,
+      errors: [
+        {
+          original: "Je va",
+          originalStart: 0,
+          correction: "Je vais",
+          correctionStart: 0,
+          explanation: "Use the first-person singular form.",
+          category: "grammar",
+        },
+      ],
+    };
+
+    const migrated = parseStoredEssayFeedback(storedFeedback({ grammarNotes: legacyGrammarNotes }));
+
+    expect(migrated).not.toBeNull();
+    expect(migrated?.correctedText).toBe(feedback.correctedText);
+    expect(migrated?.modelVersion).toBe(feedback.modelVersion);
+    expect(migrated?.errors).toEqual(feedback.errors);
+    expect(migrated?.cefr).toEqual({
+      estimatedLevel: "B2",
+      conservativeLevel: "B2",
+      // Never fabricated: this correction predates confidence, evidence, and
+      // blocker tracking, so confidence is honestly "Unknown" and evidence/
+      // blocker point to the real rationale rather than duplicating it under
+      // headings that would imply they were independently assessed.
+      confidence: "Unknown",
+      rationale: legacyGrammarNotes.cefrRationale,
+      evidence: "Not recorded separately for this earlier correction — see the rationale above.",
+      blocker: "Not recorded separately for this earlier correction — see the rationale above.",
+    });
   });
 });
 

@@ -35,7 +35,12 @@ import {
 } from "./model-answer-generator";
 
 const validAnswer = Array.from({ length: 120 }, (_, index) => `mot${index}`).join(" ");
-const params = { task: TASK_INSTRUCTIONS.TASK_2, level: "B2" as const, topicPrompt: "Sujet" };
+const params = {
+  task: TASK_INSTRUCTIONS.TASK_2,
+  taskType: "TASK_2" as const,
+  level: "B2" as const,
+  topicPrompt: "Sujet",
+};
 const originalApiKey = process.env.GEMINI_API_KEY;
 
 beforeEach(() => {
