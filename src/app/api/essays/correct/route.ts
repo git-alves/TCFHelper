@@ -14,7 +14,7 @@ import {
   hasConfiguredGemini,
 } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
-import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
+import { freshEssayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
 import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 import {
@@ -300,7 +300,7 @@ export async function POST(request: Request) {
         { status: 502, headers: NO_STORE_HEADERS },
       );
     }
-    const parsedFeedback = essayFeedbackSchema.safeParse(rawFeedback);
+    const parsedFeedback = freshEssayFeedbackSchema.safeParse(rawFeedback);
     if (!parsedFeedback.success) {
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",

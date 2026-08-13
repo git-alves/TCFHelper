@@ -36,7 +36,13 @@ export default async function CorrectionHistoryDetailPage({ params }: Correction
     redirect("/activate");
   }
 
-  const [detail, locale] = await Promise.all([getCorrectionForUser(user.id, essayId), getRequestLocale()]);
+  // getRequestLocale (a cookie read) is awaited first, not run in parallel
+  // with getCorrectionForUser: a migrated legacy record's injected
+  // disclosure text is generated in the viewer's locale (see
+  // migrateLegacyStoredFields), so the correction read genuinely depends on
+  // it.
+  const locale = await getRequestLocale();
+  const detail = await getCorrectionForUser(user.id, essayId, locale);
   if (!detail) notFound();
 
   if (detail.kind === "complete") {
@@ -78,7 +84,7 @@ export default async function CorrectionHistoryDetailPage({ params }: Correction
         <h2 className="font-semibold">{copy.workspace.correctionModal.commentsHeading}</h2>
         {detail.cefrLevel && (
           <p className="mt-3 text-sm font-medium text-violet-700 dark:text-violet-300">
-            {copy.workspace.correctionModal.secureLevel({ level: detail.cefrLevel })}
+            {copy.workspace.correctionModal.recordedLevel({ level: detail.cefrLevel })}
           </p>
         )}
         <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-zinc-700 dark:text-zinc-200">{detail.summary}</p>

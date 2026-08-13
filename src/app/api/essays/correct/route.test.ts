@@ -808,6 +808,28 @@ describe("POST /api/essays/correct", () => {
       });
     });
 
+    it("rejects a fresh Gemini response that claims 'Unknown' confidence, even though it's otherwise well-formed", async () => {
+      // "Unknown" is reserved for a correction migrated from before
+      // confidence was tracked (see migrateLegacyStoredFields in
+      // correction-history.ts). Gemini's own response schema already
+      // excludes it, but the route must not trust that alone -- a live
+      // result claiming it should be rejected the same as any other
+      // malformed response, not persisted as if it were a legacy record.
+      gradeEssayWithGeminiMock.mockResolvedValue({
+        ...feedback,
+        cefr: { ...feedback.cefr, confidence: "Unknown" },
+      });
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(502);
+      expect(essayCreateMock).not.toHaveBeenCalled();
+    });
+
     it("returns a 502 when Gemini itself fails", async () => {
       const unsafeProviderError = new Error("Gemini request failed (500): learner draft should not reach logs.");
       gradeEssayWithGeminiMock.mockRejectedValue(unsafeProviderError);

@@ -116,8 +116,10 @@ const TASK_ONE_EXAMPLE_STRUCTURE =
 // experience and adding commentary suited to a stated objective -- not a
 // plain opinion essay with an introduction/development/conclusion.
 const TASK_TWO_EXAMPLE_STRUCTURE =
-  "This format is an article, an open letter, or a note addressed to several or general readers -- not a single " +
-  "private recipient. Recount the experience or event the topic describes, then add commentary, opinions, or " +
+  "This format is an article, a letter/courrier (which may be an open letter, but can also be an ordinary letter " +
+  "addressed to several or general readers -- for example a group, a committee, or an organization), or a note. " +
+  "It is addressed to several or general readers -- not a single private individual. Recount the experience or " +
+  "event the topic describes, then add commentary, opinions, or " +
   "arguments suited to the topic's stated objective (for example: to persuade, to reconcile, to promote, to " +
   "warn). Use connectors that move naturally from the narrative into the commentary.";
 

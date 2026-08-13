@@ -255,13 +255,25 @@ export interface AppCopy {
       statusEvaluated: string;
       wordCount: (values: WordCountValues) => string;
       // secureLevel is the level actually assigned to the student
-      // (feedback.cefr.conservativeLevel / the persisted Feedback.level
-      // column) -- shown wherever a single CEFR badge appears. demonstratedLevel
-      // is the higher, less-consistently-shown level (feedback.cefr.estimatedLevel),
+      // (feedback.cefr.conservativeLevel) for a *current*-provenance
+      // correction (cefrAssessment === "current") -- demonstratedLevel is the
+      // higher, less-consistently-shown level (feedback.cefr.estimatedLevel),
       // always displayed alongside it in the CEFR card so the two results the
       // methodology tab promises are never shown as just one ambiguous number.
       secureLevel: (values: FeedbackLevelValues) => string;
       demonstratedLevel: (values: FeedbackLevelValues) => string;
+      // Used instead of secureLevel/demonstratedLevel for a *legacy*-provenance
+      // correction (cefrAssessment === "legacy"): the old schema recorded one
+      // CEFR level with no Demonstrated/Secure distinction, so presenting it
+      // with either of those specific labels would claim a consistency check
+      // that was never actually performed.
+      previouslyRecordedLevel: (values: FeedbackLevelValues) => string;
+      // A provenance-agnostic label for a single CEFR badge where the
+      // rendering code cannot cheaply know whether the record is current or
+      // legacy (the history list's compact rows, and the limited-detail
+      // fallback when even legacy migration failed) -- deliberately makes no
+      // Secure/Demonstrated claim either way.
+      recordedLevel: (values: FeedbackLevelValues) => string;
       cefrRationaleHeading: string;
       cefrEstimateDisclosure: string;
       cefrEvidenceHeading: string;
@@ -273,6 +285,13 @@ export interface AppCopy {
       // correction-history.ts. Distinct from cefrConfidenceLevels.Unknown
       // (the confidence badge itself); this is the body text.
       legacyCefrDetailUnavailable: string;
+      // Prefixed onto the rationale of a migrated legacy record: the old
+      // schema recorded one CEFR level with no Demonstrated/Secure
+      // distinction, so estimatedLevel and conservativeLevel are the same
+      // recorded value here, not two independently assessed ones -- this
+      // says so rather than letting the Secure-level badge imply a
+      // consistency check that was never actually performed.
+      legacyCefrLevelNote: string;
       downloadPdf: string;
       viewCorrection: string;
       tabOverview: string;
@@ -557,6 +576,8 @@ export const APP_COPY = {
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
         secureLevel: ({ level }) => `Secure level: ${level}`,
         demonstratedLevel: ({ level }) => `Demonstrated level: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Previously recorded level: ${level}`,
+        recordedLevel: ({ level }) => `Recorded level: ${level}`,
         cefrRationaleHeading: "Why this estimate",
         cefrEstimateDisclosure:
           "This automated estimate is based on this submitted response. A requested C1/C2 study-example level is a target, not a verified result.",
@@ -565,6 +586,8 @@ export const APP_COPY = {
         cefrConfidenceHeading: "Confidence in this estimate",
         cefrConfidenceLevels: { High: "High", Medium: "Medium", Low: "Low", Unknown: "Not assessed (older correction)" },
         legacyCefrDetailUnavailable: "Not recorded separately for this earlier correction — see the rationale above.",
+        legacyCefrLevelNote:
+          "This correction predates the Demonstrated/Secure level distinction — the level below is the single estimate recorded at the time, not a separately verified secure level.",
         downloadPdf: "Print / Save as PDF",
         viewCorrection: "View correction",
         tabOverview: "Overview & scores",
@@ -983,6 +1006,8 @@ export const APP_COPY = {
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
         secureLevel: ({ level }) => `Niveau acquis : ${level}`,
         demonstratedLevel: ({ level }) => `Niveau démontré : ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Niveau précédemment enregistré : ${level}`,
+        recordedLevel: ({ level }) => `Niveau enregistré : ${level}`,
         cefrRationaleHeading: "Pourquoi cette estimation",
         cefrEstimateDisclosure:
           "Cette estimation automatisée repose sur la réponse soumise. Un niveau C1/C2 demandé pour un exemple est un objectif, pas un résultat vérifié.",
@@ -991,6 +1016,8 @@ export const APP_COPY = {
         cefrConfidenceHeading: "Confiance dans cette estimation",
         cefrConfidenceLevels: { High: "Élevée", Medium: "Moyenne", Low: "Faible", Unknown: "Non évaluée (correction antérieure)" },
         legacyCefrDetailUnavailable: "Non enregistré séparément pour cette correction antérieure — voir la justification ci-dessus.",
+        legacyCefrLevelNote:
+          "Cette correction est antérieure à la distinction entre niveau démontré et niveau acquis — le niveau ci-dessous est l'estimation unique enregistrée à l'époque, et non un niveau acquis vérifié séparément.",
         downloadPdf: "Imprimer / Enregistrer en PDF",
         viewCorrection: "Voir la correction",
         tabOverview: "Vue d’ensemble et scores",
@@ -1414,6 +1441,8 @@ export const APP_COPY = {
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
         secureLevel: ({ level }) => `Nivel consolidado: ${level}`,
         demonstratedLevel: ({ level }) => `Nivel demostrado: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Nivel registrado anteriormente: ${level}`,
+        recordedLevel: ({ level }) => `Nivel registrado: ${level}`,
         cefrRationaleHeading: "Por qué esta estimación",
         cefrEstimateDisclosure:
           "Esta estimación automatizada se basa en la respuesta enviada. Un nivel C1/C2 solicitado para un ejemplo es un objetivo, no un resultado verificado.",
@@ -1422,6 +1451,8 @@ export const APP_COPY = {
         cefrConfidenceHeading: "Confianza en esta estimación",
         cefrConfidenceLevels: { High: "Alta", Medium: "Media", Low: "Baja", Unknown: "No evaluada (corrección anterior)" },
         legacyCefrDetailUnavailable: "No se registró por separado para esta corrección anterior — consulta la justificación anterior.",
+        legacyCefrLevelNote:
+          "Esta corrección es anterior a la distinción entre nivel demostrado y nivel consolidado — el nivel de abajo es la estimación única registrada en su momento, no un nivel consolidado verificado por separado.",
         downloadPdf: "Imprimir / Guardar como PDF",
         viewCorrection: "Ver corrección",
         tabOverview: "Resumen y puntuaciones",
@@ -1845,6 +1876,8 @@ export const APP_COPY = {
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
         secureLevel: ({ level }) => `Nível consolidado: ${level}`,
         demonstratedLevel: ({ level }) => `Nível demonstrado: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Nível registrado anteriormente: ${level}`,
+        recordedLevel: ({ level }) => `Nível registrado: ${level}`,
         cefrRationaleHeading: "Por que esta estimativa",
         cefrEstimateDisclosure:
           "Esta estimativa automatizada se baseia na resposta enviada. Um nível C1/C2 solicitado para um exemplo é uma meta, não um resultado verificado.",
@@ -1853,6 +1886,8 @@ export const APP_COPY = {
         cefrConfidenceHeading: "Confiança nesta estimativa",
         cefrConfidenceLevels: { High: "Alta", Medium: "Média", Low: "Baixa", Unknown: "Não avaliada (correção anterior)" },
         legacyCefrDetailUnavailable: "Não registrado separadamente para esta correção anterior — veja a justificativa acima.",
+        legacyCefrLevelNote:
+          "Esta correção é anterior à distinção entre nível demonstrado e nível consolidado — o nível abaixo é a estimativa única registrada na época, não um nível consolidado verificado separadamente.",
         downloadPdf: "Imprimir / Salvar como PDF",
         viewCorrection: "Ver correção",
         tabOverview: "Visão geral e notas",

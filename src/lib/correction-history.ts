@@ -3,7 +3,7 @@ import "server-only";
 import { EssayStatus, type CefrLevel, type Prisma, type TaskType } from "@prisma/client";
 import { z } from "zod";
 import { getAppCopy } from "@/lib/app-copy";
-import { DEFAULT_APP_LOCALE, isAppLocale, type AppLocale } from "@/lib/app-locale";
+import { isAppLocale, type AppLocale } from "@/lib/app-locale";
 import { ERROR_CATEGORIES, essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { prisma } from "@/lib/prisma";
 
@@ -103,6 +103,12 @@ export interface CompleteCorrectionHistoryDetail extends CorrectionHistoryBase {
   kind: "complete";
   feedback: EssayFeedback;
   feedbackLocale: AppLocale | null;
+  // "legacy": migrated from the pre-"hybrid grid" shape (see
+  // migrateLegacyStoredFields) -- feedback.cefr.estimatedLevel and
+  // .conservativeLevel are the same recorded value, not two independently
+  // assessed ones, so the UI must not present them as Secure/Demonstrated
+  // levels. "current": a genuine two-value assessment.
+  cefrAssessment: "current" | "legacy";
 }
 
 export interface LimitedCorrectionHistoryDetail extends CorrectionHistoryBase {
@@ -132,6 +138,18 @@ function submittedCorrectionWhere(userId: string): Prisma.EssayWhereInput {
  * so it keeps its full detail. Only a row whose JSON matches neither shape
  * -- genuinely incomplete or corrupted -- falls back to a limited-details
  * presentation.
+ *
+ * The returned feedbackLocale is always the row's own recorded value,
+ * unchanged (possibly null) -- never guessed. A migrated row's real
+ * historic content (rationale, corrected text, error explanations, summary,
+ * suggestions) could have been generated in any locale the learner had
+ * selected at the time; defaulting a missing feedbackLocale to English would
+ * make the modal falsely claim the *entire* correction was generated in
+ * English for a viewer in another language, when the truth is simply
+ * unknown. Only the text this migration itself injects (see
+ * migrateLegacyStoredFields) needs a language at all, and that is generated
+ * fresh in viewerLocale -- the language the viewer is reading right now --
+ * so it never needs a mismatch warning of its own.
  */
 export function parseStoredEssayFeedback({
   level,
@@ -140,6 +158,7 @@ export function parseStoredEssayFeedback({
   suggestions,
   meetsWordCount,
   feedbackLocale,
+  viewerLocale,
 }: {
   level: CefrLevel | null;
   summary: string;
@@ -147,14 +166,15 @@ export function parseStoredEssayFeedback({
   suggestions: unknown;
   meetsWordCount: boolean;
   feedbackLocale: string | null;
-}): EssayFeedback | null {
+  viewerLocale: AppLocale;
+}): { feedback: EssayFeedback; feedbackLocale: AppLocale | null; cefrAssessment: "current" | "legacy" } | null {
   const storedSuggestions = storedSuggestionsSchema.safeParse(suggestions);
   if (!storedSuggestions.success || !level) return null;
 
   const storedFields = storedCorrectionFieldsSchema.safeParse(grammarNotes);
   const migratedFields = storedFields.success
     ? null
-    : migrateLegacyStoredFields(grammarNotes, level, isAppLocale(feedbackLocale) ? feedbackLocale : DEFAULT_APP_LOCALE);
+    : migrateLegacyStoredFields(grammarNotes, level, viewerLocale);
   const fields = storedFields.success ? storedFields.data : migratedFields;
   if (!fields) return null;
 
@@ -164,38 +184,60 @@ export function parseStoredEssayFeedback({
     suggestions: storedSuggestions.data,
     meetsWordCount,
   });
+  if (!parsed.success) return null;
 
-  return parsed.success ? parsed.data : null;
+  // "Unknown" confidence is reserved for a migrated legacy record (see
+  // migrateLegacyStoredFields) -- the live route's freshEssayFeedbackSchema
+  // rejects it outright, so a *current*-shaped row should never actually
+  // carry it. But shape alone isn't sufficient to trust "current": if one
+  // somehow does (a manual edit, a future regression, a pre-fresh-validator
+  // row that happens to already use the current field names), presenting it
+  // with the Secure/Demonstrated framing would still overclaim a consistency
+  // check that "Unknown" itself says was never performed. Confidence is
+  // checked independently of shape for this reason.
+  const cefrAssessment: "current" | "legacy" =
+    storedFields.success && parsed.data.cefr.confidence !== "Unknown" ? "current" : "legacy";
+
+  return {
+    feedback: parsed.data,
+    feedbackLocale: isAppLocale(feedbackLocale) ? feedbackLocale : null,
+    cefrAssessment,
+  };
 }
 
 function migrateLegacyStoredFields(
   grammarNotes: unknown,
   level: CefrLevel,
-  feedbackLocale: AppLocale,
+  viewerLocale: AppLocale,
 ): z.infer<typeof storedCorrectionFieldsSchema> | null {
   const legacy = legacyStoredCorrectionFieldsSchema.safeParse(grammarNotes);
   if (!legacy.success) return null;
 
-  const legacyDetailUnavailable = getAppCopy(feedbackLocale).workspace.correctionModal.legacyCefrDetailUnavailable;
+  const legacyCopy = getAppCopy(viewerLocale).workspace.correctionModal;
 
   return {
     correctedText: legacy.data.correctedText,
     modelVersion: legacy.data.modelVersion,
     scores: legacy.data.scores,
     // estimatedLevel/conservativeLevel/confidence/evidence/blocker didn't
-    // exist yet -- the persisted level column stands in for both levels (it
-    // was always the conservative one). confidence, evidence, and blocker
-    // were genuinely never assessed, so this says so explicitly rather than
-    // fabricating a specific confidence level or duplicating the one real
-    // field (the old blended rationale) under two more headings as if it
-    // had been independently derived for each.
+    // exist yet -- the old schema recorded a single CEFR level with no
+    // Demonstrated/Secure distinction, so it is honestly not known whether
+    // that level was ever verified as "consistently controlled" the way
+    // conservativeLevel requires today. Both fields reuse the one recorded
+    // value (the closest available approximation), but legacyCefrLevelNote
+    // says so explicitly rather than letting the Secure-level badge imply a
+    // consistency check that was never actually performed. confidence,
+    // evidence, and blocker were genuinely never assessed at all, so those
+    // say so too rather than fabricating a value or duplicating the one real
+    // field (the old blended rationale) under two more headings as if it had
+    // been independently derived for each.
     cefr: {
       estimatedLevel: level,
       conservativeLevel: level,
       confidence: "Unknown",
-      rationale: legacy.data.cefrRationale,
-      evidence: legacyDetailUnavailable,
-      blocker: legacyDetailUnavailable,
+      rationale: `${legacyCopy.legacyCefrLevelNote} ${legacy.data.cefrRationale}`,
+      evidence: legacyCopy.legacyCefrDetailUnavailable,
+      blocker: legacyCopy.legacyCefrDetailUnavailable,
     },
     wordCountNote: legacy.data.wordCountNote,
     errors: legacy.data.errors.map((error) => ({
@@ -257,7 +299,11 @@ export async function getCorrectionHistory(userId: string): Promise<CorrectionHi
  * Callers should render the same not-found response for all of these cases so
  * an authenticated learner cannot enumerate someone else's submission IDs.
  */
-export async function getCorrectionForUser(userId: string, essayId: string): Promise<CorrectionHistoryDetail | null> {
+export async function getCorrectionForUser(
+  userId: string,
+  essayId: string,
+  viewerLocale: AppLocale,
+): Promise<CorrectionHistoryDetail | null> {
   const essay = await prisma.essay.findFirst({
     where: {
       ...submittedCorrectionWhere(userId),
@@ -277,14 +323,15 @@ export async function getCorrectionForUser(userId: string, essayId: string): Pro
     assessedAt: essay.feedback.createdAt.toISOString(),
     topicTitle: essay.topic?.title ?? null,
   };
-  const feedback = parseStoredEssayFeedback(essay.feedback);
+  const parsed = parseStoredEssayFeedback({ ...essay.feedback, viewerLocale });
 
-  if (feedback) {
+  if (parsed) {
     return {
       ...base,
       kind: "complete",
-      feedback,
-      feedbackLocale: essay.feedback.feedbackLocale,
+      feedback: parsed.feedback,
+      feedbackLocale: parsed.feedbackLocale,
+      cefrAssessment: parsed.cefrAssessment,
     };
   }
 

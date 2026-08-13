@@ -38,7 +38,7 @@ const feedback = essayFeedbackSchema.parse({
   summary: "A clear response with one verb-form issue to correct.",
 });
 
-function renderResultModal() {
+function renderResultModal(overrides: { cefrAssessment?: "current" | "legacy" } = {}) {
   return renderToStaticMarkup(
     createElement(CorrectionModal, {
       open: true,
@@ -53,6 +53,7 @@ function renderResultModal() {
       copy: getAppCopy("en"),
       onClose: () => undefined,
       onRetry: () => undefined,
+      ...overrides,
     }),
   );
 }
@@ -83,5 +84,32 @@ describe("CorrectionModal", () => {
     expect(markup).toContain("Correction");
     expect(markup).toContain("Note:");
     expect(markup).toContain("Show or hide note");
+  });
+
+  it("defaults to current-provenance labels (Secure/Demonstrated level) when cefrAssessment isn't specified", () => {
+    const markup = renderResultModal();
+
+    expect(markup).toContain("Secure level: B1");
+    expect(markup).toContain("Demonstrated level: B1");
+    expect(markup).not.toContain("Previously recorded level");
+  });
+
+  it("never renders 'Secure level' or 'Demonstrated level' for a legacy-provenance record", () => {
+    const markup = renderResultModal({ cefrAssessment: "legacy" });
+
+    // Checked against the interpolated, value-bearing strings specifically
+    // (not just the bare phrases), since the always-present "How it was
+    // evaluated" tab generically explains the Secure/Demonstrated concept
+    // as app methodology regardless of any single record's own provenance --
+    // that's fine; what must never happen is *this record's* CEFR card
+    // claiming either label for itself.
+    expect(markup).not.toContain("Secure level: B1");
+    expect(markup).not.toContain("Demonstrated level: B1");
+    expect(markup).toContain("Previously recorded level: B1");
+    // The rationale (real content) still renders; evidence/blocker headings
+    // (redundant "not recorded" placeholders for a legacy record) do not.
+    expect(markup).toContain("Why this estimate");
+    expect(markup).not.toContain("Evidence from your writing");
+    expect(markup).not.toContain("What's holding back the next level");
   });
 });

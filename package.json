@@ -16,12 +16,13 @@
     "db:deploy:additive": "tsx scripts/deploy-additive-migrations.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed-topics.ts",
+    "db:seed:deploy": "tsx scripts/deploy-seed-topics.ts",
     "stripe:setup": "tsx scripts/stripe-setup.ts",
     "clerk:import": "tsx scripts/import-users-to-clerk.ts",
     "admin:promote": "tsx scripts/promote-admin.ts",
     "onboarding:backfill-pre-gate": "tsx scripts/backfill-pre-gate-walkthrough.ts",
     "db:verify:clerk-cutover": "tsx scripts/verify-clerk-cutover.ts",
-    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
+    "vercel-build": "prisma generate && npm run db:deploy:additive && npm run db:seed:deploy && npm run db:verify:clerk-cutover && npm run build && npm run verify:prisma-engine"
   },
   "dependencies": {
     "@clerk/backend": "^3.15.0",

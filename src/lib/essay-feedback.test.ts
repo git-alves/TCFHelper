@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { essayFeedbackSchema } from "./essay-feedback";
+import { essayFeedbackSchema, freshEssayFeedbackSchema } from "./essay-feedback";
 
 const validFeedback = {
   correctedText: "Bonjour, je vais bien.",
@@ -82,5 +82,27 @@ describe("essayFeedbackSchema", () => {
         cefr: { ...validFeedback.cefr, estimatedLevel: "C1", conservativeLevel: "C1" },
       }).success,
     ).toBe(true);
+  });
+
+  it("accepts 'Unknown' confidence, reserved for a migrated legacy correction", () => {
+    expect(
+      essayFeedbackSchema.safeParse({ ...validFeedback, cefr: { ...validFeedback.cefr, confidence: "Unknown" } })
+        .success,
+    ).toBe(true);
+  });
+});
+
+describe("freshEssayFeedbackSchema", () => {
+  it("accepts the same well-formed feedback essayFeedbackSchema does", () => {
+    expect(freshEssayFeedbackSchema.safeParse(validFeedback).success).toBe(true);
+  });
+
+  it("rejects 'Unknown' confidence -- a live Gemini response must always resolve to a real level", () => {
+    const result = freshEssayFeedbackSchema.safeParse({
+      ...validFeedback,
+      cefr: { ...validFeedback.cefr, confidence: "Unknown" },
+    });
+
+    expect(result.success).toBe(false);
   });
 });

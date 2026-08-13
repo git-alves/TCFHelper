@@ -54,4 +54,13 @@ describe("buildCorrectionSystemPrompt", () => {
     expect(prompt).toContain("conservativeLevel must never exceed estimatedLevel");
     expect(prompt).toContain("Worked example");
   });
+
+  it("scopes the sustained-control/consistency rules to conservativeLevel, not estimatedLevel", () => {
+    const prompt = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.");
+
+    expect(prompt).toContain("estimatedLevel may legitimately reflect a level demonstrated only occasionally");
+    expect(prompt).toContain("do not suppress it to match conservativeLevel");
+    expect(prompt).toContain("Do NOT set conservativeLevel to a higher level merely because");
+    expect(prompt).toContain("these bullets constrain conservativeLevel only");
+  });
 });

@@ -182,6 +182,49 @@ describe("generateModelAnswer", () => {
     expect(promptText).not.toContain("not counted");
   });
 
+  it("uses Task-1-specific structure and level-calibrated guidance", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({
+      ...params,
+      task: TASK_INSTRUCTIONS.TASK_1,
+      taskType: "TASK_1" as const,
+      level: "C2",
+      topicPrompt: "Écrivez à votre voisin pour lui expliquer un changement d'horaire.",
+    });
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).toContain("addressed directly to the recipient described in the topic");
+    expect(promptText).toContain("exceptionally precise, natural, flexible, and nuanced communication");
+    // Not the task-agnostic fallback previously shared by every task.
+    expect(promptText).not.toContain("a highly nuanced, idiomatic response with sophisticated structure");
+  });
+
+  it("uses Task-2-specific structure (multi-reader format, narrative plus commentary) and level-calibrated guidance", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({ ...params, level: "C1" });
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    const promptText = String(body.contents[0].parts[0].text);
+    expect(promptText).toContain("several or general readers");
+    expect(promptText).toContain("Recount the experience or event the topic describes");
+    expect(promptText).toContain("a fluent narrative with flexible, natural cohesion between the account and the commentary");
+    // Not the task-agnostic fallback previously shared by every task.
+    expect(promptText).not.toContain("a fluent, well-structured response with effective connectors");
+  });
+
   it("uses Task-3-specific, level-calibrated guidance instead of generic level prose", async () => {
     mockFetchOnce({
       ok: true,
