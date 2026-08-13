@@ -262,21 +262,50 @@ in the Vercel dashboard that the deployment carrying a corrected
 starter-topic prompt is actually promoted to production:
 
 ```sh
-RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
+env -i PATH="$PATH" HOME="$HOME" \
+  RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
   vercel env run -e production -- npm run db:seed:deploy
 ```
 
 `vercel env run -e production` injects production environment variables
 (including `DATABASE_URL`) directly into the command's process without ever
-writing them to disk, unlike `vercel env pull`. The two leading env vars
-still matter: the script only proceeds with `VERCEL_ENV` explicitly set to
-`production` -- required, not merely permitted, since (unlike the build-time
-migration scripts) nothing sets `VERCEL_ENV` automatically on an operator's
-own machine. Run it from a fresh checkout of
-the exact commit shown as live in the Vercel dashboard; a stale local
-checkout's `STARTER_TOPICS` would retire the current, corrected bank back to
-an older one. `npm run db:seed` (`scripts/seed-topics.ts`) remains the fully
-unguarded local/maintenance entrypoint. Both go through the same Postgres
+writing them to disk, unlike `vercel env pull`. The two confirmation env
+vars still matter: the script only proceeds with `VERCEL_ENV` explicitly set
+to `production` -- required, not merely permitted, since (unlike the
+build-time migration scripts) nothing sets `VERCEL_ENV` automatically on an
+operator's own machine.
+
+`env -i` (start the child with an empty environment, plus only the names
+listed) matters for a sharper reason than tidiness. `vercel env run`
+resolves its child process's `DATABASE_URL` as fetched-production values,
+overridden by any local `.env*` file's (`.env`/`.env.local` always, plus the
+development pair by default or the test pair under `NODE_ENV=test` --
+`deploy-seed-topics.ts` refuses to run if it finds any of these, including
+an inherited `NODE_ENV`'s own pair, as defense in depth), overridden in turn
+by whatever the invoking shell already has exported. Selectively unsetting
+known-dangerous names is not enough, though: `NODE_OPTIONS=--require
+dotenv/config` (with `DOTENV_CONFIG_PATH` pointed anywhere reachable,
+including the committed `.env.example`) or `npm_config_node_options` doing
+the same for npm's own child process injects `DATABASE_URL` before any of
+this script's code -- including its own file guard -- ever runs, since a
+`--require` preload executes before the entry file loads. No check inside
+the script can close that; it runs too late by construction. `env -i`
+closes it at the source instead, by never letting `NODE_OPTIONS`,
+`npm_config_node_options`, or any other environment-influencing variable
+reach the child process at all, rather than enumerating the ones already
+known to matter. Run the command exactly as documented, from the repository
+root: `deploy-seed-topics.ts`'s file guard checks `process.cwd()`, which
+only matches what `vercel env run` itself resolves as long as no `--cwd`,
+`npm --prefix`, or similar is layered on top. This repo is a single package
+with no workspaces, so that divergence isn't a risk today, but it would
+become one if this script were ever invoked through such a wrapper. Still
+run it from a clean checkout/worktree of the exact commit shown as live in
+the Vercel dashboard: a stale checkout's `STARTER_TOPICS` is a separate risk
+no environment guard addresses -- it would retire the current, corrected
+bank back to whatever an older commit's `STARTER_TOPICS` looked like.
+`npm run db:seed` (`scripts/seed-topics.ts`)
+remains the fully unguarded local/maintenance entrypoint. Both go through
+the same Postgres
 advisory lock (`runLockedSeedTopicSync`) as each other and as any concurrent
 run of themselves, so re-running the step is always safe -- a run against
 already-current prompts is a no-op.
