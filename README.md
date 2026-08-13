@@ -256,15 +256,37 @@ GitHub does not guarantee two triggered workflow runs finish in the order
 they started, so a slower run for an older commit could still retire a row
 after a newer commit's picker is already serving traffic.
 
-Instead, `npm run db:seed:deploy` (`scripts/deploy-seed-topics.ts`) is a
-deliberate, human-run maintenance step, run once an operator has confirmed
-in the Vercel dashboard that the deployment carrying a corrected
-starter-topic prompt is actually promoted to production:
+Instead, `scripts/deploy-seed-topics.ts` (also reachable as `npm run
+db:seed:deploy`, which still requires the same production confirmation flags
+below -- see why the documented production command bypasses that alias
+regardless) is a deliberate, human-run maintenance step, run once an
+operator has confirmed in the Vercel dashboard that the deployment carrying
+a corrected starter-topic prompt is actually promoted to production. Do
+this once, in a fresh checkout of that exact commit:
 
 ```sh
-env -i PATH="$PATH" HOME="$HOME" \
-  RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
-  vercel env run -e production -- npm run db:seed:deploy
+npm ci
+vercel link --yes --project <production-project-id> --team <production-team>
+```
+
+`npm ci` matters: `node_modules` (including `./node_modules/.bin/tsx` below
+and the generated Prisma client, rebuilt by its own `postinstall`) is
+gitignored, so a genuinely fresh checkout starts without either. `vercel
+link` runs in your normal shell -- it needs your stored Vercel credentials,
+which the command below deliberately strips -- and creates that checkout's
+`.vercel/project.json`, gitignored, so every fresh checkout starts without
+one. Pass `--project` explicitly, sourced from the production project's own
+Vercel dashboard settings, not left to non-interactive `--yes` to guess:
+without it, `vercel link` can default to or silently create the wrong
+project, and `vercel env run` would then fetch *that* project's
+"production" database instead. `--team` matters the same way whenever the
+project lives under a team rather than your personal account. Then:
+
+```sh
+./scripts/assert-no-local-env-files.sh && \
+  env -i PATH="$PATH" HOME="$HOME" \
+    RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
+    vercel env run -e production -- ./node_modules/.bin/tsx scripts/deploy-seed-topics.ts
 ```
 
 `vercel env run -e production` injects production environment variables
@@ -275,25 +297,47 @@ to `production` -- required, not merely permitted, since (unlike the
 build-time migration scripts) nothing sets `VERCEL_ENV` automatically on an
 operator's own machine.
 
+The command invokes tsx directly rather than `npm run db:seed:deploy`,
+deliberately: preserving `HOME` (needed for `vercel`'s own auth/config
+lookup) means `npm run` still reads `~/.npmrc` and this project's `.npmrc`,
+and npm's own `node-options` config setting becomes `NODE_OPTIONS` for the
+lifecycle script's child process -- reopening the exact preload-injection
+vector below through npm's config file instead of the shell (reproduced: an
+`.npmrc` with `node-options=--require dotenv/config` leaked a decoy
+`DATABASE_URL` through `npm run` even under this same `env -i`). Invoking
+tsx directly skips npm's own config loading entirely, so there's no
+lifecycle-script step left for it to inject into.
+
+`./scripts/assert-no-local-env-files.sh` runs *before* `vercel env run`
+rather than as another check inside `deploy-seed-topics.ts`, for a
+structural reason: `vercel env run` reads local `.env*` files itself and
+merges their content into `tsx`'s environment before that child process
+even starts. A `NODE_OPTIONS=--require ...` line inside one of those files
+would preload before any check written inside the seed script -- its own
+`assertNoLocalEnvFiles`, called from `src/lib/local-env-guard.ts`, included
+-- ever gets a chance to run, since a `--require` preload always executes
+before the entry file's own code, regardless of how the value reached the
+child's environment. A plain POSIX shell script has no Node runtime to
+preload into, so it can safely gate `vercel env run` itself; nothing written
+*inside* the eventual Node process can. The shell script checks the same
+files as `local-env-guard.ts` (`.env`/`.env.local` always, plus the
+development pair by default or the test pair under `NODE_ENV=test`, plus an
+inherited `NODE_ENV`'s own pair for any other value); the in-script
+`assertNoLocalEnvFiles` call stays too, as defense in depth for a normal
+execution path that skipped the preflight.
+
 `env -i` (start the child with an empty environment, plus only the names
-listed) matters for a sharper reason than tidiness. `vercel env run`
-resolves its child process's `DATABASE_URL` as fetched-production values,
-overridden by any local `.env*` file's (`.env`/`.env.local` always, plus the
-development pair by default or the test pair under `NODE_ENV=test` --
-`deploy-seed-topics.ts` refuses to run if it finds any of these, including
-an inherited `NODE_ENV`'s own pair, as defense in depth), overridden in turn
-by whatever the invoking shell already has exported. Selectively unsetting
-known-dangerous names is not enough, though: `NODE_OPTIONS=--require
-dotenv/config` (with `DOTENV_CONFIG_PATH` pointed anywhere reachable,
-including the committed `.env.example`) or `npm_config_node_options` doing
-the same for npm's own child process injects `DATABASE_URL` before any of
-this script's code -- including its own file guard -- ever runs, since a
-`--require` preload executes before the entry file loads. No check inside
-the script can close that; it runs too late by construction. `env -i`
-closes it at the source instead, by never letting `NODE_OPTIONS`,
-`npm_config_node_options`, or any other environment-influencing variable
-reach the child process at all, rather than enumerating the ones already
-known to matter. Run the command exactly as documented, from the repository
+listed) matters for a sharper reason than tidiness, against a different
+injection route: `vercel env run` also resolves its child process's
+`DATABASE_URL` as fetched-production values overridden by whatever the
+invoking shell already has exported. Selectively unsetting known-dangerous
+names is not enough: `NODE_OPTIONS` exported directly in the shell (rather
+than sitting in a local file) injects the same way, before any check --
+shell-level or in-script -- gets to run. `env -i` closes that at the source
+instead, by never letting `NODE_OPTIONS` or any other environment-
+influencing variable reach the child process from the shell at all, rather
+than enumerating the ones already known to matter. Run the command exactly
+as documented, from the repository
 root: `deploy-seed-topics.ts`'s file guard checks `process.cwd()`, which
 only matches what `vercel env run` itself resolves as long as no `--cwd`,
 `npm --prefix`, or similar is layered on top. This repo is a single package
