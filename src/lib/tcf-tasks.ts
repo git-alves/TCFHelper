@@ -24,9 +24,9 @@ export const TASK_INSTRUCTIONS: Record<TaskType, TaskDefinition> = {
   },
   TASK_2: {
     label: "Tâche 2",
-    title: "Exprimer une opinion",
+    title: "Raconter et commenter",
     description:
-      "Donnez votre avis sur un sujet et justifiez-le à l'aide d'arguments et d'exemples. Structurez votre texte avec une introduction, un développement et une conclusion.",
+      "Rédigez un article, un courrier ou une note à l'intention de plusieurs destinataires pour raconter une expérience ou rendre compte d'un événement, en ajoutant des commentaires, avis ou arguments adaptés à l'objectif du texte (par exemple : convaincre, vous réconcilier, plaire, attirer l'attention).",
     minWords: 120,
     maxWords: 150,
   },

@@ -38,7 +38,7 @@ describe("CorrectionHistoryList", () => {
 
     expect(markup).toContain('href="/dashboard/history/essay_123"');
     expect(markup).toContain("Tâche 2");
-    expect(markup).toContain("Estimated level: B2");
+    expect(markup).toContain("Recorded level: B2");
     expect(markup).toContain("A forum post");
     // The actions popover is closed by default (hidden, not unmounted, so it
     // stays covered by this static-render-only test setup) -- its trigger is

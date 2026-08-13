@@ -1,5 +1,7 @@
-import { TASK_INSTRUCTIONS, type TaskDefinition } from "@/lib/tcf-tasks";
-import { CEFR_LEVELS, ERROR_CATEGORIES } from "@/lib/essay-feedback";
+import type { TaskType } from "@prisma/client";
+import { type TaskDefinition } from "@/lib/tcf-tasks";
+import { CEFR_CONFIDENCE_LEVELS, CEFR_LEVELS, ERROR_CATEGORIES } from "@/lib/essay-feedback";
+import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Google AI Studio's free tier (no credit card, no billing) — kept
@@ -16,7 +18,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-07";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-13";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -64,6 +66,7 @@ export class GeminiCorrectionParseError extends Error {
 
 export interface GenerateModelAnswerParams {
   task: TaskDefinition;
+  taskType: TaskType;
   level: ExampleCefrLevel;
   topicPrompt: string;
 }
@@ -74,24 +77,51 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
 
-const LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
-  B2: "a clear, well-organized response with a reasoned viewpoint, mostly accurate grammar, and a good range of everyday and some abstract vocabulary — solid but not yet native-like nuance.",
-  C1: "a fluent, well-structured response with effective connectors, precise and varied vocabulary, and controlled complex grammar, handling abstract ideas with clarity and flexibility.",
-  C2: "a highly nuanced, idiomatic response with sophisticated structure, subtle register control, and a near-native command of complex grammar and vocabulary.",
+// Mirrors the CEFR bands the correction prompt (essay-correction-prompt.ts)
+// grades Tache 1 against, phrased as writing instructions instead of grading
+// criteria, so the study example and the grading rubric never drift apart.
+const TASK_ONE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+  B2: "clear and reasonably detailed communication, appropriate organization, sufficient vocabulary, and generally controlled grammar -- describing or explaining the required information without excessive ambiguity.",
+  C1: "consistently precise communication, strong control of register, flexible vocabulary, and sophisticated organization where appropriate, communicating detailed information naturally and efficiently.",
+  C2: "exceptionally precise, natural, flexible, and nuanced communication with near-complete control of grammar, vocabulary, syntax, and register -- without resorting to unnecessarily literary or sophisticated language.",
 };
 
-// A recent-exam Task 3 topicPrompt is always built by parseTaskThree in
-// recent-exam-topics.ts, which formats it as a title followed by literal
-// "Document 1 :" / "Document 2 :" sections. A custom (learner-pasted) Task 3
-// topic is free text and may not contain two opposing-viewpoint documents at
-// all -- asking the model to "synthesize the two documents" when none exist
-// would push it to invent source viewpoints, so the structured rubric below
-// only applies when both markers are actually present in the prompt.
-const TASK_THREE_DOCUMENT_PATTERN = /Document\s*1\s*:[\s\S]*Document\s*2\s*:/iu;
+// Mirrors the CEFR bands the correction prompt grades Tache 2 against.
+const TASK_TWO_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+  B2: "a clear narrative with generally well-connected commentary, reasonably developed opinions or arguments, appropriate connectors, and register suited to the stated objective.",
+  C1: "a fluent narrative with flexible, natural cohesion between the account and the commentary, precise and varied vocabulary, effective paragraph organization, and well-justified opinions or arguments.",
+  C2: "a highly natural, nuanced narrative and commentary with sophisticated cohesion, subtle control of tone and register, and near-complete linguistic control.",
+};
 
-function hasTaskThreeDocuments(topicPrompt: string): boolean {
-  return TASK_THREE_DOCUMENT_PATTERN.test(topicPrompt);
-}
+// Mirrors the CEFR bands the correction prompt (ARGUMENTATIVE QUALITY)
+// grades Tache 3 against. The fixed structure below (title/summary/opinion,
+// including the argument-against and nuance) stays the same at every level
+// -- real Tache 3 responses at B2 still need to compare viewpoints and argue
+// a position -- but how sophisticated that execution should be does vary,
+// which is what this supplies instead of the generic, task-agnostic
+// LEVEL_DESCRIPTIONS fallback.
+const TASK_THREE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+  B2: "a clear position with understandable reasons, sufficiently developed arguments, logically connected ideas, a generally clear comparison of viewpoints, and a coherent overall structure. Arguments may still be relatively straightforward.",
+  C1: "well-developed and logically connected arguments, clear synthesis of the viewpoints, precise comparison, effective justification, relevant qualification and nuance, strong cohesion, precise vocabulary, and controlled complex syntax.",
+  C2: "exceptionally sophisticated and controlled argumentation: precise synthesis, subtle distinctions, nuanced evaluation, natural handling of counterarguments, precise qualification, flexible and sophisticated cohesion, and very high linguistic accuracy -- functional and sustained, not just decorative vocabulary or long sentences.",
+};
+
+const TASK_ONE_EXAMPLE_STRUCTURE =
+  "Write this as a short, natural message (a letter, an email, or a note) addressed directly to the recipient " +
+  "described in the topic. Open with a greeting and close appropriately for the register the situation calls " +
+  "for, and make sure every piece of information or event the topic asks for is covered.";
+
+// Mirrors the corrected official Tache 2 format: an article, letter, or note
+// to several/general readers (not a single private recipient), recounting an
+// experience and adding commentary suited to a stated objective -- not a
+// plain opinion essay with an introduction/development/conclusion.
+const TASK_TWO_EXAMPLE_STRUCTURE =
+  "This format is an article, a letter/courrier (which may be an open letter, but can also be an ordinary letter " +
+  "addressed to several or general readers -- for example a group, a committee, or an organization), or a note. " +
+  "It is addressed to several or general readers -- not a single private individual. Recount the experience or " +
+  "event the topic describes, then add commentary, opinions, or " +
+  "arguments suited to the topic's stated objective (for example: to persuade, to reconcile, to promote, to " +
+  "warn). Use connectors that move naturally from the narrative into the commentary.";
 
 // validateAnswerLength (model-answer-generator.ts) counts every word in the
 // returned text, title included -- so the prompt must not tell the model a
@@ -119,20 +149,40 @@ const TASK_THREE_STRUCTURE =
   "\"En conclusion\"/\"Pour conclure\" for the conclusion.\n" +
   "Separate the title, the summary, and the opinion each with a blank line.";
 
-export function buildExamplePrompt({ task, level, topicPrompt }: GenerateModelAnswerParams): string {
-  const isTaskThree = task.label === TASK_INSTRUCTIONS.TASK_3.label && hasTaskThreeDocuments(topicPrompt);
+export function buildExamplePrompt({ task, taskType, level, topicPrompt }: GenerateModelAnswerParams): string {
+  const isTaskThree = taskType === "TASK_3" && hasTaskThreeDocuments(topicPrompt);
+  const structuralNote =
+    taskType === "TASK_1"
+      ? TASK_ONE_EXAMPLE_STRUCTURE
+      : taskType === "TASK_2"
+        ? TASK_TWO_EXAMPLE_STRUCTURE
+        : isTaskThree
+          ? TASK_THREE_STRUCTURE
+          : "";
+  const levelDescription =
+    taskType === "TASK_1"
+      ? TASK_ONE_LEVEL_DESCRIPTIONS[level]
+      : taskType === "TASK_2"
+        ? TASK_TWO_LEVEL_DESCRIPTIONS[level]
+        : TASK_THREE_LEVEL_DESCRIPTIONS[level];
+  const outputFormatNote = isTaskThree
+    ? ", formatted exactly as described above"
+    : taskType === "TASK_2"
+      ? " — no explanation, and only a short title if the topic calls for the article format"
+      : " — no title, no explanation";
+
   return (
     "You are a TCF (Test de Connaissance du Français) examiner writing a model answer for a learner to " +
     "study.\n" +
     `Task: ${task.label} - ${task.title}\n` +
     `Instructions: ${task.description}\n` +
     `Required length: ${task.minWords}-${task.maxWords} words.\n` +
-    (isTaskThree ? `${TASK_THREE_STRUCTURE}\n` : "") +
+    (structuralNote ? `${structuralNote}\n` : "") +
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
-    `authentically demonstrate CEFR level ${level}: ${LEVEL_DESCRIPTIONS[level]}\n` +
+    `authentically demonstrate CEFR level ${level}: ${levelDescription}\n` +
     "Stay within the required word range. Return only the French response text itself" +
-    (isTaskThree ? ", formatted exactly as described above" : " — no title, no explanation") +
+    outputFormatNote +
     ", no markdown formatting."
   );
 }
@@ -246,8 +296,31 @@ const CORRECTION_RESPONSE_SCHEMA = {
       },
       required: ["content", "linguistics", "vocabulary"],
     },
-    cefrLevel: { type: "STRING", enum: [...CEFR_LEVELS] },
-    cefrRationale: { type: "STRING" },
+    cefr: {
+      type: "OBJECT",
+      // description strings reinforce the system prompt's CEFR ASSESSMENT
+      // section directly on the fields the model is filling in, since this
+      // schema is a separate structured parameter the model also attends to.
+      properties: {
+        estimatedLevel: {
+          type: "STRING",
+          enum: [...CEFR_LEVELS],
+          description:
+            "Demonstrated level: the level the raw evidence alone suggests, including capability shown only occasionally, before the conservative tie-breaking rule.",
+        },
+        conservativeLevel: {
+          type: "STRING",
+          enum: [...CEFR_LEVELS],
+          description:
+            "Secure level: estimatedLevel lowered to the more conservative band whenever it was not demonstrated consistently. Must never exceed estimatedLevel. This is the level actually assigned to the student.",
+        },
+        confidence: { type: "STRING", enum: [...CEFR_CONFIDENCE_LEVELS] },
+        rationale: { type: "STRING" },
+        evidence: { type: "STRING" },
+        blocker: { type: "STRING" },
+      },
+      required: ["estimatedLevel", "conservativeLevel", "confidence", "rationale", "evidence", "blocker"],
+    },
     meetsWordCount: { type: "BOOLEAN" },
     wordCountNote: { type: "STRING" },
     errors: {
@@ -255,18 +328,18 @@ const CORRECTION_RESPONSE_SCHEMA = {
       items: {
         type: "OBJECT",
         properties: {
-          original: { type: "STRING" },
+          originalText: { type: "STRING" },
           // nullable, not just non-required: Gemini fills every declared
           // property, required or not, so an omitted offset still arrives as
           // JSON null rather than a missing key. essayFeedbackSchema accepts
           // null here (.nullish()) to match.
           originalStart: { type: "INTEGER", minimum: 0, nullable: true },
-          correction: { type: "STRING" },
+          correctedText: { type: "STRING" },
           correctionStart: { type: "INTEGER", minimum: 0, nullable: true },
           explanation: { type: "STRING" },
-          category: { type: "STRING", enum: [...ERROR_CATEGORIES] },
+          errorType: { type: "STRING", enum: [...ERROR_CATEGORIES] },
         },
-        required: ["original", "correction", "explanation", "category"],
+        required: ["originalText", "correctedText", "explanation", "errorType"],
       },
     },
     suggestions: { type: "ARRAY", items: { type: "STRING" } },
@@ -276,8 +349,7 @@ const CORRECTION_RESPONSE_SCHEMA = {
     "correctedText",
     "modelVersion",
     "scores",
-    "cefrLevel",
-    "cefrRationale",
+    "cefr",
     "meetsWordCount",
     "wordCountNote",
     "errors",

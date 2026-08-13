@@ -14,7 +14,7 @@ import {
   hasConfiguredGemini,
 } from "@/lib/gemini";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
-import { essayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
+import { freshEssayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
 import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 import {
@@ -278,7 +278,7 @@ export async function POST(request: Request) {
     return correctionDailyLimitResponse(usageReservation.resetAt);
   }
 
-  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage);
+  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage, taskType, resolvedTopicPrompt);
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
   let shouldReleaseClaim = true;
   try {
@@ -300,7 +300,7 @@ export async function POST(request: Request) {
         { status: 502, headers: NO_STORE_HEADERS },
       );
     }
-    const parsedFeedback = essayFeedbackSchema.safeParse(rawFeedback);
+    const parsedFeedback = freshEssayFeedbackSchema.safeParse(rawFeedback);
     if (!parsedFeedback.success) {
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
@@ -345,14 +345,14 @@ export async function POST(request: Request) {
             status: EssayStatus.SUBMITTED,
             feedback: {
               create: {
-                level: feedback.cefrLevel,
+                level: feedback.cefr.conservativeLevel,
                 feedbackLocale: locale,
                 summary: feedback.summary,
                 meetsWordCount: feedback.meetsWordCount,
                 grammarNotes: {
                   correctedText: feedback.correctedText,
                   modelVersion: feedback.modelVersion,
-                  cefrRationale: feedback.cefrRationale,
+                  cefr: feedback.cefr,
                   wordCountNote: feedback.wordCountNote,
                   errors: feedback.errors,
                   scores: feedback.scores,

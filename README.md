@@ -225,6 +225,154 @@ Vercel-only sensitive environment variable.
   fail before release. Apply it through its maintenance runbook instead; only
   add a future migration to the allowlist after reviewing it as additive.
 
+### Starter-topic bank rollout
+
+The managed OFFICIAL_EXAM starter-topic bank (`src/lib/starter-topics.ts`) is
+never mutated in place when a prompt is corrected: `syncSeedTopics`
+(`src/lib/seed-topic-sync.ts`) retires the existing row (sets `retiredAt`,
+leaves its `id`/`source`/`prompt` untouched) and creates a new one, so an
+essay that already references the old row by id keeps its original topic
+text and id. This preserves *what was assigned*, not the rubric version it
+is graded under: correction selects a Tâche's rubric solely by `taskType`
+(`essay-correction-prompt.ts`), not by topic row, so an essay against a
+retired, pre-correction-format topic (e.g. an old opinion-style Tâche 2
+prompt) is still graded by the current rubric. Whether to version the
+rubric per topic is an open product decision, not something `retiredAt`
+attempts to solve.
+
+That sync deliberately does **not** run inside `vercel-build`, or as any
+step tied to a specific deploy or CI run. `vercel-build` runs entirely
+before Vercel promotes the new build to production traffic; a row retired
+from in there would be invisible to the *new* deployment's picker (which
+filters on `retiredAt: null`) while the *previous* deployment -- still live
+and serving requests until cutover completes -- has no such filter and
+would list both the retired and replacement topic as duplicates, or
+indefinitely if the build then failed. Tying it to a step inside
+`.github/workflows/deploy.yml` would also only cover one of the two deploy
+paths above (Option A, Vercel's own Git integration, has no GitHub Actions
+job to attach a post-deploy step to at all), and would depend on that
+specific CI/deploy run actually being the one whose commit ends up live --
+GitHub does not guarantee two triggered workflow runs finish in the order
+they started, so a slower run for an older commit could still retire a row
+after a newer commit's picker is already serving traffic.
+
+Instead, `scripts/deploy-seed-topics.ts` (also reachable as `npm run
+db:seed:deploy`, which still requires the same production confirmation flags
+below -- see why the documented production command bypasses that alias
+regardless) is a deliberate, human-run maintenance step, run once an
+operator has confirmed in the Vercel dashboard that the deployment carrying
+a corrected starter-topic prompt is actually promoted to production. Do
+this once, in a fresh checkout of that exact commit:
+
+```sh
+npm ci
+vercel link --yes --project <production-project-id> --team <production-team>
+```
+
+`npm ci` matters: `node_modules` (including `./node_modules/.bin/tsx` below
+and the generated Prisma client, rebuilt by its own `postinstall`) is
+gitignored, so a genuinely fresh checkout starts without either. `vercel
+link` runs in your normal shell -- it needs your stored Vercel credentials,
+which the command below deliberately strips -- and creates that checkout's
+`.vercel/project.json`, gitignored, so every fresh checkout starts without
+one. Pass `--project` explicitly, sourced from the production project's own
+Vercel dashboard settings, not left to non-interactive `--yes` to guess:
+without it, `vercel link` can default to or silently create the wrong
+project, and `vercel env run` would then fetch *that* project's
+"production" database instead. `--team` matters the same way whenever the
+project lives under a team rather than your personal account. Then:
+
+```sh
+./scripts/assert-no-local-env-files.sh && \
+  env -i PATH="$PATH" HOME="$HOME" \
+    RUN_PRODUCTION_MIGRATIONS=1 VERCEL_ENV=production \
+    vercel env run -e production -- ./node_modules/.bin/tsx scripts/deploy-seed-topics.ts
+```
+
+`vercel env run -e production` injects production environment variables
+(including `DATABASE_URL`) directly into the command's process without ever
+writing them to disk, unlike `vercel env pull`. The two confirmation env
+vars still matter: the script only proceeds with `VERCEL_ENV` explicitly set
+to `production` -- required, not merely permitted, since (unlike the
+build-time migration scripts) nothing sets `VERCEL_ENV` automatically on an
+operator's own machine.
+
+The command invokes tsx directly rather than `npm run db:seed:deploy`,
+deliberately: preserving `HOME` (needed for `vercel`'s own auth/config
+lookup) means `npm run` still reads `~/.npmrc` and this project's `.npmrc`,
+and npm's own `node-options` config setting becomes `NODE_OPTIONS` for the
+lifecycle script's child process -- reopening the exact preload-injection
+vector below through npm's config file instead of the shell (reproduced: an
+`.npmrc` with `node-options=--require dotenv/config` leaked a decoy
+`DATABASE_URL` through `npm run` even under this same `env -i`). Invoking
+tsx directly skips npm's own config loading entirely, so there's no
+lifecycle-script step left for it to inject into.
+
+`./scripts/assert-no-local-env-files.sh` runs *before* `vercel env run`
+rather than as another check inside `deploy-seed-topics.ts`, for a
+structural reason: `vercel env run` reads local `.env*` files itself and
+merges their content into `tsx`'s environment before that child process
+even starts. A `NODE_OPTIONS=--require ...` line inside one of those files
+would preload before any check written inside the seed script -- its own
+`assertNoLocalEnvFiles`, called from `src/lib/local-env-guard.ts`, included
+-- ever gets a chance to run, since a `--require` preload always executes
+before the entry file's own code, regardless of how the value reached the
+child's environment. A plain POSIX shell script has no Node runtime to
+preload into, so it can safely gate `vercel env run` itself; nothing written
+*inside* the eventual Node process can. The shell script checks the same
+files as `local-env-guard.ts` (`.env`/`.env.local` always, plus the
+development pair by default or the test pair under `NODE_ENV=test`, plus an
+inherited `NODE_ENV`'s own pair for any other value); the in-script
+`assertNoLocalEnvFiles` call stays too, as defense in depth for a normal
+execution path that skipped the preflight.
+
+`env -i` (start the child with an empty environment, plus only the names
+listed) matters for a sharper reason than tidiness, against a different
+injection route: `vercel env run` also resolves its child process's
+`DATABASE_URL` as fetched-production values overridden by whatever the
+invoking shell already has exported. Selectively unsetting known-dangerous
+names is not enough: `NODE_OPTIONS` exported directly in the shell (rather
+than sitting in a local file) injects the same way, before any check --
+shell-level or in-script -- gets to run. `env -i` closes that at the source
+instead, by never letting `NODE_OPTIONS` or any other environment-
+influencing variable reach the child process from the shell at all, rather
+than enumerating the ones already known to matter. Run the command exactly
+as documented, from the repository
+root: `deploy-seed-topics.ts`'s file guard checks `process.cwd()`, which
+only matches what `vercel env run` itself resolves as long as no `--cwd`,
+`npm --prefix`, or similar is layered on top. This repo is a single package
+with no workspaces, so that divergence isn't a risk today, but it would
+become one if this script were ever invoked through such a wrapper. Still
+run it from a clean checkout/worktree of the exact commit shown as live in
+the Vercel dashboard: a stale checkout's `STARTER_TOPICS` is a separate risk
+no environment guard addresses -- it would retire the current, corrected
+bank back to whatever an older commit's `STARTER_TOPICS` looked like.
+`npm run db:seed` (`scripts/seed-topics.ts`)
+remains the fully unguarded local/maintenance entrypoint. Both go through
+the same Postgres
+advisory lock (`runLockedSeedTopicSync`) as each other and as any concurrent
+run of themselves, so re-running the step is always safe -- a run against
+already-current prompts is a no-op.
+
+Running it only after confirming cutover, rather than racing it against
+cutover, is what avoids the duplicate-listing window above -- and it needs
+no scheduler, so it carries none of a periodic cron's own hazards (Vercel
+Hobby permits cron only once daily, and a cron cannot be timed to a specific
+deploy's cutover in the first place). This does not make a *later* rollback
+free: rolling back to a pre-`retiredAt` deployment after this step has run
+restores a picker that filters only on `source`, so it lists both the
+retired and replacement `OFFICIAL_EXAM` rows as duplicates until you roll
+forward again -- the database change itself is not undone by a code
+rollback. This is a display-only duplication, not a data-integrity issue:
+either duplicate still has its own stable id and unmodified prompt text, so
+an essay against either one is still stored and correctable against
+exactly the topic text it was written for (subject to the same
+taskType-only rubric-selection caveat above, which is unaffected by
+rollback either way). It is the same "additive changes are
+forward-compatible only, not rollback-compatible" caveat that applies to
+this repo's other schema changes -- see "Production migration policy"
+above.
+
 The one-time `npm run onboarding:backfill-pre-gate` command is intentionally a
 reviewed maintenance operation rather than an automatic deployment migration:
 it records only the pre-gate cohort's onboarding version, not access admission.
@@ -444,8 +592,9 @@ Either way, set these environment variables on the Vercel project (with
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `GEMINI_API_KEY`,
 `GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`,
-`STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`.
+`STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`,
+`CRON_SECRET` (Production scope only -- required for the admin-event
+retention cron to authenticate; see `.env.example`).
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary

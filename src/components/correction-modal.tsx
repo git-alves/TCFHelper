@@ -8,7 +8,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import type { AppCopy } from "@/lib/app-copy";
+import type { AppCopy, MethodologyBlock } from "@/lib/app-copy";
 import { APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { CEFR_LEVELS, type EssayFeedback } from "@/lib/essay-feedback";
 import type { TaskDefinition } from "@/lib/tcf-tasks";
@@ -23,6 +23,11 @@ interface CorrectionModalProps {
   originalText: string;
   feedback: EssayFeedback | null;
   feedbackLocale: AppLocale | null;
+  // "legacy": feedback was migrated from a pre-"hybrid grid" record with no
+  // separately assessed Demonstrated/Secure levels -- see cefrAssessment on
+  // CompleteCorrectionHistoryDetail. Defaults to "current" for a fresh
+  // correction, which never goes through that migration.
+  cefrAssessment?: "current" | "legacy";
   locale: AppLocale;
   isStale: boolean;
   copy: AppCopy;
@@ -38,7 +43,7 @@ interface CorrectionModalProps {
   suppressFocusTrap?: boolean;
 }
 
-type TabId = "overview" | "comparison" | "comments";
+type TabId = "overview" | "comparison" | "comments" | "methodology";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), summary, textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -149,6 +154,53 @@ function getOverallScore(criteria: LearningCriterion[]) {
   return Math.round(criteria.reduce((total, criterion) => total + criterion.score.score, 0) / criteria.length);
 }
 
+// The methodology copy is authored with `**bold**` spans for emphasis
+// instead of full markdown (there is no markdown renderer in this app) --
+// this is the one inline construct it needs.
+function renderInlineText(text: string): ReactNode {
+  const segments = text.split(/\*\*(.+?)\*\*/g);
+  return segments.map((segment, index) =>
+    index % 2 === 1 ? <strong key={index}>{segment}</strong> : segment,
+  );
+}
+
+function MethodologyPanel({ blocks }: { blocks: MethodologyBlock[] }) {
+  return (
+    <div className="space-y-4 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
+      {blocks.map((block, index) => {
+        switch (block.kind) {
+          case "heading":
+            return (
+              <h3 key={index} className="pt-2 text-base font-semibold text-foreground first:pt-0">
+                {renderInlineText(block.text)}
+              </h3>
+            );
+          case "list":
+            return (
+              <ul key={index} className="list-disc space-y-1.5 pl-5">
+                {block.items.map((item, itemIndex) => (
+                  <li key={itemIndex}>{renderInlineText(item)}</li>
+                ))}
+              </ul>
+            );
+          case "example":
+            return (
+              <blockquote
+                key={index}
+                className="rounded-xl border border-violet-500/20 bg-violet-500/[.055] px-4 py-2 font-medium text-violet-800 dark:border-violet-400/25 dark:bg-violet-400/[.09] dark:text-violet-200"
+              >
+                {renderInlineText(block.text)}
+              </blockquote>
+            );
+          case "paragraph":
+          default:
+            return <p key={index}>{renderInlineText(block.text)}</p>;
+        }
+      })}
+    </div>
+  );
+}
+
 function getRadarPoint(score: number, index: number) {
   const angle = (RADAR_ANGLES[index] * Math.PI) / 180;
   const radius = (Math.max(0, Math.min(100, score)) / 100) * RADAR_RADIUS;
@@ -172,10 +224,23 @@ function createPrintDocument({
   submissionId,
   originalText,
   feedback,
+  feedbackLocale,
   locale,
   copy,
-}: Pick<CorrectionModalProps, "task" | "submissionId" | "originalText" | "feedback" | "locale" | "copy">) {
+  cefrAssessment = "current",
+}: Pick<
+  CorrectionModalProps,
+  "task" | "submissionId" | "originalText" | "feedback" | "feedbackLocale" | "locale" | "copy" | "cefrAssessment"
+>) {
   if (!feedback) return "";
+  const isLegacyCefrAssessment = cefrAssessment === "legacy";
+  const generatedInOtherLanguageNotice =
+    feedbackLocale && feedbackLocale !== locale
+      ? copy.workspace.feedback.generatedInOtherLanguage({
+          generatedLanguage: APP_LOCALE_LABELS[feedbackLocale],
+          selectedLanguage: APP_LOCALE_LABELS[locale],
+        })
+      : null;
 
   const modalCopy = copy.workspace.correctionModal;
   const criteria = getLearningCriteria(feedback, modalCopy);
@@ -188,7 +253,7 @@ function createPrintDocument({
   const errorRows = feedback.errors
     .map(
       (error) =>
-        `<li><strong>${printableText(error.original)}</strong> &rarr; <strong>${printableText(error.correction)}</strong><br />${printableText(error.explanation)}</li>`,
+        `<li><strong>${printableText(error.originalText)}</strong> &rarr; <strong>${printableText(error.correctedText)}</strong><br />${printableText(error.explanation)}</li>`,
     )
     .join("");
   const suggestionRows = feedback.suggestions.map((suggestion) => `<li>${printableText(suggestion)}</li>`).join("");
@@ -227,7 +292,12 @@ function createPrintDocument({
         minWords: task.minWords,
         maxWords: task.maxWords,
       }),
-    )} &middot; ${escapeHtml(modalCopy.estimatedLevel({ level: feedback.cefrLevel }))}${submissionReference}</p>
+    )} &middot; ${escapeHtml(
+      isLegacyCefrAssessment
+        ? modalCopy.previouslyRecordedLevel({ level: feedback.cefr.conservativeLevel })
+        : modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel }),
+    )}${submissionReference}</p>
+    ${generatedInOtherLanguageNotice ? `<p class="meta">${escapeHtml(generatedInOtherLanguageNotice)}</p>` : ""}
 
     <section class="card">
       <h2>${escapeHtml(modalCopy.tabOverview)}</h2>
@@ -237,8 +307,19 @@ function createPrintDocument({
       <p>${escapeHtml(modalCopy.overallScoreDescription)}</p>
       <p>${printableText(feedback.wordCountNote)}</p>
       <p>${escapeHtml(modalCopy.cefrEstimateDisclosure)}</p>
+      ${isLegacyCefrAssessment ? "" : `<p>${escapeHtml(modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel }))}</p>`}
       <h3>${escapeHtml(modalCopy.cefrRationaleHeading)}</h3>
-      <p>${printableText(feedback.cefrRationale)}</p>
+      <p>${printableText(feedback.cefr.rationale)}</p>
+      ${
+        isLegacyCefrAssessment
+          ? ""
+          : `<h3>${escapeHtml(modalCopy.cefrEvidenceHeading)}</h3>
+      <p>${printableText(feedback.cefr.evidence)}</p>
+      <h3>${escapeHtml(modalCopy.cefrBlockerHeading)}</h3>
+      <p>${printableText(feedback.cefr.blocker)}</p>`
+      }
+      <h3>${escapeHtml(modalCopy.cefrConfidenceHeading)}</h3>
+      <p>${escapeHtml(modalCopy.cefrConfidenceLevels[feedback.cefr.confidence])}</p>
       <table>${scoreRows}</table>
     </section>
 
@@ -272,6 +353,7 @@ export function CorrectionModal({
   originalText,
   feedback,
   feedbackLocale,
+  cefrAssessment = "current",
   locale,
   isStale,
   copy,
@@ -279,6 +361,7 @@ export function CorrectionModal({
   onRetry,
   suppressFocusTrap = false,
 }: CorrectionModalProps) {
+  const isLegacyCefrAssessment = cefrAssessment === "legacy";
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [expandedCorrectionIndexes, setExpandedCorrectionIndexes] = useState<Set<number>>(() => new Set([0]));
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -287,6 +370,7 @@ export function CorrectionModal({
     overview: null,
     comparison: null,
     comments: null,
+    methodology: null,
   });
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const dialogId = useId();
@@ -368,19 +452,28 @@ export function CorrectionModal({
 
   const originalHighlights = (feedback?.errors ?? []).flatMap((error) =>
     typeof error.originalStart === "number"
-      ? [{ start: error.originalStart, text: error.original, title: `${modalCopy.correctedHeading}: ${error.correction}` }]
+      ? [{ start: error.originalStart, text: error.originalText, title: `${modalCopy.correctedHeading}: ${error.correctedText}` }]
       : [],
   );
   const correctedHighlights = (feedback?.errors ?? []).flatMap((error) =>
     typeof error.correctionStart === "number"
-      ? [{ start: error.correctionStart, text: error.correction }]
+      ? [{ start: error.correctionStart, text: error.correctedText }]
       : [],
   );
 
   function handlePrint() {
     if (!feedback) return;
 
-    const printableDocument = createPrintDocument({ task, submissionId, originalText, feedback, locale, copy });
+    const printableDocument = createPrintDocument({
+      task,
+      submissionId,
+      originalText,
+      feedback,
+      feedbackLocale,
+      locale,
+      copy,
+      cefrAssessment,
+    });
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       printWindow.opener = null;
@@ -435,6 +528,7 @@ export function CorrectionModal({
     { id: "overview", label: modalCopy.tabOverview },
     { id: "comparison", label: modalCopy.tabCompared },
     { id: "comments", label: modalCopy.tabComments },
+    { id: "methodology", label: modalCopy.tabMethodology },
   ];
   const feedbackLanguage = feedbackLocale ?? locale;
   const learningCriteria = feedback ? getLearningCriteria(feedback, modalCopy) : [];
@@ -541,7 +635,9 @@ export function CorrectionModal({
             </span>
             {state === "result" && feedback && (
               <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-violet-800 dark:bg-violet-400/15 dark:text-violet-300">
-                {modalCopy.estimatedLevel({ level: feedback.cefrLevel })}
+                {isLegacyCefrAssessment
+                  ? modalCopy.previouslyRecordedLevel({ level: feedback.cefr.conservativeLevel })
+                  : modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}
               </span>
             )}
           </div>
@@ -558,11 +654,11 @@ export function CorrectionModal({
 
         {state === "result" && feedback ? (
           <>
-            {/* Grid, not scrolling flex, below sm: exactly 3 equal-width tabs always
+            {/* Grid, not scrolling flex, below sm: exactly 4 equal-width tabs always
                 fit a narrow phone with no off-screen tab and no scroll cue needed,
                 even with a longer translated label. Reverts to the original
                 left-aligned, non-wrapping tab row from sm: up. */}
-            <div role="tablist" aria-label={modalCopy.title({ taskLabel: task.label })} className="grid grid-cols-3 gap-1 border-b border-black/[.08] px-2 pt-3 dark:border-white/[.12] sm:flex sm:flex-none sm:overflow-x-auto sm:px-6">
+            <div role="tablist" aria-label={modalCopy.title({ taskLabel: task.label })} className="grid grid-cols-4 gap-1 border-b border-black/[.08] px-2 pt-3 dark:border-white/[.12] sm:flex sm:flex-none sm:overflow-x-auto sm:px-6">
               {tabs.map((tab) => {
                 const selected = activeTab === tab.id;
                 return (
@@ -619,7 +715,18 @@ export function CorrectionModal({
 
                   <div className="rounded-2xl border border-black/[.08] bg-black/[.025] p-4 dark:border-white/[.12] dark:bg-white/[.04] sm:p-5">
                     <div className="flex flex-wrap items-baseline justify-between gap-3">
-                      <h3 className="font-semibold">{modalCopy.estimatedLevel({ level: feedback.cefrLevel })}</h3>
+                      {isLegacyCefrAssessment ? (
+                        <h3 className="font-semibold">
+                          {modalCopy.previouslyRecordedLevel({ level: feedback.cefr.conservativeLevel })}
+                        </h3>
+                      ) : (
+                        <div>
+                          <h3 className="font-semibold">{modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}</h3>
+                          <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
+                            {modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel })}
+                          </p>
+                        </div>
+                      )}
                       <p
                         lang={feedbackLanguage}
                         className={`text-sm ${
@@ -634,31 +741,65 @@ export function CorrectionModal({
                     <p className="mt-2 text-xs leading-5 text-zinc-500 dark:text-zinc-400">
                       {modalCopy.cefrEstimateDisclosure}
                     </p>
-                    <div
-                      role="list"
-                      aria-label={modalCopy.estimatedLevel({ level: feedback.cefrLevel })}
-                      className="mt-4 grid grid-cols-6 gap-1 text-center text-xs"
-                    >
-                      {CEFR_LEVELS.map((level) => (
-                        <span
-                          key={level}
-                          role="listitem"
-                          aria-current={level === feedback.cefrLevel ? "true" : undefined}
-                          className={`rounded-md px-1.5 py-2 font-medium ${
-                            level === feedback.cefrLevel
-                              ? "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950"
-                              : "bg-black/[.05] text-zinc-500 dark:bg-white/[.08] dark:text-zinc-400"
-                          }`}
-                        >
-                          {level}
-                        </span>
-                      ))}
-                    </div>
+                    {/* The Demonstrated/Secure grid (with its aria-label and
+                        per-cell ring highlight) asserts that two-value
+                        semantics -- omitted entirely for a legacy record,
+                        which only ever recorded one undifferentiated level. */}
+                    {!isLegacyCefrAssessment && (
+                      <div
+                        role="list"
+                        aria-label={modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}
+                        className="mt-4 grid grid-cols-6 gap-1 text-center text-xs"
+                      >
+                        {CEFR_LEVELS.map((level) => (
+                          <span
+                            key={level}
+                            role="listitem"
+                            aria-current={level === feedback.cefr.conservativeLevel ? "true" : undefined}
+                            className={`rounded-md px-1.5 py-2 font-medium ${
+                              level === feedback.cefr.conservativeLevel
+                                ? "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950"
+                                : level === feedback.cefr.estimatedLevel
+                                  ? "bg-violet-600/20 text-violet-800 ring-1 ring-inset ring-violet-600/50 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/40"
+                                  : "bg-black/[.05] text-zinc-500 dark:bg-white/[.08] dark:text-zinc-400"
+                            }`}
+                          >
+                            {level}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="mt-5 border-t border-black/[.08] pt-4 dark:border-white/[.12]">
                       <h4 className="text-sm font-medium">{modalCopy.cefrRationaleHeading}</h4>
                       <p lang={feedbackLanguage} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                        {feedback.cefrRationale}
+                        {feedback.cefr.rationale}
                       </p>
+                    </div>
+                    {/* Evidence/blocker are dropped for a legacy record: they
+                        are just the same "not recorded separately" note
+                        under two more headings, already explained once by
+                        the rationale's own legacy disclosure above. */}
+                    {!isLegacyCefrAssessment && (
+                      <>
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium">{modalCopy.cefrEvidenceHeading}</h4>
+                          <p lang={feedbackLanguage} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                            {feedback.cefr.evidence}
+                          </p>
+                        </div>
+                        <div className="mt-4">
+                          <h4 className="text-sm font-medium">{modalCopy.cefrBlockerHeading}</h4>
+                          <p lang={feedbackLanguage} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                            {feedback.cefr.blocker}
+                          </p>
+                        </div>
+                      </>
+                    )}
+                    <div className="mt-4 flex items-center gap-2 text-sm">
+                      <h4 className="font-medium">{modalCopy.cefrConfidenceHeading}</h4>
+                      <span className="text-zinc-600 dark:text-zinc-300">
+                        {modalCopy.cefrConfidenceLevels[feedback.cefr.confidence]}
+                      </span>
                     </div>
                   </div>
 
@@ -808,7 +949,7 @@ export function CorrectionModal({
                     {feedback.errors.length > 0 ? (
                       <ol className="mt-4 space-y-3">
                         {feedback.errors.map((error, index) => (
-                          <li key={`${error.original}-${index}`} className="text-sm">
+                          <li key={`${error.originalText}-${index}`} className="text-sm">
                             <details
                               open={expandedCorrectionIndexes.has(index)}
                               onToggle={(event) => {
@@ -829,17 +970,17 @@ export function CorrectionModal({
                                       {modalCopy.errorLabel}
                                     </span>
                                     <span lang="fr" className="break-words text-red-700 line-through decoration-red-500 dark:text-red-300">
-                                      {error.original}
+                                      {error.originalText}
                                     </span>
                                     <span aria-hidden="true">→</span>
                                     <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                                       {modalCopy.correctionLabel}
                                     </span>
                                     <strong lang="fr" className="break-words text-emerald-700 dark:text-emerald-300">
-                                      {error.correction}
+                                      {error.correctedText}
                                     </strong>
                                     <span className="rounded-full bg-black/[.06] px-2 py-0.5 text-[0.6875rem] font-medium uppercase tracking-wide text-zinc-600 dark:bg-white/[.1] dark:text-zinc-300">
-                                      {copy.workspace.feedback.errorCategories[error.category]}
+                                      {copy.workspace.feedback.errorCategories[error.errorType]}
                                     </span>
                                   </span>
                                 </span>
@@ -903,6 +1044,18 @@ export function CorrectionModal({
                       {feedback.modelVersion}
                     </p>
                   </blockquote>
+              </section>
+
+              <section
+                id={`${dialogId}-methodology-panel`}
+                role="tabpanel"
+                aria-labelledby={`${dialogId}-methodology-tab`}
+                hidden={activeTab !== "methodology"}
+                className="space-y-5 py-6"
+              >
+                  <div className="rounded-2xl border border-black/[.08] p-4 dark:border-white/[.12] sm:p-5">
+                    <MethodologyPanel blocks={modalCopy.methodology} />
+                  </div>
               </section>
             </div>
           </>

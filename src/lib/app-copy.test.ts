@@ -181,7 +181,8 @@ describe("APP_COPY", () => {
         copy.workspace.correctionModal.loading,
         copy.workspace.correctionModal.statusEvaluated,
         copy.workspace.correctionModal.wordCount({ count: 135, minWords: 120, maxWords: 150 }),
-        copy.workspace.correctionModal.estimatedLevel({ level: "B2" }),
+        copy.workspace.correctionModal.secureLevel({ level: "B2" }),
+        copy.workspace.correctionModal.demonstratedLevel({ level: "B2" }),
         copy.workspace.correctionModal.cefrRationaleHeading,
         copy.workspace.correctionModal.cefrEstimateDisclosure,
         copy.workspace.correctionModal.downloadPdf,
@@ -223,6 +224,30 @@ describe("APP_COPY", () => {
       for (const value of renderedCopy) {
         expect(value.trim()).not.toBe("");
       }
+    }
+  });
+
+  it("describes Tâche 2 as a multi-reader narrative-plus-commentary task, not an opinion essay, in every locale", () => {
+    // A revert to the old "give and justify an opinion" framing must fail
+    // this test even though taskPickerBody would still be non-empty.
+    const oldOpinionPhrasingByLocale = {
+      en: "give and justify an opinion",
+      fr: "donner et justifier une opinion",
+      es: "dar y justificar una opinión",
+      pt: "dar e justificar uma opinião",
+    } as const;
+    const correctedPhrasingByLocale = {
+      en: "recount an experience for several readers",
+      fr: "raconter une expérience pour plusieurs destinataires",
+      es: "narrar una experiencia para varios destinatarios",
+      pt: "narrar uma experiência para vários destinatários",
+    } as const;
+
+    for (const locale of APP_LOCALES) {
+      const taskPickerBody = getAppCopy(locale).walkthrough.taskPickerBody;
+
+      expect(taskPickerBody.toLowerCase()).not.toContain(oldOpinionPhrasingByLocale[locale]);
+      expect(taskPickerBody).toContain(correctedPhrasingByLocale[locale]);
     }
   });
 });

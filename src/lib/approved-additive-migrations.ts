@@ -23,4 +23,5 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260811080000_add_auth_security_sessions",
   "20260811090000_add_access_code_created_at_index",
   "20260811100000_add_access_code_expires_at",
+  "20260813060000_add_topic_retired_at",
 ]);

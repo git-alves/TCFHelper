@@ -27,18 +27,24 @@ const feedback = {
     linguistics: { score: 72, feedback: "Verb forms need attention." },
     vocabulary: { score: 76, feedback: "Vocabulary is appropriate." },
   },
-  cefrLevel: "B2" as const,
-  cefrRationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+  cefr: {
+    estimatedLevel: "B2" as const,
+    conservativeLevel: "B2" as const,
+    confidence: "Medium" as const,
+    rationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+    evidence: "Clear organization and mostly accurate vocabulary throughout.",
+    blocker: "Recurring verb-form errors limit accuracy.",
+  },
   meetsWordCount: true,
   wordCountNote: "The response meets the target length.",
   errors: [
     {
-      original: "Je va",
+      originalText: "Je va",
       originalStart: 0,
-      correction: "Je vais",
+      correctedText: "Je vais",
       correctionStart: 0,
       explanation: "Use the first-person singular form.",
-      category: "grammar" as const,
+      errorType: "grammar" as const,
     },
   ],
   suggestions: ["Use more varied connectors."],
@@ -47,21 +53,22 @@ const feedback = {
 
 function storedFeedback(overrides: Partial<Record<string, unknown>> = {}) {
   return {
-    level: feedback.cefrLevel,
+    level: feedback.cefr.conservativeLevel,
     feedbackLocale: "en",
+    viewerLocale: "en",
     summary: feedback.summary,
     meetsWordCount: feedback.meetsWordCount,
     grammarNotes: {
       correctedText: feedback.correctedText,
       modelVersion: feedback.modelVersion,
       scores: feedback.scores,
-      cefrRationale: feedback.cefrRationale,
+      cefr: feedback.cefr,
       wordCountNote: feedback.wordCountNote,
       errors: feedback.errors,
     },
     suggestions: feedback.suggestions,
     ...overrides,
-  };
+  } as unknown as Parameters<typeof parseStoredEssayFeedback>[0];
 }
 
 beforeEach(() => {
@@ -72,7 +79,11 @@ beforeEach(() => {
 
 describe("parseStoredEssayFeedback", () => {
   it("reconstructs validated feedback from the persisted columns and JSON fields", () => {
-    expect(parseStoredEssayFeedback(storedFeedback())).toEqual(feedback);
+    expect(parseStoredEssayFeedback(storedFeedback())).toEqual({
+      feedback,
+      feedbackLocale: "en",
+      cefrAssessment: "current",
+    });
   });
 
   it("returns null instead of casting an older incomplete JSON payload", () => {
@@ -83,6 +94,129 @@ describe("parseStoredEssayFeedback", () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it("migrates a pre-hybrid-grid payload instead of degrading it to a limited summary", () => {
+    const legacyGrammarNotes = {
+      correctedText: feedback.correctedText,
+      modelVersion: feedback.modelVersion,
+      scores: feedback.scores,
+      cefrRationale: "The text is clear and organized, but recurring verb-form errors limit accuracy.",
+      wordCountNote: feedback.wordCountNote,
+      errors: [
+        {
+          original: "Je va",
+          originalStart: 0,
+          correction: "Je vais",
+          correctionStart: 0,
+          explanation: "Use the first-person singular form.",
+          category: "grammar",
+        },
+      ],
+    };
+
+    const migrated = parseStoredEssayFeedback(storedFeedback({ grammarNotes: legacyGrammarNotes }));
+
+    expect(migrated).not.toBeNull();
+    expect(migrated?.feedbackLocale).toBe("en");
+    expect(migrated?.cefrAssessment).toBe("legacy");
+    expect(migrated?.feedback.correctedText).toBe(feedback.correctedText);
+    expect(migrated?.feedback.modelVersion).toBe(feedback.modelVersion);
+    expect(migrated?.feedback.errors).toEqual(feedback.errors);
+    expect(migrated?.feedback.cefr).toEqual({
+      estimatedLevel: "B2",
+      conservativeLevel: "B2",
+      // Never fabricated: this correction predates confidence, evidence, and
+      // blocker tracking, so confidence is honestly "Unknown" and evidence/
+      // blocker point to the real rationale rather than duplicating it under
+      // headings that would imply they were independently assessed. The
+      // rationale itself is prefixed with a disclosure that the old schema
+      // never distinguished a Demonstrated level from a verified Secure one.
+      confidence: "Unknown",
+      rationale:
+        "This correction predates the Demonstrated/Secure level distinction — the level below is the single estimate recorded at the time, not a separately verified secure level. " +
+        legacyGrammarNotes.cefrRationale,
+      evidence: "Not recorded separately for this earlier correction — see the rationale above.",
+      blocker: "Not recorded separately for this earlier correction — see the rationale above.",
+    });
+  });
+
+  it("keeps a migrated legacy row's null feedbackLocale as null, never guessing it was English", () => {
+    // The real historic content (rationale, corrected text, ...) could have
+    // been generated in any locale the learner had selected at the time --
+    // defaulting a missing feedbackLocale to English would make the modal
+    // falsely claim the whole correction was generated in English for a
+    // viewer in another language, when the truth is simply unknown.
+    const migrated = parseStoredEssayFeedback(
+      storedFeedback({
+        feedbackLocale: null,
+        grammarNotes: {
+          correctedText: feedback.correctedText,
+          modelVersion: feedback.modelVersion,
+          scores: feedback.scores,
+          cefrRationale: "Historic rationale.",
+          wordCountNote: feedback.wordCountNote,
+          errors: [],
+        },
+      }),
+    );
+
+    expect(migrated?.feedbackLocale).toBeNull();
+  });
+
+  it("generates the migration's own injected text in the viewer's current locale, regardless of the row's recorded locale", () => {
+    const migratedForFrenchViewer = parseStoredEssayFeedback(
+      storedFeedback({
+        feedbackLocale: null,
+        viewerLocale: "fr",
+        grammarNotes: {
+          correctedText: feedback.correctedText,
+          modelVersion: feedback.modelVersion,
+          scores: feedback.scores,
+          cefrRationale: "Historic rationale.",
+          wordCountNote: feedback.wordCountNote,
+          errors: [],
+        },
+      }),
+    );
+
+    // Not guessed as null/English -- generated fresh in French, so it never
+    // needs a "generated in another language" warning of its own.
+    expect(migratedForFrenchViewer?.feedback.cefr.evidence).toContain(
+      "Non enregistré séparément pour cette correction antérieure",
+    );
+    expect(migratedForFrenchViewer?.feedback.cefr.rationale).toContain(
+      "Cette correction est antérieure à la distinction entre niveau démontré et niveau acquis",
+    );
+  });
+
+  it("leaves a current-shape row's null feedbackLocale as null -- nothing was injected, so nothing needs disclosing", () => {
+    const parsed = parseStoredEssayFeedback(storedFeedback({ feedbackLocale: null }));
+
+    expect(parsed?.feedbackLocale).toBeNull();
+  });
+
+  it("classifies a current-shaped row with 'Unknown' confidence as legacy, not current", () => {
+    // The live route's freshEssayFeedbackSchema should make this shape
+    // impossible from a real correction, but shape alone isn't proof of
+    // provenance -- confidence: "Unknown" itself says no consistency check
+    // was ever performed, so the row must not get the Secure/Demonstrated
+    // framing just because its JSON otherwise matches the current field names.
+    const parsed = parseStoredEssayFeedback(
+      storedFeedback({
+        grammarNotes: {
+          correctedText: feedback.correctedText,
+          modelVersion: feedback.modelVersion,
+          scores: feedback.scores,
+          cefr: { ...feedback.cefr, confidence: "Unknown" },
+          wordCountNote: feedback.wordCountNote,
+          errors: feedback.errors,
+        },
+      }),
+    );
+
+    expect(parsed).not.toBeNull();
+    expect(parsed?.cefrAssessment).toBe("legacy");
   });
 });
 
@@ -146,7 +280,7 @@ describe("getCorrectionForUser", () => {
       },
     });
 
-    const detail = await getCorrectionForUser("learner_1", "essay_1");
+    const detail = await getCorrectionForUser("learner_1", "essay_1", "en");
 
     expect(findFirstMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,7 +315,7 @@ describe("getCorrectionForUser", () => {
       },
     });
 
-    await expect(getCorrectionForUser("learner_1", "essay_legacy")).resolves.toMatchObject({
+    await expect(getCorrectionForUser("learner_1", "essay_legacy", "en")).resolves.toMatchObject({
       kind: "limited",
       id: "essay_legacy",
       cefrLevel: "B2",
@@ -192,7 +326,7 @@ describe("getCorrectionForUser", () => {
   it("does not reveal whether an unowned or missing essay exists", async () => {
     findFirstMock.mockResolvedValue(null);
 
-    await expect(getCorrectionForUser("learner_1", "another_users_essay")).resolves.toBeNull();
+    await expect(getCorrectionForUser("learner_1", "another_users_essay", "en")).resolves.toBeNull();
   });
 });
 

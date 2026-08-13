@@ -16,6 +16,7 @@
     "db:deploy:additive": "tsx scripts/deploy-additive-migrations.ts",
     "db:studio": "prisma studio",
     "db:seed": "tsx scripts/seed-topics.ts",
+    "db:seed:deploy": "tsx scripts/deploy-seed-topics.ts",
     "stripe:setup": "tsx scripts/stripe-setup.ts",
     "clerk:import": "tsx scripts/import-users-to-clerk.ts",
     "admin:promote": "tsx scripts/promote-admin.ts",

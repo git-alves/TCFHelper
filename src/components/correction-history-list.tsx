@@ -169,7 +169,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                       <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
                         {item.cefrLevel && (
                           <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-violet-800 dark:bg-violet-400/15 dark:text-violet-300">
-                            {copy.workspace.correctionModal.estimatedLevel({ level: item.cefrLevel })}
+                            {copy.workspace.correctionModal.recordedLevel({ level: item.cefrLevel })}
                           </span>
                         )}
                         <span

@@ -92,8 +92,14 @@ const feedback = {
     linguistics: { score: 70, feedback: "Mostly accurate, watch verb agreement." },
     vocabulary: { score: 65, feedback: "Simple but appropriate vocabulary." },
   },
-  cefrLevel: "B1",
-  cefrRationale: "The response is understandable, but limited development and range keep it at B1.",
+  cefr: {
+    estimatedLevel: "B1",
+    conservativeLevel: "B1",
+    confidence: "Medium",
+    rationale: "The response is understandable, but limited development and range keep it at B1.",
+    evidence: "Clear, understandable sentences with accurate everyday vocabulary.",
+    blocker: "Limited development and range keep it at B1.",
+  },
   meetsWordCount: false,
   wordCountNote: "This response is below the target range.",
   errors: [],
@@ -230,6 +236,31 @@ describe("POST /api/essays/correct", () => {
     );
   });
 
+  it("still grades against a retired topic's own, never-mutated prompt", async () => {
+    // A client that loaded the picker before this topic was retired (its
+    // prompt corrected -- see seed-topic-sync.ts) still holds this topicId.
+    // source stays OFFICIAL_EXAM for a retired row specifically so this
+    // keeps resolving and grading exactly as it did before retirement, even
+    // for an app version that predates retiredAt existing at all.
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+      retiredAt: new Date("2026-08-01T00:00:00.000Z"),
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: "Bonjour voisin.",
+    });
+
+    expect(response.status).toBe(200);
+    const requestToGemini = gradeEssayWithGeminiMock.mock.calls[0][0];
+    expect(requestToGemini.userPrompt).toContain("Écrivez à votre voisin pour décrire votre quartier.");
+  });
+
   it("accepts a bank topic ID without duplicating its prompt in the request", async () => {
     findUniqueMock.mockResolvedValue({
       id: "topic_1",
@@ -287,7 +318,9 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ essayId: "essay_1", feedback });
     expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain("originalStart");
-    expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain("main blocker to the next band");
+    expect(gradeEssayWithGeminiMock.mock.calls[0][0].systemPrompt).toContain(
+      "main blocker preventing the next CEFR level",
+    );
     expect(essayCreateMock).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -297,7 +330,7 @@ describe("POST /api/essays/correct", () => {
               grammarNotes: expect.objectContaining({
                 modelVersion: feedback.modelVersion,
                 scores: feedback.scores,
-                cefrRationale: feedback.cefrRationale,
+                cefr: feedback.cefr,
               }),
             }),
           },
@@ -760,12 +793,12 @@ describe("POST /api/essays/correct", () => {
         ...feedback,
         errors: [
           {
-            original: "j'ai acheter",
+            originalText: "j'ai acheter",
             originalStart: null,
-            correction: "j'ai acheté",
+            correctedText: "j'ai acheté",
             correctionStart: 5,
             explanation: "The past participle should end in -é.",
-            category: "grammar",
+            errorType: "grammar",
           },
         ],
       });
@@ -798,6 +831,28 @@ describe("POST /api/essays/correct", () => {
         correctionKeyHash: "correction_hash_1",
         claimToken: "claim_1",
       });
+    });
+
+    it("rejects a fresh Gemini response that claims 'Unknown' confidence, even though it's otherwise well-formed", async () => {
+      // "Unknown" is reserved for a correction migrated from before
+      // confidence was tracked (see migrateLegacyStoredFields in
+      // correction-history.ts). Gemini's own response schema already
+      // excludes it, but the route must not trust that alone -- a live
+      // result claiming it should be rejected the same as any other
+      // malformed response, not persisted as if it were a legacy record.
+      gradeEssayWithGeminiMock.mockResolvedValue({
+        ...feedback,
+        cefr: { ...feedback.cefr, confidence: "Unknown" },
+      });
+
+      const response = await post({
+        taskType: "TASK_1",
+        topicId: "topic_1",
+        content: "Bonjour voisin.",
+      });
+
+      expect(response.status).toBe(502);
+      expect(essayCreateMock).not.toHaveBeenCalled();
     });
 
     it("returns a 502 when Gemini itself fails", async () => {

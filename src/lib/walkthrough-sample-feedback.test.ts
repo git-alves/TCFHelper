@@ -28,14 +28,14 @@ describe("getWalkthroughSampleFeedback", () => {
         expect(error.originalStart).toBeGreaterThanOrEqual(0);
         expect(error.correctionStart).toBeGreaterThanOrEqual(0);
         expect(
-          WALKTHROUGH_SAMPLE_ESSAY.slice(error.originalStart!, error.originalStart! + error.original.length),
-        ).toBe(error.original);
+          WALKTHROUGH_SAMPLE_ESSAY.slice(error.originalStart!, error.originalStart! + error.originalText.length),
+        ).toBe(error.originalText);
         expect(
           WALKTHROUGH_SAMPLE_CORRECTED_TEXT.slice(
             error.correctionStart!,
-            error.correctionStart! + error.correction.length,
+            error.correctionStart! + error.correctedText.length,
           ),
-        ).toBe(error.correction);
+        ).toBe(error.correctedText);
       }
     }
   });

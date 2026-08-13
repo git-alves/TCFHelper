@@ -1,7 +1,18 @@
 import type { AppLocale } from "@/lib/app-locale";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 
-type FeedbackErrorCategory = EssayFeedback["errors"][number]["category"];
+type FeedbackErrorCategory = EssayFeedback["errors"][number]["errorType"];
+type FeedbackCefrConfidence = EssayFeedback["cefr"]["confidence"];
+
+// A small block model, not raw markdown: the modal has no markdown renderer,
+// and hand-typed JSX per locale would drift the four languages out of sync
+// with each other's structure. "text" fields may contain `**bold**` spans,
+// rendered inline by the modal.
+export type MethodologyBlock =
+  | { kind: "heading"; text: string }
+  | { kind: "paragraph"; text: string }
+  | { kind: "list"; items: string[] }
+  | { kind: "example"; text: string };
 
 interface TargetLengthValues {
   minWords: number;
@@ -157,6 +168,8 @@ export interface AppCopy {
     previewFeedback: {
       summary: string;
       cefrRationale: string;
+      cefrEvidence: string;
+      cefrBlocker: string;
       wordCountNote: string;
       contentNote: string;
       linguisticsNote: string;
@@ -241,9 +254,44 @@ export interface AppCopy {
       loading: string;
       statusEvaluated: string;
       wordCount: (values: WordCountValues) => string;
-      estimatedLevel: (values: FeedbackLevelValues) => string;
+      // secureLevel is the level actually assigned to the student
+      // (feedback.cefr.conservativeLevel) for a *current*-provenance
+      // correction (cefrAssessment === "current") -- demonstratedLevel is the
+      // higher, less-consistently-shown level (feedback.cefr.estimatedLevel),
+      // always displayed alongside it in the CEFR card so the two results the
+      // methodology tab promises are never shown as just one ambiguous number.
+      secureLevel: (values: FeedbackLevelValues) => string;
+      demonstratedLevel: (values: FeedbackLevelValues) => string;
+      // Used instead of secureLevel/demonstratedLevel for a *legacy*-provenance
+      // correction (cefrAssessment === "legacy"): the old schema recorded one
+      // CEFR level with no Demonstrated/Secure distinction, so presenting it
+      // with either of those specific labels would claim a consistency check
+      // that was never actually performed.
+      previouslyRecordedLevel: (values: FeedbackLevelValues) => string;
+      // A provenance-agnostic label for a single CEFR badge where the
+      // rendering code cannot cheaply know whether the record is current or
+      // legacy (the history list's compact rows, and the limited-detail
+      // fallback when even legacy migration failed) -- deliberately makes no
+      // Secure/Demonstrated claim either way.
+      recordedLevel: (values: FeedbackLevelValues) => string;
       cefrRationaleHeading: string;
       cefrEstimateDisclosure: string;
+      cefrEvidenceHeading: string;
+      cefrBlockerHeading: string;
+      cefrConfidenceHeading: string;
+      cefrConfidenceLevels: Record<FeedbackCefrConfidence, string>;
+      // Placeholder content for evidence/blocker on a correction migrated
+      // from before those fields existed -- see migrateLegacyStoredFields in
+      // correction-history.ts. Distinct from cefrConfidenceLevels.Unknown
+      // (the confidence badge itself); this is the body text.
+      legacyCefrDetailUnavailable: string;
+      // Prefixed onto the rationale of a migrated legacy record: the old
+      // schema recorded one CEFR level with no Demonstrated/Secure
+      // distinction, so estimatedLevel and conservativeLevel are the same
+      // recorded value here, not two independently assessed ones -- this
+      // says so rather than letting the Secure-level badge imply a
+      // consistency check that was never actually performed.
+      legacyCefrLevelNote: string;
       downloadPdf: string;
       viewCorrection: string;
       tabOverview: string;
@@ -253,6 +301,8 @@ export interface AppCopy {
       overallScoreDescription: string;
       tabCompared: string;
       tabComments: string;
+      tabMethodology: string;
+      methodology: MethodologyBlock[];
       contentScoreLabel: string;
       linguisticsScoreLabel: string;
       vocabularyScoreLabel: string;
@@ -391,7 +441,7 @@ export const APP_COPY = {
       dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
       taskPickerTitle: "Choose a task",
       taskPickerBody:
-        "TCF written expression has three task types: Tâche 1 (describe or recount an experience), Tâche 2 (give and justify an opinion), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
+        "TCF written expression has three task types: Tâche 1 (describe or recount an experience), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
       topicPickerTitle: "Choose a topic",
       topicPickerBody:
         "Recent exam topics are pulled directly from real, recently published TCF exams on this site, so you always practice with an authentic prompt. You can also paste in your own topic instead.",
@@ -422,6 +472,8 @@ export const APP_COPY = {
           "Solid, natural French overall — two small agreement mistakes are the only things holding this back from a higher score.",
         cefrRationale:
           "The vocabulary and sentence structure are appropriate for B1, but the two agreement errors below are the main blocker to B2.",
+        cefrEvidence: "Clear, accurate everyday vocabulary and mostly correct sentence structure throughout the response.",
+        cefrBlocker: "The two agreement errors below are the main thing preventing a B2 estimate.",
         wordCountNote: "Within the target range for this task.",
         contentNote: "Clearly answers the prompt with relevant, well-organized details.",
         linguisticsNote: "Mostly accurate grammar, with two past-participle agreement errors.",
@@ -522,10 +574,20 @@ export const APP_COPY = {
         loading: "Preparing your detailed correction…",
         statusEvaluated: "Evaluated",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
-        estimatedLevel: ({ level }) => `Estimated level: ${level}`,
+        secureLevel: ({ level }) => `Secure level: ${level}`,
+        demonstratedLevel: ({ level }) => `Demonstrated level: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Previously recorded level: ${level}`,
+        recordedLevel: ({ level }) => `Recorded level: ${level}`,
         cefrRationaleHeading: "Why this estimate",
         cefrEstimateDisclosure:
           "This automated estimate is based on this submitted response. A requested C1/C2 study-example level is a target, not a verified result.",
+        cefrEvidenceHeading: "Evidence from your writing",
+        cefrBlockerHeading: "What's holding back the next level",
+        cefrConfidenceHeading: "Confidence in this estimate",
+        cefrConfidenceLevels: { High: "High", Medium: "Medium", Low: "Low", Unknown: "Not assessed (older correction)" },
+        legacyCefrDetailUnavailable: "Not recorded separately for this earlier correction — see the rationale above.",
+        legacyCefrLevelNote:
+          "This correction predates the Demonstrated/Secure level distinction — the level below is the single estimate recorded at the time, not a separately verified secure level.",
         downloadPdf: "Print / Save as PDF",
         viewCorrection: "View correction",
         tabOverview: "Overview & scores",
@@ -535,6 +597,139 @@ export const APP_COPY = {
         overallScoreDescription: "Average of the three mytcflab learning indicators below.",
         tabCompared: "Compared text",
         tabComments: "Feedback & tips",
+        tabMethodology: "How it was evaluated",
+        methodology: [
+          {
+            kind: "paragraph",
+            text: "The evaluation is designed to help you understand **as accurately as possible where you are today** and what you need to improve to reach your goal on the TCF Canada.",
+          },
+          { kind: "heading", text: "1. First, we check whether you completed the task correctly" },
+          {
+            kind: "paragraph",
+            text: "Writing good French is not enough. You need to **do exactly what the task asks you to do**.",
+          },
+          { kind: "paragraph", text: "We therefore check whether you:" },
+          {
+            kind: "list",
+            items: [
+              "answered all the required points",
+              "developed your ideas sufficiently",
+              "respected the situation presented",
+              "used the appropriate tone",
+              "organized the information clearly",
+              "fulfilled the purpose of the task",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Each TCF task requires different skills. For this reason, Tâche 1, Tâche 2, and Tâche 3 are evaluated slightly differently.",
+          },
+          { kind: "heading", text: "2. Then, we evaluate the quality of your French" },
+          { kind: "paragraph", text: "We mainly assess:" },
+          {
+            kind: "list",
+            items: [
+              "grammar",
+              "verb conjugation",
+              "sentence structure",
+              "spelling",
+              "vocabulary",
+              "word choice and precision",
+              "connectors",
+              "organization of ideas",
+              "register and naturalness",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "We do not evaluate your level simply by looking at whether you can use difficult words.",
+          },
+          { kind: "paragraph", text: "What matters most is whether you can **use French accurately and consistently**." },
+          { kind: "heading", text: "3. Your B2, C1, or C2 level is assessed conservatively" },
+          { kind: "paragraph", text: "The evaluation does not try to find the highest possible level in your text." },
+          {
+            kind: "paragraph",
+            text: "For example, writing one very sophisticated sentence does not automatically mean that your level is C1.",
+          },
+          {
+            kind: "paragraph",
+            text: "To consider you C1, C1-level characteristics need to appear **consistently throughout your writing**. The same principle applies to C2.",
+          },
+          {
+            kind: "paragraph",
+            text: "Therefore, when your writing falls between two levels, we use the lower level until you demonstrate the higher level consistently.",
+          },
+          { kind: "example", text: "B2/C1 → B2" },
+          {
+            kind: "paragraph",
+            text: "This does not mean that you are incapable of producing some C1-level sentences. It simply means that we need to see that quality more consistently before considering C1 a secure level.",
+          },
+          { kind: "heading", text: "4. You will receive two important results" },
+          { kind: "paragraph", text: "**Demonstrated level:** the highest level that appears in your writing." },
+          { kind: "paragraph", text: "**Secure level:** the level you demonstrate consistently." },
+          { kind: "example", text: "Demonstrated level: C1 — Secure level: B2" },
+          {
+            kind: "paragraph",
+            text: "This means that your writing shows some C1 characteristics, but there are still important weaknesses preventing C1 from being considered a secure level.",
+          },
+          {
+            kind: "paragraph",
+            text: "This distinction is important because the goal is not simply to say that you \"look like a C1.\" The goal is to determine **which level you can reproduce reliably on exam day**.",
+          },
+          { kind: "heading", text: "5. You will also receive a score from 0 to 100" },
+          { kind: "paragraph", text: "This score is only a learning tool. It evaluates three areas:" },
+          {
+            kind: "list",
+            items: [
+              "**Content and Task Fulfillment** — Did you answer the task effectively?",
+              "**French** — How good are your grammar, spelling, and sentence construction?",
+              "**Vocabulary and Register** — Do you use varied, precise, and appropriate language for the situation?",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "These scores **are not official TCF scores** and should not be directly interpreted as a TCF score or CEFR level.",
+          },
+          { kind: "heading", text: "6. You will receive corrections for your mistakes" },
+          {
+            kind: "paragraph",
+            text: "For each important error, we will show: **What you wrote → How to correct it → Why it is incorrect**",
+          },
+          {
+            kind: "paragraph",
+            text: "This helps you identify recurring mistakes and focus your practice on the areas that need the most improvement.",
+          },
+          { kind: "heading", text: "7. You will also receive a model version" },
+          {
+            kind: "paragraph",
+            text: "After the correction, you will receive an improved version of the text. This version is designed to help you study:",
+          },
+          {
+            kind: "list",
+            items: [
+              "new vocabulary",
+              "grammatical structures",
+              "connectors",
+              "ways to develop arguments",
+              "more natural ways of expressing ideas",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "But remember: **the model version is not used to determine your level.** Your level is determined only from the text you originally submitted.",
+          },
+          { kind: "heading", text: "The goal of the evaluation" },
+          {
+            kind: "paragraph",
+            text: "The purpose is not to give you a high score just to make you feel good. It is also not to look for mistakes simply to lower your score.",
+          },
+          { kind: "paragraph", text: "The goal is to answer one simple question:" },
+          { kind: "example", text: "\"If I took a similar test today, what level could I demonstrate with confidence?\"" },
+          {
+            kind: "paragraph",
+            text: "This way, you will know exactly **where you are, what is preventing you from reaching the next level, and what you need to practice** before taking the TCF Canada.",
+          },
+        ],
         contentScoreLabel: "Content & pragmatics",
         linguisticsScoreLabel: "Linguistics",
         vocabularyScoreLabel: "Vocabulary & register",
@@ -672,7 +867,7 @@ export const APP_COPY = {
       dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
-        "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (décrire ou raconter une expérience), la Tâche 2 (donner et justifier une opinion) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
+        "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (décrire ou raconter une expérience), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
       topicPickerTitle: "Choisissez un sujet",
       topicPickerBody:
         "Les sujets d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des sujets authentiques. Vous pouvez aussi coller votre propre sujet.",
@@ -703,6 +898,8 @@ export const APP_COPY = {
           "Un français solide et naturel dans l’ensemble — seules deux petites erreurs d’accord empêchent une meilleure note.",
         cefrRationale:
           "Le vocabulaire et la structure des phrases correspondent au niveau B1, mais les deux erreurs d’accord ci-dessous sont le principal frein au niveau B2.",
+        cefrEvidence: "Un vocabulaire courant précis et une structure de phrases globalement correcte tout au long de la réponse.",
+        cefrBlocker: "Les deux erreurs d’accord ci-dessous sont le principal frein à une estimation B2.",
         wordCountNote: "Dans la fourchette visée pour cette tâche.",
         contentNote: "Répond clairement au sujet avec des détails pertinents et bien organisés.",
         linguisticsNote: "Grammaire globalement correcte, avec deux erreurs d’accord du participe passé.",
@@ -807,10 +1004,20 @@ export const APP_COPY = {
         loading: "Préparation de votre correction détaillée…",
         statusEvaluated: "Évaluée",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
-        estimatedLevel: ({ level }) => `Niveau estimé : ${level}`,
+        secureLevel: ({ level }) => `Niveau acquis : ${level}`,
+        demonstratedLevel: ({ level }) => `Niveau démontré : ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Niveau précédemment enregistré : ${level}`,
+        recordedLevel: ({ level }) => `Niveau enregistré : ${level}`,
         cefrRationaleHeading: "Pourquoi cette estimation",
         cefrEstimateDisclosure:
           "Cette estimation automatisée repose sur la réponse soumise. Un niveau C1/C2 demandé pour un exemple est un objectif, pas un résultat vérifié.",
+        cefrEvidenceHeading: "Éléments observés dans votre texte",
+        cefrBlockerHeading: "Ce qui empêche le niveau supérieur",
+        cefrConfidenceHeading: "Confiance dans cette estimation",
+        cefrConfidenceLevels: { High: "Élevée", Medium: "Moyenne", Low: "Faible", Unknown: "Non évaluée (correction antérieure)" },
+        legacyCefrDetailUnavailable: "Non enregistré séparément pour cette correction antérieure — voir la justification ci-dessus.",
+        legacyCefrLevelNote:
+          "Cette correction est antérieure à la distinction entre niveau démontré et niveau acquis — le niveau ci-dessous est l'estimation unique enregistrée à l'époque, et non un niveau acquis vérifié séparément.",
         downloadPdf: "Imprimer / Enregistrer en PDF",
         viewCorrection: "Voir la correction",
         tabOverview: "Vue d’ensemble et scores",
@@ -820,6 +1027,145 @@ export const APP_COPY = {
         overallScoreDescription: "Moyenne des trois indicateurs d’apprentissage mytcflab ci-dessous.",
         tabCompared: "Comparer les textes",
         tabComments: "Commentaires et conseils",
+        tabMethodology: "Comment c’est évalué",
+        methodology: [
+          {
+            kind: "paragraph",
+            text: "L’évaluation est conçue pour vous aider à comprendre **le plus précisément possible où vous en êtes aujourd’hui** et ce que vous devez améliorer pour atteindre votre objectif au TCF Canada.",
+          },
+          { kind: "heading", text: "1. D’abord, nous vérifions que vous avez bien réalisé la tâche" },
+          {
+            kind: "paragraph",
+            text: "Bien écrire en français ne suffit pas. Vous devez **faire exactement ce que la tâche demande**.",
+          },
+          { kind: "paragraph", text: "Nous vérifions donc si vous avez :" },
+          {
+            kind: "list",
+            items: [
+              "répondu à tous les points demandés",
+              "suffisamment développé vos idées",
+              "respecté la situation présentée",
+              "utilisé le ton approprié",
+              "organisé les informations clairement",
+              "rempli l’objectif de la tâche",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Chaque tâche du TCF exige des compétences différentes. C’est pourquoi la Tâche 1, la Tâche 2 et la Tâche 3 sont évaluées de manière légèrement différente.",
+          },
+          { kind: "heading", text: "2. Ensuite, nous évaluons la qualité de votre français" },
+          { kind: "paragraph", text: "Nous évaluons principalement :" },
+          {
+            kind: "list",
+            items: [
+              "la grammaire",
+              "la conjugaison des verbes",
+              "la structure des phrases",
+              "l’orthographe",
+              "le vocabulaire",
+              "le choix et la précision des mots",
+              "les connecteurs",
+              "l’organisation des idées",
+              "le registre et le naturel",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Nous n’évaluons pas votre niveau simplement en regardant si vous savez utiliser des mots difficiles.",
+          },
+          {
+            kind: "paragraph",
+            text: "Ce qui compte le plus, c’est votre capacité à **utiliser le français de façon précise et régulière**.",
+          },
+          { kind: "heading", text: "3. Votre niveau B2, C1 ou C2 est évalué de façon prudente" },
+          {
+            kind: "paragraph",
+            text: "L’évaluation ne cherche pas à trouver le niveau le plus élevé possible dans votre texte.",
+          },
+          {
+            kind: "paragraph",
+            text: "Par exemple, écrire une seule phrase très sophistiquée ne signifie pas automatiquement que votre niveau est C1.",
+          },
+          {
+            kind: "paragraph",
+            text: "Pour être considéré C1, les caractéristiques du niveau C1 doivent apparaître **de façon régulière dans tout votre texte**. Le même principe s’applique au niveau C2.",
+          },
+          {
+            kind: "paragraph",
+            text: "Ainsi, lorsque votre texte se situe entre deux niveaux, nous retenons le niveau inférieur tant que le niveau supérieur n’est pas démontré de façon régulière.",
+          },
+          { kind: "example", text: "B2/C1 → B2" },
+          {
+            kind: "paragraph",
+            text: "Cela ne signifie pas que vous êtes incapable de produire des phrases de niveau C1. Cela signifie simplement que nous devons observer cette qualité de façon plus régulière avant de considérer le niveau C1 comme acquis.",
+          },
+          { kind: "heading", text: "4. Vous recevez deux résultats importants" },
+          { kind: "paragraph", text: "**Niveau démontré :** le niveau le plus élevé qui apparaît dans votre texte." },
+          { kind: "paragraph", text: "**Niveau acquis :** le niveau que vous démontrez de façon régulière." },
+          { kind: "example", text: "Niveau démontré : C1 — Niveau acquis : B2" },
+          {
+            kind: "paragraph",
+            text: "Cela signifie que votre texte présente certaines caractéristiques du niveau C1, mais qu’il reste des faiblesses importantes empêchant de considérer le niveau C1 comme acquis.",
+          },
+          {
+            kind: "paragraph",
+            text: "Cette distinction est importante, car l’objectif n’est pas simplement de dire que vous « ressemblez à un C1 ». L’objectif est de déterminer **quel niveau vous pouvez reproduire de façon fiable le jour de l’examen**.",
+          },
+          { kind: "heading", text: "5. Vous recevez aussi une note de 0 à 100" },
+          { kind: "paragraph", text: "Cette note est uniquement un outil d’apprentissage. Elle évalue trois domaines :" },
+          {
+            kind: "list",
+            items: [
+              "**Contenu et réalisation de la tâche** — Avez-vous répondu efficacement à la tâche ?",
+              "**Français** — Quelle est la qualité de votre grammaire, de votre orthographe et de la construction de vos phrases ?",
+              "**Vocabulaire et registre** — Utilisez-vous un langage varié, précis et adapté à la situation ?",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Ces notes **ne sont pas des scores officiels du TCF** et ne doivent pas être interprétées directement comme un score TCF ou un niveau CECR.",
+          },
+          { kind: "heading", text: "6. Vous recevez les corrections de vos erreurs" },
+          {
+            kind: "paragraph",
+            text: "Pour chaque erreur importante, nous vous montrons : **Ce que vous avez écrit → Comment le corriger → Pourquoi c’est incorrect**",
+          },
+          {
+            kind: "paragraph",
+            text: "Cela vous aide à repérer les erreurs récurrentes et à concentrer votre pratique sur les points à améliorer en priorité.",
+          },
+          { kind: "heading", text: "7. Vous recevez aussi une version modèle" },
+          {
+            kind: "paragraph",
+            text: "Après la correction, vous recevez une version améliorée du texte. Cette version est conçue pour vous aider à étudier :",
+          },
+          {
+            kind: "list",
+            items: [
+              "du nouveau vocabulaire",
+              "des structures grammaticales",
+              "des connecteurs",
+              "des façons de développer des arguments",
+              "des façons plus naturelles d’exprimer des idées",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Mais attention : **la version modèle n’est pas utilisée pour déterminer votre niveau.** Votre niveau est déterminé uniquement à partir du texte que vous avez initialement soumis.",
+          },
+          { kind: "heading", text: "L’objectif de l’évaluation" },
+          {
+            kind: "paragraph",
+            text: "Le but n’est pas de vous donner une bonne note simplement pour vous faire plaisir. Ce n’est pas non plus de chercher des erreurs simplement pour baisser votre note.",
+          },
+          { kind: "paragraph", text: "L’objectif est de répondre à une seule question simple :" },
+          { kind: "example", text: "« Si je passais un test similaire aujourd’hui, quel niveau pourrais-je démontrer avec confiance ? »" },
+          {
+            kind: "paragraph",
+            text: "Ainsi, vous saurez exactement **où vous en êtes, ce qui vous empêche d’atteindre le niveau supérieur, et ce que vous devez pratiquer** avant de passer le TCF Canada.",
+          },
+        ],
         contentScoreLabel: "Contenu et pragmatique",
         linguisticsScoreLabel: "Linguistique",
         vocabularyScoreLabel: "Vocabulaire et registre",
@@ -956,7 +1302,7 @@ export const APP_COPY = {
       dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
-        "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (describir o narrar una experiencia), la Tarea 2 (dar y justificar una opinión) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
+        "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (describir o narrar una experiencia), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
       topicPickerTitle: "Elige un tema",
       topicPickerBody:
         "Los temas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con un enunciado auténtico. También puedes pegar tu propio tema.",
@@ -987,6 +1333,8 @@ export const APP_COPY = {
           "En general, un francés sólido y natural — solo dos pequeños errores de concordancia impiden una nota más alta.",
         cefrRationale:
           "El vocabulario y la estructura de las oraciones corresponden al nivel B1, pero los dos errores de concordancia de abajo son el principal obstáculo para el B2.",
+        cefrEvidence: "Un vocabulario cotidiano preciso y una estructura de oraciones mayormente correcta a lo largo de la respuesta.",
+        cefrBlocker: "Los dos errores de concordancia de abajo son el principal obstáculo para una estimación B2.",
         wordCountNote: "Dentro del rango previsto para esta tarea.",
         contentNote: "Responde claramente al enunciado con detalles relevantes y bien organizados.",
         linguisticsNote: "Gramática mayormente correcta, con dos errores de concordancia del participio pasado.",
@@ -1091,10 +1439,20 @@ export const APP_COPY = {
         loading: "Preparando tu corrección detallada…",
         statusEvaluated: "Evaluada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
-        estimatedLevel: ({ level }) => `Nivel estimado: ${level}`,
+        secureLevel: ({ level }) => `Nivel consolidado: ${level}`,
+        demonstratedLevel: ({ level }) => `Nivel demostrado: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Nivel registrado anteriormente: ${level}`,
+        recordedLevel: ({ level }) => `Nivel registrado: ${level}`,
         cefrRationaleHeading: "Por qué esta estimación",
         cefrEstimateDisclosure:
           "Esta estimación automatizada se basa en la respuesta enviada. Un nivel C1/C2 solicitado para un ejemplo es un objetivo, no un resultado verificado.",
+        cefrEvidenceHeading: "Evidencia observada en tu texto",
+        cefrBlockerHeading: "Qué impide alcanzar el siguiente nivel",
+        cefrConfidenceHeading: "Confianza en esta estimación",
+        cefrConfidenceLevels: { High: "Alta", Medium: "Media", Low: "Baja", Unknown: "No evaluada (corrección anterior)" },
+        legacyCefrDetailUnavailable: "No se registró por separado para esta corrección anterior — consulta la justificación anterior.",
+        legacyCefrLevelNote:
+          "Esta corrección es anterior a la distinción entre nivel demostrado y nivel consolidado — el nivel de abajo es la estimación única registrada en su momento, no un nivel consolidado verificado por separado.",
         downloadPdf: "Imprimir / Guardar como PDF",
         viewCorrection: "Ver corrección",
         tabOverview: "Resumen y puntuaciones",
@@ -1104,6 +1462,145 @@ export const APP_COPY = {
         overallScoreDescription: "Promedio de los tres indicadores de aprendizaje de mytcflab que aparecen abajo.",
         tabCompared: "Comparar textos",
         tabComments: "Comentarios y consejos",
+        tabMethodology: "Cómo se evaluó",
+        methodology: [
+          {
+            kind: "paragraph",
+            text: "La evaluación está diseñada para ayudarte a entender **con la mayor precisión posible dónde te encuentras hoy** y qué necesitas mejorar para alcanzar tu objetivo en el TCF Canadá.",
+          },
+          { kind: "heading", text: "1. Primero, comprobamos si completaste la tarea correctamente" },
+          {
+            kind: "paragraph",
+            text: "Escribir bien en francés no es suficiente. Debes **hacer exactamente lo que la tarea pide**.",
+          },
+          { kind: "paragraph", text: "Por eso comprobamos si:" },
+          {
+            kind: "list",
+            items: [
+              "respondiste a todos los puntos requeridos",
+              "desarrollaste tus ideas lo suficiente",
+              "respetaste la situación planteada",
+              "usaste el tono apropiado",
+              "organizaste la información con claridad",
+              "cumpliste el propósito de la tarea",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Cada tarea del TCF exige habilidades diferentes. Por eso, la Tâche 1, la Tâche 2 y la Tâche 3 se evalúan de forma ligeramente distinta.",
+          },
+          { kind: "heading", text: "2. Luego, evaluamos la calidad de tu francés" },
+          { kind: "paragraph", text: "Evaluamos principalmente:" },
+          {
+            kind: "list",
+            items: [
+              "la gramática",
+              "la conjugación verbal",
+              "la estructura de las oraciones",
+              "la ortografía",
+              "el vocabulario",
+              "la elección y precisión de las palabras",
+              "los conectores",
+              "la organización de las ideas",
+              "el registro y la naturalidad",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "No evaluamos tu nivel simplemente observando si sabes usar palabras difíciles.",
+          },
+          {
+            kind: "paragraph",
+            text: "Lo que más importa es si puedes **usar el francés de forma precisa y constante**.",
+          },
+          { kind: "heading", text: "3. Tu nivel B2, C1 o C2 se evalúa de forma prudente" },
+          {
+            kind: "paragraph",
+            text: "La evaluación no busca encontrar el nivel más alto posible en tu texto.",
+          },
+          {
+            kind: "paragraph",
+            text: "Por ejemplo, escribir una sola oración muy sofisticada no significa automáticamente que tu nivel sea C1.",
+          },
+          {
+            kind: "paragraph",
+            text: "Para considerarte C1, las características del nivel C1 deben aparecer **de forma constante en todo tu texto**. El mismo principio se aplica al nivel C2.",
+          },
+          {
+            kind: "paragraph",
+            text: "Por lo tanto, cuando tu texto se sitúa entre dos niveles, usamos el nivel inferior hasta que demuestres el nivel superior de forma constante.",
+          },
+          { kind: "example", text: "B2/C1 → B2" },
+          {
+            kind: "paragraph",
+            text: "Esto no significa que seas incapaz de producir algunas oraciones de nivel C1. Simplemente significa que necesitamos ver esa calidad de forma más constante antes de considerar el C1 un nivel consolidado.",
+          },
+          { kind: "heading", text: "4. Recibirás dos resultados importantes" },
+          { kind: "paragraph", text: "**Nivel demostrado:** el nivel más alto que aparece en tu texto." },
+          { kind: "paragraph", text: "**Nivel consolidado:** el nivel que demuestras de forma constante." },
+          { kind: "example", text: "Nivel demostrado: C1 — Nivel consolidado: B2" },
+          {
+            kind: "paragraph",
+            text: "Esto significa que tu texto muestra algunas características de nivel C1, pero aún existen debilidades importantes que impiden considerar el C1 como un nivel consolidado.",
+          },
+          {
+            kind: "paragraph",
+            text: "Esta distinción es importante porque el objetivo no es simplemente decir que \"pareces C1\". El objetivo es determinar **qué nivel puedes reproducir de forma fiable el día del examen**.",
+          },
+          { kind: "heading", text: "5. También recibirás una puntuación de 0 a 100" },
+          { kind: "paragraph", text: "Esta puntuación es solo una herramienta de aprendizaje. Evalúa tres áreas:" },
+          {
+            kind: "list",
+            items: [
+              "**Contenido y cumplimiento de la tarea** — ¿Respondiste eficazmente a la tarea?",
+              "**Francés** — ¿Qué tan buena es tu gramática, ortografía y construcción de oraciones?",
+              "**Vocabulario y registro** — ¿Usas un lenguaje variado, preciso y adecuado para la situación?",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Estas puntuaciones **no son puntuaciones oficiales del TCF** y no deben interpretarse directamente como una puntuación TCF o un nivel MCER.",
+          },
+          { kind: "heading", text: "6. Recibirás las correcciones de tus errores" },
+          {
+            kind: "paragraph",
+            text: "Para cada error importante, te mostraremos: **Lo que escribiste → Cómo corregirlo → Por qué es incorrecto**",
+          },
+          {
+            kind: "paragraph",
+            text: "Esto te ayuda a identificar errores recurrentes y a enfocar tu práctica en las áreas que más necesitan mejorar.",
+          },
+          { kind: "heading", text: "7. También recibirás una versión modelo" },
+          {
+            kind: "paragraph",
+            text: "Después de la corrección, recibirás una versión mejorada del texto. Esta versión está diseñada para ayudarte a estudiar:",
+          },
+          {
+            kind: "list",
+            items: [
+              "vocabulario nuevo",
+              "estructuras gramaticales",
+              "conectores",
+              "formas de desarrollar argumentos",
+              "formas más naturales de expresar ideas",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Pero recuerda: **la versión modelo no se usa para determinar tu nivel.** Tu nivel se determina únicamente a partir del texto que enviaste originalmente.",
+          },
+          { kind: "heading", text: "El objetivo de la evaluación" },
+          {
+            kind: "paragraph",
+            text: "El propósito no es darte una puntuación alta solo para hacerte sentir bien. Tampoco es buscar errores simplemente para bajar tu puntuación.",
+          },
+          { kind: "paragraph", text: "El objetivo es responder a una pregunta simple:" },
+          { kind: "example", text: "«Si hiciera un examen similar hoy, ¿qué nivel podría demostrar con confianza?»" },
+          {
+            kind: "paragraph",
+            text: "Así sabrás exactamente **dónde estás, qué te impide alcanzar el siguiente nivel y qué necesitas practicar** antes de presentar el TCF Canadá.",
+          },
+        ],
         contentScoreLabel: "Contenido y pragmática",
         linguisticsScoreLabel: "Lingüística",
         vocabularyScoreLabel: "Vocabulario y registro",
@@ -1240,7 +1737,7 @@ export const APP_COPY = {
       dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
-        "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (descrever ou narrar uma experiência), a Tarefa 2 (dar e justificar uma opinião) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
+        "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (descrever ou narrar uma experiência), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
       topicPickerTitle: "Escolha um tema",
       topicPickerBody:
         "Os temas de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio tema.",
@@ -1271,6 +1768,8 @@ export const APP_COPY = {
           "No geral, um francês sólido e natural — apenas dois pequenos erros de concordância impedem uma nota mais alta.",
         cefrRationale:
           "O vocabulário e a estrutura das frases correspondem ao nível B1, mas os dois erros de concordância abaixo são o principal obstáculo para o B2.",
+        cefrEvidence: "Vocabulário cotidiano preciso e estrutura de frases majoritariamente correta ao longo da resposta.",
+        cefrBlocker: "Os dois erros de concordância abaixo são o principal obstáculo para uma estimativa B2.",
         wordCountNote: "Dentro da faixa esperada para esta tarefa.",
         contentNote: "Responde claramente ao enunciado com detalhes relevantes e bem organizados.",
         linguisticsNote: "Gramática majoritariamente correta, com dois erros de concordância do particípio passado.",
@@ -1375,10 +1874,20 @@ export const APP_COPY = {
         loading: "Preparando sua correção detalhada…",
         statusEvaluated: "Avaliada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
-        estimatedLevel: ({ level }) => `Nível estimado: ${level}`,
+        secureLevel: ({ level }) => `Nível consolidado: ${level}`,
+        demonstratedLevel: ({ level }) => `Nível demonstrado: ${level}`,
+        previouslyRecordedLevel: ({ level }) => `Nível registrado anteriormente: ${level}`,
+        recordedLevel: ({ level }) => `Nível registrado: ${level}`,
         cefrRationaleHeading: "Por que esta estimativa",
         cefrEstimateDisclosure:
           "Esta estimativa automatizada se baseia na resposta enviada. Um nível C1/C2 solicitado para um exemplo é uma meta, não um resultado verificado.",
+        cefrEvidenceHeading: "Evidências observadas no seu texto",
+        cefrBlockerHeading: "O que está impedindo o próximo nível",
+        cefrConfidenceHeading: "Confiança nesta estimativa",
+        cefrConfidenceLevels: { High: "Alta", Medium: "Média", Low: "Baixa", Unknown: "Não avaliada (correção anterior)" },
+        legacyCefrDetailUnavailable: "Não registrado separadamente para esta correção anterior — veja a justificativa acima.",
+        legacyCefrLevelNote:
+          "Esta correção é anterior à distinção entre nível demonstrado e nível consolidado — o nível abaixo é a estimativa única registrada na época, não um nível consolidado verificado separadamente.",
         downloadPdf: "Imprimir / Salvar como PDF",
         viewCorrection: "Ver correção",
         tabOverview: "Visão geral e notas",
@@ -1388,6 +1897,145 @@ export const APP_COPY = {
         overallScoreDescription: "Média dos três indicadores de aprendizagem do mytcflab abaixo.",
         tabCompared: "Comparar textos",
         tabComments: "Comentários e dicas",
+        tabMethodology: "Como foi avaliado",
+        methodology: [
+          {
+            kind: "paragraph",
+            text: "A avaliação foi criada para ajudar você a entender **com a maior precisão possível onde você está hoje** e o que precisa melhorar para alcançar seu objetivo no TCF Canadá.",
+          },
+          { kind: "heading", text: "1. Primeiro, verificamos se você realizou a tarefa corretamente" },
+          {
+            kind: "paragraph",
+            text: "Escrever bem em francês não é suficiente. Você precisa **fazer exatamente o que a tarefa pede**.",
+          },
+          { kind: "paragraph", text: "Por isso, verificamos se você:" },
+          {
+            kind: "list",
+            items: [
+              "respondeu a todos os pontos exigidos",
+              "desenvolveu suas ideias o suficiente",
+              "respeitou a situação apresentada",
+              "usou o tom apropriado",
+              "organizou as informações com clareza",
+              "cumpriu o objetivo da tarefa",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Cada tarefa do TCF exige habilidades diferentes. Por isso, a Tâche 1, a Tâche 2 e a Tâche 3 são avaliadas de forma um pouco diferente.",
+          },
+          { kind: "heading", text: "2. Em seguida, avaliamos a qualidade do seu francês" },
+          { kind: "paragraph", text: "Avaliamos principalmente:" },
+          {
+            kind: "list",
+            items: [
+              "gramática",
+              "conjugação verbal",
+              "estrutura das frases",
+              "ortografia",
+              "vocabulário",
+              "escolha e precisão das palavras",
+              "conectores",
+              "organização das ideias",
+              "registro e naturalidade",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Não avaliamos seu nível apenas observando se você sabe usar palavras difíceis.",
+          },
+          {
+            kind: "paragraph",
+            text: "O que mais importa é se você consegue **usar o francês de forma precisa e consistente**.",
+          },
+          { kind: "heading", text: "3. Seu nível B2, C1 ou C2 é avaliado de forma conservadora" },
+          {
+            kind: "paragraph",
+            text: "A avaliação não tenta encontrar o nível mais alto possível no seu texto.",
+          },
+          {
+            kind: "paragraph",
+            text: "Por exemplo, escrever uma única frase muito sofisticada não significa automaticamente que seu nível é C1.",
+          },
+          {
+            kind: "paragraph",
+            text: "Para ser considerado C1, as características do nível C1 precisam aparecer **de forma consistente em todo o seu texto**. O mesmo princípio vale para o nível C2.",
+          },
+          {
+            kind: "paragraph",
+            text: "Por isso, quando seu texto fica entre dois níveis, usamos o nível mais baixo até que o nível mais alto seja demonstrado de forma consistente.",
+          },
+          { kind: "example", text: "B2/C1 → B2" },
+          {
+            kind: "paragraph",
+            text: "Isso não significa que você seja incapaz de produzir algumas frases de nível C1. Significa apenas que precisamos ver essa qualidade de forma mais consistente antes de considerar o C1 um nível consolidado.",
+          },
+          { kind: "heading", text: "4. Você recebe dois resultados importantes" },
+          { kind: "paragraph", text: "**Nível demonstrado:** o nível mais alto que aparece no seu texto." },
+          { kind: "paragraph", text: "**Nível consolidado:** o nível que você demonstra de forma consistente." },
+          { kind: "example", text: "Nível demonstrado: C1 — Nível consolidado: B2" },
+          {
+            kind: "paragraph",
+            text: "Isso significa que seu texto mostra algumas características de nível C1, mas ainda há fraquezas importantes que impedem o C1 de ser considerado um nível consolidado.",
+          },
+          {
+            kind: "paragraph",
+            text: "Essa distinção é importante porque o objetivo não é apenas dizer que você \"parece C1\". O objetivo é determinar **qual nível você consegue reproduzir de forma confiável no dia da prova**.",
+          },
+          { kind: "heading", text: "5. Você também recebe uma pontuação de 0 a 100" },
+          { kind: "paragraph", text: "Essa pontuação é apenas uma ferramenta de aprendizagem. Ela avalia três áreas:" },
+          {
+            kind: "list",
+            items: [
+              "**Conteúdo e cumprimento da tarefa** — Você respondeu à tarefa de forma eficaz?",
+              "**Francês** — Qual é a qualidade da sua gramática, ortografia e construção de frases?",
+              "**Vocabulário e registro** — Você usa uma linguagem variada, precisa e adequada à situação?",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Essas pontuações **não são pontuações oficiais do TCF** e não devem ser interpretadas diretamente como uma pontuação do TCF ou um nível do QECR.",
+          },
+          { kind: "heading", text: "6. Você recebe as correções dos seus erros" },
+          {
+            kind: "paragraph",
+            text: "Para cada erro importante, mostraremos: **O que você escreveu → Como corrigir → Por que está incorreto**",
+          },
+          {
+            kind: "paragraph",
+            text: "Isso ajuda você a identificar erros recorrentes e a concentrar sua prática nas áreas que mais precisam melhorar.",
+          },
+          { kind: "heading", text: "7. Você também recebe uma versão modelo" },
+          {
+            kind: "paragraph",
+            text: "Após a correção, você recebe uma versão aprimorada do texto. Essa versão foi criada para ajudar você a estudar:",
+          },
+          {
+            kind: "list",
+            items: [
+              "vocabulário novo",
+              "estruturas gramaticais",
+              "conectores",
+              "formas de desenvolver argumentos",
+              "formas mais naturais de expressar ideias",
+            ],
+          },
+          {
+            kind: "paragraph",
+            text: "Mas lembre-se: **a versão modelo não é usada para determinar seu nível.** Seu nível é determinado apenas a partir do texto que você enviou originalmente.",
+          },
+          { kind: "heading", text: "O objetivo da avaliação" },
+          {
+            kind: "paragraph",
+            text: "O propósito não é dar a você uma nota alta apenas para te fazer sentir bem. Também não é procurar erros simplesmente para baixar sua nota.",
+          },
+          { kind: "paragraph", text: "O objetivo é responder a uma pergunta simples:" },
+          { kind: "example", text: "\"Se eu fizesse uma prova semelhante hoje, que nível eu conseguiria demonstrar com confiança?\"" },
+          {
+            kind: "paragraph",
+            text: "Assim, você saberá exatamente **onde está, o que impede você de alcançar o próximo nível e o que precisa praticar** antes de fazer o TCF Canadá.",
+          },
+        ],
         contentScoreLabel: "Conteúdo e pragmática",
         linguisticsScoreLabel: "Linguística",
         vocabularyScoreLabel: "Vocabulário e registro",

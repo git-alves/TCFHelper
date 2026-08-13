@@ -212,7 +212,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const generated = await generatePreferredModelAnswer({ task, level: typedLevel, topicPrompt: resolvedTopicPrompt });
+    const generated = await generatePreferredModelAnswer({
+      task,
+      taskType,
+      level: typedLevel,
+      topicPrompt: resolvedTopicPrompt,
+    });
     // The fixed provider name remains in the cache metadata and logs so each
     // saved example has a clear provenance record.
     console.log("Example generated:", generated.provider);

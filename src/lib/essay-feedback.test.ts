@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { essayFeedbackSchema } from "./essay-feedback";
+import { essayFeedbackSchema, freshEssayFeedbackSchema } from "./essay-feedback";
 
 const validFeedback = {
   correctedText: "Bonjour, je vais bien.",
@@ -9,18 +9,24 @@ const validFeedback = {
     linguistics: { score: 68, feedback: "Most sentence structures are accurate." },
     vocabulary: { score: 64, feedback: "Vocabulary is appropriate but could be more varied." },
   },
-  cefrLevel: "B1",
-  cefrRationale: "The response uses simple accurate sentences, but limited range keeps it below B2.",
+  cefr: {
+    estimatedLevel: "B1",
+    conservativeLevel: "B1",
+    confidence: "Medium",
+    rationale: "The response uses simple accurate sentences, but limited range keeps it below B2.",
+    evidence: "Consistent, accurate use of present-tense verbs and everyday vocabulary.",
+    blocker: "Limited sentence variety keeps it below B2.",
+  },
   meetsWordCount: true,
   wordCountNote: "The response is within the target range.",
   errors: [
     {
-      original: "je va",
+      originalText: "je va",
       originalStart: 9,
-      correction: "je vais",
+      correctedText: "je vais",
       correctionStart: 9,
       explanation: "Use the first-person present form.",
-      category: "grammar",
+      errorType: "grammar",
     },
   ],
   suggestions: ["Use a wider range of connectors."],
@@ -46,9 +52,57 @@ describe("essayFeedbackSchema", () => {
   });
 
   it("requires a non-empty rationale for the CEFR estimate", () => {
-    expect(essayFeedbackSchema.safeParse({ ...validFeedback, cefrRationale: "" }).success).toBe(false);
-    const withoutRationale = { ...validFeedback };
-    Reflect.deleteProperty(withoutRationale, "cefrRationale");
-    expect(essayFeedbackSchema.safeParse(withoutRationale).success).toBe(false);
+    expect(
+      essayFeedbackSchema.safeParse({ ...validFeedback, cefr: { ...validFeedback.cefr, rationale: "" } }).success,
+    ).toBe(false);
+    const withoutRationale = { ...validFeedback.cefr };
+    Reflect.deleteProperty(withoutRationale, "rationale");
+    expect(essayFeedbackSchema.safeParse({ ...validFeedback, cefr: withoutRationale }).success).toBe(false);
+  });
+
+  it("rejects a conservativeLevel higher than estimatedLevel", () => {
+    const result = essayFeedbackSchema.safeParse({
+      ...validFeedback,
+      cefr: { ...validFeedback.cefr, estimatedLevel: "B2", conservativeLevel: "C1" },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts conservativeLevel equal to or lower than estimatedLevel", () => {
+    expect(
+      essayFeedbackSchema.safeParse({
+        ...validFeedback,
+        cefr: { ...validFeedback.cefr, estimatedLevel: "C1", conservativeLevel: "B2" },
+      }).success,
+    ).toBe(true);
+    expect(
+      essayFeedbackSchema.safeParse({
+        ...validFeedback,
+        cefr: { ...validFeedback.cefr, estimatedLevel: "C1", conservativeLevel: "C1" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("accepts 'Unknown' confidence, reserved for a migrated legacy correction", () => {
+    expect(
+      essayFeedbackSchema.safeParse({ ...validFeedback, cefr: { ...validFeedback.cefr, confidence: "Unknown" } })
+        .success,
+    ).toBe(true);
+  });
+});
+
+describe("freshEssayFeedbackSchema", () => {
+  it("accepts the same well-formed feedback essayFeedbackSchema does", () => {
+    expect(freshEssayFeedbackSchema.safeParse(validFeedback).success).toBe(true);
+  });
+
+  it("rejects 'Unknown' confidence -- a live Gemini response must always resolve to a real level", () => {
+    const result = freshEssayFeedbackSchema.safeParse({
+      ...validFeedback,
+      cefr: { ...validFeedback.cefr, confidence: "Unknown" },
+    });
+
+    expect(result.success).toBe(false);
   });
 });

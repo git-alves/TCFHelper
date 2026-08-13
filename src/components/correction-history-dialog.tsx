@@ -15,6 +15,7 @@ interface CorrectionHistoryDialogProps {
     originalText: string;
     feedback: EssayFeedback;
     feedbackLocale: AppLocale | null;
+    cefrAssessment: "current" | "legacy";
   };
 }
 
@@ -33,6 +34,7 @@ export function CorrectionHistoryDialog({ detail }: CorrectionHistoryDialogProps
       originalText={detail.originalText}
       feedback={detail.feedback}
       feedbackLocale={detail.feedbackLocale}
+      cefrAssessment={detail.cefrAssessment}
       locale={locale}
       isStale={false}
       copy={copy}

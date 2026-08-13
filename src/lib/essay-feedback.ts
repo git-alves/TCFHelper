@@ -11,6 +11,81 @@ export const ERROR_CATEGORIES = [
   "register",
 ] as const;
 
+export const CEFR_CONFIDENCE_LEVELS = ["High", "Medium", "Low"] as const;
+
+// A wider domain than CEFR_CONFIDENCE_LEVELS: Gemini's response schema (see
+// gemini.ts) only ever offers High/Medium/Low for a fresh correction, so a
+// live grading result can never legitimately claim "Unknown". A correction
+// stored before confidence was tracked at all genuinely has no assessed
+// value, though -- "Unknown" represents that honestly instead of the
+// migration that reads old rows fabricating one of the three real levels.
+export const CEFR_CONFIDENCE_LEVELS_WITH_UNKNOWN = [...CEFR_CONFIDENCE_LEVELS, "Unknown"] as const;
+
+// Index into CEFR_LEVELS, so ordering can be compared numerically rather
+// than lexically (the strings are not alphabetically ordered by level).
+function cefrLevelRank(level: (typeof CEFR_LEVELS)[number]): number {
+  return CEFR_LEVELS.indexOf(level);
+}
+
+// Builds the cefr sub-schema for a given confidence domain. Called twice:
+// once with CEFR_CONFIDENCE_LEVELS_WITH_UNKNOWN for essayFeedbackSchema (the
+// general read/UI contract, which must also accept a migrated legacy
+// record's honest "Unknown"), and once with the strict CEFR_CONFIDENCE_LEVELS
+// for freshEssayFeedbackSchema (validating an actual live Gemini response,
+// which must never legitimately produce "Unknown" -- Gemini's own response
+// schema in gemini.ts already excludes it, but that upstream contract isn't
+// a substitute for enforcing it at this application boundary too).
+function buildCefrSchema<T extends readonly [string, ...string[]]>(confidenceLevels: T) {
+  return z
+    .object({
+      estimatedLevel: z
+        .enum(CEFR_LEVELS)
+        .describe(
+          "Demonstrated level: the CEFR level the raw evidence alone would suggest, including capability shown only occasionally, before applying the conservative tie-breaking rule."
+        ),
+      conservativeLevel: z
+        .enum(CEFR_LEVELS)
+        .describe(
+          "Secure level: the CEFR level actually assigned to the student -- estimatedLevel, lowered to the more conservative band whenever the evidence for it was not consistently demonstrated. Must never exceed estimatedLevel. This is the level shown on the student's record."
+        ),
+      confidence: z
+        .enum(confidenceLevels)
+        .describe(
+          "Confidence in conservativeLevel, given how much and how consistent the evidence in the original writing was. Always High, Medium, or Low for a fresh correction -- \"Unknown\" only ever appears on a correction stored before confidence was tracked."
+        ),
+      rationale: z
+        .string()
+        .min(1)
+        .describe(
+          "A concise explanation of the conservative level; if estimatedLevel and conservativeLevel differ, explain why. Write it in the feedback language specified in the system prompt."
+        ),
+      evidence: z
+        .string()
+        .min(1)
+        .describe(
+          "Concrete evidence from the original writing supporting the assigned level. Write it in the feedback language specified in the system prompt."
+        ),
+      blocker: z
+        .string()
+        .min(1)
+        .describe(
+          "The main feature of the original writing preventing the next CEFR level. Write it in the feedback language specified in the system prompt."
+        ),
+    })
+    // The conservative tie-breaking rule (see the correction prompt's CEFR
+    // ASSESSMENT section) can only ever lower the raw estimate, never raise
+    // it -- a response that violates this ordering is malformed regardless
+    // of what else it got right, so it fails validation the same way a
+    // missing field would rather than reaching the learner.
+    .refine((cefr) => cefrLevelRank(cefr.conservativeLevel) <= cefrLevelRank(cefr.estimatedLevel), {
+      message: "conservativeLevel cannot exceed estimatedLevel.",
+      path: ["conservativeLevel"],
+    });
+}
+
+const cefrSchema = buildCefrSchema(CEFR_CONFIDENCE_LEVELS_WITH_UNKNOWN);
+const freshCefrSchema = buildCefrSchema(CEFR_CONFIDENCE_LEVELS);
+
 const criterionScoreSchema = z.object({
   score: z.number().int().min(0).max(100).describe("A whole-number 0-100 score for this criterion."),
   feedback: z
@@ -46,15 +121,7 @@ export const essayFeedbackSchema = z.object({
       "Vocabulary / register: lexical range and appropriateness of tone."
     ),
   }),
-  cefrLevel: z
-    .enum(CEFR_LEVELS)
-    .describe("The estimated CEFR level (A1-C2) of the original writing sample."),
-  cefrRationale: z
-    .string()
-    .min(1)
-    .describe(
-      "A concise explanation of the estimated CEFR level, citing concrete evidence from the original writing and the main blocker to the next level. Write it in the feedback language specified in the system prompt."
-    ),
+  cefr: cefrSchema,
   meetsWordCount: z
     .boolean()
     .describe("Whether the essay's word count falls within the task's required range."),
@@ -63,7 +130,7 @@ export const essayFeedbackSchema = z.object({
     .describe("A short note explaining how the word count compares to the target range."),
   errors: z.array(
     z.object({
-      original: z.string().describe("The erroneous excerpt from the original text."),
+      originalText: z.string().describe("The erroneous excerpt from the original text."),
       // .nullish() (not .optional()): Gemini's responseSchema declares these
       // as non-required but still fills unset properties with a JSON `null`
       // rather than omitting the key, so the parser must accept null and
@@ -74,21 +141,21 @@ export const essayFeedbackSchema = z.object({
         .min(0)
         .nullish()
         .describe(
-          "When available, the zero-based UTF-16 character index where original starts in the student's exact submitted text. Use null when unavailable rather than guessing."
+          "When available, the zero-based UTF-16 character index where originalText starts in the student's exact submitted text. Use null when unavailable rather than guessing."
         ),
-      correction: z.string().describe("The corrected version of that excerpt."),
+      correctedText: z.string().describe("The corrected version of that excerpt."),
       correctionStart: z
         .number()
         .int()
         .min(0)
         .nullish()
         .describe(
-          "When available, the zero-based UTF-16 character index where correction starts in correctedText. Use null when unavailable rather than guessing."
+          "When available, the zero-based UTF-16 character index where correctedText starts in the essay's top-level correctedText field. Use null when unavailable rather than guessing."
         ),
       explanation: z
         .string()
         .describe("A short explanation of the error, written in the feedback language specified in the system prompt."),
-      category: z.enum(ERROR_CATEGORIES),
+      errorType: z.enum(ERROR_CATEGORIES),
     })
   ),
   suggestions: z
@@ -102,3 +169,12 @@ export const essayFeedbackSchema = z.object({
 });
 
 export type EssayFeedback = z.infer<typeof essayFeedbackSchema>;
+
+// Validates an actual live Gemini response (see /api/essays/correct)
+// specifically, narrower than essayFeedbackSchema only in that
+// cefr.confidence must be High/Medium/Low -- never "Unknown", which is
+// reserved for a correction migrated from before confidence was tracked at
+// all (see migrateLegacyStoredFields in correction-history.ts). Its inferred
+// type is a subtype of EssayFeedback, so a value that parses against this
+// schema is always usable wherever EssayFeedback is expected.
+export const freshEssayFeedbackSchema = essayFeedbackSchema.extend({ cefr: freshCefrSchema });

@@ -152,6 +152,31 @@ describe("POST /api/essays/example", () => {
     );
   });
 
+  it("still generates against a retired topic's own, never-mutated prompt", async () => {
+    // source stays OFFICIAL_EXAM for a retired row (see seed-topic-sync.ts),
+    // so a client that loaded this topicId before it was retired keeps
+    // working exactly as before, even against an app version that predates
+    // retiredAt existing at all.
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+      retiredAt: new Date("2026-08-01T00:00:00.000Z"),
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      level: "C1",
+      topicId: "topic_1",
+    });
+
+    expect(response.status).toBe(200);
+    expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ topicPrompt: "Écrivez à votre voisin pour décrire votre quartier.", level: "C1" }),
+    );
+  });
+
   it("rejects generated and learner-supplied topic IDs on the shared path", async () => {
     for (const source of ["AI_GENERATED", "USER_SUBMITTED"]) {
       findUniqueMock.mockResolvedValue({ id: "private_topic", taskType: "TASK_1", source, prompt: "Private." });
