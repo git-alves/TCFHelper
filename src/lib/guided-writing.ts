@@ -307,6 +307,241 @@ export function getGuidedWritingIdeaPrompts(
   return GUIDED_WRITING_IDEA_PROMPTS[locale][taskType][stage] ?? [];
 }
 
+export interface VerbTenseSuggestion {
+  // Tense names stay in French because they are part of the learner's French
+  // writing toolkit; the explanation follows the interface locale.
+  tense: string;
+  use: string;
+}
+
+type VerbTenseContent = Record<TaskType, Record<TargetLevel, readonly VerbTenseSuggestion[]>>;
+
+// These are choices to consider while planning, not a checklist of advanced
+// forms to force into every response. A correct, useful tense is always more
+// valuable than an unnecessary complicated one.
+export const GUIDED_WRITING_TENSE_SUGGESTIONS: Record<AppLocale, VerbTenseContent> = {
+  en: {
+    TASK_1: {
+      B2: [
+        { tense: "Présent", use: "greet the reader, explain why you are writing, or give current information." },
+        { tense: "Passé composé + imparfait", use: "recount what happened and set the scene or background." },
+        { tense: "Futur proche", use: "suggest a plan, invitation, or next action." },
+      ],
+      C1: [
+        { tense: "Passé composé + imparfait", use: "make the sequence of your story clear without losing the background." },
+        { tense: "Plus-que-parfait", use: "show what had already happened before another past moment." },
+        { tense: "Conditionnel présent", use: "make a polite suggestion or soften a request when the prompt calls for it." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "handle past chronology precisely when your story needs it." },
+        { tense: "Conditionnel présent ou passé", use: "express a careful hypothesis or regret only when it adds meaning." },
+        { tense: "Subjonctif", use: "use it naturally after a suitable expression, for example « je suis content(e) que… »." },
+      ],
+    },
+    TASK_2: {
+      B2: [
+        { tense: "Passé composé + imparfait", use: "recount the event with clear actions and background details." },
+        { tense: "Présent", use: "give your reaction, opinion, or general comment after the account." },
+        { tense: "Conditionnel présent", use: "make a suggestion or describe what readers could do." },
+      ],
+      C1: [
+        { tense: "Plus-que-parfait", use: "clarify an earlier cause or event when the chronology needs it." },
+        { tense: "Conditionnel présent", use: "state a recommendation or a plausible consequence with nuance." },
+        { tense: "Subjonctif", use: "use it after a natural purpose or necessity expression, not just to sound advanced." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "make a varied account while keeping the timeline easy to follow." },
+        { tense: "Futur simple ou conditionnel", use: "project a consequence, recommendation, or possible outcome precisely." },
+        { tense: "Subjonctif", use: "support a well-controlled concession or recommendation when the wording genuinely requires it." },
+      ],
+    },
+    TASK_3: {
+      B2: [
+        { tense: "Présent", use: "compare the documents and state your position clearly." },
+        { tense: "Conditionnel présent", use: "suggest a possible solution or consequence." },
+        { tense: "Futur simple", use: "describe a likely future result when it supports your argument." },
+      ],
+      C1: [
+        { tense: "Présent", use: "keep the comparison of both viewpoints direct and precise." },
+        { tense: "Conditionnel présent", use: "weigh a hypothesis, proposal, or consequence rather than making an absolute claim." },
+        { tense: "Subjonctif", use: "use it in a natural concession, for example « bien qu'il soit… »." },
+      ],
+      C2: [
+        { tense: "Conditionnel présent", use: "qualify a complex proposal or consequence with precision." },
+        { tense: "Conditionnel passé", use: "assess an alternative that was not taken, only if it is relevant to the argument." },
+        { tense: "Subjonctif", use: "express a controlled concession or condition where the structure calls for it." },
+      ],
+    },
+  },
+  fr: {
+    TASK_1: {
+      B2: [
+        { tense: "Présent", use: "saluer le destinataire, expliquer le but du message ou donner une information actuelle." },
+        { tense: "Passé composé + imparfait", use: "raconter ce qui s'est passé et installer le décor ou le contexte." },
+        { tense: "Futur proche", use: "proposer un projet, une invitation ou la prochaine action." },
+      ],
+      C1: [
+        { tense: "Passé composé + imparfait", use: "rendre la chronologie du récit claire tout en conservant le contexte." },
+        { tense: "Plus-que-parfait", use: "montrer ce qui s'était déjà passé avant un autre moment du récit." },
+        { tense: "Conditionnel présent", use: "formuler une suggestion polie ou adoucir une demande si la consigne s'y prête." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "maîtriser précisément la chronologie du passé lorsque le récit le demande." },
+        { tense: "Conditionnel présent ou passé", use: "exprimer une hypothèse prudente ou un regret seulement si cela apporte du sens." },
+        { tense: "Subjonctif", use: "l'employer naturellement après une expression adaptée, par exemple « je suis content(e) que… »." },
+      ],
+    },
+    TASK_2: {
+      B2: [
+        { tense: "Passé composé + imparfait", use: "raconter l'événement avec des actions claires et des détails de contexte." },
+        { tense: "Présent", use: "donner votre réaction, votre avis ou un commentaire général après le récit." },
+        { tense: "Conditionnel présent", use: "faire une suggestion ou expliquer ce que les lecteurs pourraient faire." },
+      ],
+      C1: [
+        { tense: "Plus-que-parfait", use: "clarifier une cause ou un événement antérieur lorsque la chronologie le demande." },
+        { tense: "Conditionnel présent", use: "formuler une recommandation ou une conséquence plausible avec nuance." },
+        { tense: "Subjonctif", use: "l'employer après une expression naturelle de but ou de nécessité, sans chercher à paraître plus avancé." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "varier le récit tout en gardant une chronologie facile à suivre." },
+        { tense: "Futur simple ou conditionnel", use: "annoncer avec précision une conséquence, une recommandation ou un résultat possible." },
+        { tense: "Subjonctif", use: "soutenir une concession ou une recommandation bien maîtrisée lorsque la formulation l'exige réellement." },
+      ],
+    },
+    TASK_3: {
+      B2: [
+        { tense: "Présent", use: "comparer les documents et exprimer clairement votre position." },
+        { tense: "Conditionnel présent", use: "proposer une solution ou une conséquence possible." },
+        { tense: "Futur simple", use: "décrire un résultat futur probable lorsqu'il soutient votre argument." },
+      ],
+      C1: [
+        { tense: "Présent", use: "garder la comparaison des deux points de vue directe et précise." },
+        { tense: "Conditionnel présent", use: "évaluer une hypothèse, une proposition ou une conséquence plutôt que d'affirmer de façon absolue." },
+        { tense: "Subjonctif", use: "l'employer dans une concession naturelle, par exemple « bien qu'il soit… »." },
+      ],
+      C2: [
+        { tense: "Conditionnel présent", use: "nuancer avec précision une proposition ou une conséquence complexe." },
+        { tense: "Conditionnel passé", use: "évaluer une autre possibilité non retenue, seulement si elle est utile à l'argumentation." },
+        { tense: "Subjonctif", use: "exprimer une concession ou une condition maîtrisée lorsque la structure l'exige." },
+      ],
+    },
+  },
+  es: {
+    TASK_1: {
+      B2: [
+        { tense: "Présent", use: "saluda al destinatario, explica por qué escribes o da información actual." },
+        { tense: "Passé composé + imparfait", use: "cuenta lo que pasó y sitúa el contexto o el ambiente." },
+        { tense: "Futur proche", use: "propón un plan, una invitación o la próxima acción." },
+      ],
+      C1: [
+        { tense: "Passé composé + imparfait", use: "haz clara la cronología del relato sin perder el contexto." },
+        { tense: "Plus-que-parfait", use: "muestra qué había sucedido antes de otro momento pasado." },
+        { tense: "Conditionnel présent", use: "formula una sugerencia cortés o suaviza una petición si la consigna lo requiere." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "maneja con precisión la cronología del pasado cuando el relato lo necesita." },
+        { tense: "Conditionnel présent ou passé", use: "expresa una hipótesis prudente o un pesar solo si aporta sentido." },
+        { tense: "Subjonctif", use: "úsalo de forma natural después de una expresión adecuada, por ejemplo « je suis content(e) que… »." },
+      ],
+    },
+    TASK_2: {
+      B2: [
+        { tense: "Passé composé + imparfait", use: "cuenta el hecho con acciones claras y detalles de contexto." },
+        { tense: "Présent", use: "da tu reacción, opinión o comentario general después del relato." },
+        { tense: "Conditionnel présent", use: "haz una sugerencia o explica lo que los lectores podrían hacer." },
+      ],
+      C1: [
+        { tense: "Plus-que-parfait", use: "aclara una causa o hecho anterior cuando la cronología lo necesita." },
+        { tense: "Conditionnel présent", use: "formula una recomendación o una consecuencia plausible con matiz." },
+        { tense: "Subjonctif", use: "úsalo tras una expresión natural de propósito o necesidad, no solo para parecer más avanzado." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "varía el relato manteniendo una cronología fácil de seguir." },
+        { tense: "Futur simple ou conditionnel", use: "plantea con precisión una consecuencia, recomendación o resultado posible." },
+        { tense: "Subjonctif", use: "apoya una concesión o recomendación bien controlada cuando la formulación realmente lo exige." },
+      ],
+    },
+    TASK_3: {
+      B2: [
+        { tense: "Présent", use: "compara los documentos y expresa tu postura con claridad." },
+        { tense: "Conditionnel présent", use: "propón una solución o consecuencia posible." },
+        { tense: "Futur simple", use: "describe un resultado futuro probable cuando apoye tu argumento." },
+      ],
+      C1: [
+        { tense: "Présent", use: "mantén directa y precisa la comparación de los dos puntos de vista." },
+        { tense: "Conditionnel présent", use: "valora una hipótesis, propuesta o consecuencia en lugar de afirmar de forma absoluta." },
+        { tense: "Subjonctif", use: "úsalo en una concesión natural, por ejemplo « bien qu'il soit… »." },
+      ],
+      C2: [
+        { tense: "Conditionnel présent", use: "matiza con precisión una propuesta o consecuencia compleja." },
+        { tense: "Conditionnel passé", use: "evalúa una alternativa no elegida solo si es relevante para el argumento." },
+        { tense: "Subjonctif", use: "expresa una concesión o condición controlada cuando la estructura lo requiera." },
+      ],
+    },
+  },
+  pt: {
+    TASK_1: {
+      B2: [
+        { tense: "Présent", use: "cumprimente o destinatário, explique por que escreve ou dê uma informação atual." },
+        { tense: "Passé composé + imparfait", use: "conte o que aconteceu e apresente o cenário ou o contexto." },
+        { tense: "Futur proche", use: "proponha um plano, um convite ou a próxima ação." },
+      ],
+      C1: [
+        { tense: "Passé composé + imparfait", use: "deixe clara a cronologia do relato sem perder o contexto." },
+        { tense: "Plus-que-parfait", use: "mostre o que já tinha acontecido antes de outro momento passado." },
+        { tense: "Conditionnel présent", use: "faça uma sugestão educada ou suavize um pedido quando a instrução pedir." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "controle com precisão a cronologia do passado quando o relato exigir." },
+        { tense: "Conditionnel présent ou passé", use: "expresse uma hipótese cuidadosa ou um arrependimento somente quando acrescentar sentido." },
+        { tense: "Subjonctif", use: "use-o naturalmente após uma expressão adequada, por exemplo « je suis content(e) que… »." },
+      ],
+    },
+    TASK_2: {
+      B2: [
+        { tense: "Passé composé + imparfait", use: "conte o acontecimento com ações claras e detalhes de contexto." },
+        { tense: "Présent", use: "dê sua reação, opinião ou comentário geral após o relato." },
+        { tense: "Conditionnel présent", use: "faça uma sugestão ou explique o que os leitores poderiam fazer." },
+      ],
+      C1: [
+        { tense: "Plus-que-parfait", use: "esclareça uma causa ou um acontecimento anterior quando a cronologia exigir." },
+        { tense: "Conditionnel présent", use: "formule uma recomendação ou consequência plausível com nuance." },
+        { tense: "Subjonctif", use: "use-o após uma expressão natural de finalidade ou necessidade, não apenas para parecer mais avançado." },
+      ],
+      C2: [
+        { tense: "Passé composé / imparfait / plus-que-parfait", use: "varie o relato mantendo uma cronologia fácil de acompanhar." },
+        { tense: "Futur simple ou conditionnel", use: "apresente com precisão uma consequência, recomendação ou resultado possível." },
+        { tense: "Subjonctif", use: "sustente uma concessão ou recomendação bem controlada quando a formulação realmente exigir." },
+      ],
+    },
+    TASK_3: {
+      B2: [
+        { tense: "Présent", use: "compare os documentos e expresse claramente sua posição." },
+        { tense: "Conditionnel présent", use: "proponha uma solução ou consequência possível." },
+        { tense: "Futur simple", use: "descreva um resultado futuro provável quando ele apoiar seu argumento." },
+      ],
+      C1: [
+        { tense: "Présent", use: "mantenha direta e precisa a comparação dos dois pontos de vista." },
+        { tense: "Conditionnel présent", use: "avalie uma hipótese, proposta ou consequência em vez de afirmar de modo absoluto." },
+        { tense: "Subjonctif", use: "use-o em uma concessão natural, por exemplo « bien qu'il soit… »." },
+      ],
+      C2: [
+        { tense: "Conditionnel présent", use: "qualifique com precisão uma proposta ou consequência complexa." },
+        { tense: "Conditionnel passé", use: "avalie uma alternativa que não foi escolhida apenas se ela for relevante ao argumento." },
+        { tense: "Subjonctif", use: "expresse uma concessão ou condição controlada quando a estrutura exigir." },
+      ],
+    },
+  },
+};
+
+export function getGuidedWritingTenseSuggestions(
+  locale: AppLocale,
+  taskType: TaskType,
+  level: TargetLevel,
+): readonly VerbTenseSuggestion[] {
+  return GUIDED_WRITING_TENSE_SUGGESTIONS[locale][taskType][level];
+}
+
 export const GUIDED_WRITING_COMPLETION_CHECKS: Record<AppLocale, Record<TaskType, readonly string[]>> = {
   en: {
     TASK_1: ["Did I give the two or three details requested?", "Does the tone fit the recipient?", "Does the message have an appropriate opening and ending?", "Am I within the word range?"],

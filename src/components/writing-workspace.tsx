@@ -48,6 +48,7 @@ type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic"
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
+const WALKTHROUGH_GUIDED_WRITING_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
 const writingPreferenceListeners = new Set<() => void>();
 const inMemoryWritingPreferences = new Map<string, string>();
 
@@ -758,6 +759,21 @@ export function WritingWorkspace() {
         getRecentTopic(taskType ?? TASK_ORDER[0]);
         return false;
       }
+      case "guided-writing": {
+        if (!walkthroughDemoActiveRef.current) return false;
+        // The recent-topic request the previous tour step begins is useful
+        // in normal use, but this scripted guide preview needs a stable
+        // prompt immediately. Invalidate the request before switching to the
+        // matching personal-message scenario so a late response cannot
+        // replace the panel underneath the tour.
+        cancelPendingRecentTopicRequest();
+        setRecentTopic(null);
+        setRecentTopicError(null);
+        setTopicMode("custom");
+        setCustomTopic(WALKTHROUGH_GUIDED_WRITING_TOPIC);
+        storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "1");
+        return false;
+      }
       case "editor": {
         if (!walkthroughDemoActiveRef.current || content.trim()) return false;
         // The topic-picker step's fetch may still be in flight -- its own
@@ -767,6 +783,7 @@ export function WritingWorkspace() {
         // same guard fetchRecentTopic already checks) means a late arrival
         // is a harmless no-op instead.
         cancelPendingRecentTopicRequest();
+        storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "0");
         applyDraftContent(WALKTHROUGH_SAMPLE_ESSAY);
         return false;
       }

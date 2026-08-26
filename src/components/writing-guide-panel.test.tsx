@@ -27,6 +27,7 @@ describe("WritingGuidePanel", () => {
     expect(markup).toContain("Writing situation");
     expect(markup).toContain("Who are you writing to?");
     expect(markup).not.toContain("Formules à adapter à votre sujet");
+    expect(markup).toContain("Verb tenses to consider");
   });
 
   it("asks for a text type and readership when opening Task 2", () => {
@@ -42,5 +43,7 @@ describe("WritingGuidePanel", () => {
 
     expect(markup).not.toContain("Writing situation");
     expect(markup).toContain("Formules à adapter à votre sujet");
+    expect(markup).toContain("Verb tenses to consider");
+    expect(markup).toContain("Présent");
   });
 });

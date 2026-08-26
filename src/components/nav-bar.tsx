@@ -207,6 +207,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                * while a direct visit or refresh still renders the full page. */}
               <Link
                 href="/settings"
+                data-walkthrough="nav-settings"
                 title={copy.nav.settings}
                 aria-label={copy.nav.settings}
                 className={ICON_BUTTON_CLASS}
