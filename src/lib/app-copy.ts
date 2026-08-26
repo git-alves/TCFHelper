@@ -221,6 +221,8 @@ export interface AppCopy {
       exampleUnavailableError: string;
       exampleGenericError: string;
       exampleNeedsTopicWarning: string;
+      reussirExampleFallbackDescription: string;
+      reussirExampleFallbackLink: string;
       copy: string;
       copied: string;
       copyFailed: string;
@@ -553,6 +555,9 @@ export const APP_COPY = {
         exampleGenericError: "We couldn't generate an example. Please try again.",
         exampleNeedsTopicWarning:
           "Choose a topic from recent exams or paste your own before generating an example.",
+        reussirExampleFallbackDescription:
+          "As an alternative, you can review the original topic on Réussir TCF Canada.",
+        reussirExampleFallbackLink: "View the topic on Réussir",
         copy: "Copy text",
         copied: "Copied!",
         copyFailed: "Couldn't copy",
@@ -1001,6 +1006,9 @@ export const APP_COPY = {
         exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
         exampleNeedsTopicWarning:
           "Choisissez un sujet d’examens récents ou collez le vôtre avant de générer un exemple.",
+        reussirExampleFallbackDescription:
+          "Vous pouvez aussi consulter le sujet original sur Réussir TCF Canada.",
+        reussirExampleFallbackLink: "Voir le sujet sur Réussir",
         copy: "Copier le texte",
         copied: "Copié !",
         copyFailed: "Impossible de copier",
@@ -1451,6 +1459,9 @@ export const APP_COPY = {
         exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
         exampleNeedsTopicWarning:
           "Elige un tema de exámenes recientes o pega el tuyo antes de generar un ejemplo.",
+        reussirExampleFallbackDescription:
+          "Como alternativa, puedes consultar el tema original en Réussir TCF Canada.",
+        reussirExampleFallbackLink: "Ver el tema en Réussir",
         copy: "Copiar texto",
         copied: "¡Copiado!",
         copyFailed: "No se pudo copiar",
@@ -1901,6 +1912,9 @@ export const APP_COPY = {
         exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
         exampleNeedsTopicWarning:
           "Escolha um tema de exames recentes ou cole o seu antes de gerar um exemplo.",
+        reussirExampleFallbackDescription:
+          "Como alternativa, você pode consultar o tema original no Réussir TCF Canada.",
+        reussirExampleFallbackLink: "Ver o tema no Réussir",
         copy: "Copiar texto",
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",

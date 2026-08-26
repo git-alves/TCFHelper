@@ -23,7 +23,7 @@
 
 Do **not** implement in-app retrieval of Réussir correction text now. The publisher’s [terms](https://reussir-tcfcanada.com/mentions-legales-et-cgu/) say that reproducing, distributing, or modifying its content without prior authorisation is prohibited. The correction page also describes its texts as material to generate ideas rather than submissions to use verbatim. See the [August 2026 correction page](https://reussir-tcfcanada.com/aout-2026-correction-expression-ecrite/).
 
-The safe interim fallback, if approved separately, is a secondary external-link action after an AI example request fails: **“View Réussir’s example response”**. It opens the publisher’s correction page in a new tab, names Réussir as the source, and keeps the learner’s draft untouched. It must not claim the publisher endorses the application.
+**Approved interim fallback** — A secondary external-link action appears only after an actual AI example-generator/upstream failure for a trusted recent-exam topic: **“View the topic on Réussir”**. It opens the exact `recentTopic.sourceUrl` already returned by the server for that selected subject in a new tab, names Réussir as the source, and keeps the learner’s draft untouched. It is not shown for user quota, cooldown, or rate-limit responses, and it must not claim that Réussir endorses the application.
 
 In-app retrieval is a follow-up only after written permission defines permitted copying, display, caching, attribution, and the treatment of content changes or removal.
 
@@ -52,4 +52,4 @@ After rights are obtained and the feature is released, a manual audit of 30 fall
 ## Open questions
 
 - Will Réussir TCF Canada grant a written licence for in-app display and caching of its correction examples, and what attribution or access terms will it require?
-- If no licence is available, is an explicitly labelled external link after AI failure acceptable, or should the product remain AI-only?
+- No decision remains for the external-link fallback: it is approved for trusted recent topics after an actual generator/upstream failure. A licence is still required for any future in-app correction-text display.
