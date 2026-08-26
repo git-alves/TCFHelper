@@ -11,6 +11,7 @@ import {
   forEachGuidedWritingCell,
   getGuidedWritingCompletionChecks,
   getGuidedWritingIdeaPrompts,
+  getGuidedWritingTenseSuggestions,
   getGuidedWritingTips,
   getGuideStagesForProfile,
   isOptionalGuideStage,
@@ -81,6 +82,21 @@ describe("GUIDED_WRITING_TIPS", () => {
     for (const locale of APP_LOCALES) {
       for (const taskType of Object.keys(TASK_GUIDE_STAGES) as (keyof typeof TASK_GUIDE_STAGES)[]) {
         expect(getGuidedWritingCompletionChecks(locale, taskType)).toHaveLength(4);
+      }
+    }
+  });
+
+  it("offers three target-level verb-tense suggestions for every task and locale", () => {
+    for (const locale of APP_LOCALES) {
+      for (const taskType of Object.keys(TASK_GUIDE_STAGES) as (keyof typeof TASK_GUIDE_STAGES)[]) {
+        for (const level of TARGET_LEVELS) {
+          const suggestions = getGuidedWritingTenseSuggestions(locale, taskType, level);
+          expect(suggestions, `${locale}/${taskType}/${level}`).toHaveLength(3);
+          for (const suggestion of suggestions) {
+            expect(suggestion.tense.trim(), `${locale}/${taskType}/${level}`).not.toBe("");
+            expect(suggestion.use.trim(), `${locale}/${taskType}/${level}`).not.toBe("");
+          }
+        }
       }
     }
   });

@@ -65,6 +65,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   const steps: WalkthroughStepContent[] = [
     { id: "task-picker", title: copy.walkthrough.taskPickerTitle, body: copy.walkthrough.taskPickerBody },
     { id: "topic-picker", title: copy.walkthrough.topicPickerTitle, body: copy.walkthrough.topicPickerBody },
+    { id: "guided-writing", title: copy.walkthrough.guidedWritingTitle, body: copy.walkthrough.guidedWritingBody },
     { id: "editor", title: copy.walkthrough.editorTitle, body: copy.walkthrough.editorBody },
     {
       id: "correct-button",

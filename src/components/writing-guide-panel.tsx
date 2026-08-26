@@ -9,6 +9,7 @@ import {
   TASK_GUIDE_STAGES,
   type GuideStage,
   type TargetLevel,
+  getGuidedWritingTenseSuggestions,
   getGuidedWritingCompletionChecks,
   getGuidedWritingIdeaPrompts,
   getGuidedWritingTips,
@@ -90,6 +91,7 @@ export function WritingGuidePanel({
   const isLastStage = stageIndex === stages.length - 1;
   const isOptionalStage = isOptionalGuideStage(taskType, stage);
   const ideaPrompts = getGuidedWritingIdeaPrompts(locale, taskType, stage);
+  const tenseSuggestions = stage === "start" ? getGuidedWritingTenseSuggestions(locale, taskType, level) : [];
   const completionChecks = stage === "finish" ? getGuidedWritingCompletionChecks(locale, taskType) : [];
   const contextConfirmPrompt =
     taskType === "TASK_2" ? gc.contextConfirmTextTypePrompt : gc.contextConfirmPrompt;
@@ -130,30 +132,35 @@ export function WritingGuidePanel({
       </div>
 
       {needsSituationChoice ? (
-        <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
-          <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {gc.contextConfirmHeading} — {contextConfirmPrompt}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {confirmableProfiles.map((candidate) => (
-              <button
-                key={candidate}
-                type="button"
-                onClick={() => {
-                  setOverride({
-                    profile: candidate,
-                    customTopicPrompt: topicMode === "custom" ? trimmedCustomTopicPrompt : null,
-                  });
-                  setIsChoosingContext(false);
-                }}
-                aria-pressed={activeOverride?.profile === candidate}
-                className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                {GUIDE_PROFILE_LABELS[locale][candidate]}
-              </button>
-            ))}
+        <>
+          <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
+            <p className="text-sm text-zinc-600 dark:text-zinc-300">
+              {gc.contextConfirmHeading} — {contextConfirmPrompt}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {confirmableProfiles.map((candidate) => (
+                <button
+                  key={candidate}
+                  type="button"
+                  onClick={() => {
+                    setOverride({
+                      profile: candidate,
+                      customTopicPrompt: topicMode === "custom" ? trimmedCustomTopicPrompt : null,
+                    });
+                    setIsChoosingContext(false);
+                  }}
+                  aria-pressed={activeOverride?.profile === candidate}
+                  className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  {GUIDE_PROFILE_LABELS[locale][candidate]}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+          {tenseSuggestions.length > 0 && (
+            <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
+          )}
+        </>
       ) : profile ? (
         <>
           <div className="flex items-center justify-between gap-2">
@@ -183,6 +190,7 @@ export function WritingGuidePanel({
             </button>
           </div>
           {ideaPrompts.length > 0 && <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />}
+          {tenseSuggestions.length > 0 && <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />}
           {completionChecks.length > 0 && <CompletionChecklist checks={completionChecks} label={gc.completionCheckLabel} />}
           <PhraseBank
             key={`${profile}:${level}:${stage}`}
@@ -203,6 +211,30 @@ function IdeaPrompts({ prompts, label }: { prompts: readonly string[]; label: st
       <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
         {prompts.map((prompt) => <li key={prompt}>• {prompt}</li>)}
       </ul>
+    </div>
+  );
+}
+
+function VerbTenseSuggestions({
+  suggestions,
+  label,
+  hint,
+}: {
+  suggestions: readonly { tense: string; use: string }[];
+  label: string;
+  hint: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
+      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
+        {suggestions.map(({ tense, use }) => (
+          <li key={tense}>
+            <span lang="fr" className="font-medium">{tense}</span> — {use}
+          </li>
+        ))}
+      </ul>
+      <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">{hint}</p>
     </div>
   );
 }

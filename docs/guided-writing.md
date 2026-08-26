@@ -9,7 +9,7 @@
 ### Goals
 
 - Let a learner activate a non-modal Writing guide after selecting a task and providing a topic.
-- Show short, French-language phrase examples and static idea prompts in task-aware stages, tailored to the selected target level: B2, C1, or C2. The stage sequence reflects the task rather than forcing every response into the same “Start / Develop / Finish” model.
+- Show short, French-language phrase examples, static idea prompts, and verb-tense suggestions in task-aware stages, tailored to the selected target level: B2, C1, or C2. The stage sequence reflects the task rather than forcing every response into the same “Start / Develop / Finish” model.
 - Tailor advice to the prompt’s writing situation: genre, intended audience, register, and communicative purpose. For example, an informal personal message can offer `Salut [Prénom],`; a formal letter can offer `Madame, Monsieur,` instead.
 - Keep all guide content editorial, versioned, reviewable application data; no model request or generative AI is used to create or select tips.
 - Require the learner to choose the writing situation before tips appear for every Tâche 1 and Tâche 2 prompt, including a trusted recent-exam topic. Tâche 3 has one fixed argumentative situation and may open directly.
@@ -96,7 +96,7 @@ type GuidedWritingContent = Record<
 >;
 ```
 
-Each stage pairs two elements: a compact, no-AI **“What can you say?”** question that helps an empty-page learner generate their own content, and a small French phrase bank that demonstrates an appropriate move without supplying a paragraph. The **Finish** stage adds a visible completion checklist for task coverage, organization, register, and word range; it is not merely a bank of closing formulas. For Tâche 3, it also gives a conclusion-thinking question and three level-appropriate ways to close the analysis. The individual phrase banks differ by level:
+Each stage pairs two elements: a compact, no-AI **“What can you say?”** question that helps an empty-page learner generate their own content, and a small French phrase bank that demonstrates an appropriate move without supplying a paragraph. The opening stage also gives three task- and level-specific verb tenses to consider. These are planning suggestions, never a requirement to force advanced forms into a response: accurate, relevant French is more valuable than a long tense list. The **Finish** stage adds a visible completion checklist for task coverage, organization, register, and word range; it is not merely a bank of closing formulas. For Tâche 3, it also gives a conclusion-thinking question and three level-appropriate ways to close the analysis. The individual phrase banks differ by level:
 
 | Target | Calibration |
 | --- | --- |

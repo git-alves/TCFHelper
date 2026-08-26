@@ -143,12 +143,16 @@ export interface AppCopy {
     dashboardWelcomeBody: string;
     dashboardCorrectionsTitle: string;
     dashboardCorrectionsBody: string;
+    settingsTitle: string;
+    settingsBody: string;
     dashboardStartWritingTitle: string;
     dashboardStartWritingBody: string;
     taskPickerTitle: string;
     taskPickerBody: string;
     topicPickerTitle: string;
     topicPickerBody: string;
+    guidedWritingTitle: string;
+    guidedWritingBody: string;
     editorTitle: string;
     editorBody: string;
     correctButtonTitle: string;
@@ -248,6 +252,8 @@ export interface AppCopy {
       nextStage: string;
       optionalStep: string;
       ideasLabel: string;
+      tensesLabel: string;
+      tensesHint: string;
       completionCheckLabel: string;
       examplesLabel: string;
       morePhrases: string;
@@ -463,6 +469,8 @@ export const APP_COPY = {
       dashboardCorrectionsTitle: "Your recent corrections",
       dashboardCorrectionsBody:
         "Every corrected essay's score and estimated level appear below the chart, so you can track exactly how each attempt went.",
+      settingsTitle: "Make the app yours",
+      settingsBody: "Open Settings to choose the interface language and appearance, or find help and support whenever you need it.",
       dashboardStartWritingTitle: "Ready to write?",
       dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
       taskPickerTitle: "Choose a task",
@@ -471,6 +479,9 @@ export const APP_COPY = {
       topicPickerTitle: "Choose a topic",
       topicPickerBody:
         "Recent exam topics are pulled directly from real, recently published TCF exams on this site, so you always practice with an authentic prompt. You can also paste in your own topic instead.",
+      guidedWritingTitle: "Plan before you write",
+      guidedWritingBody:
+        "Open the Writing guide when you need ideas. Choose the writing situation, then use its planning questions, French phrases, and suggested verb tenses for your target level.",
       editorTitle: "Write your response",
       editorBody:
         "Write your response in French here — we've pasted in a sample response so you can see how the rest of the tour works. The word count updates as you type.",
@@ -577,6 +588,8 @@ export const APP_COPY = {
         nextStage: "Next step",
         optionalStep: "Optional",
         ideasLabel: "What can you say?",
+        tensesLabel: "Verb tenses to consider",
+        tensesHint: "Use only what fits your subject — accurate French matters more than using many tenses.",
         completionCheckLabel: "Before you finish",
         // Kept in French like the phrase bank itself (see guided-writing.ts)
         // rather than translated per interface locale -- these are French
@@ -912,6 +925,8 @@ export const APP_COPY = {
       dashboardCorrectionsTitle: "Vos corrections récentes",
       dashboardCorrectionsBody:
         "La note et le niveau estimé de chaque rédaction corrigée apparaissent sous le graphique, pour suivre précisément chaque tentative.",
+      settingsTitle: "Personnalisez l’application",
+      settingsBody: "Ouvrez les paramètres pour choisir la langue et l’apparence de l’interface, ou trouver de l’aide lorsque vous en avez besoin.",
       dashboardStartWritingTitle: "Prêt à écrire ?",
       dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
       taskPickerTitle: "Choisissez une tâche",
@@ -920,6 +935,9 @@ export const APP_COPY = {
       topicPickerTitle: "Choisissez un sujet",
       topicPickerBody:
         "Les sujets d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des sujets authentiques. Vous pouvez aussi coller votre propre sujet.",
+      guidedWritingTitle: "Planifiez avant d’écrire",
+      guidedWritingBody:
+        "Ouvrez le guide de rédaction lorsque vous manquez d’idées. Choisissez la situation d’écriture, puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour votre niveau visé.",
       editorTitle: "Rédigez votre réponse",
       editorBody:
         "Rédigez votre réponse en français ici — nous avons collé une réponse d’exemple pour vous montrer la suite de la visite. Le nombre de mots se met à jour au fur et à mesure.",
@@ -1029,6 +1047,8 @@ export const APP_COPY = {
         nextStage: "Étape suivante",
         optionalStep: "Facultatif",
         ideasLabel: "Que pouvez-vous dire ?",
+        tensesLabel: "Temps verbaux à envisager",
+        tensesHint: "Utilisez seulement ce qui convient à votre sujet : un français juste vaut mieux que beaucoup de temps verbaux.",
         completionCheckLabel: "Avant de terminer",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
@@ -1366,6 +1386,8 @@ export const APP_COPY = {
       dashboardCorrectionsTitle: "Tus correcciones recientes",
       dashboardCorrectionsBody:
         "La nota y el nivel estimado de cada redacción corregida aparecen debajo del gráfico, para seguir exactamente cómo te fue en cada intento.",
+      settingsTitle: "Personaliza la aplicación",
+      settingsBody: "Abre Configuración para elegir el idioma y la apariencia de la interfaz, o encontrar ayuda y soporte cuando lo necesites.",
       dashboardStartWritingTitle: "¿Listo para escribir?",
       dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
       taskPickerTitle: "Elige una tarea",
@@ -1374,6 +1396,9 @@ export const APP_COPY = {
       topicPickerTitle: "Elige un tema",
       topicPickerBody:
         "Los temas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con un enunciado auténtico. También puedes pegar tu propio tema.",
+      guidedWritingTitle: "Planifica antes de escribir",
+      guidedWritingBody:
+        "Abre la Guía de redacción cuando necesites ideas. Elige la situación de escritura y usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para tu nivel objetivo.",
       editorTitle: "Escribe tu respuesta",
       editorBody:
         "Escribe tu respuesta en francés aquí — hemos pegado una respuesta de ejemplo para que veas el resto del recorrido. El conteo de palabras se actualiza mientras escribes.",
@@ -1483,6 +1508,8 @@ export const APP_COPY = {
         nextStage: "Paso siguiente",
         optionalStep: "Opcional",
         ideasLabel: "¿Qué puedes decir?",
+        tensesLabel: "Tiempos verbales que considerar",
+        tensesHint: "Usa solo lo que se adapte al tema: un francés correcto vale más que muchos tiempos verbales.",
         completionCheckLabel: "Antes de terminar",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
@@ -1820,6 +1847,8 @@ export const APP_COPY = {
       dashboardCorrectionsTitle: "Suas correções recentes",
       dashboardCorrectionsBody:
         "A nota e o nível estimado de cada redação corrigida aparecem abaixo do gráfico, para você acompanhar exatamente como foi cada tentativa.",
+      settingsTitle: "Personalize o aplicativo",
+      settingsBody: "Abra Configurações para escolher o idioma e a aparência da interface ou encontrar ajuda e suporte quando precisar.",
       dashboardStartWritingTitle: "Pronto para escrever?",
       dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
       taskPickerTitle: "Escolha uma tarefa",
@@ -1828,6 +1857,9 @@ export const APP_COPY = {
       topicPickerTitle: "Escolha um tema",
       topicPickerBody:
         "Os temas de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio tema.",
+      guidedWritingTitle: "Planeje antes de escrever",
+      guidedWritingBody:
+        "Abra o Guia de escrita quando precisar de ideias. Escolha a situação de escrita e use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para o nível desejado.",
       editorTitle: "Escreva sua resposta",
       editorBody:
         "Escreva sua resposta em francês aqui — colamos uma resposta de exemplo para você ver o restante do tour. A contagem de palavras é atualizada conforme você digita.",
@@ -1937,6 +1969,8 @@ export const APP_COPY = {
         nextStage: "Próxima etapa",
         optionalStep: "Opcional",
         ideasLabel: "O que você pode dizer?",
+        tensesLabel: "Tempos verbais a considerar",
+        tensesHint: "Use apenas o que combinar com o tema: francês correto vale mais do que usar muitos tempos verbais.",
         completionCheckLabel: "Antes de terminar",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
