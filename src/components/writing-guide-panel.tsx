@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { GuideProfile, TaskType } from "@prisma/client";
 import type { AppCopy } from "@/lib/app-copy";
 import type { AppLocale } from "@/lib/app-locale";
 import {
   GUIDE_PROFILE_LABELS,
-  GUIDE_STAGES,
-  GUIDE_STAGE_LABELS,
+  TASK_GUIDE_STAGES,
   type GuideStage,
   type TargetLevel,
   getGuidedWritingTips,
+  getGuideStageLabel,
 } from "@/lib/guided-writing";
 import { classifyWritingContext, type WritingContextClassification } from "@/lib/guided-writing-classifier";
 
@@ -50,6 +50,9 @@ export function WritingGuidePanel({
   locale,
   copy,
 }: WritingGuidePanelProps) {
+  // Every task's sequence starts at "start", so this stays valid across a
+  // task switch even though the rest of the sequence (and its length)
+  // differs per task -- see TASK_GUIDE_STAGES.
   const [stage, setStage] = useState<GuideStage>("start");
   const [override, setOverride] = useState<{ profile: GuideProfile; customTopicPrompt: string | null } | null>(null);
   const [isChoosingContext, setIsChoosingContext] = useState(false);
@@ -71,6 +74,16 @@ export function WritingGuidePanel({
   const profile = activeOverride?.profile ?? detected?.profile ?? null;
   const needsConfirmation = !activeOverride && detected?.confidence === "needs_confirmation";
   const confirmableProfiles = CONFIRMABLE_PROFILES[taskType];
+
+  const stages = TASK_GUIDE_STAGES[taskType];
+  const stageIndex = Math.max(0, stages.indexOf(stage));
+  const isFirstStage = stageIndex === 0;
+  const isLastStage = stageIndex === stages.length - 1;
+
+  function goToStage(nextIndex: number) {
+    const clamped = Math.min(Math.max(nextIndex, 0), stages.length - 1);
+    setStage(stages[clamped]);
+  }
 
   if (!profile) {
     return null;
@@ -129,29 +142,117 @@ export function WritingGuidePanel({
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap gap-2" role="group" aria-label={gc.heading}>
-            {GUIDE_STAGES.map((candidateStage) => (
-              <button
-                key={candidateStage}
-                type="button"
-                aria-pressed={stage === candidateStage}
-                onClick={() => setStage(candidateStage)}
-                className={`rounded-full px-3 py-1.5 text-sm transition-colors ${
-                  stage === candidateStage
-                    ? "bg-foreground text-background"
-                    : "border border-black/[.15] hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                }`}
-              >
-                {GUIDE_STAGE_LABELS[locale][candidateStage]}
-              </button>
-            ))}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => goToStage(stageIndex - 1)}
+              disabled={isFirstStage}
+              aria-label={gc.previousStage}
+              className="rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              ‹
+            </button>
+            <div className="flex flex-col items-center">
+              <span className="text-sm font-medium">{getGuideStageLabel(locale, taskType, stage)}</span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                {stageIndex + 1} / {stages.length}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => goToStage(stageIndex + 1)}
+              disabled={isLastStage}
+              aria-label={gc.nextStage}
+              className="rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              ›
+            </button>
           </div>
-          <ul aria-live="polite" aria-atomic="true" className="list-disc space-y-1 pl-5 text-sm">
-            {getGuidedWritingTips(locale, profile, level, stage).map((tip) => (
-              <li key={tip}>{tip}</li>
-            ))}
-          </ul>
+          <PhraseBank
+            key={`${profile}:${level}:${stage}`}
+            tips={getGuidedWritingTips(profile, level, stage)}
+            examplesLabel={gc.examplesLabel}
+            morePhrasesLabel={gc.morePhrases}
+            copiedLabel={gc.copied}
+          />
         </>
+      )}
+    </div>
+  );
+}
+
+// Shows only the first few phrases so an advanced stage's larger phrase bank
+// (e.g. Tâche 1's combined C1/C2 "Développer" set) doesn't read as a wall of
+// text -- see docs/guided-writing.md. Keyed by the caller on
+// `${profile}:${level}:${stage}`, so switching stage, level, or writing
+// context always remounts this with the disclosure collapsed again, rather
+// than needing an effect to reset it.
+const PHRASE_PREVIEW_COUNT = 3;
+
+interface PhraseBankProps {
+  tips: readonly string[];
+  examplesLabel: string;
+  morePhrasesLabel: string;
+  copiedLabel: string;
+}
+
+function PhraseBank({ tips, examplesLabel, morePhrasesLabel, copiedLabel }: PhraseBankProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [copiedTip, setCopiedTip] = useState<string | null>(null);
+  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    };
+  }, []);
+
+  const visibleTips = isExpanded ? tips : tips.slice(0, PHRASE_PREVIEW_COUNT);
+  const remaining = tips.length - visibleTips.length;
+
+  async function handleCopy(tip: string) {
+    try {
+      await navigator.clipboard.writeText(tip);
+    } catch {
+      // Clipboard access can be denied or unavailable -- the phrase stays
+      // visible to copy by hand, so there's nothing else to do here.
+      return;
+    }
+
+    setCopiedTip(tip);
+    if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+    copiedTimeoutRef.current = setTimeout(() => setCopiedTip(null), 2000);
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {examplesLabel}
+      </span>
+      <ul lang="fr" aria-live="polite" aria-atomic="true" className="flex w-full max-w-md flex-col gap-1.5">
+        {visibleTips.map((tip) => (
+          <li key={tip}>
+            <button
+              type="button"
+              onClick={() => void handleCopy(tip)}
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-black/[.1] bg-black/[.02] px-3 py-1.5 text-left text-sm transition-colors hover:bg-black/[.05] dark:border-white/[.15] dark:bg-white/[.04] dark:hover:bg-white/[.08]"
+            >
+              <span>{tip}</span>
+              {copiedTip === tip && (
+                <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">{copiedLabel}</span>
+              )}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {remaining > 0 && (
+        <button
+          type="button"
+          onClick={() => setIsExpanded(true)}
+          className="text-sm underline underline-offset-2 hover:text-foreground"
+        >
+          {morePhrasesLabel}
+        </button>
       )}
     </div>
   );
