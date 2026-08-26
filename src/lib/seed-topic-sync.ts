@@ -1,10 +1,15 @@
-import type { PrismaClient, TaskType } from "@prisma/client";
+import type { GuideProfile, PrismaClient, TaskType } from "@prisma/client";
 import { TopicSource } from "@prisma/client";
 
 export interface SeedTopic {
   taskType: TaskType;
   title: string;
   prompt: string;
+  // Editorially assigned writing-context profile for the guided-writing
+  // feature (see docs/guided-writing.md). Optional so a starter topic added
+  // without one still seeds fine; the guide falls back to the deterministic
+  // classifier for it, same as an uncurated recent-exam or custom topic.
+  guideContext?: GuideProfile;
 }
 
 export interface SeedTopicSyncResult {
@@ -50,14 +55,17 @@ export async function syncSeedTopics(
     // concern this sync does not attempt to resolve.
     const existing = await prisma.topic.findFirst({
       where: { title: topic.title, taskType: topic.taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
-      select: { id: true, prompt: true },
+      select: { id: true, prompt: true, guideContext: true },
       orderBy: { id: "asc" },
     });
 
     if (!existing) {
       await prisma.topic.create({ data: { ...topic, source: TopicSource.OFFICIAL_EXAM } });
       result.created += 1;
-    } else if (existing.prompt !== topic.prompt) {
+    } else if (
+      existing.prompt !== topic.prompt ||
+      (existing.guideContext ?? null) !== (topic.guideContext ?? null)
+    ) {
       await prisma.topic.update({
         where: { id: existing.id },
         data: { retiredAt: new Date() },

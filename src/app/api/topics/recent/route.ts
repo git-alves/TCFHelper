@@ -4,6 +4,7 @@ import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { getRecentExamTopic, RecentExamTopicError } from "@/lib/recent-exam-topics";
+import { classifyWritingContext } from "@/lib/guided-writing-classifier";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -94,6 +95,7 @@ export async function GET(request: Request) {
         prompt: true,
         source: true,
         sourceUrl: true,
+        guideContext: true,
       },
     });
 
@@ -109,6 +111,15 @@ export async function GET(request: Request) {
       throw new Error("Recent-exam topic provenance did not match the request.");
     }
 
+    // An editorial override on the stored record always wins over the
+    // deterministic classifier -- see docs/guided-writing.md's context-source
+    // table. A freshly scraped recent-exam topic never has one yet, but a
+    // later admin correction to this same immutable row is picked up here
+    // without any other change.
+    const guideContext = topic.guideContext
+      ? { profile: topic.guideContext, confidence: "deterministic" as const }
+      : classifyWritingContext(topic.taskType, topic.prompt);
+
     return NextResponse.json(
       {
         topic: {
@@ -118,6 +129,7 @@ export async function GET(request: Request) {
           prompt: topic.prompt,
           sourceUrl: recentTopic.sourceUrl,
           sourceMonth: recentTopic.sourceMonth,
+          guideContext,
         },
       },
       { headers: NO_STORE_HEADERS }

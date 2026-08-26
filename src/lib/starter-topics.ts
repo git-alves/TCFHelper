@@ -1,4 +1,4 @@
-import { TaskType } from "@prisma/client";
+import { GuideProfile, TaskType } from "@prisma/client";
 import type { SeedTopic } from "@/lib/seed-topic-sync";
 
 // The app-managed OFFICIAL_EXAM starter bank, shared between the manual seed
@@ -9,56 +9,67 @@ export const STARTER_TOPICS: SeedTopic[] = [
   // Tâche 1 — décrire, raconter (60-120 mots)
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Raconter son week-end",
     prompt: "Écrivez un message à un ami pour lui raconter votre dernier week-end.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Décrire sa ville natale",
     prompt: "Décrivez votre ville natale à un correspondant qui ne la connaît pas.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.FORMAL_PROFESSIONAL_MESSAGE,
     title: "Un souvenir de vacances",
     prompt: "Racontez un souvenir de vacances mémorable à un collègue.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Inviter un ami à une fête",
     prompt: "Écrivez un courriel à un ami pour l'inviter à une fête.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Décrire sa routine quotidienne",
     prompt: "Décrivez votre routine quotidienne à un nouvel ami rencontré en ligne.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Annoncer un déménagement",
     prompt: "Écrivez un message à un ami pour lui annoncer votre déménagement dans une nouvelle ville.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.FORMAL_PROFESSIONAL_MESSAGE,
     title: "Remercier un collègue",
     prompt: "Écrivez un courriel à un collègue pour le remercier de son aide sur un projet récent.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Décrire un cours suivi",
     prompt: "Décrivez à un ami un cours que vous avez suivi récemment et ce que vous en avez retenu.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Proposer une activité sportive",
     prompt: "Écrivez un message à un ami pour lui proposer de pratiquer un sport ensemble.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Raconter une découverte culinaire",
     prompt: "Racontez à un proche une découverte culinaire que vous avez faite récemment.",
   },
   {
     taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
     title: "Demander des nouvelles",
     prompt: "Écrivez un message à un ancien camarade de classe pour prendre de ses nouvelles et raconter les vôtres.",
   },
@@ -68,66 +79,77 @@ export const STARTER_TOPICS: SeedTopic[] = [
   // (convaincre, informer, conseiller...), et non un simple essai d'opinion.
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Réseaux sociaux : lien ou distance",
     prompt:
       "Rédigez un article pour le blog de votre association de quartier : racontez une expérience personnelle liée aux réseaux sociaux et donnez votre avis sur leur effet sur les relations humaines, afin de convaincre vos lecteurs de votre point de vue.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Le télétravail",
     prompt:
       "Rédigez un article pour le journal interne de votre entreprise : racontez votre expérience du télétravail et donnez votre avis sur ses bénéfices ou ses limites, afin d'informer vos collègues.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
     title: "Cours en ligne vs en classe",
     prompt:
       "Rédigez un courrier destiné aux lecteurs du journal de votre université : racontez votre expérience des cours en ligne et exprimez votre avis sur leur efficacité par rapport aux cours en classe, afin de nourrir le débat.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Téléphones portables à l'école",
     prompt:
       "Rédigez un article pour le journal de votre ancien lycée : racontez un événement lié à l'usage des téléphones portables à l'école et donnez votre avis sur leur interdiction, afin de convaincre vos lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Ville ou campagne",
     prompt:
       "Rédigez une note pour un magazine de style de vie : racontez votre expérience d'un déménagement, en ville ou à la campagne, et donnez votre avis sur ce mode de vie, afin d'inspirer vos lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Argent de poche",
     prompt:
       "Rédigez un article pour le magazine d'une association de parents d'élèves : racontez une expérience liée à l'argent de poche et donnez votre avis sur son utilité pour les enfants, afin d'informer les autres parents.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
     title: "Animaux domestiques en appartement",
     prompt:
       "Rédigez un courrier destiné aux lecteurs d'un magazine sur les animaux : racontez votre expérience d'un animal domestique en appartement et donnez votre avis sur cette pratique, afin de conseiller vos lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Uniforme scolaire",
     prompt:
       "Rédigez un article pour le journal de votre ancien établissement : racontez une expérience liée au port de l'uniforme scolaire et donnez votre avis sur son adoption, afin de convaincre vos lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Vacances entre amis ou en famille",
     prompt:
       "Rédigez une note pour le bulletin de votre club de loisirs : racontez un séjour de vacances, entre amis ou en famille, et donnez votre avis sur ce type de vacances, afin de partager votre expérience avec les lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
     title: "Livres papier ou numériques",
     prompt:
       "Rédigez un article pour le magazine d'un club de lecture : racontez votre expérience de lecture, papier ou numérique, et donnez votre avis sur l'avenir du livre, afin d'informer les autres lecteurs.",
   },
   {
     taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
     title: "Sport individuel ou collectif",
     prompt:
       "Rédigez un courrier destiné aux lecteurs du journal de votre club sportif : racontez une expérience sportive, individuelle ou collective, et donnez votre avis sur ses bienfaits, afin d'encourager vos lecteurs à pratiquer.",
@@ -139,6 +161,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   // seeded topic reads exactly like an authentic one.
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "L'intelligence artificielle et l'emploi",
     prompt:
       "L'intelligence artificielle et l'emploi\n\n" +
@@ -147,6 +170,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Le tourisme de masse",
     prompt:
       "Le tourisme de masse\n\n" +
@@ -155,6 +179,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Diplôme ou expérience",
     prompt:
       "Diplôme ou expérience\n\n" +
@@ -163,6 +188,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Voitures électriques ou à essence",
     prompt:
       "Voitures électriques ou à essence\n\n" +
@@ -171,6 +197,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "La mondialisation",
     prompt:
       "La mondialisation\n\n" +
@@ -179,6 +206,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Le télétravail généralisé",
     prompt:
       "Le télétravail généralisé\n\n" +
@@ -187,6 +215,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Les réseaux sociaux et les adolescents",
     prompt:
       "Les réseaux sociaux et les adolescents\n\n" +
@@ -195,6 +224,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "La semaine de quatre jours",
     prompt:
       "La semaine de quatre jours\n\n" +
@@ -203,6 +233,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "L'agriculture biologique",
     prompt:
       "L'agriculture biologique\n\n" +
@@ -211,6 +242,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "Les transports en commun gratuits",
     prompt:
       "Les transports en commun gratuits\n\n" +
@@ -219,6 +251,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
   },
   {
     taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
     title: "L'apprentissage à distance",
     prompt:
       "L'apprentissage à distance\n\n" +

@@ -64,6 +64,7 @@ beforeEach(() => {
     prompt: recentTopic.prompt,
     source: "RECENT_EXAM",
     sourceUrl: recentTopic.sourceUrl,
+    guideContext: null,
   });
 });
 
@@ -93,6 +94,7 @@ describe("GET /api/topics/recent", () => {
         prompt: true,
         source: true,
         sourceUrl: true,
+        guideContext: true,
       },
     });
     await expect(response.json()).resolves.toEqual({
@@ -103,6 +105,10 @@ describe("GET /api/topics/recent", () => {
         prompt: recentTopic.prompt,
         sourceUrl: recentTopic.sourceUrl,
         sourceMonth: "2026-07",
+        // No editorial override on this freshly scraped row -- falls back to
+        // the deterministic classifier, which can't tell article from public
+        // letter for this prompt and asks the learner to confirm.
+        guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "needs_confirmation" },
       },
     });
   });

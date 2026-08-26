@@ -39,7 +39,7 @@ describe("syncSeedTopics", () => {
         source: TopicSource.OFFICIAL_EXAM,
         retiredAt: null,
       },
-      select: { id: true, prompt: true },
+      select: { id: true, prompt: true, guideContext: true },
       orderBy: { id: "asc" },
     });
     expect(create).toHaveBeenCalledWith({
@@ -77,7 +77,7 @@ describe("syncSeedTopics", () => {
   });
 
   it("leaves an already-current managed starter prompt unchanged", async () => {
-    findFirst.mockResolvedValue({ id: "seed_topic_1", prompt: starterTopic.prompt });
+    findFirst.mockResolvedValue({ id: "seed_topic_1", prompt: starterTopic.prompt, guideContext: null });
 
     await expect(syncSeedTopics(prisma, [starterTopic])).resolves.toEqual({
       created: 0,
@@ -87,6 +87,25 @@ describe("syncSeedTopics", () => {
 
     expect(update).not.toHaveBeenCalled();
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("retires and replaces a topic whose prompt is unchanged but curated guideContext was corrected", async () => {
+    findFirst.mockResolvedValue({ id: "seed_topic_1", prompt: starterTopic.prompt, guideContext: null });
+    const curatedTopic = { ...starterTopic, guideContext: "ARGUMENTATIVE_ANALYSIS" as const };
+
+    await expect(syncSeedTopics(prisma, [curatedTopic])).resolves.toEqual({
+      created: 0,
+      retired: 1,
+      unchanged: 0,
+    });
+
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "seed_topic_1" },
+      data: { retiredAt: expect.any(Date) },
+    });
+    expect(create).toHaveBeenCalledWith({
+      data: { ...curatedTopic, source: TopicSource.OFFICIAL_EXAM },
+    });
   });
 });
 
