@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { GuideProfile, TaskType } from "@prisma/client";
 import type { AppCopy } from "@/lib/app-copy";
 import type { AppLocale } from "@/lib/app-locale";
@@ -173,7 +173,6 @@ export function WritingGuidePanel({
             tips={getGuidedWritingTips(profile, level, stage)}
             examplesLabel={gc.examplesLabel}
             morePhrasesLabel={gc.morePhrases}
-            copiedLabel={gc.copied}
           />
         </>
       )}
@@ -193,58 +192,33 @@ interface PhraseBankProps {
   tips: readonly string[];
   examplesLabel: string;
   morePhrasesLabel: string;
-  copiedLabel: string;
 }
 
-function PhraseBank({ tips, examplesLabel, morePhrasesLabel, copiedLabel }: PhraseBankProps) {
+// Plain reference text, not buttons: these are examples of the kind of
+// phrase or structure to use, not text meant to be pasted wholesale -- see
+// docs/guided-writing.md. Phrases run inline, separated by a middle dot,
+// instead of one per row, so a longer bank (e.g. Tâche 1's combined C1/C2
+// "Développer" set) reads as compact wrapped text rather than a stack of
+// rows competing with the editor for vertical space.
+function PhraseBank({ tips, examplesLabel, morePhrasesLabel }: PhraseBankProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [copiedTip, setCopiedTip] = useState<string | null>(null);
-  const copiedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
-    };
-  }, []);
 
   const visibleTips = isExpanded ? tips : tips.slice(0, PHRASE_PREVIEW_COUNT);
   const remaining = tips.length - visibleTips.length;
 
-  async function handleCopy(tip: string) {
-    try {
-      await navigator.clipboard.writeText(tip);
-    } catch {
-      // Clipboard access can be denied or unavailable -- the phrase stays
-      // visible to copy by hand, so there's nothing else to do here.
-      return;
-    }
-
-    setCopiedTip(tip);
-    if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
-    copiedTimeoutRef.current = setTimeout(() => setCopiedTip(null), 2000);
-  }
-
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div className="flex flex-col items-center gap-1.5">
       <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {examplesLabel}
       </span>
-      <ul lang="fr" aria-live="polite" aria-atomic="true" className="flex w-full max-w-md flex-col gap-1.5">
-        {visibleTips.map((tip) => (
-          <li key={tip}>
-            <button
-              type="button"
-              onClick={() => void handleCopy(tip)}
-              className="flex w-full items-center justify-between gap-2 rounded-lg border border-black/[.1] bg-black/[.02] px-3 py-1.5 text-left text-sm transition-colors hover:bg-black/[.05] dark:border-white/[.15] dark:bg-white/[.04] dark:hover:bg-white/[.08]"
-            >
-              <span>{tip}</span>
-              {copiedTip === tip && (
-                <span className="shrink-0 text-xs text-emerald-600 dark:text-emerald-400">{copiedLabel}</span>
-              )}
-            </button>
-          </li>
+      <p lang="fr" aria-live="polite" aria-atomic="true" className="text-center text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+        {visibleTips.map((tip, index) => (
+          <span key={tip}>
+            {tip}
+            {index < visibleTips.length - 1 ? " · " : ""}
+          </span>
         ))}
-      </ul>
+      </p>
       {remaining > 0 && (
         <button
           type="button"

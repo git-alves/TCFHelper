@@ -247,7 +247,6 @@ export interface AppCopy {
       nextStage: string;
       examplesLabel: string;
       morePhrases: string;
-      copied: string;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -577,7 +576,6 @@ export const APP_COPY = {
         // which language the rest of the app's chrome is shown in.
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
-        copied: "Copied",
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -1022,7 +1020,6 @@ export const APP_COPY = {
         nextStage: "Étape suivante",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
-        copied: "Copié",
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -1473,7 +1470,6 @@ export const APP_COPY = {
         nextStage: "Paso siguiente",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
-        copied: "Copiado",
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
@@ -1924,7 +1920,6 @@ export const APP_COPY = {
         nextStage: "Próxima etapa",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
-        copied: "Copiado",
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
