@@ -243,6 +243,11 @@ export interface AppCopy {
       contextConfirmAction: string;
       changeContext: string;
       contextLabel: (values: { profile: string }) => string;
+      previousStage: string;
+      nextStage: string;
+      examplesLabel: string;
+      morePhrases: string;
+      copied: string;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -564,6 +569,15 @@ export const APP_COPY = {
         contextConfirmAction: "Use this",
         changeContext: "Change",
         contextLabel: ({ profile }) => `Style: ${profile}`,
+        previousStage: "Previous step",
+        nextStage: "Next step",
+        // Kept in French like the phrase bank itself (see guided-writing.ts)
+        // rather than translated per interface locale -- these are French
+        // formulas the learner will use in their French text, regardless of
+        // which language the rest of the app's chrome is shown in.
+        examplesLabel: "Formules à adapter à votre sujet",
+        morePhrases: "Voir plus de formules",
+        copied: "Copied",
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -1004,6 +1018,11 @@ export const APP_COPY = {
         contextConfirmAction: "Utiliser ce choix",
         changeContext: "Changer",
         contextLabel: ({ profile }) => `Style : ${profile}`,
+        previousStage: "Étape précédente",
+        nextStage: "Étape suivante",
+        examplesLabel: "Formules à adapter à votre sujet",
+        morePhrases: "Voir plus de formules",
+        copied: "Copié",
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -1450,6 +1469,11 @@ export const APP_COPY = {
         contextConfirmAction: "Usar esta opción",
         changeContext: "Cambiar",
         contextLabel: ({ profile }) => `Estilo: ${profile}`,
+        previousStage: "Paso anterior",
+        nextStage: "Paso siguiente",
+        examplesLabel: "Formules à adapter à votre sujet",
+        morePhrases: "Voir plus de formules",
+        copied: "Copiado",
       },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
@@ -1896,6 +1920,11 @@ export const APP_COPY = {
         contextConfirmAction: "Usar esta opção",
         changeContext: "Alterar",
         contextLabel: ({ profile }) => `Estilo: ${profile}`,
+        previousStage: "Etapa anterior",
+        nextStage: "Próxima etapa",
+        examplesLabel: "Formules à adapter à votre sujet",
+        morePhrases: "Voir plus de formules",
+        copied: "Copiado",
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,
