@@ -168,7 +168,6 @@ describe("APP_COPY", () => {
         copy.workspace.guidedWriting.nextStage,
         copy.workspace.guidedWriting.examplesLabel,
         copy.workspace.guidedWriting.morePhrases,
-        copy.workspace.guidedWriting.copied,
         copy.workspace.translation.heading({ language: "English" }),
         copy.workspace.translation.show,
         copy.workspace.translation.update,

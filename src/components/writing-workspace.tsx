@@ -591,6 +591,10 @@ export function WritingWorkspace() {
         setRecentTopicError(null);
         setCustomTopic("");
         resetDraftAndFeedback();
+        // A guide left open for the previous task's writing situation
+        // shouldn't carry over to a task the learner hasn't picked a topic
+        // for yet -- the button re-opens it in one click if wanted.
+        storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "0");
       },
     );
   }
@@ -816,6 +820,7 @@ export function WritingWorkspace() {
     setRecentTopicError(null);
     setCustomTopic("");
     resetDraftAndFeedback();
+    storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "0");
   }
 
   const walkthroughScriptRef = useRef<{ applyStep: typeof applyWalkthroughStep; resetDemo: typeof resetWalkthroughDemo }>({
