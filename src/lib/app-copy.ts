@@ -226,6 +226,24 @@ export interface AppCopy {
       copyFailed: string;
       clear: string;
     };
+    // Fixed, reviewed coaching content selected by task + writing-context
+    // profile + target level -- see docs/guided-writing.md and
+    // src/lib/guided-writing.ts, which holds the actual tips (localized
+    // separately, the same way task instructions and profile/stage labels
+    // are). This block is only the guide's chrome copy. It shares
+    // editor.exampleLevelLabel's "Target level" selector rather than adding
+    // a second one -- one target level for the whole workspace.
+    guidedWriting: {
+      show: string;
+      hide: string;
+      heading: string;
+      guideForLevel: (values: { level: string }) => string;
+      contextConfirmHeading: string;
+      contextConfirmPrompt: string;
+      contextConfirmAction: string;
+      changeContext: string;
+      contextLabel: (values: { profile: string }) => string;
+    };
     translation: {
       heading: (values: LanguageValues) => string;
       show: string;
@@ -535,6 +553,17 @@ export const APP_COPY = {
         copied: "Copied!",
         copyFailed: "Couldn't copy",
         clear: "Clear text",
+      },
+      guidedWriting: {
+        show: "Writing guide",
+        hide: "Hide writing guide",
+        heading: "Writing guide",
+        guideForLevel: ({ level }) => `Guide for ${level}`,
+        contextConfirmHeading: "Writing situation",
+        contextConfirmPrompt: "Who are you writing to?",
+        contextConfirmAction: "Use this",
+        changeContext: "Change",
+        contextLabel: ({ profile }) => `Style: ${profile}`,
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -964,6 +993,17 @@ export const APP_COPY = {
         copied: "Copié !",
         copyFailed: "Impossible de copier",
         clear: "Effacer le texte",
+      },
+      guidedWriting: {
+        show: "Guide de rédaction",
+        hide: "Masquer le guide de rédaction",
+        heading: "Guide de rédaction",
+        guideForLevel: ({ level }) => `Guide pour le niveau ${level}`,
+        contextConfirmHeading: "Situation d'écriture",
+        contextConfirmPrompt: "À qui écrivez-vous ?",
+        contextConfirmAction: "Utiliser ce choix",
+        changeContext: "Changer",
+        contextLabel: ({ profile }) => `Style : ${profile}`,
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -1400,6 +1440,17 @@ export const APP_COPY = {
         copyFailed: "No se pudo copiar",
         clear: "Borrar texto",
       },
+      guidedWriting: {
+        show: "Guía de redacción",
+        hide: "Ocultar guía de redacción",
+        heading: "Guía de redacción",
+        guideForLevel: ({ level }) => `Guía para el nivel ${level}`,
+        contextConfirmHeading: "Situación de escritura",
+        contextConfirmPrompt: "¿A quién le escribes?",
+        contextConfirmAction: "Usar esta opción",
+        changeContext: "Cambiar",
+        contextLabel: ({ profile }) => `Estilo: ${profile}`,
+      },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
         show: "Mostrar traducción",
@@ -1834,6 +1885,17 @@ export const APP_COPY = {
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",
         clear: "Limpar texto",
+      },
+      guidedWriting: {
+        show: "Guia de escrita",
+        hide: "Ocultar guia de escrita",
+        heading: "Guia de escrita",
+        guideForLevel: ({ level }) => `Guia para o nível ${level}`,
+        contextConfirmHeading: "Situação de escrita",
+        contextConfirmPrompt: "Para quem você está escrevendo?",
+        contextConfirmAction: "Usar esta opção",
+        changeContext: "Alterar",
+        contextLabel: ({ profile }) => `Estilo: ${profile}`,
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,

@@ -42,6 +42,18 @@ enum TopicSource {
   USER_SUBMITTED
 }
 
+// The writing situation (audience/register/genre/purpose) a guided-writing
+// tip set is chosen for -- see docs/guided-writing.md. Deliberately narrower
+// than a free-form register flag: genre changes the expected structure as
+// well as the greeting, so "formal" alone isn't enough to pick a Start tip.
+enum GuideProfile {
+  INFORMAL_PERSONAL_MESSAGE
+  FORMAL_PROFESSIONAL_MESSAGE
+  PUBLIC_ARTICLE_OR_NOTE
+  PUBLIC_LETTER
+  ARGUMENTATIVE_ANALYSIS
+}
+
 enum EssayStatus {
   DRAFT
   SUBMITTED
@@ -181,6 +193,11 @@ model Topic {
   // picker (retiredAt: null) and the seed sync's own "find the current
   // version" lookup filter on it.
   retiredAt   DateTime?
+  // Editorially assigned writing-context profile for the guided-writing
+  // feature (see docs/guided-writing.md). Nullable and additive: existing
+  // rows and recent-exam/custom topics that have no curated profile fall
+  // back to the client-side deterministic classifier instead of this field.
+  guideContext GuideProfile?
 
   essays Essay[]
 

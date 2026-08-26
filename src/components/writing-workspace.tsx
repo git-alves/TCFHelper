@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { TaskType } from "@prisma/client";
@@ -18,8 +18,10 @@ import { CorrectionModal, type CorrectionModalState } from "@/components/correct
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
+import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { computeTranslationDelta } from "@/lib/translation-delta";
+import type { WritingContextClassification } from "@/lib/guided-writing-classifier";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 
@@ -30,6 +32,7 @@ interface RecentExamTopic {
   prompt: string;
   sourceUrl: string;
   sourceMonth: string;
+  guideContext: WritingContextClassification;
 }
 
 type TopicMode = "recent" | "custom" | null;
@@ -37,9 +40,76 @@ type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
 type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
+// Shared by the example generator and the writing guide -- one "target
+// level" for the whole workspace rather than two adjacent B2/C1/C2 controls
+// with different meanings. See docs/guided-writing.md.
 type ExampleLevel = "B2" | "C1" | "C2";
 type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
+const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
+const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
+const writingPreferenceListeners = new Set<() => void>();
+const inMemoryWritingPreferences = new Map<string, string>();
+
+function isExampleLevel(value: unknown): value is ExampleLevel {
+  return value === "B2" || value === "C1" || value === "C2";
+}
+
+function getStoredTargetLevel(): ExampleLevel {
+  const stored = readWritingPreference(TARGET_LEVEL_STORAGE_KEY);
+  return isExampleLevel(stored) ? stored : "B2";
+}
+
+function getStoredGuidedWritingOpen(): boolean {
+  return readWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY) === "1";
+}
+
+function readWritingPreference(key: string): string | null {
+  const inMemoryValue = inMemoryWritingPreferences.get(key);
+  if (inMemoryValue !== undefined) return inMemoryValue;
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function storeWritingPreference(key: string, value: string): void {
+  // Keep a per-tab fallback so unavailable browser storage does not discard a
+  // learner's selection during the current page session.
+  inMemoryWritingPreferences.set(key, value);
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Storage is a convenience only. Private browsing or restrictive browser
+    // settings must not prevent the learner from writing or using the guide.
+  }
+  writingPreferenceListeners.forEach((listener) => listener());
+}
+
+function subscribeToWritingPreferences(listener: () => void): () => void {
+  writingPreferenceListeners.add(listener);
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key) inMemoryWritingPreferences.delete(event.key);
+    else inMemoryWritingPreferences.clear();
+    listener();
+  };
+  if (typeof window !== "undefined") window.addEventListener("storage", handleStorage);
+  return () => {
+    writingPreferenceListeners.delete(listener);
+    if (typeof window !== "undefined") window.removeEventListener("storage", handleStorage);
+  };
+}
+
+function isWritingContextClassification(value: unknown): value is WritingContextClassification {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.profile === "string" &&
+    (candidate.confidence === "deterministic" || candidate.confidence === "needs_confirmation")
+  );
+}
 
 function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
   if (!value || typeof value !== "object") return null;
@@ -48,19 +118,20 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   if (!topic || typeof topic !== "object") return null;
 
   const candidate = topic as Record<string, unknown>;
-  const { id, taskType, title, prompt, sourceUrl, sourceMonth } = candidate;
+  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext } = candidate;
   if (
     typeof id !== "string" ||
     taskType !== expectedTaskType ||
     typeof title !== "string" ||
     typeof prompt !== "string" ||
     typeof sourceUrl !== "string" ||
-    typeof sourceMonth !== "string"
+    typeof sourceMonth !== "string" ||
+    !isWritingContextClassification(guideContext)
   ) {
     return null;
   }
 
-  return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth };
+  return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth, guideContext };
 }
 
 // A Tâche 3 topic's prompt is built as "title\n\nDocument 1 :\n...\n\nDocument
@@ -125,7 +196,20 @@ export function WritingWorkspace() {
   // from the current render.
   const [hasCorrectionError, setHasCorrectionError] = useState(false);
 
-  const [exampleLevel, setExampleLevel] = useState<ExampleLevel>("B2");
+  // useSyncExternalStore serves the same defaults during SSR and hydration,
+  // then reads the browser preference after hydration without a mismatched
+  // initial tree. The storage wrapper falls back to in-memory state if the
+  // browser blocks localStorage.
+  const exampleLevel = useSyncExternalStore<ExampleLevel>(
+    subscribeToWritingPreferences,
+    getStoredTargetLevel,
+    (): ExampleLevel => "B2",
+  );
+  const isGuidedWritingOpen = useSyncExternalStore(
+    subscribeToWritingPreferences,
+    getStoredGuidedWritingOpen,
+    () => false,
+  );
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
   const [exampleNeedsTopic, setExampleNeedsTopic] = useState(false);
@@ -1148,9 +1232,44 @@ export function WritingWorkspace() {
 
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-4">
-              <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {copy.workspace.editor.heading}
-              </h2>
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                  {copy.workspace.editor.heading}
+                </h2>
+                <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-3 pr-1 dark:border-white/[.2]">
+                  <label htmlFor="target-level" className="text-sm text-zinc-600 dark:text-zinc-300">
+                    {copy.workspace.editor.exampleLevelLabel}
+                  </label>
+                  <select
+                    id="target-level"
+                    value={exampleLevel}
+                    onChange={(e) => {
+                      const level = e.target.value;
+                      if (isExampleLevel(level)) storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level);
+                    }}
+                    disabled={isCorrecting || isTopicLoading || isGeneratingExample}
+                    className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {EXAMPLE_LEVELS.map((level) => (
+                      <option key={level} value={level} className="text-black">
+                        {level}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  data-walkthrough="guided-writing"
+                  onClick={() =>
+                    storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, isGuidedWritingOpen ? "0" : "1")
+                  }
+                  disabled={!activeTopicPrompt}
+                  aria-pressed={isGuidedWritingOpen}
+                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  {isGuidedWritingOpen ? copy.workspace.guidedWriting.hide : copy.workspace.guidedWriting.show}
+                </button>
+              </div>
               <span
                 id="word-count"
                 className={`shrink-0 text-sm ${
@@ -1166,6 +1285,18 @@ export function WritingWorkspace() {
                 })}
               </span>
             </div>
+            {isGuidedWritingOpen && taskType && (topicMode === "recent" || topicMode === "custom") && activeTopicPrompt && (
+              <WritingGuidePanel
+                key={`${taskType}:${topicMode}:${topicMode === "recent" ? recentTopic?.id ?? "" : ""}`}
+                taskType={taskType}
+                topicMode={topicMode}
+                recentTopicContext={topicMode === "recent" ? recentTopic?.guideContext ?? null : null}
+                customTopicPrompt={topicMode === "custom" ? customTopic : ""}
+                level={exampleLevel}
+                locale={locale}
+                copy={copy}
+              />
+            )}
             <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
             </label>
@@ -1229,24 +1360,8 @@ export function WritingWorkspace() {
 
               <div
                 data-walkthrough="example-generate"
-                className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]"
+                className="flex rounded-full border border-black/[.15] p-1 dark:border-white/[.2]"
               >
-                <label htmlFor="example-level" className="sr-only">
-                  {copy.workspace.editor.exampleLevelLabel}
-                </label>
-                <select
-                  id="example-level"
-                  value={exampleLevel}
-                  onChange={(e) => setExampleLevel(e.target.value as ExampleLevel)}
-                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                  className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {EXAMPLE_LEVELS.map((level) => (
-                    <option key={level} value={level} className="text-black">
-                      {level}
-                    </option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   onClick={requestGenerateExample}
