@@ -9,7 +9,7 @@
 ### Goals
 
 - Let a learner activate a non-modal Writing guide after selecting a task and providing a topic.
-- Show short, French-language writing prompts in **Start**, **Develop**, and **Finish** stages, tailored to the selected target level: B2, C1, or C2.
+- Show short, French-language phrase examples and static idea prompts in task-aware stages, tailored to the selected target level: B2, C1, or C2. The stage sequence reflects the task rather than forcing every response into the same “Start / Develop / Finish” model.
 - Tailor advice to the prompt’s writing situation: genre, intended audience, register, and communicative purpose. For example, an informal personal message can offer `Salut [Prénom],`; a formal letter can offer `Madame, Monsieur,` instead.
 - Keep all guide content editorial, versioned, reviewable application data; no model request or generative AI is used to create or select tips.
 - Require the learner to choose the writing situation before tips appear for every Tâche 1 and Tâche 2 prompt, including a trusted recent-exam topic. Tâche 3 has one fixed argumentative situation and may open directly.
@@ -40,12 +40,12 @@ Fixed content is preferred to an authorable database for v1 because it is a smal
 
 ### Entry and selection flow
 
-`Select task → select or paste topic → select target level → open Writing guide → choose Start / Develop / Finish → write`
+`Select task → select or paste topic → select target level → open Writing guide → choose the writing situation where needed → move through the task-specific stages → write`
 
 - The Writing guide button is disabled until a non-empty topic is available. It appears adjacent to the editor heading and does not obscure the editor. It is closed by default; selecting a task, fetching a replacement recent-exam topic, or switching topic mode never opens it automatically.
 - The first use defaults to **B2**; the learner may choose **B2**, **C1**, or **C2** at any time. The last selection is stored in local storage and visibly labels the guide, e.g. “Guide for C1.”
-- The panel opens to **Start**. The learner can choose **Develop** or **Finish** at any time; the product must not infer the drafting stage from word count in v1.
-- Opening the guide for a Tâche 1 or Tâche 2 topic first presents “Writing situation — Who are you writing to?”. The learner selects one of the applicable profiles; the selection only applies to the current prompt/session. No potentially wrong salutation or phrase bank is shown before selection. Tâche 3 opens directly because its analytical situation is fixed.
+- The panel opens to the first task-specific stage and provides previous/next controls. The product must not infer the learner’s drafting stage from word count in v1. The stages are: Tâche 1 — **Open the message → Add useful details → Add an action or request (optional) → Check and finish**; Tâche 2 — **Set the format → Recount the experience → Comment / give a view → Add an argument → Nuance (optional) → Check and conclude**; Tâche 3 — **Frame the issue → Compare both documents → Take a position → Qualify it (optional) → Check and conclude**.
+- Opening the guide for a Tâche 1 topic first presents “Writing situation — Who are you writing to?”. For Tâche 2 it asks “What type of text are you writing, and for which readers?” The learner selects one of the applicable profiles; the selection only applies to the current prompt/session. No potentially wrong salutation or phrase bank is shown before selection. Tâche 3 opens directly because its analytical situation is fixed.
 - Changing task or topic closes the guide and clears the current context selection. The saved B2/C1/C2 preference remains.
 
 ### Writing-context profiles
@@ -68,7 +68,16 @@ The guide content stays in a typed, static application module. It is composed fr
 
 ```ts
 type TargetLevel = "B2" | "C1" | "C2";
-type GuideStage = "start" | "develop" | "finish";
+type GuideStage =
+  | "start"
+  | "recount"
+  | "develop"
+  | "ask"
+  | "addArgument"
+  | "nuance"
+  | "synthesize"
+  | "position"
+  | "finish";
 type GuideProfile =
   | "informal_personal_message"
   | "formal_professional_message"
@@ -83,11 +92,11 @@ type TopicGuideContext = {
 
 type GuidedWritingContent = Record<
   GuideProfile,
-  Record<TargetLevel, Record<GuideStage, readonly string[]>>
+  Record<TargetLevel, Partial<Record<GuideStage, readonly string[]>>>
 >;
 ```
 
-Each stage contains two to four action-oriented tips. The **Start** content includes profile-specific, optional openings; **Develop** reinforces the communicative purpose and required moves; **Finish** checks task completion, register consistency, organization, and word range. The individual tips differ by level:
+Each stage pairs two elements: a compact, no-AI **“What can you say?”** question that helps an empty-page learner generate their own content, and a small French phrase bank that demonstrates an appropriate move without supplying a paragraph. The **Finish** stage adds a visible completion checklist for task coverage, organization, register, and word range; it is not merely a bank of closing formulas. The individual phrase banks differ by level:
 
 | Target | Calibration |
 | --- | --- |
@@ -112,7 +121,7 @@ No network dependency is introduced. If local storage is unavailable, use B2 for
 1. Define the static types, all localized content modules, and deterministic context rules with unit tests for informal, formal, public, and ambiguous prompts.
 2. Add editorial context to every starter topic and an additive nullable context field to persisted `Topic` records. Preserve topic immutability: revised prompt/context pairs receive a new topic record rather than changing a topic attached to existing essays.
 3. Return the trusted stored or derived context alongside a selected recent topic. For custom prompts, derive on the client only from the visible current prompt and retain any learner override in component state.
-4. Add the accessible, non-modal guide to the writing workspace. It must work by keyboard, preserve editor focus, announce stage/context changes, and never cover the textarea.
+4. Add the accessible, non-modal guide to the writing workspace. It must work by keyboard, preserve editor focus, announce stage/context changes, and never cover the textarea. Make optional moves visibly optional so a learner does not mistake them for compulsory paragraphs.
 5. Review all B2/C1/C2 advice with a qualified TCF educator before release. Verify that each opening, register recommendation, and task requirement is appropriate for its profile.
 
 ## Success metric
