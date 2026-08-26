@@ -12,8 +12,8 @@
 - Show short, French-language writing prompts in **Start**, **Develop**, and **Finish** stages, tailored to the selected target level: B2, C1, or C2.
 - Tailor advice to the prompt’s writing situation: genre, intended audience, register, and communicative purpose. For example, an informal personal message can offer `Salut [Prénom],`; a formal letter can offer `Madame, Monsieur,` instead.
 - Keep all guide content editorial, versioned, reviewable application data; no model request or generative AI is used to create or select tips.
-- Let the learner correct the inferred writing situation before tips appear when it is ambiguous, including for a pasted custom prompt.
-- Persist only the learner’s preferred target level and whether the panel is open locally. These are convenience settings, not part of grading or a learner profile.
+- Require the learner to choose the writing situation before tips appear for every Tâche 1 and Tâche 2 prompt, including a trusted recent-exam topic. Tâche 3 has one fixed argumentative situation and may open directly.
+- Persist only the learner’s preferred target level locally. The guide itself is closed by default for every newly selected task or replacement topic, and opens only after an explicit click.
 
 ### Non-goals
 
@@ -32,7 +32,7 @@ Build the guide from fixed content modules selected by two inputs:
 
 This replaces the earlier task-only content proposal. Task type still determines required structure and word range, but it does not reliably determine tone: Tâche 1 alone can be a message to a friend or a professional colleague.
 
-The app must not claim to understand arbitrary French text without AI. It will use deterministic, auditable rules for explicit wording in a prompt (for example, `ami`, `collègue`, `Madame, Monsieur`, `lecteurs`) and stored editorial metadata when it exists. If the result is missing or ambiguous, the guide asks the learner to choose or confirm the context before showing a register-specific opening. Learner confirmation always takes precedence over an inference.
+The app must not claim to understand arbitrary French text without AI. It may retain deterministic, auditable rules and stored editorial metadata for future curation, but these must not bypass learner choice. Every fresh Tâche 1 or Tâche 2 guide opening asks the learner to choose the writing situation before showing register- or genre-specific phrases. Learner choice is the source of truth for the current prompt/session.
 
 Fixed content is preferred to an authorable database for v1 because it is a small, high-stakes pedagogical corpus: application review, translation completeness tests, and version control are more valuable than dynamic editing. The **topic context**, however, belongs with a topic where it is already known; it is data about the prompt rather than coaching prose.
 
@@ -42,11 +42,11 @@ Fixed content is preferred to an authorable database for v1 because it is a smal
 
 `Select task → select or paste topic → select target level → open Writing guide → choose Start / Develop / Finish → write`
 
-- The Writing guide button is disabled until a non-empty topic is available. It appears adjacent to the editor heading and does not obscure the editor.
+- The Writing guide button is disabled until a non-empty topic is available. It appears adjacent to the editor heading and does not obscure the editor. It is closed by default; selecting a task, fetching a replacement recent-exam topic, or switching topic mode never opens it automatically.
 - The first use defaults to **B2**; the learner may choose **B2**, **C1**, or **C2** at any time. The last selection is stored in local storage and visibly labels the guide, e.g. “Guide for C1.”
 - The panel opens to **Start**. The learner can choose **Develop** or **Finish** at any time; the product must not infer the drafting stage from word count in v1.
-- When a topic’s context is unknown or ambiguous, opening the guide first presents a small “Writing situation” confirmation. The learner selects one of the applicable profiles; the selection only applies to the current prompt/session. No potentially wrong salutation is shown before confirmation.
-- Changing task or topic refreshes the context and closes any context-confirmation state. The saved B2/C1/C2 preference remains.
+- Opening the guide for a Tâche 1 or Tâche 2 topic first presents “Writing situation — Who are you writing to?”. The learner selects one of the applicable profiles; the selection only applies to the current prompt/session. No potentially wrong salutation or phrase bank is shown before selection. Tâche 3 opens directly because its analytical situation is fixed.
+- Changing task or topic closes the guide and clears the current context selection. The saved B2/C1/C2 preference remains.
 
 ### Writing-context profiles
 
@@ -101,11 +101,11 @@ The selected interface locale determines panel labels and explanatory copy. Fren
 
 | Topic path | Context source | If unavailable or uncertain |
 | --- | --- | --- |
-| Curated starter topic | Editorially assigned `TopicGuideContext`, stored with the topic definition and persisted with the topic. | Not applicable once the starter-bank data is complete. |
-| Recent-exam topic | Deterministic rules based only on explicit prompt wording, with an optional editorial override keyed to the immutable topic record. | Ask the learner to confirm a profile; do not offer a profile-specific opening until they do. |
+| Curated starter topic | Editorially assigned `TopicGuideContext`, stored with the topic definition and persisted with the topic. | Still ask the learner to select a Tâche 1/2 writing situation before showing phrases. |
+| Recent-exam topic | Deterministic rules based only on explicit prompt wording, with an optional editorial override keyed to the immutable topic record. | Still ask the learner to select a Tâche 1/2 writing situation before showing phrases. |
 | Pasted custom topic | Deterministic rules based only on explicit prompt wording. | Ask the learner to choose a profile for this writing session. |
 
-No network dependency is introduced. If local storage is unavailable, use B2 for the current page and keep the guide usable; nothing blocks writing or correction. If context rules fail, the confirmation control is the normal degraded path, not an error state.
+No network dependency is introduced. If local storage is unavailable, use B2 for the current page and keep the guide usable; nothing blocks writing or correction. Writing-situation selection is always available for Tâches 1 and 2, so a context-rule failure is not an error state.
 
 ## Implementation boundaries and rollout
 
@@ -135,7 +135,7 @@ The baseline for these metrics is currently unmeasured. Instrument only guide op
 
 **Store every tip in the database and build an editor now** — rejected for v1. It adds moderation, translation, publishing, and preview requirements before there is evidence that the guide is used. Static content is the simpler editable source of truth; an admin editor can follow only if content changes become operationally frequent.
 
-**Ask the learner for the register every time** — rejected. It is accurate but unnecessarily repetitive for curated topics and prompts whose audience is explicit. Deterministic inference plus visible confirmation retains learner control without adding avoidable friction.
+**Automatically apply detected register/context** — rejected. Even an explicit audience can be pedagogically ambiguous, and a learner must understand why they see a formal or informal phrase bank. A single compact writing-situation choice on each fresh Tâche 1/2 guide opening is a deliberate friction that prevents the system from silently steering the response.
 
 ## Recommendation
 
