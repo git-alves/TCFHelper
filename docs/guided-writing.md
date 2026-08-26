@@ -96,7 +96,7 @@ type GuidedWritingContent = Record<
 >;
 ```
 
-Each stage pairs two elements: a compact, no-AI **“What can you say?”** question that helps an empty-page learner generate their own content, and a small French phrase bank that demonstrates an appropriate move without supplying a paragraph. The **Finish** stage adds a visible completion checklist for task coverage, organization, register, and word range; it is not merely a bank of closing formulas. The individual phrase banks differ by level:
+Each stage pairs two elements: a compact, no-AI **“What can you say?”** question that helps an empty-page learner generate their own content, and a small French phrase bank that demonstrates an appropriate move without supplying a paragraph. The **Finish** stage adds a visible completion checklist for task coverage, organization, register, and word range; it is not merely a bank of closing formulas. For Tâche 3, it also gives a conclusion-thinking question and three level-appropriate ways to close the analysis. The individual phrase banks differ by level:
 
 | Target | Calibration |
 | --- | --- |

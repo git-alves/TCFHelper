@@ -55,16 +55,25 @@ describe("GUIDED_WRITING_TIPS", () => {
     }
   });
 
-  it("has a concise idea prompt for every drafting stage in every locale", () => {
+  it("has a concise idea prompt for every guide stage in every locale", () => {
     for (const locale of APP_LOCALES) {
       for (const [taskType, stages] of Object.entries(TASK_GUIDE_STAGES)) {
         for (const stage of stages) {
-          if (stage === "finish") continue;
           const prompts = getGuidedWritingIdeaPrompts(locale, taskType as keyof typeof TASK_GUIDE_STAGES, stage);
-          expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeGreaterThanOrEqual(1);
-          expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeLessThanOrEqual(2);
+          if (stage === "finish" && taskType !== "TASK_3") {
+            expect(prompts, `${locale}/${taskType}/${stage}`).toEqual([]);
+          } else {
+            expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeGreaterThanOrEqual(1);
+            expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeLessThanOrEqual(2);
+          }
         }
       }
+    }
+  });
+
+  it("offers three Task 3 conclusion formulas at every target level", () => {
+    for (const level of TARGET_LEVELS) {
+      expect(getGuidedWritingTips("ARGUMENTATIVE_ANALYSIS", level, "finish")).toHaveLength(3);
     }
   });
 

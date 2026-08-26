@@ -231,6 +231,7 @@ export const GUIDED_WRITING_IDEA_PROMPTS: IdeaPromptContent = {
       synthesize: ["Document 1: what is the main claim and why? Document 2: what is the main claim and why?", "What is their key difference or common concern? Rephrase it in your own words."],
       position: ["Which view do you favour, or how would you qualify both?", "Give one concrete reason or example for your view."],
       nuance: ["What limit, consequence, or opposing view makes your position more balanced?"],
+      finish: ["What final position do your comparison and reason lead to? Restate it without opening a new argument."],
     },
   },
   fr: {
@@ -251,6 +252,7 @@ export const GUIDED_WRITING_IDEA_PROMPTS: IdeaPromptContent = {
       synthesize: ["Document 1 : quelle est l'idée principale et pourquoi ? Document 2 : quelle est l'idée principale et pourquoi ?", "Quelle différence essentielle ou quelle préoccupation commune voyez-vous ? Reformulez avec vos propres mots."],
       position: ["Quelle position privilégiez-vous, ou comment nuanceriez-vous les deux ?", "Donnez une raison ou un exemple concret pour défendre votre avis."],
       nuance: ["Quelle limite, conséquence ou opinion contraire rend votre position plus équilibrée ?"],
+      finish: ["À quelle conclusion votre comparaison et votre raison vous conduisent-elles ? Reformulez-la sans ajouter un nouvel argument."],
     },
   },
   es: {
@@ -271,6 +273,7 @@ export const GUIDED_WRITING_IDEA_PROMPTS: IdeaPromptContent = {
       synthesize: ["Documento 1: ¿cuál es la idea principal y por qué? Documento 2: ¿cuál es la idea principal y por qué?", "¿Cuál es la diferencia esencial o preocupación común? Reformúlala con tus propias palabras."],
       position: ["¿Qué postura prefieres o cómo matizarías las dos?", "Da una razón o ejemplo concreto para defender tu opinión."],
       nuance: ["¿Qué límite, consecuencia u opinión contraria hace tu postura más equilibrada?"],
+      finish: ["¿A qué conclusión te llevan la comparación y tu razón? Reformúlala sin abrir un argumento nuevo."],
     },
   },
   pt: {
@@ -291,6 +294,7 @@ export const GUIDED_WRITING_IDEA_PROMPTS: IdeaPromptContent = {
       synthesize: ["Documento 1: qual é a ideia principal e por quê? Documento 2: qual é a ideia principal e por quê?", "Qual é a diferença essencial ou preocupação comum? Reformule-a com suas próprias palavras."],
       position: ["Que posição você privilegia ou como matizaria as duas?", "Dê uma razão ou exemplo concreto para defender sua opinião."],
       nuance: ["Que limite, consequência ou opinião contrária torna sua posição mais equilibrada?"],
+      finish: ["A que conclusão a comparação e sua razão levam? Reformule-a sem abrir um argumento novo."],
     },
   },
 };
@@ -412,7 +416,7 @@ export const GUIDED_WRITING_TIPS: GuidedWritingContent = {
       ask: ["Tu pourrais peut-être me dire si…", "Ça t'ennuierait de… ?"],
       finish: [
         "Je te remercie par avance pour ton retour.",
-        "Dans l'attente de ta réponse, je te souhaite une excellente journée.",
+        "J'espère avoir de tes nouvelles bientôt.",
       ],
     },
     C2: {
@@ -585,7 +589,11 @@ export const GUIDED_WRITING_TIPS: GuidedWritingContent = {
       ],
       position: TASK3_POSITION_BASE,
       nuance: NUANCE_CONNECTORS.B2,
-      finish: ["En conclusion, je pense que…"],
+      finish: [
+        "En conclusion, je pense que…",
+        "Au final, il me semble préférable de…",
+        "Pour résumer, les deux points de vue sont utiles, mais je préfère…",
+      ],
     },
     C1: {
       start: [
@@ -602,6 +610,8 @@ export const GUIDED_WRITING_TIPS: GuidedWritingContent = {
       nuance: NUANCE_CONNECTORS.C1,
       finish: [
         "En définitive, même si les deux points de vue présentent des arguments pertinents, je considère que…",
+        "La comparaison des deux documents montre ainsi que…",
+        "Il me semble donc essentiel de…",
       ],
     },
     C2: {
@@ -619,6 +629,8 @@ export const GUIDED_WRITING_TIPS: GuidedWritingContent = {
       nuance: NUANCE_CONNECTORS.C2,
       finish: [
         "En définitive, la confrontation de ces deux perspectives montre que la question ne saurait être envisagée de manière binaire. À mon sens,…",
+        "Une réponse équilibrée consisterait dès lors à…",
+        "Il paraît donc préférable de… tout en…",
       ],
     },
   },
