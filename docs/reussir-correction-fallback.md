@@ -1,4 +1,4 @@
-# Réussir correction examples — proposed fallback, pending permission
+# Réussir correction examples — rejected fallback
 
 **Problem** — A learner who requests an example response can be blocked when the AI example generator is unavailable. For recent-exam subjects sourced from Réussir TCF Canada, a corresponding correction page may contain an example response for the exact task and combination.
 
@@ -23,9 +23,9 @@
 
 Do **not** implement in-app retrieval of Réussir correction text now. The publisher’s [terms](https://reussir-tcfcanada.com/mentions-legales-et-cgu/) say that reproducing, distributing, or modifying its content without prior authorisation is prohibited. The correction page also describes its texts as material to generate ideas rather than submissions to use verbatim. See the [August 2026 correction page](https://reussir-tcfcanada.com/aout-2026-correction-expression-ecrite/).
 
-**Approved interim fallback** — A secondary external-link action appears only after an actual AI example-generator/upstream failure for a trusted recent-exam topic: **“View the topic on Réussir”**. It opens the exact `recentTopic.sourceUrl` already returned by the server for that selected subject in a new tab, names Réussir as the source, and keeps the learner’s draft untouched. It is not shown for user quota, cooldown, or rate-limit responses, and it must not claim that Réussir endorses the application.
+A secondary external-link fallback — **“View Réussir’s example response”**, opening the publisher's page in a new tab after an AI example request failed — was implemented and briefly shipped, then explicitly rejected by the product owner. It has been removed; do not reintroduce a Réussir link, in any form, without a new, explicit decision from the product owner.
 
-In-app retrieval is a follow-up only after written permission defines permitted copying, display, caching, attribution, and the treatment of content changes or removal.
+In-app retrieval remains a follow-up only after written permission defines permitted copying, display, caching, attribution, and the treatment of content changes or removal, and only if the product owner separately decides to revisit an external fallback at all.
 
 ## Licensed implementation contract
 
@@ -52,4 +52,4 @@ After rights are obtained and the feature is released, a manual audit of 30 fall
 ## Open questions
 
 - Will Réussir TCF Canada grant a written licence for in-app display and caching of its correction examples, and what attribution or access terms will it require?
-- No decision remains for the external-link fallback: it is approved for trusted recent topics after an actual generator/upstream failure. A licence is still required for any future in-app correction-text display.
+- The external-link fallback question is resolved: rejected. The product remains AI-only for example generation until a new decision is made.
