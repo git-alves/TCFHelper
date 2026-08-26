@@ -708,6 +708,10 @@ export function WritingWorkspace() {
         return;
       }
 
+      // A newly loaded subject must not expose guidance the learner did not
+      // ask to see. The Writing guide remains an explicit, per-subject choice
+      // even when it was open for the topic being replaced.
+      storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "0");
       setRecentTopic(nextTopic);
       setCustomTopic("");
       setTopicMode("recent");

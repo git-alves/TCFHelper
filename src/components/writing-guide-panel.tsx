@@ -72,8 +72,14 @@ export function WritingGuidePanel({
   const isChoosingContextForCurrentTopic =
     isChoosingContext && (topicMode === "recent" || contextChoicePrompt === trimmedCustomTopicPrompt);
   const profile = activeOverride?.profile ?? detected?.profile ?? null;
-  const needsConfirmation = !activeOverride && detected?.confidence === "needs_confirmation";
   const confirmableProfiles = CONFIRMABLE_PROFILES[taskType];
+  // A guide is coaching, not an automatic answer. Tâches 1 and 2 have more
+  // than one valid writing situation, so every fresh opening asks the learner
+  // to choose before it surfaces register- or genre-specific phrase ideas.
+  // Task 3 has one fixed argumentative situation and can begin directly.
+  const needsSituationChoice =
+    confirmableProfiles.length > 1 &&
+    (!activeOverride || isChoosingContextForCurrentTopic);
 
   const stages = TASK_GUIDE_STAGES[taskType];
   const stageIndex = Math.max(0, stages.indexOf(stage));
@@ -85,7 +91,7 @@ export function WritingGuidePanel({
     setStage(stages[clamped]);
   }
 
-  if (!profile) {
+  if (!profile && !needsSituationChoice) {
     return null;
   }
 
@@ -96,7 +102,7 @@ export function WritingGuidePanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-sm font-medium">{gc.guideForLevel({ level })}</h3>
-        {!needsConfirmation && !isChoosingContextForCurrentTopic && (
+        {!needsSituationChoice && profile && (
           <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
             <span>{gc.contextLabel({ profile: GUIDE_PROFILE_LABELS[locale][profile] })}</span>
             {confirmableProfiles.length > 1 && (
@@ -115,7 +121,7 @@ export function WritingGuidePanel({
         )}
       </div>
 
-      {(needsConfirmation || isChoosingContextForCurrentTopic) && confirmableProfiles.length > 1 ? (
+      {needsSituationChoice ? (
         <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
             {gc.contextConfirmHeading} — {gc.contextConfirmPrompt}
@@ -140,7 +146,7 @@ export function WritingGuidePanel({
             ))}
           </div>
         </div>
-      ) : (
+      ) : profile ? (
         <>
           <div className="flex items-center justify-between gap-2">
             <button
@@ -175,7 +181,7 @@ export function WritingGuidePanel({
             morePhrasesLabel={gc.morePhrases}
           />
         </>
-      )}
+      ) : null}
     </div>
   );
 }
