@@ -240,11 +240,15 @@ export interface AppCopy {
       guideForLevel: (values: { level: string }) => string;
       contextConfirmHeading: string;
       contextConfirmPrompt: string;
+      contextConfirmTextTypePrompt: string;
       contextConfirmAction: string;
       changeContext: string;
       contextLabel: (values: { profile: string }) => string;
       previousStage: string;
       nextStage: string;
+      optionalStep: string;
+      ideasLabel: string;
+      completionCheckLabel: string;
       examplesLabel: string;
       morePhrases: string;
     };
@@ -565,11 +569,15 @@ export const APP_COPY = {
         guideForLevel: ({ level }) => `Guide for ${level}`,
         contextConfirmHeading: "Writing situation",
         contextConfirmPrompt: "Who are you writing to?",
+        contextConfirmTextTypePrompt: "What type of text are you writing, and for which readers?",
         contextConfirmAction: "Use this",
         changeContext: "Change",
         contextLabel: ({ profile }) => `Style: ${profile}`,
         previousStage: "Previous step",
         nextStage: "Next step",
+        optionalStep: "Optional",
+        ideasLabel: "What can you say?",
+        completionCheckLabel: "Before you finish",
         // Kept in French like the phrase bank itself (see guided-writing.ts)
         // rather than translated per interface locale -- these are French
         // formulas the learner will use in their French text, regardless of
@@ -1013,11 +1021,15 @@ export const APP_COPY = {
         guideForLevel: ({ level }) => `Guide pour le niveau ${level}`,
         contextConfirmHeading: "Situation d'écriture",
         contextConfirmPrompt: "À qui écrivez-vous ?",
+        contextConfirmTextTypePrompt: "Quel type de texte écrivez-vous, et pour quels lecteurs ?",
         contextConfirmAction: "Utiliser ce choix",
         changeContext: "Changer",
         contextLabel: ({ profile }) => `Style : ${profile}`,
         previousStage: "Étape précédente",
         nextStage: "Étape suivante",
+        optionalStep: "Facultatif",
+        ideasLabel: "Que pouvez-vous dire ?",
+        completionCheckLabel: "Avant de terminer",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
       },
@@ -1463,11 +1475,15 @@ export const APP_COPY = {
         guideForLevel: ({ level }) => `Guía para el nivel ${level}`,
         contextConfirmHeading: "Situación de escritura",
         contextConfirmPrompt: "¿A quién le escribes?",
+        contextConfirmTextTypePrompt: "¿Qué tipo de texto escribes y para qué lectores?",
         contextConfirmAction: "Usar esta opción",
         changeContext: "Cambiar",
         contextLabel: ({ profile }) => `Estilo: ${profile}`,
         previousStage: "Paso anterior",
         nextStage: "Paso siguiente",
+        optionalStep: "Opcional",
+        ideasLabel: "¿Qué puedes decir?",
+        completionCheckLabel: "Antes de terminar",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
       },
@@ -1913,11 +1929,15 @@ export const APP_COPY = {
         guideForLevel: ({ level }) => `Guia para o nível ${level}`,
         contextConfirmHeading: "Situação de escrita",
         contextConfirmPrompt: "Para quem você está escrevendo?",
+        contextConfirmTextTypePrompt: "Que tipo de texto você está escrevendo e para quais leitores?",
         contextConfirmAction: "Usar esta opção",
         changeContext: "Alterar",
         contextLabel: ({ profile }) => `Estilo: ${profile}`,
         previousStage: "Etapa anterior",
         nextStage: "Próxima etapa",
+        optionalStep: "Opcional",
+        ideasLabel: "O que você pode dizer?",
+        completionCheckLabel: "Antes de terminar",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
       },

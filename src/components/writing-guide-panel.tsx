@@ -9,8 +9,11 @@ import {
   TASK_GUIDE_STAGES,
   type GuideStage,
   type TargetLevel,
+  getGuidedWritingCompletionChecks,
+  getGuidedWritingIdeaPrompts,
   getGuidedWritingTips,
   getGuideStageLabel,
+  isOptionalGuideStage,
 } from "@/lib/guided-writing";
 import { classifyWritingContext, type WritingContextClassification } from "@/lib/guided-writing-classifier";
 
@@ -85,6 +88,11 @@ export function WritingGuidePanel({
   const stageIndex = Math.max(0, stages.indexOf(stage));
   const isFirstStage = stageIndex === 0;
   const isLastStage = stageIndex === stages.length - 1;
+  const isOptionalStage = isOptionalGuideStage(taskType, stage);
+  const ideaPrompts = getGuidedWritingIdeaPrompts(locale, taskType, stage);
+  const completionChecks = stage === "finish" ? getGuidedWritingCompletionChecks(locale, taskType) : [];
+  const contextConfirmPrompt =
+    taskType === "TASK_2" ? gc.contextConfirmTextTypePrompt : gc.contextConfirmPrompt;
 
   function goToStage(nextIndex: number) {
     const clamped = Math.min(Math.max(nextIndex, 0), stages.length - 1);
@@ -124,7 +132,7 @@ export function WritingGuidePanel({
       {needsSituationChoice ? (
         <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
           <p className="text-sm text-zinc-600 dark:text-zinc-300">
-            {gc.contextConfirmHeading} — {gc.contextConfirmPrompt}
+            {gc.contextConfirmHeading} — {contextConfirmPrompt}
           </p>
           <div className="flex flex-wrap gap-2">
             {confirmableProfiles.map((candidate) => (
@@ -161,7 +169,7 @@ export function WritingGuidePanel({
             <div className="flex flex-col items-center">
               <span className="text-sm font-medium">{getGuideStageLabel(locale, taskType, stage)}</span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {stageIndex + 1} / {stages.length}
+                {stageIndex + 1} / {stages.length}{isOptionalStage ? ` · ${gc.optionalStep}` : ""}
               </span>
             </div>
             <button
@@ -174,6 +182,8 @@ export function WritingGuidePanel({
               ›
             </button>
           </div>
+          {ideaPrompts.length > 0 && <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />}
+          {completionChecks.length > 0 && <CompletionChecklist checks={completionChecks} label={gc.completionCheckLabel} />}
           <PhraseBank
             key={`${profile}:${level}:${stage}`}
             tips={getGuidedWritingTips(profile, level, stage)}
@@ -182,6 +192,28 @@ export function WritingGuidePanel({
           />
         </>
       ) : null}
+    </div>
+  );
+}
+
+function IdeaPrompts({ prompts, label }: { prompts: readonly string[]; label: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
+      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
+        {prompts.map((prompt) => <li key={prompt}>• {prompt}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function CompletionChecklist({ checks, label }: { checks: readonly string[]; label: string }) {
+  return (
+    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
+      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
+        {checks.map((check) => <li key={check}>□ {check}</li>)}
+      </ul>
     </div>
   );
 }

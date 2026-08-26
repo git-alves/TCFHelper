@@ -21,14 +21,19 @@ function render(taskType: TaskType, profile: GuideProfile) {
 }
 
 describe("WritingGuidePanel", () => {
-  it.each([
-    ["TASK_1", "INFORMAL_PERSONAL_MESSAGE"],
-    ["TASK_2", "PUBLIC_ARTICLE_OR_NOTE"],
-  ] as const)("asks for a writing situation when opening %s", (taskType, profile) => {
-    const markup = render(taskType, profile);
+  it("asks who the learner is writing to when opening Task 1", () => {
+    const markup = render("TASK_1", "INFORMAL_PERSONAL_MESSAGE");
 
     expect(markup).toContain("Writing situation");
     expect(markup).toContain("Who are you writing to?");
+    expect(markup).not.toContain("Formules à adapter à votre sujet");
+  });
+
+  it("asks for a text type and readership when opening Task 2", () => {
+    const markup = render("TASK_2", "PUBLIC_ARTICLE_OR_NOTE");
+
+    expect(markup).toContain("Writing situation");
+    expect(markup).toContain("What type of text are you writing, and for which readers?");
     expect(markup).not.toContain("Formules à adapter à votre sujet");
   });
 

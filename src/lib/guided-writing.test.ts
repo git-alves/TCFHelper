@@ -4,12 +4,16 @@ import {
   GUIDE_PROFILE_LABELS,
   GUIDE_PROFILES,
   GUIDE_STAGE_LABELS,
+  OPTIONAL_GUIDE_STAGES,
   PROFILE_TASK_TYPE,
   TARGET_LEVELS,
   TASK_GUIDE_STAGES,
   forEachGuidedWritingCell,
+  getGuidedWritingCompletionChecks,
+  getGuidedWritingIdeaPrompts,
   getGuidedWritingTips,
   getGuideStagesForProfile,
+  isOptionalGuideStage,
 } from "./guided-writing";
 
 describe("GUIDED_WRITING_TIPS", () => {
@@ -47,6 +51,54 @@ describe("GUIDED_WRITING_TIPS", () => {
           const label = GUIDE_STAGE_LABELS[locale][taskType as keyof typeof TASK_GUIDE_STAGES][stage];
           expect(label?.trim().length, `${locale}/${taskType}/${stage}`).toBeGreaterThan(0);
         }
+      }
+    }
+  });
+
+  it("has a concise idea prompt for every guide stage in every locale", () => {
+    for (const locale of APP_LOCALES) {
+      for (const [taskType, stages] of Object.entries(TASK_GUIDE_STAGES)) {
+        for (const stage of stages) {
+          const prompts = getGuidedWritingIdeaPrompts(locale, taskType as keyof typeof TASK_GUIDE_STAGES, stage);
+          if (stage === "finish" && taskType !== "TASK_3") {
+            expect(prompts, `${locale}/${taskType}/${stage}`).toEqual([]);
+          } else {
+            expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeGreaterThanOrEqual(1);
+            expect(prompts.length, `${locale}/${taskType}/${stage}`).toBeLessThanOrEqual(2);
+          }
+        }
+      }
+    }
+  });
+
+  it("offers three Task 3 conclusion formulas at every target level", () => {
+    for (const level of TARGET_LEVELS) {
+      expect(getGuidedWritingTips("ARGUMENTATIVE_ANALYSIS", level, "finish")).toHaveLength(3);
+    }
+  });
+
+  it("has a completion checklist for every task in every locale", () => {
+    for (const locale of APP_LOCALES) {
+      for (const taskType of Object.keys(TASK_GUIDE_STAGES) as (keyof typeof TASK_GUIDE_STAGES)[]) {
+        expect(getGuidedWritingCompletionChecks(locale, taskType)).toHaveLength(4);
+      }
+    }
+  });
+
+  it("marks only optional writing moves as optional", () => {
+    expect(OPTIONAL_GUIDE_STAGES.TASK_1).toEqual(["ask"]);
+    expect(OPTIONAL_GUIDE_STAGES.TASK_2).toEqual(["nuance"]);
+    expect(OPTIONAL_GUIDE_STAGES.TASK_3).toEqual(["nuance"]);
+    expect(isOptionalGuideStage("TASK_1", "ask")).toBe(true);
+    expect(isOptionalGuideStage("TASK_2", "recount")).toBe(false);
+  });
+
+  it("shows distinct C1 and C2 phrase-bank content before the disclosure", () => {
+    for (const profile of GUIDE_PROFILES) {
+      for (const stage of getGuideStagesForProfile(profile)) {
+        const c1FirstTip = getGuidedWritingTips(profile, "C1", stage)[0];
+        const c2FirstTip = getGuidedWritingTips(profile, "C2", stage)[0];
+        expect(c1FirstTip, `${profile}/${stage}`).not.toBe(c2FirstTip);
       }
     }
   });
