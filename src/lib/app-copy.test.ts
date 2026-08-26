@@ -151,6 +151,8 @@ describe("APP_COPY", () => {
         copy.workspace.editor.exampleUnavailableError,
         copy.workspace.editor.exampleGenericError,
         copy.workspace.editor.exampleNeedsTopicWarning,
+        copy.workspace.editor.reussirExampleFallbackDescription,
+        copy.workspace.editor.reussirExampleFallbackLink,
         copy.workspace.editor.copy,
         copy.workspace.editor.copied,
         copy.workspace.editor.copyFailed,

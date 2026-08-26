@@ -22,6 +22,7 @@ import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { computeTranslationDelta } from "@/lib/translation-delta";
 import type { WritingContextClassification } from "@/lib/guided-writing-classifier";
+import { getReussirExampleFallbackUrl } from "@/lib/reussir-example-fallback";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 
@@ -708,6 +709,10 @@ export function WritingWorkspace() {
         return;
       }
 
+      // A newly loaded subject must not expose guidance the learner did not
+      // ask to see. The Writing guide remains an explicit, per-subject choice
+      // even when it was open for the topic being replaced.
+      storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "0");
       setRecentTopic(nextTopic);
       setCustomTopic("");
       setTopicMode("recent");
@@ -1073,6 +1078,13 @@ export function WritingWorkspace() {
         : visibleTranslationError
           ? copy.workspace.translation.unavailableError
           : null;
+  // Réussir is an external, learner-invoked source fallback, never copied
+  // content. It appears only for actual generator/upstream failures, not for
+  // locally-enforced quota or rate-limit responses.
+  const reussirExampleFallbackUrl = getReussirExampleFallbackUrl(
+    exampleError,
+    topicMode === "recent" ? recentTopic?.sourceUrl : null,
+  );
   // The last translation actually fetched, even once the draft has moved on
   // from it -- translation is on-demand now, not live, so a stale (but
   // still accurate for the text it covers) translation stays visible until
@@ -1458,6 +1470,19 @@ export function WritingWorkspace() {
                   : exampleError === "unavailable"
                     ? copy.workspace.editor.exampleUnavailableError
                     : copy.workspace.editor.exampleGenericError}
+              </p>
+            )}
+            {reussirExampleFallbackUrl && (
+              <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                {copy.workspace.editor.reussirExampleFallbackDescription}{" "}
+                <a
+                  href={reussirExampleFallbackUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {copy.workspace.editor.reussirExampleFallbackLink}
+                </a>
               </p>
             )}
             {exampleNeedsTopic && (
