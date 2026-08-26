@@ -189,8 +189,24 @@ export function WritingGuidePanel({
               ›
             </button>
           </div>
-          {ideaPrompts.length > 0 && <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />}
-          {tenseSuggestions.length > 0 && <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />}
+          {(ideaPrompts.length > 0 || tenseSuggestions.length > 0) && (
+            // Side by side above sm, not stacked: "What can you say?" and
+            // verb tenses are both only ever shown together on the "start"
+            // stage, and stacking two full-width cards there ate more
+            // vertical space than the phrase bank below them needed.
+            <div className="flex flex-col gap-3 sm:flex-row">
+              {ideaPrompts.length > 0 && (
+                <div className="sm:flex-1">
+                  <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />
+                </div>
+              )}
+              {tenseSuggestions.length > 0 && (
+                <div className="sm:flex-1">
+                  <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
+                </div>
+              )}
+            </div>
+          )}
           {completionChecks.length > 0 && <CompletionChecklist checks={completionChecks} label={gc.completionCheckLabel} />}
           <PhraseBank
             key={`${profile}:${level}:${stage}`}
