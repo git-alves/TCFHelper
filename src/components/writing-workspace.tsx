@@ -1323,7 +1323,7 @@ export function WritingWorkspace() {
                 copy={copy}
               />
             )}
-            <label htmlFor="essay-content" className="sr-only">
+            <label htmlFor="essay-content" className="text-sm font-medium">
               {copy.workspace.editor.responseLabel}
             </label>
             <textarea
@@ -1339,7 +1339,7 @@ export function WritingWorkspace() {
               maxLength={20000}
               disabled={isCorrecting || isTopicLoading || isGeneratingExample}
               aria-describedby="word-count"
-              className="min-h-72 w-full rounded-xl border border-black/[.15] bg-transparent px-4 py-3 outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
+              className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
             />
             <div className="flex flex-wrap items-center gap-3">
               <button

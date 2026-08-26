@@ -107,11 +107,14 @@ export function WritingGuidePanel({
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-xl border border-black/[.1] bg-black/[.015] p-4 dark:border-white/[.15] dark:bg-white/[.02]"
+      className="flex flex-col gap-2 rounded-xl border border-black/[.1] bg-black/[.015] p-3 dark:border-white/[.15] dark:bg-white/[.02]"
       aria-label={gc.heading}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-medium">{gc.guideForLevel({ level })}</h3>
+        <h3 className="text-sm font-medium">
+          <span aria-hidden="true">💡 </span>
+          {gc.guideForLevel({ level })}
+        </h3>
         {!needsSituationChoice && profile && (
           <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
             <span>{gc.contextLabel({ profile: GUIDE_PROFILE_LABELS[locale][profile] })}</span>
@@ -190,20 +193,15 @@ export function WritingGuidePanel({
             </button>
           </div>
           {(ideaPrompts.length > 0 || tenseSuggestions.length > 0) && (
-            // Side by side above sm, not stacked: "What can you say?" and
-            // verb tenses are both only ever shown together on the "start"
-            // stage, and stacking two full-width cards there ate more
-            // vertical space than the phrase bank below them needed.
-            <div className="flex flex-col gap-3 sm:flex-row">
-              {ideaPrompts.length > 0 && (
-                <div className="sm:flex-1">
-                  <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />
-                </div>
-              )}
+            // Both stacked full-width as single compact lines rather than
+            // side-by-side cards: now that IdeaPrompts/VerbTenseSuggestions
+            // render as one dot-separated line each (not a boxed multi-row
+            // list), splitting into columns has no space to save and only
+            // gave two independently-wrapping lines less room each.
+            <div className="flex flex-col gap-1">
+              {ideaPrompts.length > 0 && <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />}
               {tenseSuggestions.length > 0 && (
-                <div className="sm:flex-1">
-                  <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
-                </div>
+                <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
               )}
             </div>
           )}
@@ -220,14 +218,21 @@ export function WritingGuidePanel({
   );
 }
 
+// Compact, unboxed inline text (dot-separated, like PhraseBank below) rather
+// than a bulleted list in a shaded card: this section previously ran two
+// full-height cards side by side just to show a couple of short lines, which
+// is what made the "start" stage feel oversized relative to the editor below.
 function IdeaPrompts({ prompts, label }: { prompts: readonly string[]; label: string }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
-      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
-      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
-        {prompts.map((prompt) => <li key={prompt}>• {prompt}</li>)}
-      </ul>
-    </div>
+    <p className="text-sm text-zinc-700 dark:text-zinc-300">
+      <span className="sr-only">{label}: </span>
+      {prompts.map((prompt, index) => (
+        <span key={prompt}>
+          {prompt}
+          {index < prompts.length - 1 ? " · " : ""}
+        </span>
+      ))}
+    </p>
   );
 }
 
@@ -241,17 +246,15 @@ function VerbTenseSuggestions({
   hint: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
-      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
-      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
-        {suggestions.map(({ tense, use }) => (
-          <li key={tense}>
-            <span lang="fr" className="font-medium">{tense}</span> — {use}
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs leading-5 text-zinc-500 dark:text-zinc-400">{hint}</p>
-    </div>
+    <p className="text-sm text-zinc-700 dark:text-zinc-300" title={hint}>
+      <span className="sr-only">{label}: </span>
+      {suggestions.map(({ tense, use }, index) => (
+        <span key={tense}>
+          <span lang="fr" className="font-medium">{tense}</span> — {use}
+          {index < suggestions.length - 1 ? " · " : ""}
+        </span>
+      ))}
+    </p>
   );
 }
 
