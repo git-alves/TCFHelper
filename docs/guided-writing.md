@@ -125,6 +125,8 @@ The release succeeds if, in the first four weeks after launch:
 
 The baseline for these metrics is currently unmeasured. Instrument only guide opened, target selected, context inferred/confirmed/overridden, stage viewed, and session completion; do not collect the learner’s draft text for guide analytics.
 
+**Analytics follow-up** — No guided-writing event collection is included in the first implementation. The metrics above are product targets, not measured release evidence, until privacy-reviewed instrumentation for those aggregate events is approved and delivered. Do not claim the targets have been met before then.
+
 ## Alternatives considered
 
 **Task-only tips** — rejected. They cannot distinguish `Salut [Prénom],` from `Madame, Monsieur,` inside the same Tâche and would teach incorrect register on a material share of prompts.

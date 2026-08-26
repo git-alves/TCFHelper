@@ -1236,6 +1236,27 @@ export function WritingWorkspace() {
                 <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   {copy.workspace.editor.heading}
                 </h2>
+                <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-3 pr-1 dark:border-white/[.2]">
+                  <label htmlFor="target-level" className="text-sm text-zinc-600 dark:text-zinc-300">
+                    {copy.workspace.editor.exampleLevelLabel}
+                  </label>
+                  <select
+                    id="target-level"
+                    value={exampleLevel}
+                    onChange={(e) => {
+                      const level = e.target.value;
+                      if (isExampleLevel(level)) storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level);
+                    }}
+                    disabled={isCorrecting || isTopicLoading || isGeneratingExample}
+                    className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {EXAMPLE_LEVELS.map((level) => (
+                      <option key={level} value={level} className="text-black">
+                        {level}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   type="button"
                   data-walkthrough="guided-writing"
@@ -1339,27 +1360,8 @@ export function WritingWorkspace() {
 
               <div
                 data-walkthrough="example-generate"
-                className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-1 pr-1 dark:border-white/[.2]"
+                className="flex rounded-full border border-black/[.15] p-1 dark:border-white/[.2]"
               >
-                <label htmlFor="example-level" className="sr-only">
-                  {copy.workspace.editor.exampleLevelLabel}
-                </label>
-                <select
-                  id="example-level"
-                  value={exampleLevel}
-                  onChange={(e) => {
-                    const level = e.target.value;
-                    if (isExampleLevel(level)) storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level);
-                  }}
-                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                  className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {EXAMPLE_LEVELS.map((level) => (
-                    <option key={level} value={level} className="text-black">
-                      {level}
-                    </option>
-                  ))}
-                </select>
                 <button
                   type="button"
                   onClick={requestGenerateExample}
