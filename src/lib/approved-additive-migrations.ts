@@ -24,4 +24,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   "20260811090000_add_access_code_created_at_index",
   "20260811100000_add_access_code_expires_at",
   "20260813060000_add_topic_retired_at",
+  // Adds a nullable Topic writing-context profile. Existing topics continue
+  // to use the deterministic guide classifier until they are curated, so the
+  // column is forward compatible with the already-deployed application.
+  "20260826120000_add_topic_guide_context",
 ]);
