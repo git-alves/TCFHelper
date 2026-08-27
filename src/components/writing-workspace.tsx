@@ -147,6 +147,21 @@ function promptWithoutLeadingTitle(title: string, prompt: string): string {
   return prompt.startsWith(prefix) ? prompt.slice(prefix.length) : prompt;
 }
 
+// Grows the custom-topic textarea to fit its content instead of capping it
+// at its `rows` and leaving the rest behind an internal scrollbar -- the
+// learner needs to keep the whole pasted topic visible while writing.
+// Resetting height to "auto" first is required for scrollHeight to shrink
+// back down when text is deleted, not just grow. scrollHeight excludes
+// border width, but this element is border-box (Tailwind's global
+// preflight), so its border must be added back or the box ends up a
+// couple pixels shorter than its own content and still scrolls internally.
+function resizeCustomTopicTextarea(textarea: HTMLTextAreaElement | null) {
+  if (!textarea) return;
+  textarea.style.height = "auto";
+  const { borderTopWidth, borderBottomWidth } = window.getComputedStyle(textarea);
+  textarea.style.height = `${textarea.scrollHeight + parseFloat(borderTopWidth) + parseFloat(borderBottomWidth)}px`;
+}
+
 function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
   const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
   if (!match) return sourceMonth;
@@ -306,7 +321,13 @@ export function WritingWorkspace() {
   const feedbackIsStale = Boolean(feedback && !isCurrentDraftAlreadyCorrected);
 
   useEffect(() => {
-    if (topicMode === "custom") customTopicRef.current?.focus();
+    if (topicMode !== "custom") return;
+    customTopicRef.current?.focus();
+    // A pasted topic prompt can be long, and the learner needs to keep
+    // rereading all of it while writing the response -- growing the field
+    // to fit its content (instead of a fixed height with an internal
+    // scrollbar) means it never gets hidden behind a scroll.
+    resizeCustomTopicTextarea(customTopicRef.current);
   }, [topicMode]);
 
   // A claim from another tab/server expires after a short lease. Keep the
@@ -1245,12 +1266,13 @@ export function WritingWorkspace() {
                     setCustomTopic(e.target.value);
                     if (e.target.value.trim()) setExampleNeedsTopic(false);
                     setHasCorrectionError(false);
+                    resizeCustomTopicTextarea(e.target);
                   }}
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
                   rows={3}
                   maxLength={2000}
                   disabled={isCorrecting || isTopicLoading}
-                  className="w-full rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
+                  className="w-full resize-none overflow-hidden rounded-md border border-black/[.15] bg-transparent px-3 py-2 text-sm outline-none focus:border-black/[.4] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:focus:border-white/[.5]"
                 />
               </div>
             )}
