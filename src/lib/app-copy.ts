@@ -1,5 +1,6 @@
 import type { AppLocale } from "@/lib/app-locale";
 import type { EssayFeedback } from "@/lib/essay-feedback";
+import type { TimedTaskPhaseId } from "@/lib/timed-task";
 
 type FeedbackErrorCategory = EssayFeedback["errors"][number]["errorType"];
 type FeedbackCefrConfidence = EssayFeedback["cefr"]["confidence"];
@@ -257,6 +258,23 @@ export interface AppCopy {
       completionCheckLabel: string;
       examplesLabel: string;
       morePhrases: string;
+    };
+    timedTask: {
+      show: string;
+      heading: string;
+      recommendedPace: (values: { task: string; minutes: number }) => string;
+      setupDescription: string;
+      changeDuration: string;
+      durationLabel: string;
+      start: string;
+      pause: string;
+      resume: string;
+      end: string;
+      remaining: (values: { minutes: string; seconds: string }) => string;
+      timeUp: string;
+      continueForTwoMinutes: string;
+      phaseLabels: Record<TimedTaskPhaseId, string>;
+      phasePrompts: Record<TimedTaskPhaseId, string>;
     };
     translation: {
       heading: (values: LanguageValues) => string;
@@ -597,6 +615,37 @@ export const APP_COPY = {
         // which language the rest of the app's chrome is shown in.
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
+      },
+      timedTask: {
+        show: "Timed task",
+        heading: "Timed task",
+        recommendedPace: ({ task, minutes }) => `${task} practice pace: ${minutes} minutes`,
+        setupDescription: "This is a recommended practice pace, not an official TCF timing rule.",
+        changeDuration: "Change duration",
+        durationLabel: "Practice duration (minutes)",
+        start: "Start timed task",
+        pause: "Pause",
+        resume: "Resume",
+        end: "End",
+        remaining: ({ minutes, seconds }) => `${minutes}:${seconds} remaining`,
+        timeUp: "Time is up — finish or keep writing.",
+        continueForTwoMinutes: "Add 2 minutes",
+        phaseLabels: {
+          plan: "Plan",
+          write: "Write",
+          analyse: "Analyse the documents",
+          synthesise: "Summarise both viewpoints",
+          argue: "State and support your position",
+          check: "Check and finish",
+        },
+        phasePrompts: {
+          plan: "Identify the audience, purpose, and a simple structure before writing.",
+          write: "Cover every requested point and keep your ideas connected.",
+          analyse: "Read both documents and identify the central idea in each.",
+          synthesise: "Present both viewpoints before giving your own opinion.",
+          argue: "Give a clear position with two or three developed arguments.",
+          check: "Check the word range, register, agreements, accents, and verb forms.",
+        },
       },
       translation: {
         heading: ({ language }) => `Translation (${language})`,
@@ -1052,6 +1101,37 @@ export const APP_COPY = {
         completionCheckLabel: "Avant de terminer",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
+      },
+      timedTask: {
+        show: "Tâche chronométrée",
+        heading: "Tâche chronométrée",
+        recommendedPace: ({ task, minutes }) => `Rythme d’entraînement pour ${task} : ${minutes} minutes`,
+        setupDescription: "C’est un rythme d’entraînement conseillé, pas une règle officielle du TCF.",
+        changeDuration: "Modifier la durée",
+        durationLabel: "Durée d’entraînement (minutes)",
+        start: "Démarrer la tâche chronométrée",
+        pause: "Pause",
+        resume: "Reprendre",
+        end: "Terminer",
+        remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
+        timeUp: "Le temps est écoulé : terminez ou continuez à écrire.",
+        continueForTwoMinutes: "Ajouter 2 minutes",
+        phaseLabels: {
+          plan: "Planifier",
+          write: "Rédiger",
+          analyse: "Analyser les documents",
+          synthesise: "Résumer les deux points de vue",
+          argue: "Présenter et défendre votre position",
+          check: "Vérifier et terminer",
+        },
+        phasePrompts: {
+          plan: "Identifiez le destinataire, l’objectif et une structure simple avant d’écrire.",
+          write: "Répondez à chaque point demandé et reliez bien vos idées.",
+          analyse: "Lisez les deux documents et identifiez l’idée centrale de chacun.",
+          synthesise: "Présentez les deux points de vue avant de donner votre avis.",
+          argue: "Exprimez une position claire avec deux ou trois arguments développés.",
+          check: "Vérifiez le nombre de mots, le registre, les accords, les accents et les verbes.",
+        },
       },
       translation: {
         heading: ({ language }) => `Traduction (${language})`,
@@ -1514,6 +1594,37 @@ export const APP_COPY = {
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
       },
+      timedTask: {
+        show: "Tarea cronometrada",
+        heading: "Tarea cronometrada",
+        recommendedPace: ({ task, minutes }) => `Ritmo de práctica para ${task}: ${minutes} minutos`,
+        setupDescription: "Es un ritmo de práctica recomendado, no una regla oficial de tiempo del TCF.",
+        changeDuration: "Cambiar duración",
+        durationLabel: "Duración de práctica (minutos)",
+        start: "Iniciar tarea cronometrada",
+        pause: "Pausar",
+        resume: "Reanudar",
+        end: "Finalizar",
+        remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
+        timeUp: "Se acabó el tiempo: termina o sigue escribiendo.",
+        continueForTwoMinutes: "Añadir 2 minutos",
+        phaseLabels: {
+          plan: "Planificar",
+          write: "Redactar",
+          analyse: "Analizar los documentos",
+          synthesise: "Resumir los dos puntos de vista",
+          argue: "Exponer y respaldar tu postura",
+          check: "Revisar y terminar",
+        },
+        phasePrompts: {
+          plan: "Identifica el destinatario, el propósito y una estructura sencilla antes de escribir.",
+          write: "Responde a todos los puntos solicitados y conecta bien tus ideas.",
+          analyse: "Lee los dos documentos e identifica la idea central de cada uno.",
+          synthesise: "Presenta ambos puntos de vista antes de dar tu opinión.",
+          argue: "Da una postura clara con dos o tres argumentos desarrollados.",
+          check: "Revisa el número de palabras, el registro, las concordancias, los acentos y los verbos.",
+        },
+      },
       translation: {
         heading: ({ language }) => `Traducción (${language})`,
         show: "Mostrar traducción",
@@ -1974,6 +2085,37 @@ export const APP_COPY = {
         completionCheckLabel: "Antes de terminar",
         examplesLabel: "Formules à adapter à votre sujet",
         morePhrases: "Voir plus de formules",
+      },
+      timedTask: {
+        show: "Tarefa cronometrada",
+        heading: "Tarefa cronometrada",
+        recommendedPace: ({ task, minutes }) => `Ritmo de prática para ${task}: ${minutes} minutos`,
+        setupDescription: "Este é um ritmo de prática recomendado, não uma regra oficial de tempo do TCF.",
+        changeDuration: "Alterar duração",
+        durationLabel: "Duração da prática (minutos)",
+        start: "Iniciar tarefa cronometrada",
+        pause: "Pausar",
+        resume: "Retomar",
+        end: "Encerrar",
+        remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
+        timeUp: "O tempo acabou — termine ou continue escrevendo.",
+        continueForTwoMinutes: "Adicionar 2 minutos",
+        phaseLabels: {
+          plan: "Planejar",
+          write: "Escrever",
+          analyse: "Analisar os documentos",
+          synthesise: "Resumir os dois pontos de vista",
+          argue: "Apresentar e defender sua posição",
+          check: "Revisar e terminar",
+        },
+        phasePrompts: {
+          plan: "Identifique o destinatário, o objetivo e uma estrutura simples antes de escrever.",
+          write: "Responda a todos os pontos solicitados e conecte bem suas ideias.",
+          analyse: "Leia os dois documentos e identifique a ideia central de cada um.",
+          synthesise: "Apresente os dois pontos de vista antes de dar sua opinião.",
+          argue: "Apresente uma posição clara com dois ou três argumentos desenvolvidos.",
+          check: "Verifique a quantidade de palavras, o registro, as concordâncias, os acentos e os verbos.",
+        },
       },
       translation: {
         heading: ({ language }) => `Tradução (${language})`,

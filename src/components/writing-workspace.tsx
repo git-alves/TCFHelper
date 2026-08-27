@@ -21,6 +21,11 @@ import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspac
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { computeTranslationDelta } from "@/lib/translation-delta";
+import {
+  TIMED_TASK_PLANS,
+  formatRemainingTime,
+  getTimedTaskPhase,
+} from "@/lib/timed-task";
 import type { WritingContextClassification } from "@/lib/guided-writing-classifier";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
@@ -40,6 +45,18 @@ type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
 type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
+type TimedTaskStatus = "running" | "paused" | "expired";
+interface TimedTaskSession {
+  version: 1;
+  taskType: TaskType;
+  topicKey: string;
+  status: TimedTaskStatus;
+  // An absolute deadline means backgrounded tabs and delayed intervals still
+  // show the true remaining time when the browser wakes up.
+  endsAt: number | null;
+  totalDurationMilliseconds: number;
+  remainingMilliseconds: number;
+}
 // Shared by the example generator and the writing guide -- one "target
 // level" for the whole workspace rather than two adjacent B2/C1/C2 controls
 // with different meanings. See docs/guided-writing.md.
@@ -48,9 +65,12 @@ type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic"
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
+const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
 const WALKTHROUGH_GUIDED_WRITING_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
 const writingPreferenceListeners = new Set<() => void>();
 const inMemoryWritingPreferences = new Map<string, string>();
+let cachedTimedTaskSessionRaw: string | null | undefined;
+let cachedTimedTaskSession: TimedTaskSession | null = null;
 
 function isExampleLevel(value: unknown): value is ExampleLevel {
   return value === "B2" || value === "C1" || value === "C2";
@@ -63,6 +83,43 @@ function getStoredTargetLevel(): ExampleLevel {
 
 function getStoredGuidedWritingOpen(): boolean {
   return readWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY) === "1";
+}
+
+function isTimedTaskSession(value: unknown): value is TimedTaskSession {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    candidate.version === 1 &&
+    (candidate.taskType === "TASK_1" || candidate.taskType === "TASK_2" || candidate.taskType === "TASK_3") &&
+    typeof candidate.topicKey === "string" &&
+    (candidate.status === "running" || candidate.status === "paused" || candidate.status === "expired") &&
+    (typeof candidate.endsAt === "number" || candidate.endsAt === null) &&
+    typeof candidate.totalDurationMilliseconds === "number" &&
+    Number.isFinite(candidate.totalDurationMilliseconds) &&
+    candidate.totalDurationMilliseconds > 0 &&
+    typeof candidate.remainingMilliseconds === "number" &&
+    Number.isFinite(candidate.remainingMilliseconds)
+  );
+}
+
+function getStoredTimedTaskSession(): TimedTaskSession | null {
+  const stored = readWritingPreference(TIMED_TASK_SESSION_STORAGE_KEY);
+  if (stored === cachedTimedTaskSessionRaw) return cachedTimedTaskSession;
+
+  cachedTimedTaskSessionRaw = stored;
+  if (!stored) {
+    cachedTimedTaskSession = null;
+    return null;
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    cachedTimedTaskSession = isTimedTaskSession(parsed) ? parsed : null;
+    return cachedTimedTaskSession;
+  } catch {
+    cachedTimedTaskSession = null;
+    return null;
+  }
 }
 
 function readWritingPreference(key: string): string | null {
@@ -87,6 +144,35 @@ function storeWritingPreference(key: string, value: string): void {
     // settings must not prevent the learner from writing or using the guide.
   }
   writingPreferenceListeners.forEach((listener) => listener());
+}
+
+function clearWritingPreference(key: string): void {
+  inMemoryWritingPreferences.delete(key);
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // Storage is optional; the in-memory state is still cleared.
+  }
+  writingPreferenceListeners.forEach((listener) => listener());
+}
+
+function persistTimedTaskSession(session: TimedTaskSession | null): void {
+  if (session) {
+    storeWritingPreference(TIMED_TASK_SESSION_STORAGE_KEY, JSON.stringify(session));
+  } else {
+    clearWritingPreference(TIMED_TASK_SESSION_STORAGE_KEY);
+  }
+}
+
+function fingerprintTopicPrompt(prompt: string): string {
+  // Keep the persisted timing session tied to an exact custom prompt without
+  // writing the prompt text itself into local storage.
+  let hash = 2_166_136_261;
+  for (let index = 0; index < prompt.length; index += 1) {
+    hash ^= prompt.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function subscribeToWritingPreferences(listener: () => void): () => void {
@@ -204,6 +290,23 @@ export function WritingWorkspace() {
 
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
+  const [isTimedTaskSetupOpen, setIsTimedTaskSetupOpen] = useState(false);
+  const [isTimedTaskDurationEditing, setIsTimedTaskDurationEditing] = useState(false);
+  const [timedTaskDurationMinutes, setTimedTaskDurationMinutes] = useState<number | null>(null);
+  const timedTaskSession = useSyncExternalStore<TimedTaskSession | null>(
+    subscribeToWritingPreferences,
+    getStoredTimedTaskSession,
+    (): TimedTaskSession | null => null,
+  );
+  const [timedTaskNow, setTimedTaskNow] = useState(() => Date.now());
+  const [timedTaskAnnouncement, setTimedTaskAnnouncement] = useState("");
+  const hasAnnouncedTimedTaskFinalCheck = useRef(false);
+  const updateTimedTaskSession = useCallback(
+    (update: (current: TimedTaskSession | null) => TimedTaskSession | null): void => {
+      persistTimedTaskSession(update(getStoredTimedTaskSession()));
+    },
+    [],
+  );
 
   const [isCorrecting, setIsCorrecting] = useState(false);
   // Keep only the failure state, not a localized message captured when the
@@ -300,6 +403,37 @@ export function WritingWorkspace() {
       : topicMode === "custom"
         ? customTopic.trim()
         : "";
+  // Topic changes should end a timed practice run instead of quietly timing
+  // a different prompt. Custom prompts are fingerprinted so their text is
+  // never kept in the persisted session.
+  const timedTaskTopicKey =
+    taskType && activeTopicPrompt
+      ? topicMode === "recent" && recentTopic
+        ? `${taskType}:recent:${recentTopic.id}`
+        : `${taskType}:custom:${fingerprintTopicPrompt(activeTopicPrompt)}`
+      : null;
+  const timedTaskRemainingMilliseconds = timedTaskSession
+    ? Math.max(
+        0,
+        timedTaskSession.status === "running" && timedTaskSession.endsAt !== null
+          ? timedTaskSession.endsAt - timedTaskNow
+          : timedTaskSession.remainingMilliseconds,
+      )
+    : 0;
+  const timedTaskPhase = timedTaskSession
+    ? getTimedTaskPhase(
+        timedTaskSession.taskType,
+        timedTaskRemainingMilliseconds,
+        timedTaskSession.totalDurationMilliseconds,
+      )
+    : null;
+  const timedTaskTime = formatRemainingTime(timedTaskRemainingMilliseconds);
+  const timedTaskElapsedMilliseconds = timedTaskSession
+    ? Math.min(
+        timedTaskSession.totalDurationMilliseconds,
+        Math.max(0, timedTaskSession.totalDurationMilliseconds - timedTaskRemainingMilliseconds),
+      )
+    : 0;
   const correctionRequestKey = getCorrectionRequestKey({
     taskType,
     topic:
@@ -329,6 +463,59 @@ export function WritingWorkspace() {
     // scrollbar) means it never gets hidden behind a scroll.
     resizeCustomTopicTextarea(customTopicRef.current);
   }, [topicMode]);
+
+  useEffect(() => {
+    // A reload begins with no task/topic selected. Keep a stored timer until
+    // the learner returns to its matching prompt; a real topic switch or a
+    // draft reset clears it through resetDraftAndFeedback instead.
+    if (!timedTaskSession || !timedTaskTopicKey || timedTaskSession.topicKey === timedTaskTopicKey) return;
+
+    persistTimedTaskSession(null);
+    hasAnnouncedTimedTaskFinalCheck.current = false;
+  }, [timedTaskSession, timedTaskTopicKey]);
+
+  useEffect(() => {
+    if (timedTaskSession?.status !== "running" || timedTaskSession.endsAt === null) return;
+
+    const updateClock = () => setTimedTaskNow(Date.now());
+    updateClock();
+    const interval = window.setInterval(updateClock, 1_000);
+    return () => window.clearInterval(interval);
+  }, [timedTaskSession?.endsAt, timedTaskSession?.status]);
+
+  useEffect(() => {
+    if (
+      timedTaskSession?.status !== "running" ||
+      timedTaskSession.endsAt === null ||
+      timedTaskSession.endsAt > timedTaskNow
+    ) {
+      return;
+    }
+
+    updateTimedTaskSession((current) =>
+      current?.status === "running" && current.endsAt !== null && current.endsAt <= timedTaskNow
+        ? { ...current, status: "expired", endsAt: null, remainingMilliseconds: 0 }
+        : current,
+    );
+    window.setTimeout(() => setTimedTaskAnnouncement(copy.workspace.timedTask.timeUp), 0);
+  }, [copy.workspace.timedTask.timeUp, timedTaskNow, timedTaskSession?.endsAt, timedTaskSession?.status, updateTimedTaskSession]);
+
+  useEffect(() => {
+    if (
+      timedTaskSession?.status !== "running" ||
+      !timedTaskPhase ||
+      timedTaskRemainingMilliseconds === 0 ||
+      timedTaskRemainingMilliseconds > 2 * 60_000 ||
+      hasAnnouncedTimedTaskFinalCheck.current
+    ) {
+      return;
+    }
+
+    hasAnnouncedTimedTaskFinalCheck.current = true;
+    setTimedTaskAnnouncement(
+      `${copy.workspace.timedTask.phaseLabels[timedTaskPhase.id]}. ${copy.workspace.timedTask.phasePrompts[timedTaskPhase.id]}`,
+    );
+  }, [copy.workspace.timedTask, timedTaskPhase, timedTaskRemainingMilliseconds, timedTaskSession?.status]);
 
   // A claim from another tab/server expires after a short lease. Keep the
   // block tied to that exact correction key until then: changing and reverting
@@ -523,6 +710,14 @@ export function WritingWorkspace() {
   }
 
   function resetDraftAndFeedback() {
+    // Clearing a draft or loading/replacing a subject must not leave a timer
+    // running invisibly against work the learner has intentionally reset.
+    persistTimedTaskSession(null);
+    setIsTimedTaskSetupOpen(false);
+    setIsTimedTaskDurationEditing(false);
+    setTimedTaskDurationMinutes(null);
+    setTimedTaskAnnouncement("");
+    hasAnnouncedTimedTaskFinalCheck.current = false;
     setContent("");
     setFeedback(null);
     setFeedbackLocale(null);
@@ -544,6 +739,75 @@ export function WritingWorkspace() {
     setTranslationFor(null);
     setTranslationError(null);
     setTranslationErrorFor(null);
+  }
+
+  function startTimedTask() {
+    if (!taskType || !timedTaskTopicKey) return;
+
+    const recommendedMinutes = TIMED_TASK_PLANS[taskType].totalMinutes;
+    const totalDurationMilliseconds = Math.max(1, timedTaskDurationMinutes ?? recommendedMinutes) * 60_000;
+    const remainingMilliseconds = totalDurationMilliseconds;
+    setTimedTaskNow(Date.now());
+    persistTimedTaskSession({
+      version: 1,
+      taskType,
+      topicKey: timedTaskTopicKey,
+      status: "running",
+      endsAt: Date.now() + remainingMilliseconds,
+      totalDurationMilliseconds,
+      remainingMilliseconds,
+    });
+    setIsTimedTaskSetupOpen(false);
+    hasAnnouncedTimedTaskFinalCheck.current = false;
+    const firstPhase = TIMED_TASK_PLANS[taskType].phases[0];
+    setTimedTaskAnnouncement(
+      `${copy.workspace.timedTask.start}. ${copy.workspace.timedTask.phaseLabels[firstPhase.id]}. ${copy.workspace.timedTask.phasePrompts[firstPhase.id]}`,
+    );
+  }
+
+  function pauseTimedTask() {
+    updateTimedTaskSession((current) => {
+      if (current?.status !== "running" || current.endsAt === null) return current;
+
+      const remainingMilliseconds = Math.max(0, current.endsAt - Date.now());
+      if (remainingMilliseconds === 0) {
+        setTimedTaskAnnouncement(copy.workspace.timedTask.timeUp);
+        return { ...current, status: "expired", endsAt: null, remainingMilliseconds: 0 };
+      }
+
+      setTimedTaskAnnouncement(copy.workspace.timedTask.pause);
+      return { ...current, status: "paused", endsAt: null, remainingMilliseconds };
+    });
+  }
+
+  function resumeTimedTask() {
+    updateTimedTaskSession((current) => {
+      if (current?.status !== "paused") return current;
+
+      setTimedTaskNow(Date.now());
+      setTimedTaskAnnouncement(copy.workspace.timedTask.resume);
+      return { ...current, status: "running", endsAt: Date.now() + current.remainingMilliseconds };
+    });
+  }
+
+  function endTimedTask() {
+    persistTimedTaskSession(null);
+    setIsTimedTaskSetupOpen(false);
+    setIsTimedTaskDurationEditing(false);
+    setTimedTaskDurationMinutes(null);
+    setTimedTaskAnnouncement("");
+    hasAnnouncedTimedTaskFinalCheck.current = false;
+  }
+
+  function addTimedTaskMinutes() {
+    const remainingMilliseconds = 2 * 60_000;
+    setTimedTaskNow(Date.now());
+    updateTimedTaskSession((current) =>
+      current?.status === "expired"
+        ? { ...current, status: "running", endsAt: Date.now() + remainingMilliseconds, remainingMilliseconds }
+        : current,
+    );
+    hasAnnouncedTimedTaskFinalCheck.current = false;
   }
 
   function cancelPendingRecentTopicRequest() {
@@ -1317,21 +1581,108 @@ export function WritingWorkspace() {
                 >
                   {isGuidedWritingOpen ? copy.workspace.guidedWriting.hide : copy.workspace.guidedWriting.show}
                 </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    data-walkthrough="timed-task"
+                    onClick={() => setIsTimedTaskSetupOpen((open) => !open)}
+                    disabled={!activeTopicPrompt || Boolean(timedTaskSession)}
+                    aria-expanded={isTimedTaskSetupOpen}
+                    aria-controls="timed-task-setup"
+                    className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                  >
+                    <span aria-hidden="true">⏱ </span>
+                    {copy.workspace.timedTask.show}
+                  </button>
+                  {isTimedTaskSetupOpen && taskType && task && !timedTaskSession && (
+                    <div
+                      id="timed-task-setup"
+                      role="region"
+                      aria-label={copy.workspace.timedTask.heading}
+                      className="absolute left-0 z-20 mt-2 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3 rounded-xl border border-black/[.15] bg-background p-4 shadow-lg dark:border-white/[.2]"
+                    >
+                      <div>
+                        <h3 className="text-sm font-medium">
+                          {copy.workspace.timedTask.recommendedPace({
+                            task: task.label,
+                            minutes: timedTaskDurationMinutes ?? TIMED_TASK_PLANS[taskType].totalMinutes,
+                          })}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-300">
+                          {copy.workspace.timedTask.setupDescription}
+                        </p>
+                      </div>
+                      <ol className="flex flex-col gap-2 text-sm">
+                        {TIMED_TASK_PLANS[taskType].phases.map((phase) => (
+                          <li key={phase.id} className="flex gap-2">
+                            <span className="shrink-0 font-medium">
+                              {copy.workspace.timedTask.phaseLabels[phase.id]} · {phase.durationMilliseconds / 60_000} min
+                            </span>
+                            <span className="text-zinc-600 dark:text-zinc-300">
+                              {copy.workspace.timedTask.phasePrompts[phase.id]}
+                            </span>
+                          </li>
+                        ))}
+                      </ol>
+                      {isTimedTaskDurationEditing ? (
+                        <label className="flex items-center gap-2 text-sm">
+                          <span>{copy.workspace.timedTask.durationLabel}</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={180}
+                            value={timedTaskDurationMinutes ?? TIMED_TASK_PLANS[taskType].totalMinutes}
+                            onChange={(event) => {
+                              const nextMinutes = event.currentTarget.valueAsNumber;
+                              setTimedTaskDurationMinutes(
+                                Number.isFinite(nextMinutes) ? Math.min(Math.max(Math.round(nextMinutes), 1), 180) : null,
+                              );
+                            }}
+                            className="w-16 rounded-md border border-black/[.2] bg-transparent px-2 py-1 text-right outline-none focus:border-violet-600 dark:border-white/[.25] dark:focus:border-violet-400"
+                          />
+                        </label>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsTimedTaskDurationEditing(true)}
+                          className="self-start text-sm underline underline-offset-2 hover:text-foreground"
+                        >
+                          {copy.workspace.timedTask.changeDuration}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={startTimedTask}
+                        className="self-start rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+                      >
+                        {copy.workspace.timedTask.start}
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-              <span
-                id="word-count"
-                className={`shrink-0 text-sm ${
-                  wordCountInRange
-                    ? "text-zinc-500 dark:text-zinc-400"
-                    : "text-amber-600 dark:text-amber-400"
-                }`}
-              >
-                {copy.workspace.editor.wordCount({
-                  count: wordCount,
-                  minWords: task.minWords,
-                  maxWords: task.maxWords,
-                })}
-              </span>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <span
+                  id="word-count"
+                  className={`shrink-0 text-sm ${
+                    wordCountInRange
+                      ? "text-zinc-500 dark:text-zinc-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  }`}
+                >
+                  {copy.workspace.editor.wordCount({
+                    count: wordCount,
+                    minWords: task.minWords,
+                    maxWords: task.maxWords,
+                  })}
+                </span>
+                {timedTaskSession && timedTaskPhase && (
+                  <span className="rounded-full border border-violet-500/30 px-2 py-1 font-mono text-sm font-semibold tabular-nums dark:border-violet-400/35">
+                    <span className="sr-only">{copy.workspace.timedTask.phaseLabels[timedTaskPhase.id]}: </span>
+                    ⏱ {timedTaskTime.minutes}:{timedTaskTime.seconds}
+                  </span>
+                )}
+              </div>
             </div>
             {isGuidedWritingOpen && taskType && (topicMode === "recent" || topicMode === "custom") && activeTopicPrompt && (
               <WritingGuidePanel
@@ -1344,6 +1695,83 @@ export function WritingWorkspace() {
                 locale={locale}
                 copy={copy}
               />
+            )}
+            {timedTaskSession && timedTaskPhase && (
+              <div
+                className="sticky top-2 z-10 flex flex-col gap-2 rounded-xl border border-violet-500/30 bg-background/95 p-3 shadow-sm backdrop-blur dark:border-violet-400/35"
+                aria-label={copy.workspace.timedTask.heading}
+              >
+                <p className="sr-only" aria-live="polite" aria-atomic="true">
+                  {timedTaskAnnouncement}
+                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      <span aria-hidden="true">⏱ </span>
+                      {copy.workspace.timedTask.heading} · {copy.workspace.timedTask.phaseLabels[timedTaskPhase.id]}
+                    </p>
+                    <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                      {timedTaskSession.status === "expired"
+                        ? copy.workspace.timedTask.timeUp
+                        : copy.workspace.timedTask.phasePrompts[timedTaskPhase.id]}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <time className="font-mono text-lg font-semibold tabular-nums" aria-live="off">
+                      {copy.workspace.timedTask.remaining(timedTaskTime)}
+                    </time>
+                    {timedTaskSession.status === "running" ? (
+                      <button
+                        type="button"
+                        onClick={pauseTimedTask}
+                        className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                      >
+                        {copy.workspace.timedTask.pause}
+                      </button>
+                    ) : timedTaskSession.status === "paused" ? (
+                      <button
+                        type="button"
+                        onClick={resumeTimedTask}
+                        className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                      >
+                        {copy.workspace.timedTask.resume}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={addTimedTaskMinutes}
+                        className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                      >
+                        {copy.workspace.timedTask.continueForTwoMinutes}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={endTimedTask}
+                      className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                    >
+                      {copy.workspace.timedTask.end}
+                    </button>
+                  </div>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label={copy.workspace.timedTask.heading}
+                  aria-valuemin={0}
+                  aria-valuemax={timedTaskSession.totalDurationMilliseconds / 1_000}
+                  aria-valuenow={Math.round(timedTaskElapsedMilliseconds / 1_000)}
+                  className="h-1 overflow-hidden rounded-full bg-violet-500/15 dark:bg-violet-400/15"
+                >
+                  <div
+                    className="h-full bg-violet-600 transition-[width] duration-1000 dark:bg-violet-400"
+                    style={{
+                      width: `${Math.round(
+                        (timedTaskElapsedMilliseconds / timedTaskSession.totalDurationMilliseconds) * 100,
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
             )}
             <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
