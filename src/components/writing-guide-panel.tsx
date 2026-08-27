@@ -208,18 +208,12 @@ export function WritingGuidePanel({
               ›
             </button>
           </div>
-          {(ideaPrompts.length > 0 || tenseSuggestions.length > 0) && (
-            // Both stacked full-width as single compact lines rather than
-            // side-by-side cards: now that IdeaPrompts/VerbTenseSuggestions
-            // render as one dot-separated line each (not a boxed multi-row
-            // list), splitting into columns has no space to save and only
-            // gave two independently-wrapping lines less room each.
-            <div className="flex flex-col gap-1">
-              {ideaPrompts.length > 0 && <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />}
-              {tenseSuggestions.length > 0 && (
-                <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
-              )}
-            </div>
+          {ideaPrompts.length > 0 && (
+            // The "start" stage's verb tense suggestions were already shown
+            // once in the intro before this full guide appeared (see the
+            // !introAdvanced branch below) -- repeating them here on arrival
+            // would just duplicate what the learner already read.
+            <IdeaPrompts prompts={ideaPrompts} label={gc.ideasLabel} />
           )}
           {completionChecks.length > 0 && <CompletionChecklist checks={completionChecks} label={gc.completionCheckLabel} />}
           <PhraseBank
@@ -262,15 +256,17 @@ function VerbTenseSuggestions({
   hint: string;
 }) {
   return (
-    <p className="text-sm text-zinc-700 dark:text-zinc-300" title={hint}>
-      <span className="sr-only">{label}: </span>
-      {suggestions.map(({ tense, use }, index) => (
-        <span key={tense}>
-          <span lang="fr" className="font-medium">{tense}</span> — {use}
-          {index < suggestions.length - 1 ? " · " : ""}
-        </span>
-      ))}
-    </p>
+    <div className="flex flex-col gap-1" title={hint}>
+      <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
+      <p className="text-sm text-zinc-700 dark:text-zinc-300">
+        {suggestions.map(({ tense, use }, index) => (
+          <span key={tense}>
+            <span lang="fr" className="font-medium">{tense}</span> — {use}
+            {index < suggestions.length - 1 ? " · " : ""}
+          </span>
+        ))}
+      </p>
+    </div>
   );
 }
 
