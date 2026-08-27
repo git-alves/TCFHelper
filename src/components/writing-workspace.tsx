@@ -1323,7 +1323,7 @@ export function WritingWorkspace() {
                 copy={copy}
               />
             )}
-            <label htmlFor="essay-content" className="text-sm font-medium">
+            <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
             </label>
             <textarea
