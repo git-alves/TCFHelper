@@ -74,6 +74,24 @@ export function getTimedTaskPhase(
   return plan.phases.at(-1)!;
 }
 
+export function getReachedTimedTaskPhases(
+  taskType: TaskType,
+  elapsedMilliseconds: number,
+  totalDurationMilliseconds = getTimedTaskTotalMilliseconds(taskType),
+): readonly TimedTaskPhase[] {
+  const plan = TIMED_TASK_PLANS[taskType];
+  const defaultDuration = getTimedTaskTotalMilliseconds(taskType);
+  const totalDuration = Math.max(1, totalDurationMilliseconds);
+  const elapsed = Math.min(totalDuration, Math.max(0, elapsedMilliseconds));
+  let phaseStart = 0;
+
+  return plan.phases.filter((phase) => {
+    const reached = elapsed >= phaseStart;
+    phaseStart += (phase.durationMilliseconds / defaultDuration) * totalDuration;
+    return reached;
+  });
+}
+
 export function formatRemainingTime(remainingMilliseconds: number): { minutes: string; seconds: string } {
   const totalSeconds = Math.ceil(Math.max(0, remainingMilliseconds) / 1_000);
   return {

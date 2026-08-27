@@ -43,6 +43,9 @@ interface WritingGuidePanelProps {
   level: TargetLevel;
   locale: AppLocale;
   copy: AppCopy;
+  // Informative only: timing must never move the learner through guide stages
+  // or imply that a guide step is compulsory.
+  timedTaskCue?: { label: string; prompt: string } | null;
 }
 
 export function WritingGuidePanel({
@@ -53,6 +56,7 @@ export function WritingGuidePanel({
   level,
   locale,
   copy,
+  timedTaskCue = null,
 }: WritingGuidePanelProps) {
   // Every task's sequence starts at "start", so this stays valid across a
   // task switch even though the rest of the sequence (and its length)
@@ -141,6 +145,13 @@ export function WritingGuidePanel({
           </div>
         )}
       </div>
+
+      {timedTaskCue && (
+        <div className="rounded-lg border border-violet-500/25 bg-violet-500/[.06] px-3 py-2 text-sm dark:border-violet-400/30 dark:bg-violet-400/[.1]">
+          <span className="font-medium">⏱ {timedTaskCue.label}</span>
+          <span className="text-zinc-700 dark:text-zinc-200"> — {timedTaskCue.prompt}</span>
+        </div>
+      )}
 
       {needsSituationChoice ? (
         <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>

@@ -50,6 +50,8 @@ The strip includes a subtle progress bar, an accessible text equivalent, and a l
 
 At a phase boundary, update the text in the strip—for example, `Check · 02:00 remaining`—and make one polite, optional announcement. No audio alarm is enabled by default. At zero, show `Time is up — finish or keep writing`, with `Add 2 minutes` and `End timed task`; the editor remains fully usable.
 
+When the learner explicitly ends timed practice, replace the strip with a small, in-context summary of time spent, target time, current word count, and the phases reached. This summary is ephemeral: closing it or changing task removes it, and it is never added to progress history in this release.
+
 ### Recommended plan
 
 | Mode | Total | Phase prompts |
@@ -59,7 +61,7 @@ At a phase boundary, update the text in the strip—for example, `Check · 02:00
 | Tâche 3 | 23 min | Analyse 5 min: identify each document's central idea. Synthesize 5 min: present both viewpoints without your opinion. Argue 11 min: give a clear position with two or three developed arguments. Check 2 min: reach 120–180 words and review balance, cohesion, and accuracy. |
 | Future full simulation | 60 min | Tâche 1 12 min + Tâche 2 20 min + Tâche 3 23 min + 5 min final review across all responses. |
 
-The task's existing Writing guide remains available during timing practice. Its stage tips and the timer phase can be related but neither should automatically move the other: a learner may need more planning time, and the guide must not turn the countdown into a rigid script.
+The task's existing Writing guide remains available during timing practice. Its stage tips and the timer phase can be related through a subtle current-phase cue, but neither should automatically move the other: a learner may need more planning time, and the guide must not turn the countdown into a rigid script.
 
 ### State, reliability, and accessibility
 

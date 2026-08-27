@@ -273,6 +273,13 @@ export interface AppCopy {
       remaining: (values: { minutes: string; seconds: string }) => string;
       timeUp: string;
       continueForTwoMinutes: string;
+      summaryHeading: string;
+      summaryActualTime: (values: { time: string }) => string;
+      summaryTargetTime: (values: { time: string }) => string;
+      summaryWordCount: (values: { count: number }) => string;
+      summaryPhaseReached: string;
+      summaryPhaseNotReached: string;
+      summaryClose: string;
       phaseLabels: Record<TimedTaskPhaseId, string>;
       phasePrompts: Record<TimedTaskPhaseId, string>;
     };
@@ -630,6 +637,13 @@ export const APP_COPY = {
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} remaining`,
         timeUp: "Time is up — finish or keep writing.",
         continueForTwoMinutes: "Add 2 minutes",
+        summaryHeading: "Timed task summary",
+        summaryActualTime: ({ time }) => `Time spent: ${time}`,
+        summaryTargetTime: ({ time }) => `Target time: ${time}`,
+        summaryWordCount: ({ count }) => `Words: ${count}`,
+        summaryPhaseReached: "Reached",
+        summaryPhaseNotReached: "Not reached",
+        summaryClose: "Close summary",
         phaseLabels: {
           plan: "Plan",
           write: "Write",
@@ -1116,6 +1130,13 @@ export const APP_COPY = {
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
         timeUp: "Le temps est écoulé : terminez ou continuez à écrire.",
         continueForTwoMinutes: "Ajouter 2 minutes",
+        summaryHeading: "Bilan de la tâche chronométrée",
+        summaryActualTime: ({ time }) => `Temps passé : ${time}`,
+        summaryTargetTime: ({ time }) => `Temps prévu : ${time}`,
+        summaryWordCount: ({ count }) => `Mots : ${count}`,
+        summaryPhaseReached: "Atteinte",
+        summaryPhaseNotReached: "Non atteinte",
+        summaryClose: "Fermer le bilan",
         phaseLabels: {
           plan: "Planifier",
           write: "Rédiger",
@@ -1608,6 +1629,13 @@ export const APP_COPY = {
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
         timeUp: "Se acabó el tiempo: termina o sigue escribiendo.",
         continueForTwoMinutes: "Añadir 2 minutos",
+        summaryHeading: "Resumen de la tarea cronometrada",
+        summaryActualTime: ({ time }) => `Tiempo empleado: ${time}`,
+        summaryTargetTime: ({ time }) => `Tiempo objetivo: ${time}`,
+        summaryWordCount: ({ count }) => `Palabras: ${count}`,
+        summaryPhaseReached: "Completada",
+        summaryPhaseNotReached: "No completada",
+        summaryClose: "Cerrar resumen",
         phaseLabels: {
           plan: "Planificar",
           write: "Redactar",
@@ -2100,6 +2128,13 @@ export const APP_COPY = {
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
         timeUp: "O tempo acabou — termine ou continue escrevendo.",
         continueForTwoMinutes: "Adicionar 2 minutos",
+        summaryHeading: "Resumo da tarefa cronometrada",
+        summaryActualTime: ({ time }) => `Tempo gasto: ${time}`,
+        summaryTargetTime: ({ time }) => `Tempo previsto: ${time}`,
+        summaryWordCount: ({ count }) => `Palavras: ${count}`,
+        summaryPhaseReached: "Concluída",
+        summaryPhaseNotReached: "Não concluída",
+        summaryClose: "Fechar resumo",
         phaseLabels: {
           plan: "Planejar",
           write: "Escrever",

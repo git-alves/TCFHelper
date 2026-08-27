@@ -4,6 +4,7 @@ import {
   FULL_EXAM_TOTAL_MINUTES,
   TIMED_TASK_PLANS,
   formatRemainingTime,
+  getReachedTimedTaskPhases,
   getTimedTaskPhase,
   getTimedTaskTotalMilliseconds,
 } from "./timed-task";
@@ -39,6 +40,17 @@ describe("TIMED_TASK_PLANS", () => {
     // the first 50 seconds of a five-minute custom session.
     expect(getTimedTaskPhase("TASK_1", 250_001, 5 * 60_000).id).toBe("plan");
     expect(getTimedTaskPhase("TASK_1", 250_000, 5 * 60_000).id).toBe("write");
+  });
+
+  it("reports only the phases reached when a learner ends early", () => {
+    expect(getReachedTimedTaskPhases("TASK_1", 0).map((phase) => phase.id)).toEqual(["plan"]);
+    expect(getReachedTimedTaskPhases("TASK_1", 2 * 60_000).map((phase) => phase.id)).toEqual(["plan", "write"]);
+    expect(getReachedTimedTaskPhases("TASK_3", 23 * 60_000).map((phase) => phase.id)).toEqual([
+      "analyse",
+      "synthesise",
+      "argue",
+      "check",
+    ]);
   });
 
   it("formats a non-negative minute-and-second countdown", () => {

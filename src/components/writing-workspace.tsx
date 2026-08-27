@@ -24,7 +24,9 @@ import { computeTranslationDelta } from "@/lib/translation-delta";
 import {
   TIMED_TASK_PLANS,
   formatRemainingTime,
+  getReachedTimedTaskPhases,
   getTimedTaskPhase,
+  type TimedTaskPhaseId,
 } from "@/lib/timed-task";
 import type { WritingContextClassification } from "@/lib/guided-writing-classifier";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
@@ -56,6 +58,14 @@ interface TimedTaskSession {
   endsAt: number | null;
   totalDurationMilliseconds: number;
   remainingMilliseconds: number;
+  extraTimeAddedMilliseconds: number;
+}
+interface TimedTaskSummary {
+  taskType: TaskType;
+  targetDurationMilliseconds: number;
+  elapsedMilliseconds: number;
+  wordCount: number;
+  reachedPhaseIds: readonly TimedTaskPhaseId[];
 }
 // Shared by the example generator and the writing guide -- one "target
 // level" for the whole workspace rather than two adjacent B2/C1/C2 controls
@@ -98,7 +108,10 @@ function isTimedTaskSession(value: unknown): value is TimedTaskSession {
     Number.isFinite(candidate.totalDurationMilliseconds) &&
     candidate.totalDurationMilliseconds > 0 &&
     typeof candidate.remainingMilliseconds === "number" &&
-    Number.isFinite(candidate.remainingMilliseconds)
+    Number.isFinite(candidate.remainingMilliseconds) &&
+    typeof candidate.extraTimeAddedMilliseconds === "number" &&
+    Number.isFinite(candidate.extraTimeAddedMilliseconds) &&
+    candidate.extraTimeAddedMilliseconds >= 0
   );
 }
 
@@ -293,6 +306,7 @@ export function WritingWorkspace() {
   const [isTimedTaskSetupOpen, setIsTimedTaskSetupOpen] = useState(false);
   const [isTimedTaskDurationEditing, setIsTimedTaskDurationEditing] = useState(false);
   const [timedTaskDurationMinutes, setTimedTaskDurationMinutes] = useState<number | null>(null);
+  const [timedTaskSummary, setTimedTaskSummary] = useState<TimedTaskSummary | null>(null);
   const timedTaskSession = useSyncExternalStore<TimedTaskSession | null>(
     subscribeToWritingPreferences,
     getStoredTimedTaskSession,
@@ -434,6 +448,12 @@ export function WritingWorkspace() {
         Math.max(0, timedTaskSession.totalDurationMilliseconds - timedTaskRemainingMilliseconds),
       )
     : 0;
+  const timedTaskSummaryElapsedTime = timedTaskSummary
+    ? formatRemainingTime(timedTaskSummary.elapsedMilliseconds)
+    : null;
+  const timedTaskSummaryTargetTime = timedTaskSummary
+    ? formatRemainingTime(timedTaskSummary.targetDurationMilliseconds)
+    : null;
   const correctionRequestKey = getCorrectionRequestKey({
     taskType,
     topic:
@@ -716,6 +736,7 @@ export function WritingWorkspace() {
     setIsTimedTaskSetupOpen(false);
     setIsTimedTaskDurationEditing(false);
     setTimedTaskDurationMinutes(null);
+    setTimedTaskSummary(null);
     setTimedTaskAnnouncement("");
     hasAnnouncedTimedTaskFinalCheck.current = false;
     setContent("");
@@ -756,8 +777,10 @@ export function WritingWorkspace() {
       endsAt: Date.now() + remainingMilliseconds,
       totalDurationMilliseconds,
       remainingMilliseconds,
+      extraTimeAddedMilliseconds: 0,
     });
     setIsTimedTaskSetupOpen(false);
+    setTimedTaskSummary(null);
     hasAnnouncedTimedTaskFinalCheck.current = false;
     const firstPhase = TIMED_TASK_PLANS[taskType].phases[0];
     setTimedTaskAnnouncement(
@@ -791,6 +814,33 @@ export function WritingWorkspace() {
   }
 
   function endTimedTask() {
+    const current = getStoredTimedTaskSession();
+    if (current) {
+      const remainingMilliseconds = Math.max(
+        0,
+        current.status === "running" && current.endsAt !== null
+          ? current.endsAt - Date.now()
+          : current.remainingMilliseconds,
+      );
+      const elapsedMilliseconds =
+        Math.min(
+          current.totalDurationMilliseconds,
+          Math.max(0, current.totalDurationMilliseconds - remainingMilliseconds),
+        ) + current.extraTimeAddedMilliseconds;
+      const reachedPhaseIds = getReachedTimedTaskPhases(
+        current.taskType,
+        current.totalDurationMilliseconds - remainingMilliseconds,
+        current.totalDurationMilliseconds,
+      ).map((phase) => phase.id);
+
+      setTimedTaskSummary({
+        taskType: current.taskType,
+        targetDurationMilliseconds: current.totalDurationMilliseconds,
+        elapsedMilliseconds,
+        wordCount,
+        reachedPhaseIds,
+      });
+    }
     persistTimedTaskSession(null);
     setIsTimedTaskSetupOpen(false);
     setIsTimedTaskDurationEditing(false);
@@ -804,7 +854,13 @@ export function WritingWorkspace() {
     setTimedTaskNow(Date.now());
     updateTimedTaskSession((current) =>
       current?.status === "expired"
-        ? { ...current, status: "running", endsAt: Date.now() + remainingMilliseconds, remainingMilliseconds }
+        ? {
+            ...current,
+            status: "running",
+            endsAt: Date.now() + remainingMilliseconds,
+            remainingMilliseconds,
+            extraTimeAddedMilliseconds: current.extraTimeAddedMilliseconds + remainingMilliseconds,
+          }
         : current,
     );
     hasAnnouncedTimedTaskFinalCheck.current = false;
@@ -1694,6 +1750,14 @@ export function WritingWorkspace() {
                 level={exampleLevel}
                 locale={locale}
                 copy={copy}
+                timedTaskCue={
+                  timedTaskSession && timedTaskPhase
+                    ? {
+                        label: copy.workspace.timedTask.phaseLabels[timedTaskPhase.id],
+                        prompt: copy.workspace.timedTask.phasePrompts[timedTaskPhase.id],
+                      }
+                    : null
+                }
               />
             )}
             {timedTaskSession && timedTaskPhase && (
@@ -1772,6 +1836,55 @@ export function WritingWorkspace() {
                   />
                 </div>
               </div>
+            )}
+            {timedTaskSummary && timedTaskSummaryElapsedTime && timedTaskSummaryTargetTime && (
+              <section
+                role="status"
+                aria-label={copy.workspace.timedTask.summaryHeading}
+                className="flex flex-col gap-3 rounded-xl border border-violet-500/30 bg-violet-500/[.06] p-4 dark:border-violet-400/35 dark:bg-violet-400/[.1]"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h3 className="font-medium">{copy.workspace.timedTask.summaryHeading}</h3>
+                  <button
+                    type="button"
+                    onClick={() => setTimedTaskSummary(null)}
+                    className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                  >
+                    {copy.workspace.timedTask.summaryClose}
+                  </button>
+                </div>
+                <div className="grid gap-2 text-sm sm:grid-cols-3">
+                  <p className="text-zinc-600 dark:text-zinc-300">
+                    {copy.workspace.timedTask.summaryActualTime({
+                      time: `${timedTaskSummaryElapsedTime.minutes}:${timedTaskSummaryElapsedTime.seconds}`,
+                    })}
+                  </p>
+                  <p className="text-zinc-600 dark:text-zinc-300">
+                    {copy.workspace.timedTask.summaryTargetTime({
+                      time: `${timedTaskSummaryTargetTime.minutes}:${timedTaskSummaryTargetTime.seconds}`,
+                    })}
+                  </p>
+                  <p className="text-zinc-600 dark:text-zinc-300">
+                    {copy.workspace.timedTask.summaryWordCount({ count: timedTaskSummary.wordCount })}
+                  </p>
+                </div>
+                <ul className="flex flex-wrap gap-2 text-sm">
+                  {TIMED_TASK_PLANS[timedTaskSummary.taskType].phases.map((phase) => {
+                    const reached = timedTaskSummary.reachedPhaseIds.includes(phase.id);
+                    return (
+                      <li
+                        key={phase.id}
+                        className="rounded-full border border-black/[.12] px-2 py-1 dark:border-white/[.2]"
+                      >
+                        <span aria-hidden="true">{reached ? "✓" : "–"} </span>
+                        {copy.workspace.timedTask.phaseLabels[phase.id]}: {reached
+                          ? copy.workspace.timedTask.summaryPhaseReached
+                          : copy.workspace.timedTask.summaryPhaseNotReached}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             )}
             <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
