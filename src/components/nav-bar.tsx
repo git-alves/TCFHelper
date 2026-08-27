@@ -204,9 +204,22 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
               )}
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
-               * while a direct visit or refresh still renders the full page. */}
+               * while a direct visit or refresh still renders the full page.
+               * prefetch={false}: this Link is persistent across every
+               * client-side navigation in the app (it lives in the nav bar,
+               * outside {children}), so Next's background prefetch for it
+               * gets established once, from whatever page happened to be
+               * active when it first entered the viewport, and is then
+               * reused on click regardless of the page the learner is
+               * actually on. Interception depends on the referring page at
+               * click time, so a reused prefetch cached under a different
+               * referrer can serve the plain, non-intercepted /settings page
+               * instead of the modal. Disabling prefetch forces a fresh
+               * request on every click, always carrying the correct
+               * referrer. */}
               <Link
                 href="/settings"
+                prefetch={false}
                 data-walkthrough="nav-settings"
                 title={copy.nav.settings}
                 aria-label={copy.nav.settings}
