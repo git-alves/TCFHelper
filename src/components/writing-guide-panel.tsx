@@ -61,6 +61,13 @@ export function WritingGuidePanel({
   const [override, setOverride] = useState<{ profile: GuideProfile; customTopicPrompt: string | null } | null>(null);
   const [isChoosingContext, setIsChoosingContext] = useState(false);
   const [contextChoicePrompt, setContextChoicePrompt] = useState<string | null>(null);
+  // Gates the full stage-by-stage guide behind a one-time intro: a learner
+  // must see the writing situation (Tâches 1/2 only) and the verb tense
+  // suggestions before the idea prompts, phrase bank, and stage nav appear --
+  // otherwise everything lands on screen at once on first open. Re-choosing
+  // the situation re-shows this intro, since a new situation has its own
+  // tense suggestions worth re-surfacing on their own.
+  const [introAdvanced, setIntroAdvanced] = useState(false);
   const trimmedCustomTopicPrompt = customTopicPrompt.trim();
 
   const detected: WritingContextClassification | null =
@@ -115,8 +122,8 @@ export function WritingGuidePanel({
           <span aria-hidden="true">💡 </span>
           {gc.guideForLevel({ level })}
         </h3>
-        {!needsSituationChoice && profile && (
-          <div className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+        {!needsSituationChoice && profile && introAdvanced && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
             <span>{gc.contextLabel({ profile: GUIDE_PROFILE_LABELS[locale][profile] })}</span>
             {confirmableProfiles.length > 1 && (
               <button
@@ -124,6 +131,7 @@ export function WritingGuidePanel({
                 onClick={() => {
                   setContextChoicePrompt(topicMode === "custom" ? trimmedCustomTopicPrompt : null);
                   setIsChoosingContext(true);
+                  setIntroAdvanced(false);
                 }}
                 className="underline underline-offset-2 hover:text-foreground"
               >
@@ -135,35 +143,43 @@ export function WritingGuidePanel({
       </div>
 
       {needsSituationChoice ? (
-        <>
-          <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
-            <p className="text-sm text-zinc-600 dark:text-zinc-300">
-              {gc.contextConfirmHeading} — {contextConfirmPrompt}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {confirmableProfiles.map((candidate) => (
-                <button
-                  key={candidate}
-                  type="button"
-                  onClick={() => {
-                    setOverride({
-                      profile: candidate,
-                      customTopicPrompt: topicMode === "custom" ? trimmedCustomTopicPrompt : null,
-                    });
-                    setIsChoosingContext(false);
-                  }}
-                  aria-pressed={activeOverride?.profile === candidate}
-                  className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                >
-                  {GUIDE_PROFILE_LABELS[locale][candidate]}
-                </button>
-              ))}
-            </div>
+        <div className="flex flex-col gap-2" role="group" aria-label={gc.contextConfirmHeading}>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+            {gc.contextConfirmHeading} — {contextConfirmPrompt}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {confirmableProfiles.map((candidate) => (
+              <button
+                key={candidate}
+                type="button"
+                onClick={() => {
+                  setOverride({
+                    profile: candidate,
+                    customTopicPrompt: topicMode === "custom" ? trimmedCustomTopicPrompt : null,
+                  });
+                  setIsChoosingContext(false);
+                }}
+                aria-pressed={activeOverride?.profile === candidate}
+                className="rounded-full border border-black/[.15] px-3 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {GUIDE_PROFILE_LABELS[locale][candidate]}
+              </button>
+            ))}
           </div>
+        </div>
+      ) : profile && !introAdvanced ? (
+        <div className="flex flex-col gap-2">
           {tenseSuggestions.length > 0 && (
             <VerbTenseSuggestions suggestions={tenseSuggestions} label={gc.tensesLabel} hint={gc.tensesHint} />
           )}
-        </>
+          <button
+            type="button"
+            onClick={() => setIntroAdvanced(true)}
+            className="self-end rounded-full border border-black/[.15] px-3 py-1.5 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+          >
+            {gc.nextStage} ›
+          </button>
+        </div>
       ) : profile ? (
         <>
           <div className="flex items-center justify-between gap-2">
@@ -172,11 +188,11 @@ export function WritingGuidePanel({
               onClick={() => goToStage(stageIndex - 1)}
               disabled={isFirstStage}
               aria-label={gc.previousStage}
-              className="rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              className="shrink-0 rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
             >
               ‹
             </button>
-            <div className="flex flex-col items-center">
+            <div className="flex min-w-0 flex-1 flex-col items-center text-center">
               <span className="text-sm font-medium">{getGuideStageLabel(locale, taskType, stage)}</span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
                 {stageIndex + 1} / {stages.length}{isOptionalStage ? ` · ${gc.optionalStep}` : ""}
@@ -187,7 +203,7 @@ export function WritingGuidePanel({
               onClick={() => goToStage(stageIndex + 1)}
               disabled={isLastStage}
               aria-label={gc.nextStage}
-              className="rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              className="shrink-0 rounded-full border border-black/[.15] px-2.5 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
             >
               ›
             </button>
@@ -260,10 +276,10 @@ function VerbTenseSuggestions({
 
 function CompletionChecklist({ checks, label }: { checks: readonly string[]; label: string }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg bg-black/[.03] px-3 py-2.5 text-sm dark:bg-white/[.05]">
+    <div className="flex flex-col gap-1.5 text-sm">
       <span className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">{label}</span>
-      <ul className="flex flex-col gap-1 text-zinc-700 dark:text-zinc-300">
-        {checks.map((check) => <li key={check}>□ {check}</li>)}
+      <ul className="flex list-disc flex-col gap-1 pl-4 text-zinc-700 dark:text-zinc-300">
+        {checks.map((check) => <li key={check}>{check}</li>)}
       </ul>
     </div>
   );
