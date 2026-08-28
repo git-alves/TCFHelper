@@ -262,12 +262,11 @@ export interface AppCopy {
     timedTask: {
       show: string;
       heading: string;
-      recommendedPace: (values: { task: string; minutes: number }) => string;
-      setupDescription: string;
-      changeDuration: string;
-      durationLabel: string;
+      suggestedTotalTime: (values: { minutes: number }) => string;
+      phaseDuration: (values: { label: string; minutes: number }) => string;
       start: string;
       pause: string;
+      paused: string;
       resume: string;
       end: string;
       remaining: (values: { minutes: string; seconds: string }) => string;
@@ -626,12 +625,11 @@ export const APP_COPY = {
       timedTask: {
         show: "Timed task",
         heading: "Timed task",
-        recommendedPace: ({ task, minutes }) => `${task} practice pace: ${minutes} minutes`,
-        setupDescription: "This is a recommended practice pace, not an official TCF timing rule.",
-        changeDuration: "Change duration",
-        durationLabel: "Practice duration (minutes)",
+        suggestedTotalTime: ({ minutes }) => `Suggested time for this task: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Start timed task",
         pause: "Pause",
+        paused: "Paused",
         resume: "Resume",
         end: "End",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} remaining`,
@@ -1119,12 +1117,11 @@ export const APP_COPY = {
       timedTask: {
         show: "Tâche chronométrée",
         heading: "Tâche chronométrée",
-        recommendedPace: ({ task, minutes }) => `Rythme d’entraînement pour ${task} : ${minutes} minutes`,
-        setupDescription: "C’est un rythme d’entraînement conseillé, pas une règle officielle du TCF.",
-        changeDuration: "Modifier la durée",
-        durationLabel: "Durée d’entraînement (minutes)",
+        suggestedTotalTime: ({ minutes }) => `Durée suggérée pour cette tâche : ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Démarrer la tâche chronométrée",
         pause: "Pause",
+        paused: "En pause",
         resume: "Reprendre",
         end: "Terminer",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
@@ -1618,12 +1615,11 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarea cronometrada",
         heading: "Tarea cronometrada",
-        recommendedPace: ({ task, minutes }) => `Ritmo de práctica para ${task}: ${minutes} minutos`,
-        setupDescription: "Es un ritmo de práctica recomendado, no una regla oficial de tiempo del TCF.",
-        changeDuration: "Cambiar duración",
-        durationLabel: "Duración de práctica (minutos)",
+        suggestedTotalTime: ({ minutes }) => `Tiempo sugerido para esta tarea: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarea cronometrada",
         pause: "Pausar",
+        paused: "En pausa",
         resume: "Reanudar",
         end: "Finalizar",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
@@ -2117,12 +2113,11 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarefa cronometrada",
         heading: "Tarefa cronometrada",
-        recommendedPace: ({ task, minutes }) => `Ritmo de prática para ${task}: ${minutes} minutos`,
-        setupDescription: "Este é um ritmo de prática recomendado, não uma regra oficial de tempo do TCF.",
-        changeDuration: "Alterar duração",
-        durationLabel: "Duração da prática (minutos)",
+        suggestedTotalTime: ({ minutes }) => `Tempo sugerido para esta tarefa: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarefa cronometrada",
         pause: "Pausar",
+        paused: "Pausado",
         resume: "Retomar",
         end: "Encerrar",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
