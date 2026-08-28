@@ -1684,12 +1684,24 @@ export function WritingWorkspace() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium">
                       <span aria-hidden="true">⏱ </span>
-                      {copy.workspace.timedTask.heading} · {copy.workspace.timedTask.phaseLabels[timedTaskPhase.id]}
+                      {copy.workspace.timedTask.suggestedTotalTime({
+                        minutes: TIMED_TASK_PLANS[timedTaskSession.taskType].totalMinutes,
+                      })}
                     </p>
                     <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                      {timedTaskSession.status === "expired"
-                        ? copy.workspace.timedTask.timeUp
-                        : copy.workspace.timedTask.phasePrompts[timedTaskPhase.id]}
+                      {timedTaskSession.status === "expired" ? (
+                        copy.workspace.timedTask.timeUp
+                      ) : (
+                        <>
+                          <span className="font-medium text-foreground">
+                            {copy.workspace.timedTask.phaseDuration({
+                              label: copy.workspace.timedTask.phaseLabels[timedTaskPhase.id],
+                              minutes: timedTaskPhase.durationMilliseconds / 60_000,
+                            })}
+                          </span>{" "}
+                          {copy.workspace.timedTask.phasePrompts[timedTaskPhase.id]}
+                        </>
+                      )}
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">

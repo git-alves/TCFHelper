@@ -262,6 +262,8 @@ export interface AppCopy {
     timedTask: {
       show: string;
       heading: string;
+      suggestedTotalTime: (values: { minutes: number }) => string;
+      phaseDuration: (values: { label: string; minutes: number }) => string;
       start: string;
       pause: string;
       resume: string;
@@ -622,6 +624,8 @@ export const APP_COPY = {
       timedTask: {
         show: "Timed task",
         heading: "Timed task",
+        suggestedTotalTime: ({ minutes }) => `Suggested time for this task: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Start timed task",
         pause: "Pause",
         resume: "Resume",
@@ -1111,6 +1115,8 @@ export const APP_COPY = {
       timedTask: {
         show: "Tâche chronométrée",
         heading: "Tâche chronométrée",
+        suggestedTotalTime: ({ minutes }) => `Durée suggérée pour cette tâche : ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Démarrer la tâche chronométrée",
         pause: "Pause",
         resume: "Reprendre",
@@ -1606,6 +1612,8 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarea cronometrada",
         heading: "Tarea cronometrada",
+        suggestedTotalTime: ({ minutes }) => `Tiempo sugerido para esta tarea: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarea cronometrada",
         pause: "Pausar",
         resume: "Reanudar",
@@ -2101,6 +2109,8 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarefa cronometrada",
         heading: "Tarefa cronometrada",
+        suggestedTotalTime: ({ minutes }) => `Tempo sugerido para esta tarefa: ${minutes} min`,
+        phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarefa cronometrada",
         pause: "Pausar",
         resume: "Retomar",

@@ -180,6 +180,8 @@ describe("APP_COPY", () => {
         copy.workspace.guidedWriting.morePhrases,
         copy.workspace.timedTask.show,
         copy.workspace.timedTask.heading,
+        copy.workspace.timedTask.suggestedTotalTime({ minutes: 12 }),
+        copy.workspace.timedTask.phaseDuration({ label: "Plan", minutes: 2 }),
         copy.workspace.timedTask.start,
         copy.workspace.timedTask.pause,
         copy.workspace.timedTask.resume,
