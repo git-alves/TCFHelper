@@ -303,9 +303,6 @@ export function WritingWorkspace() {
 
   const [customTopic, setCustomTopic] = useState("");
   const [content, setContent] = useState("");
-  const [isTimedTaskSetupOpen, setIsTimedTaskSetupOpen] = useState(false);
-  const [isTimedTaskDurationEditing, setIsTimedTaskDurationEditing] = useState(false);
-  const [timedTaskDurationMinutes, setTimedTaskDurationMinutes] = useState<number | null>(null);
   const [timedTaskSummary, setTimedTaskSummary] = useState<TimedTaskSummary | null>(null);
   const timedTaskSession = useSyncExternalStore<TimedTaskSession | null>(
     subscribeToWritingPreferences,
@@ -733,9 +730,6 @@ export function WritingWorkspace() {
     // Clearing a draft or loading/replacing a subject must not leave a timer
     // running invisibly against work the learner has intentionally reset.
     persistTimedTaskSession(null);
-    setIsTimedTaskSetupOpen(false);
-    setIsTimedTaskDurationEditing(false);
-    setTimedTaskDurationMinutes(null);
     setTimedTaskSummary(null);
     setTimedTaskAnnouncement("");
     hasAnnouncedTimedTaskFinalCheck.current = false;
@@ -765,8 +759,7 @@ export function WritingWorkspace() {
   function startTimedTask() {
     if (!taskType || !timedTaskTopicKey) return;
 
-    const recommendedMinutes = TIMED_TASK_PLANS[taskType].totalMinutes;
-    const totalDurationMilliseconds = Math.max(1, timedTaskDurationMinutes ?? recommendedMinutes) * 60_000;
+    const totalDurationMilliseconds = TIMED_TASK_PLANS[taskType].totalMinutes * 60_000;
     const remainingMilliseconds = totalDurationMilliseconds;
     setTimedTaskNow(Date.now());
     persistTimedTaskSession({
@@ -779,7 +772,6 @@ export function WritingWorkspace() {
       remainingMilliseconds,
       extraTimeAddedMilliseconds: 0,
     });
-    setIsTimedTaskSetupOpen(false);
     setTimedTaskSummary(null);
     hasAnnouncedTimedTaskFinalCheck.current = false;
     const firstPhase = TIMED_TASK_PLANS[taskType].phases[0];
@@ -842,9 +834,6 @@ export function WritingWorkspace() {
       });
     }
     persistTimedTaskSession(null);
-    setIsTimedTaskSetupOpen(false);
-    setIsTimedTaskDurationEditing(false);
-    setTimedTaskDurationMinutes(null);
     setTimedTaskAnnouncement("");
     hasAnnouncedTimedTaskFinalCheck.current = false;
   }
@@ -1637,85 +1626,16 @@ export function WritingWorkspace() {
                 >
                   {isGuidedWritingOpen ? copy.workspace.guidedWriting.hide : copy.workspace.guidedWriting.show}
                 </button>
-                <div className="relative">
-                  <button
-                    type="button"
-                    data-walkthrough="timed-task"
-                    onClick={() => setIsTimedTaskSetupOpen((open) => !open)}
-                    disabled={!activeTopicPrompt || Boolean(timedTaskSession)}
-                    aria-expanded={isTimedTaskSetupOpen}
-                    aria-controls="timed-task-setup"
-                    className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                  >
-                    <span aria-hidden="true">⏱ </span>
-                    {copy.workspace.timedTask.show}
-                  </button>
-                  {isTimedTaskSetupOpen && taskType && task && !timedTaskSession && (
-                    <div
-                      id="timed-task-setup"
-                      role="region"
-                      aria-label={copy.workspace.timedTask.heading}
-                      className="absolute left-0 z-20 mt-2 flex w-[min(20rem,calc(100vw-2rem))] flex-col gap-3 rounded-xl border border-black/[.15] bg-background p-4 shadow-lg dark:border-white/[.2]"
-                    >
-                      <div>
-                        <h3 className="text-sm font-medium">
-                          {copy.workspace.timedTask.recommendedPace({
-                            task: task.label,
-                            minutes: timedTaskDurationMinutes ?? TIMED_TASK_PLANS[taskType].totalMinutes,
-                          })}
-                        </h3>
-                        <p className="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-300">
-                          {copy.workspace.timedTask.setupDescription}
-                        </p>
-                      </div>
-                      <ol className="flex flex-col gap-2 text-sm">
-                        {TIMED_TASK_PLANS[taskType].phases.map((phase) => (
-                          <li key={phase.id} className="flex gap-2">
-                            <span className="shrink-0 font-medium">
-                              {copy.workspace.timedTask.phaseLabels[phase.id]} · {phase.durationMilliseconds / 60_000} min
-                            </span>
-                            <span className="text-zinc-600 dark:text-zinc-300">
-                              {copy.workspace.timedTask.phasePrompts[phase.id]}
-                            </span>
-                          </li>
-                        ))}
-                      </ol>
-                      {isTimedTaskDurationEditing ? (
-                        <label className="flex items-center gap-2 text-sm">
-                          <span>{copy.workspace.timedTask.durationLabel}</span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={180}
-                            value={timedTaskDurationMinutes ?? TIMED_TASK_PLANS[taskType].totalMinutes}
-                            onChange={(event) => {
-                              const nextMinutes = event.currentTarget.valueAsNumber;
-                              setTimedTaskDurationMinutes(
-                                Number.isFinite(nextMinutes) ? Math.min(Math.max(Math.round(nextMinutes), 1), 180) : null,
-                              );
-                            }}
-                            className="w-16 rounded-md border border-black/[.2] bg-transparent px-2 py-1 text-right outline-none focus:border-violet-600 dark:border-white/[.25] dark:focus:border-violet-400"
-                          />
-                        </label>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setIsTimedTaskDurationEditing(true)}
-                          className="self-start text-sm underline underline-offset-2 hover:text-foreground"
-                        >
-                          {copy.workspace.timedTask.changeDuration}
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        onClick={startTimedTask}
-                        className="self-start rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-                      >
-                        {copy.workspace.timedTask.start}
-                      </button>
-                    </div>
-                  )}
-                </div>
+                <button
+                  type="button"
+                  data-walkthrough="timed-task"
+                  onClick={startTimedTask}
+                  disabled={!activeTopicPrompt || Boolean(timedTaskSession)}
+                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  <span aria-hidden="true">⏱ </span>
+                  {copy.workspace.timedTask.show}
+                </button>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <span

@@ -262,10 +262,6 @@ export interface AppCopy {
     timedTask: {
       show: string;
       heading: string;
-      recommendedPace: (values: { task: string; minutes: number }) => string;
-      setupDescription: string;
-      changeDuration: string;
-      durationLabel: string;
       start: string;
       pause: string;
       resume: string;
@@ -626,10 +622,6 @@ export const APP_COPY = {
       timedTask: {
         show: "Timed task",
         heading: "Timed task",
-        recommendedPace: ({ task, minutes }) => `${task} practice pace: ${minutes} minutes`,
-        setupDescription: "This is a recommended practice pace, not an official TCF timing rule.",
-        changeDuration: "Change duration",
-        durationLabel: "Practice duration (minutes)",
         start: "Start timed task",
         pause: "Pause",
         resume: "Resume",
@@ -1119,10 +1111,6 @@ export const APP_COPY = {
       timedTask: {
         show: "Tâche chronométrée",
         heading: "Tâche chronométrée",
-        recommendedPace: ({ task, minutes }) => `Rythme d’entraînement pour ${task} : ${minutes} minutes`,
-        setupDescription: "C’est un rythme d’entraînement conseillé, pas une règle officielle du TCF.",
-        changeDuration: "Modifier la durée",
-        durationLabel: "Durée d’entraînement (minutes)",
         start: "Démarrer la tâche chronométrée",
         pause: "Pause",
         resume: "Reprendre",
@@ -1618,10 +1606,6 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarea cronometrada",
         heading: "Tarea cronometrada",
-        recommendedPace: ({ task, minutes }) => `Ritmo de práctica para ${task}: ${minutes} minutos`,
-        setupDescription: "Es un ritmo de práctica recomendado, no una regla oficial de tiempo del TCF.",
-        changeDuration: "Cambiar duración",
-        durationLabel: "Duración de práctica (minutos)",
         start: "Iniciar tarea cronometrada",
         pause: "Pausar",
         resume: "Reanudar",
@@ -2117,10 +2101,6 @@ export const APP_COPY = {
       timedTask: {
         show: "Tarefa cronometrada",
         heading: "Tarefa cronometrada",
-        recommendedPace: ({ task, minutes }) => `Ritmo de prática para ${task}: ${minutes} minutos`,
-        setupDescription: "Este é um ritmo de prática recomendado, não uma regra oficial de tempo do TCF.",
-        changeDuration: "Alterar duração",
-        durationLabel: "Duração da prática (minutos)",
         start: "Iniciar tarefa cronometrada",
         pause: "Pausar",
         resume: "Retomar",
