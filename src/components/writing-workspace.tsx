@@ -1608,7 +1608,7 @@ export function WritingWorkspace() {
                     className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {EXAMPLE_LEVELS.map((level) => (
-                      <option key={level} value={level} className="text-black">
+                      <option key={level} value={level}>
                         {level}
                       </option>
                     ))}

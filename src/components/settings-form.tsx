@@ -53,7 +53,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
           className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
         >
           {APP_THEMES.map((option) => (
-            <option key={option} value={option} className="text-black">
+            <option key={option} value={option}>
               {themeLabels[option]}
             </option>
           ))}
@@ -76,7 +76,7 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
           className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
         >
           {APP_LOCALES.map((code) => (
-            <option key={code} value={code} className="text-black">
+            <option key={code} value={code}>
               {APP_LOCALE_LABELS[code]}
             </option>
           ))}
