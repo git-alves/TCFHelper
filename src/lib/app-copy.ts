@@ -266,6 +266,7 @@ export interface AppCopy {
       phaseDuration: (values: { label: string; minutes: number }) => string;
       start: string;
       pause: string;
+      paused: string;
       resume: string;
       end: string;
       remaining: (values: { minutes: string; seconds: string }) => string;
@@ -628,6 +629,7 @@ export const APP_COPY = {
         phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Start timed task",
         pause: "Pause",
+        paused: "Paused",
         resume: "Resume",
         end: "End",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} remaining`,
@@ -1119,6 +1121,7 @@ export const APP_COPY = {
         phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Démarrer la tâche chronométrée",
         pause: "Pause",
+        paused: "En pause",
         resume: "Reprendre",
         end: "Terminer",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
@@ -1616,6 +1619,7 @@ export const APP_COPY = {
         phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarea cronometrada",
         pause: "Pausar",
+        paused: "En pausa",
         resume: "Reanudar",
         end: "Finalizar",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,
@@ -2113,6 +2117,7 @@ export const APP_COPY = {
         phaseDuration: ({ label, minutes }) => `${label} · ${minutes} min`,
         start: "Iniciar tarefa cronometrada",
         pause: "Pausar",
+        paused: "Pausado",
         resume: "Retomar",
         end: "Encerrar",
         remaining: ({ minutes, seconds }) => `${minutes}:${seconds} restantes`,

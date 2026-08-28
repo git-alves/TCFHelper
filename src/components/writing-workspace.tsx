@@ -1705,6 +1705,11 @@ export function WritingWorkspace() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {timedTaskSession.status === "paused" && (
+                      <span className="rounded-full border border-amber-500/40 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-400/40 dark:text-amber-300">
+                        {copy.workspace.timedTask.paused}
+                      </span>
+                    )}
                     <time className="font-mono text-lg font-semibold tabular-nums" aria-live="off">
                       {copy.workspace.timedTask.remaining(timedTaskTime)}
                     </time>

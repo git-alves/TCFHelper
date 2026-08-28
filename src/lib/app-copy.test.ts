@@ -184,6 +184,7 @@ describe("APP_COPY", () => {
         copy.workspace.timedTask.phaseDuration({ label: "Plan", minutes: 2 }),
         copy.workspace.timedTask.start,
         copy.workspace.timedTask.pause,
+        copy.workspace.timedTask.paused,
         copy.workspace.timedTask.resume,
         copy.workspace.timedTask.end,
         copy.workspace.timedTask.remaining({ minutes: "12", seconds: "00" }),

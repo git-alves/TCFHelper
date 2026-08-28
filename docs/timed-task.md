@@ -22,7 +22,7 @@
 
 ## Decision
 
-Ship **single-task timed practice** first. The learner turns on `Timed task` beside the existing target-level and Writing-guide controls, sees the recommended duration before starting, and explicitly starts the countdown. Once running, the live timer belongs in a slim sticky status strip directly above the editor—not in a modal, the guide panel, or a distant page header—because this keeps the deadline and the word count visible while they write without covering the text area.
+Ship **single-task timed practice** first. The learner turns on `Timed task` beside the existing target-level and Writing-guide controls, which starts the countdown immediately at the task's recommended duration—no setup step in between. Once running, the live timer belongs in a slim sticky status strip directly above the editor—not in a modal, the guide panel, or a distant page header—because this keeps the deadline and the word count visible while they write without covering the text area.
 
 Use a fixed 60-minute allocation of **12 minutes for Tâche 1, 20 minutes for Tâche 2, 23 minutes for Tâche 3, and 5 minutes for final cross-task review**. This is preferred to broad overlapping ranges because practice works best against one repeatable target, and the allocations total exactly 60 minutes. Solo task practice folds its task-specific check into that task's countdown; the five-minute cross-task review is relevant only to a future full simulation.
 
@@ -30,25 +30,17 @@ Use a fixed 60-minute allocation of **12 minutes for Tâche 1, 20 minutes for T�
 
 ### Entry and display
 
-Before a timer starts, the compact `Timed task` control opens an inline popover:
+The compact `Timed task` control starts the countdown immediately, at the task's recommended duration—no setup step, popover, or duration override in between. The control is disabled without a selected task and non-empty topic, matching the Writing guide's availability.
 
-`Practice Tâche 1 — 12 minutes`
+While running, render a sticky strip between the editor toolbar and the textarea, leading with the recommended total and then the current phase, e.g.:
 
-`Plan 2 min · Write 8 min · Check 2 min`
+`⏱ Suggested time for this task: 12 min`
 
-`Start timed task`
+`Plan · 2 min  Identify the recipient, the objective, and a simple structure before writing.`
 
-The learner may expand the secondary **Change duration** control before starting. It changes the total countdown only; the recommended plan remains the default and its phase proportions scale to the selected duration.
+alongside the live countdown and `Pause` / `End` controls. The strip includes a subtle progress bar and an accessible text equivalent. The existing word count remains in the editor toolbar; it is an independent requirement and should not be replaced by the clock. On narrow screens, the strip wraps its controls but remains above the textarea rather than becoming a floating overlay.
 
-Do not show a running clock until the learner has clicked Start. The control is disabled without a selected task and non-empty topic, matching the Writing guide's availability.
-
-While running, render a sticky strip between the editor toolbar and the textarea:
-
-`Timed task · Tâche 1 · Writing  |  07:42 remaining  |  Pause  End`
-
-The strip includes a subtle progress bar, an accessible text equivalent, and a link/button to expand the phase plan. The existing word count remains in the editor toolbar; it is an independent requirement and should not be replaced by the clock. On narrow screens, the strip wraps its controls but remains above the textarea rather than becoming a floating overlay.
-
-At a phase boundary, update the text in the strip—for example, `Check · 02:00 remaining`—and make one polite, optional announcement. No audio alarm is enabled by default. At zero, show `Time is up — finish or keep writing`, with `Add 2 minutes` and `End timed task`; the editor remains fully usable.
+At a phase boundary, the phase line updates in place—for example, `Write · 8 min  Answer every requested point directly.`—and makes one polite, optional announcement. No audio alarm is enabled by default. While paused, the strip visibly labels the state (`Paused`) beside the frozen time, in addition to the `Resume` control. At zero, show `Time is up — finish or keep writing`, with `Add 2 minutes` and `End timed task`; the editor remains fully usable.
 
 When the learner explicitly ends timed practice, replace the strip with a small, in-context summary of time spent, target time, current word count, and the phases reached. This summary is ephemeral: closing it or changing task removes it, and it is never added to progress history in this release.
 
@@ -61,7 +53,7 @@ When the learner explicitly ends timed practice, replace the strip with a small,
 | Tâche 3 | 23 min | Analyse 5 min: identify each document's central idea. Synthesize 5 min: present both viewpoints without your opinion. Argue 11 min: give a clear position with two or three developed arguments. Check 2 min: reach 120–180 words and review balance, cohesion, and accuracy. |
 | Future full simulation | 60 min | Tâche 1 12 min + Tâche 2 20 min + Tâche 3 23 min + 5 min final review across all responses. |
 
-The task's existing Writing guide remains available during timing practice. Its stage tips and the timer phase can be related through a subtle current-phase cue, but neither should automatically move the other: a learner may need more planning time, and the guide must not turn the countdown into a rigid script.
+The task's existing Writing guide remains available during timing practice, unchanged by it: neither should automatically move the other, since a learner may need more planning time and the guide must not turn the countdown into a rigid script. The guide no longer repeats the timer's phase prompt inline—that reads as duplicated text, since the sticky strip below it already shows the current phase.
 
 ### State, reliability, and accessibility
 
