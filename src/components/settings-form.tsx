@@ -2,8 +2,14 @@
 
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useAppTheme } from "@/components/app-theme-provider";
+import { ThemedSelect } from "@/components/themed-select";
 import { APP_LOCALES, APP_LOCALE_LABELS } from "@/lib/app-locale";
 import { APP_THEMES, type AppTheme } from "@/lib/app-theme";
+
+const SELECT_BUTTON_CLASSNAME =
+  "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]";
+const SELECT_LIST_CLASSNAME =
+  "absolute left-0 right-0 z-20 mt-1 flex max-h-60 flex-col gap-0.5 overflow-auto rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]";
 
 interface SettingsFormProps {
   name: string | null;
@@ -46,18 +52,14 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.appearanceDescription}
           </p>
         </div>
-        <select
-          aria-labelledby="appearance-heading"
+        <ThemedSelect<AppTheme>
+          ariaLabelledBy="appearance-heading"
           value={theme}
-          onChange={(event) => setTheme(event.target.value as AppTheme)}
-          className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
-        >
-          {APP_THEMES.map((option) => (
-            <option key={option} value={option}>
-              {themeLabels[option]}
-            </option>
-          ))}
-        </select>
+          onChange={setTheme}
+          options={APP_THEMES.map((option) => ({ value: option, label: themeLabels[option] }))}
+          buttonClassName={SELECT_BUTTON_CLASSNAME}
+          listClassName={SELECT_LIST_CLASSNAME}
+        />
       </section>
 
       <section className="flex flex-col gap-2" aria-labelledby="language-heading">
@@ -69,18 +71,14 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.languageDescription}
           </p>
         </div>
-        <select
-          aria-labelledby="language-heading"
+        <ThemedSelect<typeof locale>
+          ariaLabelledBy="language-heading"
           value={locale}
-          onChange={(event) => setLocale(event.target.value as typeof locale)}
-          className="rounded-xl border border-black/[.15] bg-transparent px-4 py-2.5 text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]"
-        >
-          {APP_LOCALES.map((code) => (
-            <option key={code} value={code}>
-              {APP_LOCALE_LABELS[code]}
-            </option>
-          ))}
-        </select>
+          onChange={setLocale}
+          options={APP_LOCALES.map((code) => ({ value: code, label: APP_LOCALE_LABELS[code] }))}
+          buttonClassName={SELECT_BUTTON_CLASSNAME}
+          listClassName={SELECT_LIST_CLASSNAME}
+        />
       </section>
 
       <section className="flex flex-col gap-2" aria-labelledby="help-heading">

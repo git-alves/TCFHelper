@@ -16,6 +16,7 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+import { ThemedSelect } from "@/components/themed-select";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
@@ -1597,22 +1598,15 @@ export function WritingWorkspace() {
                   <label htmlFor="target-level" className="text-sm text-zinc-600 dark:text-zinc-300">
                     {copy.workspace.editor.exampleLevelLabel}
                   </label>
-                  <select
+                  <ThemedSelect<ExampleLevel>
                     id="target-level"
                     value={exampleLevel}
-                    onChange={(e) => {
-                      const level = e.target.value;
-                      if (isExampleLevel(level)) storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level);
-                    }}
+                    onChange={(level) => storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level)}
+                    options={EXAMPLE_LEVELS.map((level) => ({ value: level, label: level }))}
                     disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                    className="rounded-full bg-transparent px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {EXAMPLE_LEVELS.map((level) => (
-                      <option key={level} value={level}>
-                        {level}
-                      </option>
-                    ))}
-                  </select>
+                    buttonClassName="flex items-center gap-1.5 rounded-full bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                    listClassName="absolute left-0 z-20 mt-1 flex min-w-full flex-col gap-0.5 rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]"
+                  />
                 </div>
                 <button
                   type="button"
