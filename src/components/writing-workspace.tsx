@@ -1750,14 +1750,6 @@ export function WritingWorkspace() {
                 level={exampleLevel}
                 locale={locale}
                 copy={copy}
-                timedTaskCue={
-                  timedTaskSession && timedTaskPhase
-                    ? {
-                        label: copy.workspace.timedTask.phaseLabels[timedTaskPhase.id],
-                        prompt: copy.workspace.timedTask.phasePrompts[timedTaskPhase.id],
-                      }
-                    : null
-                }
               />
             )}
             {timedTaskSession && timedTaskPhase && (

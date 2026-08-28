@@ -6,11 +6,7 @@ import { describe, expect, it } from "vitest";
 import { APP_COPY } from "@/lib/app-copy";
 import { WritingGuidePanel } from "./writing-guide-panel";
 
-function render(
-  taskType: TaskType,
-  profile: GuideProfile,
-  timedTaskCue: { label: string; prompt: string } | null = null,
-) {
+function render(taskType: TaskType, profile: GuideProfile) {
   return renderToStaticMarkup(
     createElement(WritingGuidePanel, {
       taskType,
@@ -20,7 +16,6 @@ function render(
       level: "B2",
       locale: "en",
       copy: APP_COPY.en,
-      timedTaskCue,
     }),
   );
 }
@@ -55,16 +50,5 @@ describe("WritingGuidePanel", () => {
     // The rest of the guide (idea prompts, stage nav, phrase bank) only
     // appears after the learner clicks past the tense-suggestions intro.
     expect(markup).not.toContain("Formules à adapter à votre sujet");
-  });
-
-  it("shows a timing cue without changing the learner's guide stage", () => {
-    const markup = render("TASK_3", "ARGUMENTATIVE_ANALYSIS", {
-      label: "Analyse the documents",
-      prompt: "Read both documents and identify the central idea in each.",
-    });
-
-    expect(markup).toContain("Analyse the documents");
-    expect(markup).toContain("Read both documents and identify the central idea in each.");
-    expect(markup).toContain("Verb tenses to consider");
   });
 });
