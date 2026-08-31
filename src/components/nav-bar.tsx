@@ -171,6 +171,23 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   {copy.nav.tasks}
                 </Link>
               )}
+              {!isHome &&
+                realPathname !== "/practice" &&
+                (onTasks && isDashboardBlocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.practice} — ${dashboardBlockedReason}`}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
+                    {copy.nav.practice}
+                  </button>
+                ) : (
+                  <Link href="/practice" onClick={guardedNavigationHandler("/practice")} className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.practice}
+                  </Link>
+                ))}
               {isAdmin && !isOnAdminPage && (
                 // Same in-flight-work protection as Dashboard above: reachable
                 // from /tasks, so it must not let an owner leave a draft or an

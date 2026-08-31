@@ -18,6 +18,7 @@ describe("APP_COPY", () => {
         copy.common.close,
         copy.nav.dashboard,
         copy.nav.tasks,
+        copy.nav.practice,
         copy.nav.settings,
         copy.nav.logIn,
         copy.nav.closeSettingsFirst,
