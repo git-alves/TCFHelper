@@ -294,7 +294,11 @@ function ExerciseInput({
 export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(null);
-  const [selectedSkillId, setSelectedSkillId] = useState<string | null>(null);
+  // A skill label/ID is scoped to a task and level. Keeping the selected
+  // record, rather than resolving a bare ID against the full catalogue,
+  // prevents a future shared label such as "conclusion" from loading the
+  // sequence belonging to another Tâche.
+  const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(null);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
@@ -308,7 +312,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         : [],
     [curriculum.skills, selectedLevel, selectedTask],
   );
-  const selectedSkill = curriculum.skills.find((skill) => skill.id === selectedSkillId) ?? null;
   const exercises = useMemo(
     () =>
       selectedSkill
@@ -339,7 +342,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseTask(task: PracticeTask) {
     setSelectedTask(task);
-    setSelectedSkillId(null);
+    setSelectedSkill(null);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -347,7 +350,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseLevel(level: PracticeLevel) {
     setSelectedLevel(level);
-    setSelectedSkillId(null);
+    setSelectedSkill(null);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -359,7 +362,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
       )
       .sort((left, right) => left.sequence_order - right.sequence_order)[0];
-    setSelectedSkillId(skill.id);
+    setSelectedSkill(skill);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(firstExercise ?? null);
@@ -406,7 +409,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function returnToSkills() {
-    setSelectedSkillId(null);
+    setSelectedSkill(null);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -504,7 +507,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               {matchingSkills.map((skill) => (
                 <ChoiceCard
                   key={skill.id}
-                  selected={selectedSkillId === skill.id}
+                  selected={selectedSkill?.id === skill.id}
                   onClick={() => chooseSkill(skill)}
                   disabled={!selectedTask || !selectedLevel}
                 >
