@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
-import { randomizePracticeExerciseOrder } from "@/lib/practice-exercise-order";
+import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -330,10 +330,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function chooseSkill(skill: CuratedPracticeSkill) {
-    // The bank gives each exercise a pedagogical stage and a sequence order
-    // for authoring and quality checks. Learners practise the same reviewed
-    // set in a new order instead of always seeing the same exercise type next.
-    const nextExercises = randomizePracticeExerciseOrder(exercisesForSkill(skill));
+    // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
+    // when a stage has more than one reviewed variant, a random one is used
+    // so replaying a topic doesn't always show the identical exercise.
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(skill));
     setSelectedSkill(skill);
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
@@ -377,15 +377,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function restartSequence() {
     if (!selectedSkill) return;
-    let nextExercises = randomizePracticeExerciseOrder(exercisesForSkill(selectedSkill));
-
-    // A shuffle can coincidentally return the existing order. Rotate the
-    // authored references in that exceptional case so “practise again” always
-    // starts with a different exercise when there is a choice.
-    if (nextExercises.length > 1 && nextExercises.every((exercise, index) => exercise.id === exercises[index]?.id)) {
-      nextExercises = [...nextExercises.slice(1), nextExercises[0]];
-    }
-
+    // The stage order stays fixed on replay too; only the variant chosen for
+    // a stage with more than one reviewed option can change.
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill));
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -485,7 +479,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           </fieldset>
 
           <fieldset disabled={!selectedTask || !selectedLevel} aria-describedby={!selectedLevel ? "skill-help" : undefined}>
-            <legend className="text-sm font-semibold">{practice.chooseSkill}</legend>
+            <legend id="practice-skill-label" className="text-sm font-semibold">{practice.chooseSkill}</legend>
             <ThemedSelect<string>
               value={selectedSkill?.id ?? ""}
               options={[
@@ -496,6 +490,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 })),
               ] satisfies readonly ThemedSelectOption<string>[]}
               disabled={!selectedTask || !selectedLevel}
+              ariaLabelledBy="practice-skill-label"
               onChange={(skillId) => {
                 const skill = matchingSkills.find((candidate) => candidate.id === skillId);
                 if (skill) {

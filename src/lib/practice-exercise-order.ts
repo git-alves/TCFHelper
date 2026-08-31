@@ -1,19 +1,23 @@
 /**
- * Vary the order in which a learner sees an already-authored practice set.
+ * Build one practice session from an already-authored exercise set.
  *
- * This deliberately shuffles references to fixed exercises only. It never
- * creates prompts, answers, or any new teaching content.
+ * The six-stage scaffold order (Recognize -> Complete -> Transform ->
+ * Organize -> Develop -> Produce) is fixed and never reordered: it is what
+ * takes a learner from controlled recognition to independent production.
+ * Replay variety instead comes from picking a different authored variant
+ * for a given stage, when more than one reviewed variant exists for it.
+ * This never creates prompts, answers, or any new teaching content.
  */
-export function randomizePracticeExerciseOrder<T>(
+const STAGE_ORDER = ["recognize", "complete", "transform", "organize", "develop", "produce"] as const;
+
+export function selectPracticeExerciseSession<T extends { exercise_type: string }>(
   exercises: readonly T[],
   random: () => number = Math.random,
 ): T[] {
-  const randomized = [...exercises];
-
-  for (let index = randomized.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(random() * (index + 1));
-    [randomized[index], randomized[swapIndex]] = [randomized[swapIndex], randomized[index]];
-  }
-
-  return randomized;
+  return STAGE_ORDER.flatMap((stage) => {
+    const variants = exercises.filter((exercise) => exercise.exercise_type === stage);
+    if (variants.length === 0) return [];
+    const chosenIndex = Math.floor(random() * variants.length);
+    return [variants[chosenIndex]];
+  });
 }
