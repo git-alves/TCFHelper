@@ -68,6 +68,46 @@ export interface AppCopy {
     startATask: string;
     getStarted: string;
   };
+  practice: {
+    tasks: Record<"TASK_1" | "TASK_2" | "TASK_3", { title: string; description: string }>;
+    levels: Record<"B2" | "C1" | "C2", { title: string; description: string }>;
+    stages: Record<"recognize" | "complete" | "transform" | "organize" | "develop" | "produce", string>;
+    completedEyebrow: string;
+    completedTitle: (values: { skill: string }) => string;
+    completedDescription: (values: { outcome: string }) => string;
+    reviewSequence: string;
+    chooseAnotherSkill: string;
+    eyebrow: string;
+    title: string;
+    description: string;
+    chooseTask: string;
+    chooseLevel: string;
+    levelHelp: string;
+    chooseSkill: string;
+    durationAndSteps: (values: { minutes: number; steps: number }) => string;
+    unavailableCombination: string;
+    skillHelp: string;
+    changeSkill: string;
+    sequenceDescription: (values: { count: number }) => string;
+    progress: (values: { step: number; total: number }) => string;
+    attentionLabel: string;
+    selectAnswer: string;
+    selectOrder: string;
+    reorderItems: string;
+    moveUp: string;
+    moveDown: string;
+    responseLabel: string;
+    responsePlaceholder: string;
+    suggestionPlaceholder: string;
+    correctFeedback: string;
+    selfReviewFeedback: string;
+    retryFeedback: string;
+    finishSequence: string;
+    nextExercise: string;
+    selfReview: string;
+    verify: string;
+    retryHint: string;
+  };
   login: {
     title: string;
     emailLabel: string;
@@ -415,6 +455,54 @@ export const APP_COPY = {
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
       startATask: "Start a task",
       getStarted: "Get started",
+    },
+    practice: {
+      tasks: {
+        TASK_1: { title: "Task 1", description: "Communicate effectively in a short message, for the right reader and in the right register." },
+        TASK_2: { title: "Task 2", description: "Recount and comment on an experience in an email or blog post for specific readers." },
+        TASK_3: { title: "Task 3", description: "Compare viewpoints and defend a nuanced position on a social issue." },
+      },
+      levels: {
+        B2: { title: "B2", description: "Clear, connected and sufficiently developed ideas." },
+        C1: { title: "C1", description: "Flexible organisation, connected viewpoints and nuance." },
+        C2: { title: "C2", description: "Very precise, autonomous control adapted to the situation." },
+      },
+      stages: { recognize: "Recognise", complete: "Complete", transform: "Transform", organize: "Organise", develop: "Develop", produce: "Produce" },
+      completedEyebrow: "Sequence complete",
+      completedTitle: ({ skill }) => `You practised: ${skill}`,
+      completedDescription: ({ outcome }) => `You moved from recognition to independent writing. Keep this in mind for your next full response: ${outcome}`,
+      reviewSequence: "Review the sequence",
+      chooseAnotherSkill: "Choose another skill",
+      eyebrow: "Focused practice",
+      title: "Work on one writing skill at a time.",
+      description: "This is not an exam simulation. Choose a task, your target level and a skill; you will then follow guided practice from choosing a formulation to writing your own text.",
+      chooseTask: "1. Which task would you like to improve?",
+      chooseLevel: "2. What is your target level?",
+      levelHelp: "Choose a task first: difficulty is linked to its writing purpose.",
+      chooseSkill: "3. Which skill would you like to practise?",
+      durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps}-step progression`,
+      unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
+      skillHelp: "The available skills depend on the task and level you choose.",
+      changeSkill: "← Change skill",
+      sequenceDescription: ({ count }) => `This sequence contains ${count} connected exercises in a fixed learning order.`,
+      progress: ({ step, total }) => `Step ${step} of ${total}`,
+      attentionLabel: "Focus point:",
+      selectAnswer: "Choose your answer",
+      selectOrder: "Choose the most logical order",
+      reorderItems: "Reorder the items",
+      moveUp: "Move up",
+      moveDown: "Move down",
+      responseLabel: "Your response in French",
+      responsePlaceholder: "Write your response in French…",
+      suggestionPlaceholder: "Write your proposal in French…",
+      correctFeedback: "Well done.",
+      selfReviewFeedback: "Review your writing with this checklist.",
+      retryFeedback: "Not yet — edit your response and try again.",
+      finishSequence: "Finish the sequence",
+      nextExercise: "Next exercise",
+      selfReview: "See my self-check checklist",
+      verify: "Check",
+      retryHint: "You can edit your response and try again as many times as you need.",
     },
     login: {
       title: "Log in",
@@ -905,6 +993,54 @@ export const APP_COPY = {
         "Entraînez-vous aux tâches 1, 2 et 3, puis recevez en quelques secondes des commentaires sur la grammaire, le vocabulaire et votre niveau du CECRL.",
       startATask: "Commencer une tâche",
       getStarted: "Commencer",
+    },
+    practice: {
+      tasks: {
+        TASK_1: { title: "Tâche 1", description: "Communiquer efficacement dans un message court, avec le bon destinataire et le bon registre." },
+        TASK_2: { title: "Tâche 2", description: "Raconter et commenter une expérience dans un e-mail ou un billet de blog pour des lecteurs précis." },
+        TASK_3: { title: "Tâche 3", description: "Comparer des points de vue et défendre une position nuancée sur un sujet de société." },
+      },
+      levels: {
+        B2: { title: "B2", description: "Idées claires, reliées et suffisamment développées." },
+        C1: { title: "C1", description: "Organisation flexible, points de vue mis en relation et nuance." },
+        C2: { title: "C2", description: "Maîtrise très précise, autonome et adaptée à la situation." },
+      },
+      stages: { recognize: "Reconnaître", complete: "Compléter", transform: "Transformer", organize: "Organiser", develop: "Développer", produce: "Produire" },
+      completedEyebrow: "Séquence terminée",
+      completedTitle: ({ skill }) => `Vous avez travaillé : ${skill}`,
+      completedDescription: ({ outcome }) => `Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine rédaction complète : ${outcome}`,
+      reviewSequence: "Revoir la séquence",
+      chooseAnotherSkill: "Choisir une autre compétence",
+      eyebrow: "Entraînement ciblé",
+      title: "Travaillez une compétence d’écriture à la fois.",
+      description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et une compétence : vous suivrez ensuite une progression guidée, du choix d’une formulation à votre propre texte.",
+      chooseTask: "1. Quelle tâche voulez-vous améliorer ?",
+      chooseLevel: "2. Quel est votre niveau cible ?",
+      levelHelp: "Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.",
+      chooseSkill: "3. Quelle compétence voulez-vous entraîner ?",
+      durationAndSteps: ({ minutes, steps }) => `${minutes} min · progression en ${steps} étapes`,
+      unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
+      skillHelp: "Les compétences disponibles dépendent de la tâche et du niveau que vous choisissez.",
+      changeSkill: "← Changer de compétence",
+      sequenceDescription: ({ count }) => `Cette séquence contient ${count} exercices connectés, dans un ordre pédagogique fixe.`,
+      progress: ({ step, total }) => `Étape ${step} sur ${total}`,
+      attentionLabel: "Point d’attention :",
+      selectAnswer: "Choisissez votre réponse",
+      selectOrder: "Choisissez l’ordre le plus logique",
+      reorderItems: "Réorganisez les éléments",
+      moveUp: "Monter",
+      moveDown: "Descendre",
+      responseLabel: "Votre réponse en français",
+      responsePlaceholder: "Écrivez votre réponse en français…",
+      suggestionPlaceholder: "Écrivez votre proposition en français…",
+      correctFeedback: "Bien vu.",
+      selfReviewFeedback: "Relisez votre production avec cette grille.",
+      retryFeedback: "Pas encore — modifiez votre réponse et réessayez.",
+      finishSequence: "Terminer la séquence",
+      nextExercise: "Exercice suivant",
+      selfReview: "Voir ma grille d’auto-vérification",
+      verify: "Vérifier",
+      retryHint: "Vous pouvez modifier votre réponse autant de fois que nécessaire.",
     },
     login: {
       title: "Se connecter",
@@ -1407,6 +1543,54 @@ export const APP_COPY = {
       startATask: "Empezar una tarea",
       getStarted: "Empezar",
     },
+    practice: {
+      tasks: {
+        TASK_1: { title: "Tarea 1", description: "Comunícate eficazmente en un mensaje breve, para el destinatario y con el registro adecuados." },
+        TASK_2: { title: "Tarea 2", description: "Cuenta y comenta una experiencia en un correo electrónico o una entrada de blog para lectores concretos." },
+        TASK_3: { title: "Tarea 3", description: "Compara puntos de vista y defiende una postura matizada sobre un tema social." },
+      },
+      levels: {
+        B2: { title: "B2", description: "Ideas claras, conectadas y suficientemente desarrolladas." },
+        C1: { title: "C1", description: "Organización flexible, puntos de vista relacionados y matices." },
+        C2: { title: "C2", description: "Dominio muy preciso, autónomo y adaptado a la situación." },
+      },
+      stages: { recognize: "Reconocer", complete: "Completar", transform: "Transformar", organize: "Organizar", develop: "Desarrollar", produce: "Producir" },
+      completedEyebrow: "Secuencia completada",
+      completedTitle: ({ skill }) => `Has trabajado: ${skill}`,
+      completedDescription: ({ outcome }) => `Has pasado del reconocimiento a la producción autónoma. Tenlo en cuenta para tu próxima redacción completa: ${outcome}`,
+      reviewSequence: "Repasar la secuencia",
+      chooseAnotherSkill: "Elegir otra competencia",
+      eyebrow: "Práctica específica",
+      title: "Trabaja una habilidad de escritura cada vez.",
+      description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y una habilidad; después seguirás una práctica guiada, desde elegir una formulación hasta escribir tu propio texto.",
+      chooseTask: "1. ¿Qué tarea quieres mejorar?",
+      chooseLevel: "2. ¿Cuál es tu nivel objetivo?",
+      levelHelp: "Elige primero una tarea: la dificultad está ligada a su propósito de escritura.",
+      chooseSkill: "3. ¿Qué habilidad quieres practicar?",
+      durationAndSteps: ({ minutes, steps }) => `${minutes} min · progresión de ${steps} pasos`,
+      unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
+      skillHelp: "Las habilidades disponibles dependen de la tarea y del nivel que elijas.",
+      changeSkill: "← Cambiar de habilidad",
+      sequenceDescription: ({ count }) => `Esta secuencia contiene ${count} ejercicios conectados, en un orden pedagógico fijo.`,
+      progress: ({ step, total }) => `Paso ${step} de ${total}`,
+      attentionLabel: "Punto de atención:",
+      selectAnswer: "Elige tu respuesta",
+      selectOrder: "Elige el orden más lógico",
+      reorderItems: "Reordena los elementos",
+      moveUp: "Subir",
+      moveDown: "Bajar",
+      responseLabel: "Tu respuesta en francés",
+      responsePlaceholder: "Escribe tu respuesta en francés…",
+      suggestionPlaceholder: "Escribe tu propuesta en francés…",
+      correctFeedback: "Correcto.",
+      selfReviewFeedback: "Revisa tu producción con esta lista.",
+      retryFeedback: "Aún no; modifica tu respuesta e inténtalo de nuevo.",
+      finishSequence: "Terminar la secuencia",
+      nextExercise: "Siguiente ejercicio",
+      selfReview: "Ver mi lista de autoevaluación",
+      verify: "Comprobar",
+      retryHint: "Puedes modificar tu respuesta e intentarlo tantas veces como necesites.",
+    },
     login: {
       title: "Iniciar sesión",
       emailLabel: "Correo electrónico",
@@ -1905,6 +2089,54 @@ export const APP_COPY = {
         "Pratique as tarefas 1, 2 e 3 e receba em segundos comentários sobre gramática, vocabulário e nível do QECR.",
       startATask: "Começar uma tarefa",
       getStarted: "Começar",
+    },
+    practice: {
+      tasks: {
+        TASK_1: { title: "Tarefa 1", description: "Comunique-se com eficácia em uma mensagem curta, para o destinatário e no registro adequados." },
+        TASK_2: { title: "Tarefa 2", description: "Conte e comente uma experiência em um e-mail ou publicação de blog para leitores específicos." },
+        TASK_3: { title: "Tarefa 3", description: "Compare pontos de vista e defenda uma posição ponderada sobre uma questão social." },
+      },
+      levels: {
+        B2: { title: "B2", description: "Ideias claras, conectadas e suficientemente desenvolvidas." },
+        C1: { title: "C1", description: "Organização flexível, pontos de vista relacionados e nuance." },
+        C2: { title: "C2", description: "Domínio muito preciso, autônomo e adaptado à situação." },
+      },
+      stages: { recognize: "Reconhecer", complete: "Completar", transform: "Transformar", organize: "Organizar", develop: "Desenvolver", produce: "Produzir" },
+      completedEyebrow: "Sequência concluída",
+      completedTitle: ({ skill }) => `Você trabalhou: ${skill}`,
+      completedDescription: ({ outcome }) => `Você passou do reconhecimento à produção autônoma. Use isto na sua próxima redação completa: ${outcome}`,
+      reviewSequence: "Rever a sequência",
+      chooseAnotherSkill: "Escolher outra competência",
+      eyebrow: "Prática direcionada",
+      title: "Trabalhe uma habilidade de escrita de cada vez.",
+      description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e uma habilidade; em seguida, você fará uma prática guiada, da escolha de uma formulação ao seu próprio texto.",
+      chooseTask: "1. Qual tarefa você quer melhorar?",
+      chooseLevel: "2. Qual é seu nível-alvo?",
+      levelHelp: "Escolha primeiro uma tarefa: a dificuldade está ligada ao objetivo de escrita.",
+      chooseSkill: "3. Qual habilidade você quer praticar?",
+      durationAndSteps: ({ minutes, steps }) => `${minutes} min · progressão em ${steps} etapas`,
+      unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
+      skillHelp: "As habilidades disponíveis dependem da tarefa e do nível escolhidos.",
+      changeSkill: "← Mudar de habilidade",
+      sequenceDescription: ({ count }) => `Esta sequência contém ${count} exercícios conectados, em uma ordem pedagógica fixa.`,
+      progress: ({ step, total }) => `Etapa ${step} de ${total}`,
+      attentionLabel: "Ponto de atenção:",
+      selectAnswer: "Escolha sua resposta",
+      selectOrder: "Escolha a ordem mais lógica",
+      reorderItems: "Reorganize os elementos",
+      moveUp: "Subir",
+      moveDown: "Descer",
+      responseLabel: "Sua resposta em francês",
+      responsePlaceholder: "Escreva sua resposta em francês…",
+      suggestionPlaceholder: "Escreva sua proposta em francês…",
+      correctFeedback: "Muito bem.",
+      selfReviewFeedback: "Revise sua produção com esta lista.",
+      retryFeedback: "Ainda não; modifique sua resposta e tente novamente.",
+      finishSequence: "Terminar a sequência",
+      nextExercise: "Próximo exercício",
+      selfReview: "Ver minha lista de autoavaliação",
+      verify: "Verificar",
+      retryHint: "Você pode modificar sua resposta e tentar novamente quantas vezes precisar.",
     },
     login: {
       title: "Entrar",
