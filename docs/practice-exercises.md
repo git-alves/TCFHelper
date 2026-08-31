@@ -10,7 +10,7 @@
 
 - Add a dedicated `/practice` page for structured writing-skill training, distinct from `/tasks`, which remains the full-task performance workspace.
 - Require the learner to choose **Tâche**, **target level** (B2, C1, C2), and a **topic/skill**. The skill menu is derived from the chosen task; it must never be a generic cross-task list.
-- Deliver a fixed, editorially reviewed sequence for one skill: **Recognize → Complete → Transform → Organize → Develop → Produce**. Every activity in a sequence develops the same writing move.
+- Deliver a fixed, editorially reviewed **six-stage path** for one skill: **Recognize → Complete → Transform → Organize → Develop → Produce**. A fresh replay may select a different reviewed variant *within a stage*, but it must never reorder the stages.
 - Store curriculum content as typed, version-controlled question-bank data. A model may later correct learner production or recommend a next reviewed path, but it must never generate, remix, or select the core exercises dynamically.
 - Differentiate B2, C1, and C2 by independence, relationships between ideas, organization, register control, precision, flexibility, and nuance — not vocabulary difficulty alone.
 - Make the practice target continuously explicit: for example, `Tâche 3 · C1 · Introduire un contre-argument` and its learner-facing objective.
@@ -18,18 +18,18 @@
 ### Non-goals
 
 - No full-exam simulation, clock, word-range enforcement, or recent-exam-topic retrieval. Those belong to the existing task workspace.
-- No generic grammar course, random worksheet generator, daily randomization, or mixing unrelated grammar drills into a sequence.
+- No generic grammar course, random worksheet generator, or mixing unrelated grammar drills into a topic. Runtime selection may choose only among reviewed variants already assigned to the selected task, level, topic, and stage; it never creates content or changes the scaffold order.
 - No claim that completing a path certifies a CEFR level or predicts an official TCF result.
 - No authoring/admin interface, spaced-repetition engine, adaptive curriculum, or AI correction in the first release. The source data remains code-reviewed editorial content.
 - No scoring of an open-ended `Produce` response as objectively right or wrong. It receives a manually authored checklist and optional self-reflection; later AI correction remains a separately designed feature.
 
 ## Decision
 
-Build Practice as a **curated task-specific curriculum**, not a question picker. A task owns its own skills, level outcomes, and authored exercise sequences. Some competencies recur across tasks (such as register or connecting ideas), but their IDs, outcomes, and prompts remain task-specific because the communicative demand changes: a Tâche 1 register decision is about recipient and purpose; a Tâche 2 transition connects an experience, reaction, and reader-facing comment; a Tâche 3 transition compares and qualifies viewpoints.
+Build Practice as a **curated task-specific curriculum**, not a question generator. A task owns its own skills, level outcomes, and authored exercise sets. Some competencies recur across tasks (such as register or connecting ideas), but their IDs, outcomes, and prompts remain task-specific because the communicative demand changes: a Tâche 1 register decision is about recipient and purpose; a Tâche 2 transition connects an experience, reaction, and reader-facing comment; a Tâche 3 transition compares and qualifies viewpoints.
 
 Use a static typed question bank for the launch. This makes content reviewable, testable, deployable with the application, and demonstrably independent of AI. It is preferred to a database/editor because the initial risk is pedagogical quality and task fit, not operational publishing volume. The bank can move to a managed content workflow only after there is evidence of frequent editorial iteration.
 
-Every selectable topic must have a complete six-step sequence for its task and level. This is preferred to showing a large catalogue with partial coverage: it protects the learner from a misleading “practice path” that stops at a quiz or jumps straight to a paragraph.
+Every selectable topic must have a complete six-stage exercise path for its task and level. This is preferred to showing a large catalogue with partial coverage: it protects the learner from a misleading practice set that stops at a quiz or jumps straight to a paragraph. Stage order is learner-facing and fixed because it deliberately moves from controlled recognition to independent production.
 
 ## Curriculum taxonomy
 
@@ -90,7 +90,7 @@ Tâche 3 paths train analysis of a social issue and the synthesis of viewpoints 
 | `t3_synthesizing_information` | Synthétiser les informations | Bring multiple viewpoints together into a meaningful relationship. |
 | `t3_concluding_analysis` | Conclure l'analyse | Reach a coherent conclusion that follows from the comparison and position. |
 
-The selector first filters by `task`; level then filters to published sequences for that task. It shows only topics whose selected level has a full sequence. This means no irrelevant Tâche 1 greeting drill appears under Tâche 3, and no topic appears merely because a single quiz exists for it.
+The flow is always **Task → target level → topic**. The first two choices establish the teaching context; the third control is a topic dropdown populated only with the selected task's published topics at that level. This means no irrelevant Tâche 1 greeting drill appears under Tâche 3, and no topic appears merely because a single quiz exists for it.
 
 ## Level calibration
 
@@ -108,7 +108,7 @@ For example, `t2_justifying_opinion` at B2 asks the learner to comment on an exp
 
 ## Sequence and exercise design
 
-One path always keeps the same writing focus and uses a shared scenario or thematic thread where it helps continuity. The six required ordered stages are:
+One exercise set always keeps the same writing focus and uses a shared scenario or thematic thread where it helps continuity. It must cover these six activity types:
 
 | Order | Stage | Permitted exercise types | Evidence of progress |
 | --- | --- | --- | --- |
@@ -119,9 +119,15 @@ One path always keeps the same writing focus and uses a shared scenario or thema
 | 5 | **Develop** | Guided expansion from an initial idea with required slots or prompts | Learner can add a reason, explanation, example, consequence, contrast, or other skill-specific support. |
 | 6 | **Produce** | Independent sentence, paragraph, or short response | Learner uses the target move without sentence-level scaffolding. |
 
-`Develop` and `Produce` are intentionally distinct. Develop gives structured prompts such as “claim → reason → explanation → example”; Produce asks the learner to choose and compose that structure. The page does not unlock a later item until the preceding closed-response item is submitted; an incorrect response receives its fixed explanation and can be retried. Open responses remain completion-based, accompanied by an editorial checklist rather than a false automatic grade.
+`Develop` and `Produce` are intentionally distinct. Develop gives structured prompts such as “claim → reason → explanation → example”; Produce asks the learner to choose and compose that structure. Every closed-response item must be submitted before the session moves to its next stage; an incorrect response receives its fixed explanation and can be retried. Open responses remain completion-based, accompanied by an editorial checklist rather than a false automatic grade.
 
-Example path: `Tâche 2 → B2 → Justifier son opinion` uses one shared experience (trying a local co-working space) across the path: distinguish a supported comment from an unsupported reaction; complete `Je recommande cet espace parce que …`; connect a concrete benefit to reduced commuting; order event → reaction → comment → reason → example; expand a supplied evaluation; then write a short blog/email passage recounting the experience and explaining the recommendation. It is a single skill progression, not six unrelated questions.
+### Fixed scaffold, reviewed replay variants
+
+Starting or restarting a topic creates a fresh session from the selected `task + level + topic` exercise set. The client chooses one manually authored exercise for each of the six stage slots, then always presents those slots in ascending order: Recognize through Produce. It does not call a model, construct a new prompt, mix entries from another topic, or shuffle the stage order.
+
+When a stage has more than one reviewed variant, a replay chooses a different eligible variant for that same stage where possible. When it has only one approved variant, the session safely reuses it; the product must not imply variety that the bank does not contain. `sequenceOrder` and `prerequisiteExerciseId` remain both authoring controls and learner-facing progression controls: they determine the fixed delivery order.
+
+Example set: `Tâche 2 → B2 → Raconter les événements` uses one shared experience across all six stages: choose an appropriate opening; complete a chronological connector; combine an event and reaction; organize the narrative; develop a supplied moment; and write a short blog/email post. On replay, the Recognize slot might use a different reviewed opening and the Complete slot a different reviewed connector, but the learner still completes the six stages in that order.
 
 ## Data model and content controls
 
@@ -180,34 +186,35 @@ type PracticeExercise = {
 };
 ```
 
-Validation must reject a bank entry when its task does not match its skill, when it repeats an order, skips one of the six stages, lacks a predecessor after order 1, or uses an objectively gradable type without a correct/accepted answer. `FREE_PRODUCTION` must instead carry a `productionChecklist`, and has no `correctAnswer`. Tests also assert that each published path contains exactly the six stages in order and that selector results contain only skills owned by its selected task.
+An exercise variant belongs to a stage group identified by `task + level + skillId + sequenceOrder`; all variants in the group must use the stage's activity type. Its permanent `id` distinguishes the reviewed variants, while `contentVersion` records editorial change. Validation must reject a bank entry when its task does not match its skill, when the set repeats or omits one of the six required stages, when a variant's activity type does not match its stage, or when it uses an objectively gradable type without a correct/accepted answer. `FREE_PRODUCTION` must instead carry a `productionChecklist`, and has no `correctAnswer`. Tests also assert that each published topic covers all six stages, a session selects only its selected task/level/topic entries with exactly one approved variant per stage in fixed order, and the topic dropdown contains only skills owned by its selected task.
 
 The client can keep in-progress navigation and unsubmitted open responses in browser state for v1. Do not persist learner answer text or introduce an attempt schema until a privacy-reviewed progress product is specified. If browser storage is unavailable, the active sequence still works for the current session. Static curriculum availability never depends on a network model call.
 
 ## Experience, architecture, and degraded behavior
 
-`Open Practice → select Tâche → select level → select task-specific topic → see skill objective and six-step path → complete the sequence`
+`Open Practice → select task → select level → choose a task-specific topic from the dropdown → start a staged curated session → complete the six-stage path`
 
-- Selecting a task resets incompatible topic choices and explains the task's writing purpose before exposing its topics.
-- Selecting a level updates the task's topic list to full, published paths at that level. If none are ready, show an editorial “coming soon” state rather than a disabled or random exercise.
-- A path header permanently displays task, level, topic, skill description, and `Step n of 6`. It also names the current scaffold stage.
+- Selecting a task resets incompatible level/topic choices and explains the task's writing purpose before exposing later choices.
+- Selecting a level enables the **Topic** dropdown and limits it to full, published exercise sets for that exact task and level. If none are ready, show an editorial “coming soon” state rather than a disabled or generated exercise.
+- The topic dropdown's placeholder explains that its choices depend on the selected task and level. It must be keyboard accessible and never contain a topic from another task.
+- A session header permanently displays task, level, topic, skill description, `Exercise n of 6`, and the current stage.
 - Closed exercises expose a single response action, immediate fixed feedback, and an explanation for each retry. They must work by keyboard and communicate state changes to assistive technology.
 - The final production activity displays its short, manually written task, target checklist, and a clear distinction between “complete your practice” and “officially correct.” No AI request is needed to finish.
-- Switching a path with unsaved production text prompts before clearing it. A page refresh may lose that draft in v1; this is stated rather than silently implying server save.
+- Restarting retains the six-stage delivery order and selects a different approved variant within a stage when available. Switching task, level, or topic with unsaved production text prompts before clearing it. A page refresh may lose that draft in v1; this is stated rather than silently implying server save.
 
 The question bank is bundled with the application, so there is no curriculum-service outage. A malformed or missing local entry is a deployment defect: fail closed for that path, log the ID server-side where possible, and show a generic unavailable message with a return-to-selection action. Never fall back to another task's topic or an AI-created replacement.
 
 ## Launch scope, quality gate, and success metric
 
-The launch catalogue is intentionally **complete before broad**. Publish at least two complete six-step paths for every Task × Level cell — 18 paths and 108 manually authored activities — using the canonical taxonomy above. Each path must be reviewed by a qualified TCF educator for task fit, level calibration, answer accuracy, and explanation quality before its `published` flag is enabled. Additional taxonomy topics remain hidden until their full six-step paths pass the same gate.
+The launch catalogue is intentionally **complete before broad**. Publish at least two complete six-stage paths for every Task × Level cell — 18 paths and 108 manually authored activities — using the canonical taxonomy above. To promise replay variety for a visible path, publish at least two reviewed variants for every stage in that path (12 activities per path, or 216 activities at the 18-path launch gate). Each variant must be reviewed by a qualified TCF educator for task fit, level calibration, answer accuracy, and explanation quality before its `published` flag is enabled. Additional taxonomy topics remain hidden until their full paths pass the same gate.
 
-This is a meaningful first trainer without pretending that 108 activities complete the entire curriculum. It is preferred to seeding hundreds of thin or unreviewed items: the product promise is progressive writing practice, and a partial path breaks that promise more severely than a smaller menu.
+This is a meaningful first trainer without pretending that 216 activities complete the entire curriculum. It is preferred to seeding hundreds of thin or unreviewed items: the product promise is progressive writing practice, and a partial path breaks that promise more severely than a smaller menu.
 
 The release succeeds in the first four weeks when:
 
 1. at least **35%** of authenticated learners who open `/practice` start a path (baseline: unmeasured);
 2. at least **45%** of started paths reach the `Produce` activity (baseline: unmeasured); and
-3. a blinded TCF-qualified audit of the 108 launch activities finds **0** task-mismatched topics, **0** stage-order violations, and at least **95%** of closed-answer/explanation pairs pedagogically accurate.
+3. a blinded TCF-qualified audit of the launch activities finds **0** task-mismatched topics, **0** required-stage coverage violations, and at least **95%** of closed-answer/explanation pairs pedagogically accurate.
 
 Collect only selection, path start, stage reached, closed-answer correctness, retry, and path completion events after privacy review. Do not collect or transmit free-production text in the first release. The success metrics are targets until this minimal, privacy-reviewed instrumentation exists.
 
@@ -217,7 +224,9 @@ Collect only selection, path start, stage reached, closed-answer correctness, re
 
 **Generate an exercise from a topic with AI** — rejected. It violates the fixed-curriculum requirement, makes content quality and level calibration non-auditable, and adds a dependency to the moment when a learner needs immediate practice.
 
-**Start every path with an independent paragraph** — rejected. It measures a capability but does not train it. The staged sequence gives controlled rehearsal before independent production.
+**Make every item an independent paragraph** — rejected. It measures a capability but does not provide varied rehearsal. Each selected topic instead has a reviewed progression of recognition, completion, transformation, organization, guided development, and production activities, with replay variety coming only from reviewed alternatives for the same stage.
+
+**Shuffle the six exercise types on replay** — rejected. It can surface independent production before a learner has completed controlled practice, undermining the load-bearing controlled-to-independent learning path. Selecting an authored variant within each fixed stage gives variety without sacrificing the instructional sequence.
 
 **Publish incomplete paths to make the catalogue look larger** — rejected. A learner selecting a named topic reasonably expects a complete learning progression. Two reviewed paths per Task × Level cell is an honest launch boundary; every other topic stays unpublished until complete.
 
@@ -231,4 +240,4 @@ Collect only selection, path start, stage reached, closed-answer correctness, re
 
 ## Recommendation
 
-Proceed with the task-owned taxonomy and a curated 18-path launch catalogue. The key tradeoff is a smaller initial menu in exchange for every visible topic being truly progressive, task-relevant, reviewable, and independent of AI generation. Treat the first launch as proof that learners will complete a focused skill path; expand breadth and persistent progress only after that evidence exists.
+Proceed with the task-owned taxonomy and a curated 18-path launch catalogue. The key tradeoff is more editorial work to author stage variants in exchange for every visible topic being comprehensive, task-relevant, reviewable, replayable without losing progression, and independent of AI generation. Treat the first launch as proof that learners will complete focused skill practice; expand breadth and persistent progress only after that evidence exists.

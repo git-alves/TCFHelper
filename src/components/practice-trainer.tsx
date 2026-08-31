@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
+import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -54,7 +56,12 @@ interface PracticeTrainerProps {
 const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
-type CheckState = "correct" | "try-again" | "self-review" | null;
+type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
+
+const SELECT_BUTTON_CLASS =
+  "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
+const SELECT_LIST_CLASS =
+  "absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-black/[.15] bg-white p-1 shadow-lg dark:border-white/[.2] dark:bg-zinc-950";
 
 function normalizeAnswer(answer: string): string {
   return answer
@@ -79,6 +86,12 @@ function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExe
     order.length === exercise.correct_answer.length &&
     order.every((item, index) => item === exercise.correct_answer?.[index])
   );
+}
+
+function getReviewedAnswers(exercise: CuratedPracticeExercise): readonly string[] {
+  if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
+  if (Array.isArray(exercise.correct_answer)) return exercise.correct_answer;
+  return exercise.accepted_answers ?? [];
 }
 
 function ChoiceCard({
@@ -268,6 +281,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   // prevents a future shared label such as "conclusion" from loading the
   // sequence belonging to another Tâche.
   const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(null);
+  const [exerciseOrder, setExerciseOrder] = useState<readonly CuratedPracticeExercise[]>([]);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
@@ -281,20 +295,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         : [],
     [curriculum.skills, selectedLevel, selectedTask],
   );
-  const exercises = useMemo(
-    () =>
-      selectedSkill
-        ? curriculum.exercises
-            .filter(
-              (exercise) =>
-                exercise.task === selectedSkill.task &&
-                exercise.level === selectedSkill.level &&
-                exercise.skill === selectedSkill.id,
-            )
-            .sort((left, right) => left.sequence_order - right.sequence_order)
-        : [],
-    [curriculum.exercises, selectedSkill],
-  );
+  const exercises = exerciseOrder;
   const currentExercise = exercises[currentExerciseIndex] ?? null;
   const isIndependentWriting =
     currentExercise?.exercise_type === "develop" || currentExercise?.exercise_type === "produce";
@@ -302,6 +303,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
       : answer.trim().length > 0;
+  const reviewedAnswers = getReviewedAnswers(currentExercise);
+  const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
+  const isExerciseComplete =
+    checkState === "correct" || checkState === "revealed" || checkState === "self-review";
 
   function resetExercise(nextExercise: CuratedPracticeExercise | null) {
     setAnswer("");
@@ -311,7 +316,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseTask(task: PracticeTask) {
     setSelectedTask(task);
+    setSelectedLevel(null);
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -320,21 +327,28 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   function chooseLevel(level: PracticeLevel) {
     setSelectedLevel(level);
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
   }
 
+  function exercisesForSkill(skill: CuratedPracticeSkill): CuratedPracticeExercise[] {
+    return curriculum.exercises.filter(
+      (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
+    );
+  }
+
   function chooseSkill(skill: CuratedPracticeSkill) {
-    const firstExercise = curriculum.exercises
-      .filter(
-        (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
-      )
-      .sort((left, right) => left.sequence_order - right.sequence_order)[0];
+    // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
+    // when a stage has more than one reviewed variant, a random one is used
+    // so replaying a topic doesn't always show the identical exercise.
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(skill));
     setSelectedSkill(skill);
+    setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
-    resetExercise(firstExercise ?? null);
+    resetExercise(nextExercises[0] ?? null);
   }
 
   function updateAnswer(nextAnswer: string) {
@@ -361,6 +375,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(correct ? "correct" : "try-again");
   }
 
+  function revealAnswer() {
+    if (!canRevealAnswer) return;
+    setCheckState("revealed");
+  }
+
   function moveNext() {
     const nextIndex = currentExerciseIndex + 1;
     if (nextIndex >= exercises.length) {
@@ -372,13 +391,20 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function restartSequence() {
+    if (!selectedSkill) return;
+    // The stage order stays fixed on replay too; only the variant chosen for
+    // a stage with more than one reviewed option can change.
+    const previousExerciseIds = new Set(exercises.map((exercise) => exercise.id));
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill), Math.random, previousExerciseIds);
+    setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
-    resetExercise(exercises[0] ?? null);
+    resetExercise(nextExercises[0] ?? null);
   }
 
   function returnToSkills() {
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -469,23 +495,29 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           </fieldset>
 
           <fieldset disabled={!selectedTask || !selectedLevel} aria-describedby={!selectedLevel ? "skill-help" : undefined}>
-            <legend className="text-sm font-semibold">{practice.chooseSkill}</legend>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {matchingSkills.map((skill) => (
-                <ChoiceCard
-                  key={skill.id}
-                  selected={selectedSkill?.id === skill.id}
-                  onClick={() => chooseSkill(skill)}
-                  disabled={!selectedTask || !selectedLevel}
-                >
-                  <strong className="block text-base">{skill.label}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{skill.description}</span>
-                  <span className="mt-3 block text-xs font-medium text-violet-700 dark:text-violet-300">
-                    {practice.durationAndSteps({ minutes: skill.estimated_minutes, steps: 6 })}
-                  </span>
-                </ChoiceCard>
-              ))}
-            </div>
+            <legend id="practice-skill-label" className="text-sm font-semibold">{practice.chooseSkill}</legend>
+            <ThemedSelect<string>
+              value={selectedSkill?.id ?? ""}
+              options={[
+                { value: "", label: practice.topicPlaceholder },
+                ...matchingSkills.map((skill) => ({
+                  value: skill.id,
+                  label: `${skill.label} — ${skill.description}`,
+                })),
+              ] satisfies readonly ThemedSelectOption<string>[]}
+              disabled={!selectedTask || !selectedLevel}
+              ariaLabelledBy="practice-skill-label"
+              onChange={(skillId) => {
+                const skill = matchingSkills.find((candidate) => candidate.id === skillId);
+                if (skill) {
+                  chooseSkill(skill);
+                } else if (!skillId) {
+                  returnToSkills();
+                }
+              }}
+              buttonClassName={`mt-3 ${SELECT_BUTTON_CLASS}`}
+              listClassName={SELECT_LIST_CLASS}
+            />
             {selectedTask && selectedLevel && matchingSkills.length === 0 && (
               <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {practice.unavailableCombination}
@@ -548,7 +580,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             onAnswerChange={updateAnswer}
             ordering={ordering}
             onOrderingChange={updateOrdering}
-            disabled={checkState === "correct" || checkState === "self-review"}
+            disabled={isExerciseComplete}
             practice={practice}
           />
         </div>
@@ -560,7 +592,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             className={`mt-5 rounded-xl border px-4 py-3 text-sm leading-6 ${
               checkState === "correct"
                 ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-                : checkState === "self-review"
+                : checkState === "self-review" || checkState === "revealed"
                   ? "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100"
                   : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
             }`}
@@ -570,9 +602,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 ? practice.correctFeedback
                 : checkState === "self-review"
                   ? practice.selfReviewFeedback
+                  : checkState === "revealed"
+                    ? practice.revealedFeedback
                   : practice.retryFeedback}
             </p>
             <p className="mt-1">{currentExercise.explanation}</p>
+            {checkState === "revealed" && (
+              <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
+                <p className="font-medium">{practice.reviewedAnswerLabel}</p>
+                {currentExercise.exercise_type === "organize" && reviewedAnswers.length > 1 ? (
+                  <ol className="mt-1 list-decimal space-y-1 pl-5">
+                    {reviewedAnswers.map((reviewedAnswer) => (
+                      <li key={reviewedAnswer}>{reviewedAnswer}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-1">{reviewedAnswers.join(" / ")}</p>
+                )}
+              </div>
+            )}
             {checkState === "self-review" && currentExercise.self_check && (
               <ul className="mt-3 list-disc space-y-1 pl-5">
                 {currentExercise.self_check.map((check) => (
@@ -584,7 +632,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {checkState === "correct" || checkState === "self-review" ? (
+          {isExerciseComplete ? (
             <button
               type="button"
               onClick={moveNext}
@@ -593,14 +641,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
             </button>
           ) : (
-            <button
-              type="button"
-              disabled={!hasAnswer}
-              onClick={checkAnswer}
-              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
-            >
-              {isIndependentWriting ? practice.selfReview : practice.verify}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={!hasAnswer}
+                onClick={checkAnswer}
+                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
+              >
+                {isIndependentWriting ? practice.selfReview : practice.verify}
+              </button>
+              {canRevealAnswer && (
+                <button
+                  type="button"
+                  onClick={revealAnswer}
+                  className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  {practice.revealAnswer}
+                </button>
+              )}
+            </>
           )}
           {checkState === "try-again" && (
             <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>

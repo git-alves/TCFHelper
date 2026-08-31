@@ -34,7 +34,7 @@ describe("practice curriculum", () => {
     }
   });
 
-  it("makes every curated sequence progress from recognition to independent production", () => {
+  it("makes every curated topic cover the fixed scaffold and allow reviewed variants per stage", () => {
     // Derive the paths from the bank rather than carrying a hand-maintained
     // list. A future author cannot accidentally add an incomplete or wrongly
     // ordered task/level/skill path without this test exercising it.
@@ -48,11 +48,15 @@ describe("practice curriculum", () => {
 
     for (const [path, { task, level, skill }] of selections) {
       const exercises = getPracticeExercises(task, level, skill);
-      expect(exercises.map((exercise) => exercise.exerciseType), path).toEqual(PRACTICE_EXERCISE_SEQUENCE);
-      expect(exercises.map((exercise) => exercise.sequenceOrder)).toEqual([1, 2, 3, 4, 5, 6]);
-      expect(exercises[0].prerequisiteExerciseId).toBeNull();
-      for (let index = 1; index < exercises.length; index += 1) {
-        expect(exercises[index].prerequisiteExerciseId).toBe(exercises[index - 1].id);
+      expect(new Set(exercises.map((exercise) => exercise.exerciseType)), path).toEqual(
+        new Set(PRACTICE_EXERCISE_SEQUENCE),
+      );
+      expect(new Set(exercises.map((exercise) => exercise.sequenceOrder)), path).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+
+      for (const [index, stage] of PRACTICE_EXERCISE_SEQUENCE.entries()) {
+        const stageVariants = exercises.filter((exercise) => exercise.sequenceOrder === index + 1);
+        expect(stageVariants.length, `${path}/${stage}`).toBeGreaterThanOrEqual(2);
+        expect(stageVariants.every((exercise) => exercise.exerciseType === stage), `${path}/${stage}`).toBe(true);
       }
     }
   });
