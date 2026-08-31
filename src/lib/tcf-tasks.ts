@@ -26,7 +26,7 @@ export const TASK_INSTRUCTIONS: Record<TaskType, TaskDefinition> = {
     label: "Tâche 2",
     title: "Raconter et commenter",
     description:
-      "Rédigez un article, un courrier ou une note à l'intention de plusieurs destinataires pour raconter une expérience ou rendre compte d'un événement, en ajoutant des commentaires, avis ou arguments adaptés à l'objectif du texte (par exemple : convaincre, vous réconcilier, plaire, attirer l'attention).",
+      "Rédigez un article de blog ou un e-mail pour raconter une expérience ou un événement à des lecteurs précis. Faites vivre l'expérience avec des détails utiles, puis ajoutez votre réaction, votre commentaire ou la suite que vous en tirez, selon le but du message.",
     minWords: 120,
     maxWords: 150,
   },
