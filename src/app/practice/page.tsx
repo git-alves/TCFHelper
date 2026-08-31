@@ -47,6 +47,7 @@ function toExercise(exercise: PracticeExercise): CuratedPracticeExercise {
     sequence_order: exercise.sequenceOrder,
     prerequisite_exercise: exercise.prerequisiteExerciseId ?? undefined,
     tags: exercise.tags,
+    self_check: exercise.selfCheck,
   };
 }
 

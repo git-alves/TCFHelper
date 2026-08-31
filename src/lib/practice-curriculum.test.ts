@@ -35,15 +35,20 @@ describe("practice curriculum", () => {
   });
 
   it("makes every curated sequence progress from recognition to independent production", () => {
-    const selections = [
-      ["TASK_1", "B2", "openings"],
-      ["TASK_2", "B2", "recounting-events"],
-      ["TASK_3", "C1", "counterarguments"],
-    ] as const;
+    // Derive the paths from the bank rather than carrying a hand-maintained
+    // list. A future author cannot accidentally add an incomplete or wrongly
+    // ordered task/level/skill path without this test exercising it.
+    const selections = new Map(
+      PRACTICE_EXERCISES.map((exercise) => [
+        `${exercise.task}/${exercise.level}/${exercise.skill}`,
+        { task: exercise.task, level: exercise.level, skill: exercise.skill },
+      ]),
+    );
+    expect(selections.size).toBeGreaterThan(0);
 
-    for (const [task, level, skill] of selections) {
+    for (const [path, { task, level, skill }] of selections) {
       const exercises = getPracticeExercises(task, level, skill);
-      expect(exercises.map((exercise) => exercise.exerciseType), `${task}/${level}/${skill}`).toEqual(PRACTICE_EXERCISE_SEQUENCE);
+      expect(exercises.map((exercise) => exercise.exerciseType), path).toEqual(PRACTICE_EXERCISE_SEQUENCE);
       expect(exercises.map((exercise) => exercise.sequenceOrder)).toEqual([1, 2, 3, 4, 5, 6]);
       expect(exercises[0].prerequisiteExerciseId).toBeNull();
       for (let index = 1; index < exercises.length; index += 1) {
@@ -60,9 +65,14 @@ describe("practice curriculum", () => {
       expect(entry.explanation.trim(), entry.id).not.toBe("");
       expect(entry.targetLanguageFeature.trim(), entry.id).not.toBe("");
       expect(entry.tags.length, entry.id).toBeGreaterThan(0);
+      if (entry.exerciseType === "develop" || entry.exerciseType === "produce") {
+        expect(entry.correctAnswer, entry.id).toBeNull();
+        expect(entry.acceptedAnswers, entry.id).toEqual([]);
+        expect(entry.selfCheck, entry.id).toHaveLength(3);
+      }
       if (entry.exerciseType === "organize") {
         expect(Array.isArray(entry.correctAnswer), entry.id).toBe(true);
-        expect(entry.correctAnswer).toEqual(expect.arrayContaining(entry.options));
+        expect(entry.correctAnswer).toEqual(expect.arrayContaining([...entry.options]));
         expect(entry.options).toHaveLength((entry.correctAnswer as readonly string[]).length);
       }
     }
