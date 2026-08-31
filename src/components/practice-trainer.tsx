@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
+import { randomizePracticeExerciseOrder } from "@/lib/practice-exercise-order";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -55,6 +57,11 @@ const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
 type CheckState = "correct" | "try-again" | "self-review" | null;
+
+const SELECT_BUTTON_CLASS =
+  "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
+const SELECT_LIST_CLASS =
+  "absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-black/[.15] bg-white p-1 shadow-lg dark:border-white/[.2] dark:bg-zinc-950";
 
 function normalizeAnswer(answer: string): string {
   return answer
@@ -268,6 +275,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   // prevents a future shared label such as "conclusion" from loading the
   // sequence belonging to another Tâche.
   const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(null);
+  const [exerciseOrder, setExerciseOrder] = useState<readonly CuratedPracticeExercise[]>([]);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
@@ -281,20 +289,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         : [],
     [curriculum.skills, selectedLevel, selectedTask],
   );
-  const exercises = useMemo(
-    () =>
-      selectedSkill
-        ? curriculum.exercises
-            .filter(
-              (exercise) =>
-                exercise.task === selectedSkill.task &&
-                exercise.level === selectedSkill.level &&
-                exercise.skill === selectedSkill.id,
-            )
-            .sort((left, right) => left.sequence_order - right.sequence_order)
-        : [],
-    [curriculum.exercises, selectedSkill],
-  );
+  const exercises = exerciseOrder;
   const currentExercise = exercises[currentExerciseIndex] ?? null;
   const isIndependentWriting =
     currentExercise?.exercise_type === "develop" || currentExercise?.exercise_type === "produce";
@@ -311,7 +306,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseTask(task: PracticeTask) {
     setSelectedTask(task);
+    setSelectedLevel(null);
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -320,21 +317,28 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   function chooseLevel(level: PracticeLevel) {
     setSelectedLevel(level);
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
   }
 
+  function exercisesForSkill(skill: CuratedPracticeSkill): CuratedPracticeExercise[] {
+    return curriculum.exercises.filter(
+      (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
+    );
+  }
+
   function chooseSkill(skill: CuratedPracticeSkill) {
-    const firstExercise = curriculum.exercises
-      .filter(
-        (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
-      )
-      .sort((left, right) => left.sequence_order - right.sequence_order)[0];
+    // The bank gives each exercise a pedagogical stage and a sequence order
+    // for authoring and quality checks. Learners practise the same reviewed
+    // set in a new order instead of always seeing the same exercise type next.
+    const nextExercises = randomizePracticeExerciseOrder(exercisesForSkill(skill));
     setSelectedSkill(skill);
+    setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
-    resetExercise(firstExercise ?? null);
+    resetExercise(nextExercises[0] ?? null);
   }
 
   function updateAnswer(nextAnswer: string) {
@@ -372,13 +376,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function restartSequence() {
+    if (!selectedSkill) return;
+    let nextExercises = randomizePracticeExerciseOrder(exercisesForSkill(selectedSkill));
+
+    // A shuffle can coincidentally return the existing order. Rotate the
+    // authored references in that exceptional case so “practise again” always
+    // starts with a different exercise when there is a choice.
+    if (nextExercises.length > 1 && nextExercises.every((exercise, index) => exercise.id === exercises[index]?.id)) {
+      nextExercises = [...nextExercises.slice(1), nextExercises[0]];
+    }
+
+    setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
-    resetExercise(exercises[0] ?? null);
+    resetExercise(nextExercises[0] ?? null);
   }
 
   function returnToSkills() {
     setSelectedSkill(null);
+    setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     resetExercise(null);
@@ -470,22 +486,27 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
           <fieldset disabled={!selectedTask || !selectedLevel} aria-describedby={!selectedLevel ? "skill-help" : undefined}>
             <legend className="text-sm font-semibold">{practice.chooseSkill}</legend>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {matchingSkills.map((skill) => (
-                <ChoiceCard
-                  key={skill.id}
-                  selected={selectedSkill?.id === skill.id}
-                  onClick={() => chooseSkill(skill)}
-                  disabled={!selectedTask || !selectedLevel}
-                >
-                  <strong className="block text-base">{skill.label}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{skill.description}</span>
-                  <span className="mt-3 block text-xs font-medium text-violet-700 dark:text-violet-300">
-                    {practice.durationAndSteps({ minutes: skill.estimated_minutes, steps: 6 })}
-                  </span>
-                </ChoiceCard>
-              ))}
-            </div>
+            <ThemedSelect<string>
+              value={selectedSkill?.id ?? ""}
+              options={[
+                { value: "", label: practice.topicPlaceholder },
+                ...matchingSkills.map((skill) => ({
+                  value: skill.id,
+                  label: `${skill.label} — ${skill.description}`,
+                })),
+              ] satisfies readonly ThemedSelectOption<string>[]}
+              disabled={!selectedTask || !selectedLevel}
+              onChange={(skillId) => {
+                const skill = matchingSkills.find((candidate) => candidate.id === skillId);
+                if (skill) {
+                  chooseSkill(skill);
+                } else if (!skillId) {
+                  returnToSkills();
+                }
+              }}
+              buttonClassName={`mt-3 ${SELECT_BUTTON_CLASS}`}
+              listClassName={SELECT_LIST_CLASS}
+            />
             {selectedTask && selectedLevel && matchingSkills.length === 0 && (
               <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 {practice.unavailableCombination}
