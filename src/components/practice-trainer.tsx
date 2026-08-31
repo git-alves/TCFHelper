@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useAppCopy } from "@/components/app-locale-provider";
+import type { AppCopy } from "@/lib/app-copy";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -49,46 +51,8 @@ interface PracticeTrainerProps {
   curriculum: CuratedPracticeCurriculum;
 }
 
-const TASKS: readonly {
-  id: PracticeTask;
-  title: string;
-  description: string;
-}[] = [
-  {
-    id: "TASK_1",
-    title: "Tâche 1",
-    description: "Communiquer efficacement dans un message court, avec le bon destinataire et le bon registre.",
-  },
-  {
-    id: "TASK_2",
-    title: "Tâche 2",
-    description: "Raconter et commenter une expérience dans un e-mail ou un billet de blog pour des lecteurs précis.",
-  },
-  {
-    id: "TASK_3",
-    title: "Tâche 3",
-    description: "Comparer des points de vue et défendre une position nuancée sur un sujet de société.",
-  },
-];
-
-const LEVELS: readonly {
-  id: PracticeLevel;
-  title: string;
-  description: string;
-}[] = [
-  { id: "B2", title: "B2", description: "Idées claires, reliées et suffisamment développées." },
-  { id: "C1", title: "C1", description: "Organisation flexible, points de vue mis en relation et nuance." },
-  { id: "C2", title: "C2", description: "Maîtrise très précise, autonome et adaptée à la situation." },
-];
-
-const EXERCISE_LABELS: Record<PracticeExerciseType, string> = {
-  recognize: "Reconnaître",
-  complete: "Compléter",
-  transform: "Transformer",
-  organize: "Organiser",
-  develop: "Développer",
-  produce: "Produire",
-};
+const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
+const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
 type CheckState = "correct" | "try-again" | "self-review" | null;
 
@@ -148,12 +112,14 @@ function ChoiceCard({
 function ProgressSteps({
   exercises,
   currentIndex,
+  practice,
 }: {
   exercises: readonly CuratedPracticeExercise[];
   currentIndex: number;
+  practice: AppCopy["practice"];
 }) {
   return (
-    <ol aria-label="Progression de la séquence" className="grid grid-cols-6 gap-1 sm:gap-2">
+    <ol aria-label={practice.progress({ step: currentIndex + 1, total: exercises.length })} className="grid grid-cols-6 gap-1 sm:gap-2">
       {exercises.map((exercise, index) => {
         const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "future";
         return (
@@ -169,7 +135,7 @@ function ProgressSteps({
               }`}
             />
             <span className="mt-2 block truncate text-center text-[11px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-xs">
-              {EXERCISE_LABELS[exercise.exercise_type]}
+              {practice.stages[exercise.exercise_type]}
             </span>
           </li>
         );
@@ -185,6 +151,7 @@ function ExerciseInput({
   ordering,
   onOrderingChange,
   disabled,
+  practice,
 }: {
   exercise: CuratedPracticeExercise;
   answer: string;
@@ -192,11 +159,12 @@ function ExerciseInput({
   ordering: readonly string[];
   onOrderingChange: (ordering: readonly string[]) => void;
   disabled: boolean;
+  practice: AppCopy["practice"];
 }) {
   if (exercise.exercise_type === "recognize") {
     return (
       <fieldset className="grid gap-3">
-        <legend className="sr-only">Choisissez votre réponse</legend>
+        <legend className="sr-only">{practice.selectAnswer}</legend>
         {exercise.options?.map((option) => (
           <ChoiceCard
             key={option}
@@ -218,7 +186,7 @@ function ExerciseInput({
     if (typeof exercise.correct_answer === "string") {
       return (
         <fieldset className="grid gap-3">
-          <legend className="sr-only">Choisissez l’ordre le plus logique</legend>
+          <legend className="sr-only">{practice.selectOrder}</legend>
           {exercise.options?.map((option) => (
             <ChoiceCard
               key={option}
@@ -233,7 +201,7 @@ function ExerciseInput({
       );
     }
     return (
-      <div className="grid gap-2" aria-label="Réorganisez les éléments">
+      <div className="grid gap-2" aria-label={practice.reorderItems}>
         {ordering.map((item, index) => (
           <div
             key={item}
@@ -252,7 +220,7 @@ function ExerciseInput({
                 }}
                 className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                Monter
+                {practice.moveUp}
               </button>
               <button
                 type="button"
@@ -264,7 +232,7 @@ function ExerciseInput({
                 }}
                 className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                Descendre
+                {practice.moveDown}
               </button>
             </div>
           </div>
@@ -280,11 +248,11 @@ function ExerciseInput({
       disabled={disabled}
       onChange={(event) => onAnswerChange(event.target.value)}
       rows={isIndependentWriting ? 6 : 3}
-      aria-label="Votre réponse en français"
+      aria-label={practice.responseLabel}
       placeholder={
         isIndependentWriting
-          ? "Écrivez votre réponse en français…"
-          : "Écrivez votre proposition en français…"
+          ? practice.responsePlaceholder
+          : practice.suggestionPlaceholder
       }
       className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
     />
@@ -292,6 +260,7 @@ function ExerciseInput({
 }
 
 export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
+  const practice = useAppCopy().practice;
   const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(null);
   const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(null);
   // A skill label/ID is scoped to a task and level. Keeping the selected
@@ -422,15 +391,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   if (!selectedSkill || !currentExercise || isSequenceComplete) {
     if (isSequenceComplete && selectedSkill) {
       return (
-        <section aria-labelledby="practice-complete-heading" className="mx-auto w-full max-w-3xl">
+        <section aria-labelledby="practice-complete-heading" className="w-full">
           <div className="rounded-3xl border border-violet-200 bg-violet-50 p-6 sm:p-8 dark:border-violet-900 dark:bg-violet-950/40">
-            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">Séquence terminée</p>
+            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.completedEyebrow}</p>
             <h1 id="practice-complete-heading" className="mt-2 text-3xl font-semibold tracking-tight">
-              Vous avez travaillé : {selectedSkill.label}
+              {practice.completedTitle({ skill: selectedSkill.label })}
             </h1>
             <p className="mt-3 max-w-2xl leading-7 text-zinc-700 dark:text-zinc-300">
-              Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine
-              rédaction complète : {selectedSkill.learning_outcome}
+              {practice.completedDescription({ outcome: selectedSkill.learning_outcome })}
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
@@ -438,14 +406,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 onClick={restartSequence}
                 className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
               >
-                Revoir la séquence
+                {practice.reviewSequence}
               </button>
               <button
                 type="button"
                 onClick={returnToSkills}
                 className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                Choisir une autre compétence
+                {practice.chooseAnotherSkill}
               </button>
             </div>
           </div>
@@ -454,55 +422,54 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     }
 
     return (
-      <section aria-labelledby="practice-heading" className="mx-auto flex w-full max-w-5xl flex-col gap-8">
-        <header className="max-w-3xl">
-          <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Entraînement ciblé</p>
+      <section aria-labelledby="practice-heading" className="flex w-full flex-col gap-8">
+        <header>
+          <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">{practice.eyebrow}</p>
           <h1 id="practice-heading" className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            Travaillez une compétence d’écriture à la fois.
+            {practice.title}
           </h1>
           <p className="mt-3 text-base leading-7 text-zinc-600 dark:text-zinc-400">
-            Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et une compétence : vous
-            suivrez ensuite une progression guidée, du choix d’une formulation à votre propre texte.
+            {practice.description}
           </p>
         </header>
 
         <div className="grid gap-6">
           <fieldset>
-            <legend className="text-sm font-semibold">1. Quelle tâche voulez-vous améliorer&nbsp;?</legend>
+            <legend className="text-sm font-semibold">{practice.chooseTask}</legend>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {TASKS.map((task) => (
-                <ChoiceCard key={task.id} selected={selectedTask === task.id} onClick={() => chooseTask(task.id)}>
-                  <strong className="block text-base">{task.title}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{task.description}</span>
+                <ChoiceCard key={task} selected={selectedTask === task} onClick={() => chooseTask(task)}>
+                  <strong className="block text-base">{practice.tasks[task].title}</strong>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{practice.tasks[task].description}</span>
                 </ChoiceCard>
               ))}
             </div>
           </fieldset>
 
           <fieldset disabled={!selectedTask} aria-describedby={!selectedTask ? "level-help" : undefined}>
-            <legend className="text-sm font-semibold">2. Quel est votre niveau cible&nbsp;?</legend>
+            <legend className="text-sm font-semibold">{practice.chooseLevel}</legend>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {LEVELS.map((level) => (
                 <ChoiceCard
-                  key={level.id}
-                  selected={selectedLevel === level.id}
-                  onClick={() => chooseLevel(level.id)}
+                  key={level}
+                  selected={selectedLevel === level}
+                  onClick={() => chooseLevel(level)}
                   disabled={!selectedTask}
                 >
-                  <strong className="block text-base">{level.title}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{level.description}</span>
+                  <strong className="block text-base">{level}</strong>
+                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{practice.levels[level].description}</span>
                 </ChoiceCard>
               ))}
             </div>
             {!selectedTask && (
               <p id="level-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.
+                {practice.levelHelp}
               </p>
             )}
           </fieldset>
 
           <fieldset disabled={!selectedTask || !selectedLevel} aria-describedby={!selectedLevel ? "skill-help" : undefined}>
-            <legend className="text-sm font-semibold">3. Quelle compétence voulez-vous entraîner&nbsp;?</legend>
+            <legend className="text-sm font-semibold">{practice.chooseSkill}</legend>
             <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {matchingSkills.map((skill) => (
                 <ChoiceCard
@@ -514,20 +481,19 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                   <strong className="block text-base">{skill.label}</strong>
                   <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{skill.description}</span>
                   <span className="mt-3 block text-xs font-medium text-violet-700 dark:text-violet-300">
-                    {skill.estimated_minutes} min · progression en 6 étapes
+                    {practice.durationAndSteps({ minutes: skill.estimated_minutes, steps: 6 })}
                   </span>
                 </ChoiceCard>
               ))}
             </div>
             {selectedTask && selectedLevel && matchingSkills.length === 0 && (
               <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche :
-                nous n’affichons jamais d’exercice généré automatiquement.
+                {practice.unavailableCombination}
               </p>
             )}
             {(!selectedTask || !selectedLevel) && (
               <p id="skill-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                Les compétences disponibles dépendent de la tâche et du niveau que vous venez de choisir.
+                {practice.skillHelp}
               </p>
             )}
           </fieldset>
@@ -537,43 +503,42 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   return (
-    <section aria-labelledby="exercise-heading" className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+    <section aria-labelledby="exercise-heading" className="flex w-full flex-col gap-6">
       <button
         type="button"
         onClick={returnToSkills}
         className="w-fit text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
       >
-        ← Changer de compétence
+        {practice.changeSkill}
       </button>
 
       <header>
         <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
-          {TASKS.find((task) => task.id === selectedSkill.task)?.title} · {selectedSkill.level} · {selectedSkill.label}
+          {practice.tasks[selectedSkill.task].title} · {selectedSkill.level} · {selectedSkill.label}
         </p>
         <h1 id="exercise-heading" className="mt-2 text-3xl font-semibold tracking-tight">
           {selectedSkill.learning_outcome}
         </h1>
         <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          {selectedSkill.description} Cette séquence contient {exercises.length} exercices connectés, dans un ordre
-          pédagogique fixe.
+          {selectedSkill.description} {practice.sequenceDescription({ count: exercises.length })}
         </p>
       </header>
 
-      <ProgressSteps exercises={exercises} currentIndex={currentExerciseIndex} />
+      <ProgressSteps exercises={exercises} currentIndex={currentExerciseIndex} practice={practice} />
 
       <article className="rounded-3xl border border-black/[.1] bg-white p-5 shadow-sm sm:p-7 dark:border-white/[.15] dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-            {EXERCISE_LABELS[currentExercise.exercise_type]}
+            {practice.stages[currentExercise.exercise_type]}
           </span>
           <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            Étape {currentExerciseIndex + 1} sur {exercises.length}
+            {practice.progress({ step: currentExerciseIndex + 1, total: exercises.length })}
           </span>
         </div>
         <h2 className="mt-5 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{currentExercise.instructions}</p>
         <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-white/[.06] dark:text-zinc-300">
-          <span className="font-semibold">Point d’attention&nbsp;:</span> {currentExercise.target_language_feature}
+          <span className="font-semibold">{practice.attentionLabel}</span> {currentExercise.target_language_feature}
         </p>
 
         <div className="mt-5">
@@ -584,6 +549,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             ordering={ordering}
             onOrderingChange={updateOrdering}
             disabled={checkState === "correct" || checkState === "self-review"}
+            practice={practice}
           />
         </div>
 
@@ -601,10 +567,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           >
             <p className="font-semibold">
               {checkState === "correct"
-                ? "Bien vu."
+                ? practice.correctFeedback
                 : checkState === "self-review"
-                  ? "Relisez votre production avec cette grille."
-                  : "Pas encore — modifiez votre réponse et réessayez."}
+                  ? practice.selfReviewFeedback
+                  : practice.retryFeedback}
             </p>
             <p className="mt-1">{currentExercise.explanation}</p>
             {checkState === "self-review" && currentExercise.self_check && (
@@ -624,7 +590,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               onClick={moveNext}
               className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
             >
-              {currentExerciseIndex + 1 === exercises.length ? "Terminer la séquence" : "Exercice suivant"}
+              {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
             </button>
           ) : (
             <button
@@ -633,11 +599,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               onClick={checkAnswer}
               className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
             >
-              {isIndependentWriting ? "Voir ma grille d’auto-vérification" : "Vérifier"}
+              {isIndependentWriting ? practice.selfReview : practice.verify}
             </button>
           )}
           {checkState === "try-again" && (
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">Vous pouvez modifier votre réponse autant de fois que nécessaire.</span>
+            <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>
           )}
         </div>
       </article>

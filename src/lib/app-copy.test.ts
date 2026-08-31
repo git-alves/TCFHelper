@@ -26,6 +26,44 @@ describe("APP_COPY", () => {
         copy.home.description,
         copy.home.startATask,
         copy.home.getStarted,
+        ...Object.values(copy.practice.tasks).flatMap((task) => [task.title, task.description]),
+        ...Object.values(copy.practice.levels).flatMap((level) => [level.title, level.description]),
+        ...Object.values(copy.practice.stages),
+        copy.practice.completedEyebrow,
+        copy.practice.completedTitle({ skill: "Openings" }),
+        copy.practice.completedDescription({ outcome: "Write a clear opening." }),
+        copy.practice.reviewSequence,
+        copy.practice.chooseAnotherSkill,
+        copy.practice.eyebrow,
+        copy.practice.title,
+        copy.practice.description,
+        copy.practice.chooseTask,
+        copy.practice.chooseLevel,
+        copy.practice.levelHelp,
+        copy.practice.chooseSkill,
+        copy.practice.durationAndSteps({ minutes: 20, steps: 6 }),
+        copy.practice.unavailableCombination,
+        copy.practice.skillHelp,
+        copy.practice.changeSkill,
+        copy.practice.sequenceDescription({ count: 6 }),
+        copy.practice.progress({ step: 1, total: 6 }),
+        copy.practice.attentionLabel,
+        copy.practice.selectAnswer,
+        copy.practice.selectOrder,
+        copy.practice.reorderItems,
+        copy.practice.moveUp,
+        copy.practice.moveDown,
+        copy.practice.responseLabel,
+        copy.practice.responsePlaceholder,
+        copy.practice.suggestionPlaceholder,
+        copy.practice.correctFeedback,
+        copy.practice.selfReviewFeedback,
+        copy.practice.retryFeedback,
+        copy.practice.finishSequence,
+        copy.practice.nextExercise,
+        copy.practice.selfReview,
+        copy.practice.verify,
+        copy.practice.retryHint,
         copy.login.title,
         copy.login.emailLabel,
         copy.login.passwordLabel,
@@ -293,6 +331,56 @@ describe("APP_COPY", () => {
 
       expect(taskPickerBody.toLowerCase()).not.toContain(oldOpinionPhrasingByLocale[locale]);
       expect(taskPickerBody).toContain(correctedPhrasingByLocale[locale]);
+    }
+  });
+
+  it("has complete practice-mode interface copy for every locale", () => {
+    for (const locale of APP_LOCALES) {
+      const practice = getAppCopy(locale).practice;
+      const values = [
+        ...Object.values(practice.tasks).flatMap((task) => [task.title, task.description]),
+        ...Object.values(practice.levels).flatMap((level) => [level.title, level.description]),
+        ...Object.values(practice.stages),
+        practice.completedEyebrow,
+        practice.completedTitle({ skill: "Openings" }),
+        practice.completedDescription({ outcome: "Write a clear opening." }),
+        practice.reviewSequence,
+        practice.chooseAnotherSkill,
+        practice.eyebrow,
+        practice.title,
+        practice.description,
+        practice.chooseTask,
+        practice.chooseLevel,
+        practice.levelHelp,
+        practice.chooseSkill,
+        practice.durationAndSteps({ minutes: 20, steps: 6 }),
+        practice.unavailableCombination,
+        practice.skillHelp,
+        practice.changeSkill,
+        practice.sequenceDescription({ count: 6 }),
+        practice.progress({ step: 1, total: 6 }),
+        practice.attentionLabel,
+        practice.selectAnswer,
+        practice.selectOrder,
+        practice.reorderItems,
+        practice.moveUp,
+        practice.moveDown,
+        practice.responseLabel,
+        practice.responsePlaceholder,
+        practice.suggestionPlaceholder,
+        practice.correctFeedback,
+        practice.selfReviewFeedback,
+        practice.retryFeedback,
+        practice.finishSequence,
+        practice.nextExercise,
+        practice.selfReview,
+        practice.verify,
+        practice.retryHint,
+      ];
+
+      for (const value of values) {
+        expect(value.trim(), `${locale}/${value}`).not.toBe("");
+      }
     }
   });
 });

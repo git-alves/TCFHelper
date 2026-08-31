@@ -136,9 +136,14 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           <Show when="signed-in">
             <>
               {isHome ? (
-                <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
-                  {copy.nav.dashboard}
-                </Link>
+                <>
+                  <Link href="/practice" className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.practice}
+                  </Link>
+                  <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.dashboard}
+                  </Link>
+                </>
               ) : onTasks ? (
                 // A correction the server already received can't be
                 // recalled by leaving the page, or the Settings modal
