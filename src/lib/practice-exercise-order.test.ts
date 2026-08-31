@@ -37,6 +37,18 @@ describe("selectPracticeExerciseSession", () => {
     expect(session.map((exercise) => exercise.id)).toEqual(["recognize-b", "complete-a"]);
   });
 
+  it("uses another reviewed variant on replay when one exists", () => {
+    const authoredExercises = [
+      { exercise_type: "recognize", id: "recognize-a" },
+      { exercise_type: "recognize", id: "recognize-b" },
+      { exercise_type: "complete", id: "complete-a" },
+    ];
+
+    const session = selectPracticeExerciseSession(authoredExercises, () => 0, new Set(["recognize-a", "complete-a"]));
+
+    expect(session.map((exercise) => exercise.id)).toEqual(["recognize-b", "complete-a"]);
+  });
+
   it("omits a stage entirely when no exercise is authored for it", () => {
     const authoredExercises = [{ exercise_type: "recognize", id: "recognize-1" }];
 

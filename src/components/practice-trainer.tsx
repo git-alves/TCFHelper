@@ -56,7 +56,7 @@ interface PracticeTrainerProps {
 const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
-type CheckState = "correct" | "try-again" | "self-review" | null;
+type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
 
 const SELECT_BUTTON_CLASS =
   "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
@@ -86,6 +86,12 @@ function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExe
     order.length === exercise.correct_answer.length &&
     order.every((item, index) => item === exercise.correct_answer?.[index])
   );
+}
+
+function getReviewedAnswers(exercise: CuratedPracticeExercise): readonly string[] {
+  if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
+  if (Array.isArray(exercise.correct_answer)) return exercise.correct_answer;
+  return exercise.accepted_answers ?? [];
 }
 
 function ChoiceCard({
@@ -297,6 +303,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
       : answer.trim().length > 0;
+  const reviewedAnswers = getReviewedAnswers(currentExercise);
+  const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
+  const isExerciseComplete =
+    checkState === "correct" || checkState === "revealed" || checkState === "self-review";
 
   function resetExercise(nextExercise: CuratedPracticeExercise | null) {
     setAnswer("");
@@ -365,6 +375,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(correct ? "correct" : "try-again");
   }
 
+  function revealAnswer() {
+    if (!canRevealAnswer) return;
+    setCheckState("revealed");
+  }
+
   function moveNext() {
     const nextIndex = currentExerciseIndex + 1;
     if (nextIndex >= exercises.length) {
@@ -379,7 +394,8 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     if (!selectedSkill) return;
     // The stage order stays fixed on replay too; only the variant chosen for
     // a stage with more than one reviewed option can change.
-    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill));
+    const previousExerciseIds = new Set(exercises.map((exercise) => exercise.id));
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill), Math.random, previousExerciseIds);
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -564,7 +580,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             onAnswerChange={updateAnswer}
             ordering={ordering}
             onOrderingChange={updateOrdering}
-            disabled={checkState === "correct" || checkState === "self-review"}
+            disabled={isExerciseComplete}
             practice={practice}
           />
         </div>
@@ -576,7 +592,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             className={`mt-5 rounded-xl border px-4 py-3 text-sm leading-6 ${
               checkState === "correct"
                 ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-                : checkState === "self-review"
+                : checkState === "self-review" || checkState === "revealed"
                   ? "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100"
                   : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
             }`}
@@ -586,9 +602,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 ? practice.correctFeedback
                 : checkState === "self-review"
                   ? practice.selfReviewFeedback
+                  : checkState === "revealed"
+                    ? practice.revealedFeedback
                   : practice.retryFeedback}
             </p>
             <p className="mt-1">{currentExercise.explanation}</p>
+            {checkState === "revealed" && (
+              <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
+                <p className="font-medium">{practice.reviewedAnswerLabel}</p>
+                {currentExercise.exercise_type === "organize" && reviewedAnswers.length > 1 ? (
+                  <ol className="mt-1 list-decimal space-y-1 pl-5">
+                    {reviewedAnswers.map((reviewedAnswer) => (
+                      <li key={reviewedAnswer}>{reviewedAnswer}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-1">{reviewedAnswers.join(" / ")}</p>
+                )}
+              </div>
+            )}
             {checkState === "self-review" && currentExercise.self_check && (
               <ul className="mt-3 list-disc space-y-1 pl-5">
                 {currentExercise.self_check.map((check) => (
@@ -600,7 +632,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {checkState === "correct" || checkState === "self-review" ? (
+          {isExerciseComplete ? (
             <button
               type="button"
               onClick={moveNext}
@@ -609,14 +641,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
             </button>
           ) : (
-            <button
-              type="button"
-              disabled={!hasAnswer}
-              onClick={checkAnswer}
-              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
-            >
-              {isIndependentWriting ? practice.selfReview : practice.verify}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={!hasAnswer}
+                onClick={checkAnswer}
+                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
+              >
+                {isIndependentWriting ? practice.selfReview : practice.verify}
+              </button>
+              {canRevealAnswer && (
+                <button
+                  type="button"
+                  onClick={revealAnswer}
+                  className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  {practice.revealAnswer}
+                </button>
+              )}
+            </>
           )}
           {checkState === "try-again" && (
             <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>

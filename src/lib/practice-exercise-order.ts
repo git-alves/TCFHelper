@@ -10,14 +10,19 @@
  */
 const STAGE_ORDER = ["recognize", "complete", "transform", "organize", "develop", "produce"] as const;
 
-export function selectPracticeExerciseSession<T extends { exercise_type: string }>(
+export function selectPracticeExerciseSession<T extends { exercise_type: string; id: string }>(
   exercises: readonly T[],
   random: () => number = Math.random,
+  previousExerciseIds: ReadonlySet<string> = new Set(),
 ): T[] {
   return STAGE_ORDER.flatMap((stage) => {
     const variants = exercises.filter((exercise) => exercise.exercise_type === stage);
     if (variants.length === 0) return [];
-    const chosenIndex = Math.floor(random() * variants.length);
-    return [variants[chosenIndex]];
+    // On replay, avoid the last variant for this stage whenever another
+    // reviewed option exists. A one-variant stage remains valid and stable.
+    const eligibleVariants = variants.filter((exercise) => !previousExerciseIds.has(exercise.id));
+    const choices = eligibleVariants.length > 0 ? eligibleVariants : variants;
+    const chosenIndex = Math.floor(random() * choices.length);
+    return [choices[chosenIndex]];
   });
 }
