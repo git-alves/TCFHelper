@@ -14,6 +14,9 @@ owner-issued access code before reaching the app. The owner controls admission
 and current usage through the
 [admin access-control specification](docs/admin-access-control-and-usage.md)
 and can review the bounded [admin operational log](docs/admin-audit-log.md).
+The planned [Practice exercises specification](docs/practice-exercises.md)
+defines the separate, curated trainer for task-specific micro-skills; it does
+not replace the full-task writing workspace.
 
 ## Stack
 

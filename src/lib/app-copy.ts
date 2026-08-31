@@ -56,6 +56,7 @@ export interface AppCopy {
   nav: {
     dashboard: string;
     tasks: string;
+    practice: string;
     settings: string;
     admin: string;
     logIn: string;
@@ -402,6 +403,7 @@ export const APP_COPY = {
     nav: {
       dashboard: "Dashboard",
       tasks: "Tasks",
+      practice: "Practice",
       settings: "Settings",
       admin: "Admin",
       logIn: "Log in",
@@ -891,6 +893,7 @@ export const APP_COPY = {
     nav: {
       dashboard: "Tableau de bord",
       tasks: "Tâches",
+      practice: "Pratique",
       settings: "Paramètres",
       admin: "Admin",
       logIn: "Se connecter",
@@ -1391,6 +1394,7 @@ export const APP_COPY = {
     nav: {
       dashboard: "Panel",
       tasks: "Tareas",
+      practice: "Práctica",
       settings: "Configuración",
       admin: "Admin",
       logIn: "Iniciar sesión",
@@ -1889,6 +1893,7 @@ export const APP_COPY = {
     nav: {
       dashboard: "Painel",
       tasks: "Tarefas",
+      practice: "Prática",
       settings: "Configurações",
       admin: "Admin",
       logIn: "Entrar",
