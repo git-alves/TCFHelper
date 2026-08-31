@@ -88,7 +88,8 @@ function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExe
   );
 }
 
-function getReviewedAnswers(exercise: CuratedPracticeExercise): readonly string[] {
+function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
+  if (!exercise) return [];
   if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
   if (Array.isArray(exercise.correct_answer)) return exercise.correct_answer;
   return exercise.accepted_answers ?? [];
