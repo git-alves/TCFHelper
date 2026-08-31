@@ -105,6 +105,8 @@ export interface AppCopy {
     retryFeedback: string;
     revealedFeedback: string;
     reviewedAnswerLabel: string;
+    explanationLabel: string;
+    completedWithHelpLabel: string;
     finishSequence: string;
     nextExercise: string;
     selfReview: string;
@@ -505,6 +507,8 @@ export const APP_COPY = {
       retryFeedback: "Not yet — edit your response and try again.",
       revealedFeedback: "Here is the reviewed answer. Use it to understand the writing move, then continue when you are ready.",
       reviewedAnswerLabel: "Reviewed answer:",
+      explanationLabel: "Why this works:",
+      completedWithHelpLabel: "Completed with help",
       finishSequence: "Finish the sequence",
       nextExercise: "Next exercise",
       selfReview: "See my self-check checklist",
@@ -1047,6 +1051,8 @@ export const APP_COPY = {
       retryFeedback: "Pas encore — modifiez votre réponse et réessayez.",
       revealedFeedback: "Voici la réponse validée. Utilisez-la pour comprendre la compétence travaillée, puis continuez lorsque vous êtes prêt·e.",
       reviewedAnswerLabel: "Réponse validée :",
+      explanationLabel: "Pourquoi c’est juste :",
+      completedWithHelpLabel: "Terminé avec de l’aide",
       finishSequence: "Terminer la séquence",
       nextExercise: "Exercice suivant",
       selfReview: "Voir ma grille d’auto-vérification",
@@ -1600,6 +1606,8 @@ export const APP_COPY = {
       retryFeedback: "Aún no; modifica tu respuesta e inténtalo de nuevo.",
       revealedFeedback: "Esta es la respuesta revisada. Úsala para entender la habilidad que practicas y continúa cuando estés listo.",
       reviewedAnswerLabel: "Respuesta revisada:",
+      explanationLabel: "Por qué es correcta:",
+      completedWithHelpLabel: "Completado con ayuda",
       finishSequence: "Terminar la secuencia",
       nextExercise: "Siguiente ejercicio",
       selfReview: "Ver mi lista de autoevaluación",
@@ -2151,6 +2159,8 @@ export const APP_COPY = {
       retryFeedback: "Ainda não; modifique sua resposta e tente novamente.",
       revealedFeedback: "Esta é a resposta revisada. Use-a para entender a habilidade praticada e continue quando estiver pronto.",
       reviewedAnswerLabel: "Resposta revisada:",
+      explanationLabel: "Por que está correta:",
+      completedWithHelpLabel: "Concluído com ajuda",
       finishSequence: "Terminar a sequência",
       nextExercise: "Próximo exercício",
       selfReview: "Ver minha lista de autoavaliação",

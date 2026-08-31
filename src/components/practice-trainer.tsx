@@ -57,6 +57,7 @@ const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
 type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
+type CompletionMethod = "correct" | "revealed" | "self-review";
 
 const SELECT_BUTTON_CLASS =
   "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
@@ -126,30 +127,40 @@ function ChoiceCard({
 function ProgressSteps({
   exercises,
   currentIndex,
+  completionMethods,
   practice,
 }: {
   exercises: readonly CuratedPracticeExercise[];
   currentIndex: number;
+  completionMethods: ReadonlyMap<string, CompletionMethod>;
   practice: AppCopy["practice"];
 }) {
   return (
     <ol aria-label={practice.progress({ step: currentIndex + 1, total: exercises.length })} className="grid grid-cols-6 gap-1 sm:gap-2">
       {exercises.map((exercise, index) => {
         const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "future";
+        // A stage finished by revealing the answer stays visibly distinct
+        // from one the learner actually solved, so progress signals honest
+        // mastery rather than mere completion.
+        const doneWithHelp = state === "done" && completionMethods.get(exercise.id) === "revealed";
         return (
           <li key={exercise.id} className="min-w-0">
             <div
               aria-current={state === "current" ? "step" : undefined}
+              title={doneWithHelp ? practice.completedWithHelpLabel : undefined}
               className={`h-1.5 rounded-full ${
-                state === "done"
-                  ? "bg-violet-600 dark:bg-violet-300"
-                  : state === "current"
-                    ? "bg-violet-400 dark:bg-violet-500"
-                    : "bg-zinc-200 dark:bg-zinc-800"
+                doneWithHelp
+                  ? "bg-amber-500 dark:bg-amber-400"
+                  : state === "done"
+                    ? "bg-violet-600 dark:bg-violet-300"
+                    : state === "current"
+                      ? "bg-violet-400 dark:bg-violet-500"
+                      : "bg-zinc-200 dark:bg-zinc-800"
               }`}
             />
             <span className="mt-2 block truncate text-center text-[11px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-xs">
               {practice.stages[exercise.exercise_type]}
+              {doneWithHelp && <span className="sr-only"> ({practice.completedWithHelpLabel})</span>}
             </span>
           </li>
         );
@@ -288,6 +299,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [ordering, setOrdering] = useState<readonly string[]>([]);
   const [checkState, setCheckState] = useState<CheckState>(null);
   const [isSequenceComplete, setIsSequenceComplete] = useState(false);
+  // Tracked separately from checkState so a stage's completion method
+  // survives navigating to later stages, letting the progress bar keep
+  // showing which earlier stages were solved versus revealed.
+  const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
 
   const matchingSkills = useMemo(
     () =>
@@ -349,6 +364,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
+    setCompletionMethods(new Map());
     resetExercise(nextExercises[0] ?? null);
   }
 
@@ -362,10 +378,15 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(null);
   }
 
+  function markCompletion(exerciseId: string, method: CompletionMethod) {
+    setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
+  }
+
   function checkAnswer() {
     if (!currentExercise) return;
     if (isIndependentWriting) {
       setCheckState("self-review");
+      markCompletion(currentExercise.id, "self-review");
       return;
     }
 
@@ -374,11 +395,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         ? isOrderedCorrect(ordering, currentExercise)
         : matchesAnswer(answer, currentExercise);
     setCheckState(correct ? "correct" : "try-again");
+    if (correct) markCompletion(currentExercise.id, "correct");
   }
 
   function revealAnswer() {
-    if (!canRevealAnswer) return;
+    if (!canRevealAnswer || !currentExercise) return;
     setCheckState("revealed");
+    markCompletion(currentExercise.id, "revealed");
   }
 
   function moveNext() {
@@ -400,6 +423,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
+    setCompletionMethods(new Map());
     resetExercise(nextExercises[0] ?? null);
   }
 
@@ -408,6 +432,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
+    setCompletionMethods(new Map());
     resetExercise(null);
   }
 
@@ -557,7 +582,12 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         </p>
       </header>
 
-      <ProgressSteps exercises={exercises} currentIndex={currentExerciseIndex} practice={practice} />
+      <ProgressSteps
+        exercises={exercises}
+        currentIndex={currentExerciseIndex}
+        completionMethods={completionMethods}
+        practice={practice}
+      />
 
       <article className="rounded-3xl border border-black/[.1] bg-white p-5 shadow-sm sm:p-7 dark:border-white/[.15] dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -607,7 +637,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                     ? practice.revealedFeedback
                   : practice.retryFeedback}
             </p>
-            <p className="mt-1">{currentExercise.explanation}</p>
+            <p className="mt-3">
+              <span className="font-semibold">{practice.explanationLabel}</span> {currentExercise.explanation}
+            </p>
             {checkState === "revealed" && (
               <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
                 <p className="font-medium">{practice.reviewedAnswerLabel}</p>
