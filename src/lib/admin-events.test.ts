@@ -209,7 +209,9 @@ describe("recordAdminEvent", () => {
 
   it("rejects a far-future clock value so retention cannot be bypassed", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    const future = new Date(Date.now() + ADMIN_EVENT_MAX_FUTURE_CLOCK_SKEW_MS + 1);
+    // Leave enough headroom for real clock time to advance between constructing
+    // this value and validating it; a one-millisecond offset is flaky on CI.
+    const future = new Date(Date.now() + ADMIN_EVENT_MAX_FUTURE_CLOCK_SKEW_MS + 60_000);
 
     await recordAdminEvent(
       { eventType: "ACCESS_CODE_REDEEMED", userId: USER_ID, accessCodeId: ACCESS_CODE_ID, httpStatus: 200 },
