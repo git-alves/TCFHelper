@@ -87,6 +87,10 @@ export interface AppCopy {
     topicPlaceholder: string;
     durationAndSteps: (values: { minutes: number; steps: number }) => string;
     unavailableCombination: string;
+    unavailableTitle: (values: { task: string; level: string }) => string;
+    unavailableDescription: string;
+    availableLevelsLabel: string;
+    availableLevel: (values: { level: string; topics: number }) => string;
     skillHelp: string;
     changeSkill: string;
     sequenceDescription: (values: { count: number }) => string;
@@ -113,6 +117,11 @@ export interface AppCopy {
     verify: string;
     revealAnswer: string;
     retryHint: string;
+    difficultyPrompt: string;
+    difficultyTooEasy: string;
+    difficultyAppropriate: string;
+    difficultyTooHard: string;
+    difficultyRecorded: string;
   };
   login: {
     title: string;
@@ -489,6 +498,10 @@ export const APP_COPY = {
       topicPlaceholder: "Select a topic",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} curated exercises`,
       unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
+      unavailableTitle: ({ task, level }) => `${task} at ${level} is not available yet`,
+      unavailableDescription: "This topic set is still being reviewed. Choose an available level below to practise this task now.",
+      availableLevelsLabel: "Available levels for this task:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "topic" : "topics"}`,
       skillHelp: "The available topics depend on the task and level you choose.",
       changeSkill: "← Change topic",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
@@ -515,6 +528,11 @@ export const APP_COPY = {
       verify: "Check",
       revealAnswer: "Show the answer",
       retryHint: "You can edit your response and try again as many times as you need.",
+      difficultyPrompt: "Optional: how did this exercise feel?",
+      difficultyTooEasy: "Too easy",
+      difficultyAppropriate: "Appropriate",
+      difficultyTooHard: "Too hard",
+      difficultyRecorded: "Thanks — recorded for this practice session.",
     },
     login: {
       title: "Log in",
@@ -1033,6 +1051,10 @@ export const APP_COPY = {
       topicPlaceholder: "Choisissez un sujet",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercices sélectionnés`,
       unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
+      unavailableTitle: ({ task, level }) => `${task} au niveau ${level} n’est pas encore disponible`,
+      unavailableDescription: "Cette série est encore en cours de validation. Choisissez ci-dessous un niveau disponible pour vous entraîner dès maintenant.",
+      availableLevelsLabel: "Niveaux disponibles pour cette tâche :",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "thème" : "thèmes"}`,
       skillHelp: "Les thèmes disponibles dépendent de la tâche et du niveau que vous choisissez.",
       changeSkill: "← Changer de thème",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
@@ -1059,6 +1081,11 @@ export const APP_COPY = {
       verify: "Vérifier",
       revealAnswer: "Voir la réponse",
       retryHint: "Vous pouvez modifier votre réponse autant de fois que nécessaire.",
+      difficultyPrompt: "Facultatif : comment avez-vous trouvé cet exercice ?",
+      difficultyTooEasy: "Trop facile",
+      difficultyAppropriate: "Adapté",
+      difficultyTooHard: "Trop difficile",
+      difficultyRecorded: "Merci — votre réponse est enregistrée pour cette séance.",
     },
     login: {
       title: "Se connecter",
@@ -1588,6 +1615,10 @@ export const APP_COPY = {
       topicPlaceholder: "Elige un tema",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} ejercicios seleccionados`,
       unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
+      unavailableTitle: ({ task, level }) => `${task} en ${level} aún no está disponible`,
+      unavailableDescription: "Este conjunto sigue en revisión. Elige abajo un nivel disponible para practicar esta tarea ahora.",
+      availableLevelsLabel: "Niveles disponibles para esta tarea:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
       skillHelp: "Los temas disponibles dependen de la tarea y del nivel que elijas.",
       changeSkill: "← Cambiar de tema",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
@@ -1614,6 +1645,11 @@ export const APP_COPY = {
       verify: "Comprobar",
       revealAnswer: "Ver la respuesta",
       retryHint: "Puedes modificar tu respuesta e intentarlo tantas veces como necesites.",
+      difficultyPrompt: "Opcional: ¿cómo te resultó este ejercicio?",
+      difficultyTooEasy: "Demasiado fácil",
+      difficultyAppropriate: "Adecuado",
+      difficultyTooHard: "Demasiado difícil",
+      difficultyRecorded: "Gracias; se guardó para esta sesión de práctica.",
     },
     login: {
       title: "Iniciar sesión",
@@ -2141,6 +2177,10 @@ export const APP_COPY = {
       topicPlaceholder: "Escolha um tema",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercícios selecionados`,
       unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
+      unavailableTitle: ({ task, level }) => `${task} no nível ${level} ainda não está disponível`,
+      unavailableDescription: "Este conjunto ainda está em revisão. Escolha abaixo um nível disponível para praticar esta tarefa agora.",
+      availableLevelsLabel: "Níveis disponíveis para esta tarefa:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
       skillHelp: "Os temas disponíveis dependem da tarefa e do nível escolhidos.",
       changeSkill: "← Mudar de tema",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
@@ -2167,6 +2207,11 @@ export const APP_COPY = {
       verify: "Verificar",
       revealAnswer: "Ver a resposta",
       retryHint: "Você pode modificar sua resposta e tentar novamente quantas vezes precisar.",
+      difficultyPrompt: "Opcional: como este exercício pareceu para você?",
+      difficultyTooEasy: "Fácil demais",
+      difficultyAppropriate: "Adequado",
+      difficultyTooHard: "Difícil demais",
+      difficultyRecorded: "Obrigado — registrado para esta sessão de prática.",
     },
     login: {
       title: "Entrar",

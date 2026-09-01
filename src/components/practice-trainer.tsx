@@ -58,6 +58,9 @@ const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
 type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
 type CompletionMethod = "correct" | "revealed" | "self-review";
+type DifficultyRating = "too-easy" | "appropriate" | "too-hard";
+
+const DIFFICULTY_RATINGS: readonly DifficultyRating[] = ["too-easy", "appropriate", "too-hard"];
 
 const SELECT_BUTTON_CLASS =
   "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
@@ -299,6 +302,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [ordering, setOrdering] = useState<readonly string[]>([]);
   const [checkState, setCheckState] = useState<CheckState>(null);
   const [isSequenceComplete, setIsSequenceComplete] = useState(false);
+  const [difficultyRatings, setDifficultyRatings] = useState<ReadonlyMap<string, DifficultyRating>>(new Map());
   // Tracked separately from checkState so a stage's completion method
   // survives navigating to later stages, letting the progress bar keep
   // showing which earlier stages were solved versus revealed.
@@ -310,6 +314,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         ? curriculum.skills.filter((skill) => skill.task === selectedTask && skill.level === selectedLevel)
         : [],
     [curriculum.skills, selectedLevel, selectedTask],
+  );
+  const availableLevels = useMemo(
+    () =>
+      selectedTask
+        ? LEVELS.filter((level) => curriculum.skills.some((skill) => skill.task === selectedTask && skill.level === level))
+        : [],
+    [curriculum.skills, selectedTask],
   );
   const exercises = exerciseOrder;
   const currentExercise = exercises[currentExerciseIndex] ?? null;
@@ -337,6 +348,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
+    setDifficultyRatings(new Map());
     resetExercise(null);
   }
 
@@ -346,6 +358,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
+    setDifficultyRatings(new Map());
     resetExercise(null);
   }
 
@@ -365,6 +378,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     setCompletionMethods(new Map());
+    setDifficultyRatings(new Map());
     resetExercise(nextExercises[0] ?? null);
   }
 
@@ -380,6 +394,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function markCompletion(exerciseId: string, method: CompletionMethod) {
     setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
+  }
+
+  function rateExercise(exerciseId: string, rating: DifficultyRating) {
+    setDifficultyRatings((previous) => new Map(previous).set(exerciseId, rating));
   }
 
   function checkAnswer() {
@@ -424,6 +442,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     setCompletionMethods(new Map());
+    setDifficultyRatings(new Map());
     resetExercise(nextExercises[0] ?? null);
   }
 
@@ -433,6 +452,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
     setCompletionMethods(new Map());
+    setDifficultyRatings(new Map());
     resetExercise(null);
   }
 
@@ -545,9 +565,36 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               listClassName={SELECT_LIST_CLASS}
             />
             {selectedTask && selectedLevel && matchingSkills.length === 0 && (
-              <p className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                {practice.unavailableCombination}
-              </p>
+              <aside className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
+                <p className="font-semibold">
+                  {practice.unavailableTitle({ task: practice.tasks[selectedTask].title, level: selectedLevel })}
+                </p>
+                <p className="mt-1">{practice.unavailableDescription}</p>
+                {availableLevels.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="font-medium">{practice.availableLevelsLabel}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {availableLevels.map((level) => {
+                        const topicCount = curriculum.skills.filter(
+                          (skill) => skill.task === selectedTask && skill.level === level,
+                        ).length;
+                        return (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => chooseLevel(level)}
+                            className="rounded-full border border-amber-700/30 bg-white/70 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white dark:border-amber-200/30 dark:bg-black/10 dark:hover:bg-black/20"
+                          >
+                            {practice.availableLevel({ level, topics: topicCount })}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2">{practice.unavailableCombination}</p>
+                )}
+              </aside>
             )}
             {(!selectedTask || !selectedLevel) && (
               <p id="skill-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
@@ -662,6 +709,43 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               </ul>
             )}
           </div>
+        )}
+
+        {isExerciseComplete && (
+          <fieldset className="mt-5 border-t border-black/[.08] pt-5 dark:border-white/[.12]">
+            <legend className="text-sm font-semibold">{practice.difficultyPrompt}</legend>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {DIFFICULTY_RATINGS.map((rating) => {
+                const selected = difficultyRatings.get(currentExercise.id) === rating;
+                const label =
+                  rating === "too-easy"
+                    ? practice.difficultyTooEasy
+                    : rating === "appropriate"
+                      ? practice.difficultyAppropriate
+                      : practice.difficultyTooHard;
+                return (
+                  <button
+                    key={rating}
+                    type="button"
+                    aria-pressed={selected}
+                    onClick={() => rateExercise(currentExercise.id, rating)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+                      selected
+                        ? "border-violet-600 bg-violet-50 text-violet-900 dark:border-violet-300 dark:bg-violet-950/50 dark:text-violet-100"
+                        : "border-black/[.15] hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+            {difficultyRatings.has(currentExercise.id) && (
+              <p role="status" className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
+                {practice.difficultyRecorded}
+              </p>
+            )}
+          </fieldset>
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
