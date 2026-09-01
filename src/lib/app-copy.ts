@@ -224,6 +224,8 @@ export interface AppCopy {
     back: string;
     skip: string;
     finish: string;
+    continueToPractice: string;
+    continueToFullTask: string;
     dashboardWelcomeTitle: string;
     dashboardWelcomeBody: string;
     dashboardCorrectionsTitle: string;
@@ -671,6 +673,8 @@ export const APP_COPY = {
       back: "Back",
       skip: "Skip",
       finish: "Finish",
+      continueToPractice: "Continue to Practice",
+      continueToFullTask: "Continue to Full task",
       dashboardWelcomeTitle: "Welcome to MyTCFLab",
       dashboardWelcomeBody:
         "This is your dashboard — your CEFR level over time and your recent corrections will show up here once you've written a few.",
@@ -1264,6 +1268,8 @@ export const APP_COPY = {
       back: "Précédent",
       skip: "Ignorer",
       finish: "Terminer",
+      continueToPractice: "Continuer vers Pratique",
+      continueToFullTask: "Continuer vers la tâche complète",
       dashboardWelcomeTitle: "Bienvenue sur MyTCFLab",
       dashboardWelcomeBody:
         "Voici votre tableau de bord — votre niveau CECR au fil du temps et vos corrections récentes apparaîtront ici après quelques rédactions.",
@@ -1862,6 +1868,8 @@ export const APP_COPY = {
       back: "Atrás",
       skip: "Omitir",
       finish: "Finalizar",
+      continueToPractice: "Continuar a Práctica",
+      continueToFullTask: "Continuar a la tarea completa",
       dashboardWelcomeTitle: "Bienvenido a MyTCFLab",
       dashboardWelcomeBody:
         "Este es tu panel: tu nivel MCER a lo largo del tiempo y tus correcciones recientes aparecerán aquí después de escribir algunas.",
@@ -2460,6 +2468,8 @@ export const APP_COPY = {
       back: "Voltar",
       skip: "Pular",
       finish: "Concluir",
+      continueToPractice: "Continuar para Prática",
+      continueToFullTask: "Continuar para a tarefa completa",
       dashboardWelcomeTitle: "Bem-vindo ao MyTCFLab",
       dashboardWelcomeBody:
         "Este é o seu painel — seu nível QECR ao longo do tempo e suas correções recentes aparecerão aqui depois de algumas redações.",

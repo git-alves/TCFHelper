@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
@@ -10,6 +11,7 @@ import {
   markContextualWalkthroughSeen,
   shouldShowContextualWalkthrough,
 } from "@/lib/contextual-walkthrough";
+import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
 
 interface TasksWalkthroughRunnerProps {
   // A plain boolean, computed server-side from the signed-in learner's
@@ -34,20 +36,28 @@ interface TasksWalkthroughRunnerProps {
  */
 export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunnerProps) {
   const copy = useAppCopy();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
   const { applyStep, resetDemo } = useWalkthroughWorkspaceScript();
-  const [isOpen, setIsOpen] = useState(shouldAutoStart);
+  const [isFullTour] = useState(() => isFullWalkthrough(searchParams.get(FULL_WALKTHROUGH_PARAM)));
+  const [isOpen, setIsOpen] = useState(shouldAutoStart || isFullTour);
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isFullTour) return;
+    router.replace("/tasks", { scroll: false });
+  }, [isFullTour, router]);
 
   // Show this concise guide when the learner chooses Full task for the first
   // time on this browser. It does not depend on, or redirect from, Practice.
   useEffect(() => {
-    if (shouldAutoStart || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
+    if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
     // Let the workspace render its first state before opening a guide that
     // measures targets and drives its illustrative sample.
     const timer = window.setTimeout(() => setIsOpen(true), 0);
     return () => window.clearTimeout(timer);
-  }, [shouldAutoStart]);
+  }, [isFullTour, shouldAutoStart]);
 
   useEffect(() => {
     register(() => {
@@ -57,7 +67,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     return () => register(null);
   }, [register]);
 
-  const steps: WalkthroughStepContent[] = [
+  const shortSteps: WalkthroughStepContent[] = [
     { id: "task-picker", title: copy.walkthrough.taskPickerTitle, body: copy.walkthrough.taskPickerBody },
     { id: "topic-picker", title: copy.walkthrough.topicPickerTitle, body: copy.walkthrough.topicPickerBody },
     { id: "editor", title: copy.walkthrough.editorTitle, body: copy.walkthrough.editorBody },
@@ -67,6 +77,27 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       body: copy.walkthrough.correctButtonBody,
     },
   ];
+  const steps: WalkthroughStepContent[] = isFullTour
+    ? [
+        ...shortSteps.slice(0, 2),
+        { id: "guided-writing", title: copy.walkthrough.guidedWritingTitle, body: copy.walkthrough.guidedWritingBody },
+        ...shortSteps.slice(2),
+        {
+          id: "correction-modal",
+          title: copy.walkthrough.correctionModalTitle,
+          body: copy.walkthrough.correctionModalBody,
+        },
+        {
+          id: "example-generate",
+          title: copy.walkthrough.exampleGenerateTitle,
+          body: copy.walkthrough.exampleGenerateBody,
+        },
+        { id: "editor-copy", title: copy.walkthrough.editorCopyTitle, body: copy.walkthrough.editorCopyBody },
+        { id: "editor-clear", title: copy.walkthrough.editorClearTitle, body: copy.walkthrough.editorClearBody },
+        { id: "translation", title: copy.walkthrough.translationTitle, body: copy.walkthrough.translationBody },
+        { id: "nav-dashboard", title: copy.walkthrough.navTitle, body: copy.walkthrough.navBody, placement: "left" },
+      ]
+    : shortSteps;
 
   // Announces the active step to WritingWorkspace so it can drive its own
   // state (see applyWalkthroughStep there) -- fires on open and on every
@@ -101,7 +132,8 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     setIsOpen(false);
     resetDemo();
     markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "tasks");
-  }, [resetDemo]);
+    if (isFullTour) void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
+  }, [isFullTour, resetDemo]);
 
   return (
     <WalkthroughOverlay
@@ -113,6 +145,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={dismiss}
+      progress={isFullTour ? { step: stepIndex + 8, total: 18 } : undefined}
     />
   );
 }

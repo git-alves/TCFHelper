@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
@@ -9,6 +10,7 @@ import {
   markContextualWalkthroughSeen,
   shouldShowContextualWalkthrough,
 } from "@/lib/contextual-walkthrough";
+import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE, isFullWalkthrough } from "@/lib/walkthrough";
 
 interface PracticeWalkthroughRunnerProps {
   shouldAutoStart: boolean;
@@ -21,21 +23,29 @@ interface PracticeWalkthroughRunnerProps {
  */
 export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthroughRunnerProps) {
   const copy = useAppCopy();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
-  const [isOpen, setIsOpen] = useState(shouldAutoStart);
+  const [isFullTour] = useState(() => isFullWalkthrough(searchParams.get(FULL_WALKTHROUGH_PARAM)));
+  const [isOpen, setIsOpen] = useState(shouldAutoStart || isFullTour);
   const [stepIndex, setStepIndex] = useState(0);
+
+  useEffect(() => {
+    if (!isFullTour) return;
+    router.replace("/practice", { scroll: false });
+  }, [isFullTour, router]);
 
   // This guide appears only after the learner has deliberately opened
   // Practice. It is separate from the account-level Dashboard orientation,
   // so completing one never suppresses the other.
   useEffect(() => {
-    if (shouldAutoStart || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
+    if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
     // Defer the state change until after this synchronization effect so the
     // page's initial render stays stable (and the overlay measures its
     // targets only after Practice has painted).
     const timer = window.setTimeout(() => setIsOpen(true), 0);
     return () => window.clearTimeout(timer);
-  }, [shouldAutoStart]);
+  }, [isFullTour, shouldAutoStart]);
 
   useEffect(() => {
     register(() => {
@@ -56,12 +66,31 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
       title: copy.walkthrough.practicePartsTitle,
       body: copy.walkthrough.practicePartsBody,
     },
+    ...(isFullTour
+      ? [
+          {
+            id: "nav-tasks",
+            title: copy.walkthrough.practiceFullTaskTitle,
+            body: copy.walkthrough.practiceFullTaskBody,
+            placement: "left" as const,
+          },
+        ]
+      : []),
   ];
 
   const dismiss = useCallback(() => {
     setIsOpen(false);
     markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "practice");
-  }, []);
+    if (isFullTour) void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
+  }, [isFullTour]);
+
+  const continueToTasks = useCallback(() => {
+    setIsOpen(false);
+    // The comprehensive tour already covered Practice, so returning here
+    // later should not immediately launch the shorter contextual guide.
+    markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "practice");
+    router.push(`/tasks?${FULL_WALKTHROUGH_PARAM}=${FULL_WALKTHROUGH_VALUE}`);
+  }, [router]);
 
   return (
     <WalkthroughOverlay
@@ -72,7 +101,9 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
       onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
-      onFinish={dismiss}
+      onFinish={isFullTour ? continueToTasks : dismiss}
+      progress={isFullTour ? { step: stepIndex + 5, total: 18 } : undefined}
+      finishLabel={isFullTour ? copy.walkthrough.continueToFullTask : undefined}
     />
   );
 }

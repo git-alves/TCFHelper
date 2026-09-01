@@ -150,6 +150,8 @@ describe("APP_COPY", () => {
         copy.walkthrough.back,
         copy.walkthrough.skip,
         copy.walkthrough.finish,
+        copy.walkthrough.continueToPractice,
+        copy.walkthrough.continueToFullTask,
         copy.walkthrough.dashboardWelcomeTitle,
         copy.walkthrough.dashboardWelcomeBody,
         copy.walkthrough.dashboardCorrectionsTitle,
