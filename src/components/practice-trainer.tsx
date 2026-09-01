@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
@@ -12,6 +13,7 @@ import {
   saveStoredPracticeSession,
   type StoredPracticeSession,
 } from "@/lib/practice-session-storage";
+import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -352,13 +354,24 @@ function ExerciseInput({
 
 export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const practice = useAppCopy().practice;
-  const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(null);
-  const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(null);
+  const searchParams = useSearchParams();
+  // The comprehensive tour's final Practice step points at the six-stage
+  // plan panel below, which normally only renders after a manual selection.
+  // Seeding a guaranteed-available demo skill (Task 1, the same task the
+  // Tasks tour already uses as its own worked example) gives that step a
+  // real target without waiting on the learner to choose anything first.
+  const demoSkill = isFullWalkthrough(searchParams?.get(FULL_WALKTHROUGH_PARAM) ?? null)
+    ? [...curriculum.skills]
+        .filter((skill) => skill.task === "TASK_1" && skill.level === "B2" && skill.is_available)
+        .sort((left, right) => left.part_order - right.part_order)[0] ?? null
+    : null;
+  const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(() => demoSkill?.task ?? null);
+  const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(() => demoSkill?.level ?? null);
   // A skill label/ID is scoped to a task and level. Keeping the selected
   // record, rather than resolving a bare ID against the full catalogue,
   // prevents a future shared label such as "conclusion" from loading the
   // sequence belonging to another Tâche.
-  const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(null);
+  const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(() => demoSkill);
   const [exerciseOrder, setExerciseOrder] = useState<readonly CuratedPracticeExercise[]>([]);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -844,7 +857,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           </fieldset>
 
           {selectedSkill?.is_available && (
-            <aside aria-labelledby="practice-preview-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
+            <aside
+              data-walkthrough="practice-stages-preview"
+              aria-labelledby="practice-preview-heading"
+              className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30"
+            >
               <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.previewEyebrow}</p>
               <h2 id="practice-preview-heading" className="mt-1 text-xl font-semibold">
                 {practice.previewTitle({ part: `${practice.partLabel({ order: selectedSkill.part_order })}: ${selectedSkill.label}` })}

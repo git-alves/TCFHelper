@@ -133,7 +133,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToPractice : dismiss}
-      progress={isFullTour ? { step: stepIndex + 1, total: 18 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 1, total: 19 } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToPractice : undefined}
     />
   );
