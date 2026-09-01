@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
@@ -55,6 +56,14 @@ interface PracticeTrainerProps {
 
 const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
+const EXERCISE_STAGES: readonly PracticeExerciseType[] = [
+  "recognize",
+  "complete",
+  "transform",
+  "organize",
+  "develop",
+  "produce",
+];
 
 type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
 type CompletionMethod = "correct" | "revealed" | "self-review";
@@ -369,11 +378,21 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function chooseSkill(skill: CuratedPracticeSkill) {
+    setSelectedSkill(skill);
+    setExerciseOrder([]);
+    setCurrentExerciseIndex(0);
+    setIsSequenceComplete(false);
+    setCompletionMethods(new Map());
+    setDifficultyRatings(new Map());
+    resetExercise(null);
+  }
+
+  function startSequence() {
+    if (!selectedSkill) return;
     // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
     // when a stage has more than one reviewed variant, a random one is used
     // so replaying a topic doesn't always show the identical exercise.
-    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(skill));
-    setSelectedSkill(skill);
+    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill));
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -472,6 +491,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             <p className="mt-3 max-w-2xl leading-7 text-zinc-700 dark:text-zinc-300">
               {practice.completedDescription({ outcome: selectedSkill.learning_outcome })}
             </p>
+            <p className="mt-3 text-sm leading-6 text-violet-950/80 dark:text-violet-100/80">
+              {practice.nextActionDescription}
+            </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
@@ -487,6 +509,12 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               >
                 {practice.chooseAnotherSkill}
               </button>
+              <Link
+                href="/tasks"
+                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {practice.tryFullTask}
+              </Link>
             </div>
           </div>
         </section>
@@ -602,6 +630,39 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               </p>
             )}
           </fieldset>
+
+          {selectedSkill && (
+            <aside aria-labelledby="practice-preview-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
+              <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.previewEyebrow}</p>
+              <h2 id="practice-preview-heading" className="mt-1 text-xl font-semibold">
+                {practice.previewTitle({ topic: selectedSkill.label })}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+                <span className="font-semibold">{practice.previewOutcomeLabel}</span> {selectedSkill.learning_outcome}
+              </p>
+              <p className="mt-3 text-sm font-medium text-violet-900 dark:text-violet-100">
+                {practice.durationAndSteps({ minutes: selectedSkill.estimated_minutes, steps: EXERCISE_STAGES.length })}
+              </p>
+              <div className="mt-4">
+                <p className="text-sm font-semibold">{practice.previewStagesLabel}</p>
+                <ol className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {EXERCISE_STAGES.map((stage, index) => (
+                    <li key={stage} className="rounded-xl bg-white/70 px-3 py-2 text-sm dark:bg-black/15">
+                      <span className="mr-2 text-xs font-semibold text-violet-700 dark:text-violet-300">{index + 1}</span>
+                      {practice.stages[stage]}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+              <button
+                type="button"
+                onClick={startSequence}
+                className="mt-5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+              >
+                {practice.startPractice}
+              </button>
+            </aside>
+          )}
         </div>
       </section>
     );
@@ -635,6 +696,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         completionMethods={completionMethods}
         practice={practice}
       />
+      <p className="rounded-xl bg-zinc-50 px-4 py-3 text-sm text-zinc-700 dark:bg-white/[.06] dark:text-zinc-300">
+        {practice.stageMap({
+          current: practice.stages[currentExercise.exercise_type],
+          next: exercises[currentExerciseIndex + 1]
+            ? practice.stages[exercises[currentExerciseIndex + 1].exercise_type]
+            : null,
+        })}
+      </p>
 
       <article className="rounded-3xl border border-black/[.1] bg-white p-5 shadow-sm sm:p-7 dark:border-white/[.15] dark:bg-zinc-950">
         <div className="flex flex-wrap items-center justify-between gap-3">

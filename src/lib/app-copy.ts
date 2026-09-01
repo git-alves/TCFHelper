@@ -75,8 +75,10 @@ export interface AppCopy {
     completedEyebrow: string;
     completedTitle: (values: { skill: string }) => string;
     completedDescription: (values: { outcome: string }) => string;
+    nextActionDescription: string;
     reviewSequence: string;
     chooseAnotherSkill: string;
+    tryFullTask: string;
     eyebrow: string;
     title: string;
     description: string;
@@ -85,6 +87,11 @@ export interface AppCopy {
     levelHelp: string;
     chooseSkill: string;
     topicPlaceholder: string;
+    previewEyebrow: string;
+    previewTitle: (values: { topic: string }) => string;
+    previewOutcomeLabel: string;
+    previewStagesLabel: string;
+    startPractice: string;
     durationAndSteps: (values: { minutes: number; steps: number }) => string;
     unavailableCombination: string;
     unavailableTitle: (values: { task: string; level: string }) => string;
@@ -95,6 +102,7 @@ export interface AppCopy {
     changeSkill: string;
     sequenceDescription: (values: { count: number }) => string;
     progress: (values: { step: number; total: number }) => string;
+    stageMap: (values: { current: string; next: string | null }) => string;
     attentionLabel: string;
     selectAnswer: string;
     selectOrder: string;
@@ -486,8 +494,10 @@ export const APP_COPY = {
       completedEyebrow: "Sequence complete",
       completedTitle: ({ skill }) => `You practised: ${skill}`,
       completedDescription: ({ outcome }) => `You moved from recognition to independent writing. Keep this in mind for your next full response: ${outcome}`,
+      nextActionDescription: "Next, apply this writing move in a complete TCF task or continue with another topic.",
       reviewSequence: "Practise again",
       chooseAnotherSkill: "Choose another topic",
+      tryFullTask: "Try a full task",
       eyebrow: "Focused practice",
       title: "Work on one writing topic at a time.",
       description: "This is not an exam simulation. Choose a task, your target level and a topic; you will then follow a fixed, reviewed progression from recognition to independent writing.",
@@ -496,6 +506,11 @@ export const APP_COPY = {
       levelHelp: "Choose a task first: difficulty is linked to its writing purpose.",
       chooseSkill: "3. Which topic would you like to practise?",
       topicPlaceholder: "Select a topic",
+      previewEyebrow: "Your practice plan",
+      previewTitle: ({ topic }) => `Practise: ${topic}`,
+      previewOutcomeLabel: "By the end, you will be able to:",
+      previewStagesLabel: "Your six stages",
+      startPractice: "Start practice",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} curated exercises`,
       unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
       unavailableTitle: ({ task, level }) => `${task} at ${level} is not available yet`,
@@ -506,6 +521,7 @@ export const APP_COPY = {
       changeSkill: "← Change topic",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
       progress: ({ step, total }) => `Step ${step} of ${total}`,
+      stageMap: ({ current, next }) => (next ? `Now: ${current}. Next: ${next}.` : `Now: ${current}. This is your final stage.`),
       attentionLabel: "Focus point:",
       selectAnswer: "Choose your answer",
       selectOrder: "Choose the most logical order",
@@ -1039,8 +1055,10 @@ export const APP_COPY = {
       completedEyebrow: "Séquence terminée",
       completedTitle: ({ skill }) => `Vous avez travaillé : ${skill}`,
       completedDescription: ({ outcome }) => `Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine rédaction complète : ${outcome}`,
+      nextActionDescription: "Réutilisez maintenant cette compétence dans une tâche TCF complète ou choisissez un autre thème.",
       reviewSequence: "S’entraîner de nouveau",
       chooseAnotherSkill: "Choisir un autre thème",
+      tryFullTask: "Essayer une tâche complète",
       eyebrow: "Entraînement ciblé",
       title: "Travaillez un thème d’écriture à la fois.",
       description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et un thème ; vous suivrez ensuite une progression fixe et validée, de la reconnaissance à la production autonome.",
@@ -1049,6 +1067,11 @@ export const APP_COPY = {
       levelHelp: "Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.",
       chooseSkill: "3. Quel thème voulez-vous entraîner ?",
       topicPlaceholder: "Choisissez un sujet",
+      previewEyebrow: "Votre plan d’entraînement",
+      previewTitle: ({ topic }) => `Entraîner : ${topic}`,
+      previewOutcomeLabel: "À la fin, vous saurez :",
+      previewStagesLabel: "Vos six étapes",
+      startPractice: "Commencer l’entraînement",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercices sélectionnés`,
       unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
       unavailableTitle: ({ task, level }) => `${task} au niveau ${level} n’est pas encore disponible`,
@@ -1059,6 +1082,7 @@ export const APP_COPY = {
       changeSkill: "← Changer de thème",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
       progress: ({ step, total }) => `Étape ${step} sur ${total}`,
+      stageMap: ({ current, next }) => (next ? `En cours : ${current}. Prochaine étape : ${next}.` : `En cours : ${current}. C’est votre dernière étape.`),
       attentionLabel: "Point d’attention :",
       selectAnswer: "Choisissez votre réponse",
       selectOrder: "Choisissez l’ordre le plus logique",
@@ -1603,8 +1627,10 @@ export const APP_COPY = {
       completedEyebrow: "Secuencia completada",
       completedTitle: ({ skill }) => `Has trabajado: ${skill}`,
       completedDescription: ({ outcome }) => `Has pasado del reconocimiento a la producción autónoma. Tenlo en cuenta para tu próxima redacción completa: ${outcome}`,
+      nextActionDescription: "Ahora aplica esta habilidad en una tarea TCF completa o elige otro tema.",
       reviewSequence: "Practicar de nuevo",
       chooseAnotherSkill: "Elegir otro tema",
+      tryFullTask: "Probar una tarea completa",
       eyebrow: "Práctica específica",
       title: "Trabaja un tema de escritura cada vez.",
       description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y un tema; después seguirás una progresión fija y revisada, del reconocimiento a la producción autónoma.",
@@ -1613,6 +1639,11 @@ export const APP_COPY = {
       levelHelp: "Elige primero una tarea: la dificultad está ligada a su propósito de escritura.",
       chooseSkill: "3. ¿Qué tema quieres practicar?",
       topicPlaceholder: "Elige un tema",
+      previewEyebrow: "Tu plan de práctica",
+      previewTitle: ({ topic }) => `Practicar: ${topic}`,
+      previewOutcomeLabel: "Al final podrás:",
+      previewStagesLabel: "Tus seis etapas",
+      startPractice: "Empezar a practicar",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} ejercicios seleccionados`,
       unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
       unavailableTitle: ({ task, level }) => `${task} en ${level} aún no está disponible`,
@@ -1623,6 +1654,7 @@ export const APP_COPY = {
       changeSkill: "← Cambiar de tema",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
       progress: ({ step, total }) => `Paso ${step} de ${total}`,
+      stageMap: ({ current, next }) => (next ? `Ahora: ${current}. Siguiente: ${next}.` : `Ahora: ${current}. Esta es tu última etapa.`),
       attentionLabel: "Punto de atención:",
       selectAnswer: "Elige tu respuesta",
       selectOrder: "Elige el orden más lógico",
@@ -2165,8 +2197,10 @@ export const APP_COPY = {
       completedEyebrow: "Sequência concluída",
       completedTitle: ({ skill }) => `Você trabalhou: ${skill}`,
       completedDescription: ({ outcome }) => `Você passou do reconhecimento à produção autônoma. Use isto na sua próxima redação completa: ${outcome}`,
+      nextActionDescription: "Agora aplique essa habilidade em uma tarefa TCF completa ou escolha outro tema.",
       reviewSequence: "Praticar novamente",
       chooseAnotherSkill: "Escolher outro tema",
+      tryFullTask: "Experimentar uma tarefa completa",
       eyebrow: "Prática direcionada",
       title: "Trabalhe um tema de escrita de cada vez.",
       description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e um tema; em seguida, você seguirá uma progressão fixa e revisada, do reconhecimento à produção autônoma.",
@@ -2175,6 +2209,11 @@ export const APP_COPY = {
       levelHelp: "Escolha primeiro uma tarefa: a dificuldade está ligada ao objetivo de escrita.",
       chooseSkill: "3. Qual tema você quer praticar?",
       topicPlaceholder: "Escolha um tema",
+      previewEyebrow: "Seu plano de prática",
+      previewTitle: ({ topic }) => `Praticar: ${topic}`,
+      previewOutcomeLabel: "Ao final, você saberá:",
+      previewStagesLabel: "Suas seis etapas",
+      startPractice: "Começar a praticar",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercícios selecionados`,
       unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
       unavailableTitle: ({ task, level }) => `${task} no nível ${level} ainda não está disponível`,
@@ -2185,6 +2224,7 @@ export const APP_COPY = {
       changeSkill: "← Mudar de tema",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
       progress: ({ step, total }) => `Etapa ${step} de ${total}`,
+      stageMap: ({ current, next }) => (next ? `Agora: ${current}. Próxima: ${next}.` : `Agora: ${current}. Esta é sua última etapa.`),
       attentionLabel: "Ponto de atenção:",
       selectAnswer: "Escolha sua resposta",
       selectOrder: "Escolha a ordem mais lógica",
