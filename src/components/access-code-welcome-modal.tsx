@@ -3,6 +3,10 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 
 interface AccessCodeWelcomeModalProps {
+  // The CTA label must match where onContinue actually sends the learner --
+  // new learners land on Dashboard for the guided tour, not straight into a
+  // task, so "Start writing" would be a broken promise for them.
+  destination: "/dashboard" | "/tasks";
   onContinue: () => void;
 }
 
@@ -19,7 +23,7 @@ const CONFETTI_PIECES = [
 // Celebrates a learner's first access-code admission. A durable user-level
 // marker is set atomically with redemption, so the modal remains one-time if
 // an owner later deactivates access and the learner redeems a new code.
-export function AccessCodeWelcomeModal({ onContinue }: AccessCodeWelcomeModalProps) {
+export function AccessCodeWelcomeModal({ destination, onContinue }: AccessCodeWelcomeModalProps) {
   const continueRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -108,7 +112,7 @@ export function AccessCodeWelcomeModal({ onContinue }: AccessCodeWelcomeModalPro
           onClick={onContinue}
           className="mt-6 w-full rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
         >
-          Start writing
+          {destination === "/tasks" ? "Start writing" : "Get started"}
         </button>
       </div>
     </div>
