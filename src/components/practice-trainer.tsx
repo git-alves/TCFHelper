@@ -53,6 +53,8 @@ export interface CuratedPracticeExercise {
   prerequisite_exercise?: string;
   tags: readonly string[];
   self_check?: readonly string[];
+  /** A reviewed starting suggestion for Develop/Produce; never a model answer. */
+  hint?: string;
 }
 
 export interface CuratedPracticeCurriculum {
@@ -362,6 +364,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
   const [checkState, setCheckState] = useState<CheckState>(null);
+  const [isHintVisible, setIsHintVisible] = useState(false);
   const [isSequenceComplete, setIsSequenceComplete] = useState(false);
   const [difficultyRatings, setDifficultyRatings] = useState<ReadonlyMap<string, DifficultyRating>>(new Map());
   // Tracked separately from checkState so a stage's completion method
@@ -474,6 +477,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setAnswer("");
     setOrdering(nextExercise?.exercise_type === "organize" ? [...(nextExercise.options ?? [])] : []);
     setCheckState(null);
+    setIsHintVisible(false);
   }
 
   function chooseTask(task: PracticeTask) {
@@ -939,6 +943,31 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             practice={practice}
           />
         </div>
+
+        {isIndependentWriting && currentExercise.hint && (
+          <div className="mt-4">
+            <button
+              type="button"
+              aria-expanded={isHintVisible}
+              aria-controls="practice-writing-hint"
+              onClick={() => setIsHintVisible((visible) => !visible)}
+              className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              {practice.showHint}
+            </button>
+            {isHintVisible && (
+              <aside
+                id="practice-writing-hint"
+                role="status"
+                className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100"
+              >
+                <p className="font-semibold">{practice.hintLabel}</p>
+                <p className="mt-1">{currentExercise.hint}</p>
+                <p className="mt-2 text-sky-900/80 dark:text-sky-100/80">{practice.hintNotice}</p>
+              </aside>
+            )}
+          </div>
+        )}
 
         {checkState && (
           <div

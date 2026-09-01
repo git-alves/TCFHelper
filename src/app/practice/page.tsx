@@ -8,6 +8,7 @@ import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redi
 import {
   PRACTICE_EXERCISES,
   PRACTICE_LEVELS,
+  getPracticeHint,
   hasCompletePracticePath,
   getPracticeTopics,
   type PracticeExercise,
@@ -53,6 +54,10 @@ function toExercise(exercise: PracticeExercise): CuratedPracticeExercise {
     prerequisite_exercise: exercise.prerequisiteExerciseId ?? undefined,
     tags: exercise.tags,
     self_check: exercise.selfCheck,
+    // Open-writing hints reuse an exercise-specific, editor-reviewed first
+    // self-check criterion. They guide a first move without exposing an
+    // answer or generating any content at runtime.
+    hint: getPracticeHint(exercise) ?? undefined,
   };
 }
 

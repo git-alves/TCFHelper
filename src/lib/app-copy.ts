@@ -129,6 +129,9 @@ export interface AppCopy {
     finishSequence: string;
     nextExercise: string;
     selfReview: string;
+    showHint: string;
+    hintLabel: string;
+    hintNotice: string;
     verify: string;
     revealAnswer: string;
     retryHint: string;
@@ -563,6 +566,9 @@ export const APP_COPY = {
       finishSequence: "Finish the sequence",
       nextExercise: "Next exercise",
       selfReview: "See my self-check checklist",
+      showHint: "Show a hint",
+      hintLabel: "A way to begin:",
+      hintNotice: "This is a suggestion, not an answer. Keep writing in your own words.",
       verify: "Check",
       revealAnswer: "Show the answer",
       retryHint: "You can edit your response and try again as many times as you need.",
@@ -1139,6 +1145,9 @@ export const APP_COPY = {
       finishSequence: "Terminer la séquence",
       nextExercise: "Exercice suivant",
       selfReview: "Voir ma grille d’auto-vérification",
+      showHint: "Voir un indice",
+      hintLabel: "Une piste pour commencer :",
+      hintNotice: "C’est une suggestion, pas une réponse. Continuez à rédiger avec vos propres mots.",
       verify: "Vérifier",
       revealAnswer: "Voir la réponse",
       retryHint: "Vous pouvez modifier votre réponse autant de fois que nécessaire.",
@@ -1726,6 +1735,9 @@ export const APP_COPY = {
       finishSequence: "Terminar la secuencia",
       nextExercise: "Siguiente ejercicio",
       selfReview: "Ver mi lista de autoevaluación",
+      showHint: "Ver una pista",
+      hintLabel: "Una forma de empezar:",
+      hintNotice: "Es una sugerencia, no una respuesta. Sigue escribiendo con tus propias palabras.",
       verify: "Comprobar",
       revealAnswer: "Ver la respuesta",
       retryHint: "Puedes modificar tu respuesta e intentarlo tantas veces como necesites.",
@@ -2311,6 +2323,9 @@ export const APP_COPY = {
       finishSequence: "Terminar a sequência",
       nextExercise: "Próximo exercício",
       selfReview: "Ver minha lista de autoavaliação",
+      showHint: "Ver uma dica",
+      hintLabel: "Uma forma de começar:",
+      hintNotice: "É uma sugestão, não uma resposta. Continue escrevendo com suas próprias palavras.",
       verify: "Verificar",
       revealAnswer: "Ver a resposta",
       retryHint: "Você pode modificar sua resposta e tentar novamente quantas vezes precisar.",
