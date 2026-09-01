@@ -953,7 +953,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               onClick={() => setIsHintVisible((visible) => !visible)}
               className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
             >
-              {practice.showHint}
+              {isHintVisible ? practice.hideHint : practice.showHint}
             </button>
             {isHintVisible && (
               <aside
