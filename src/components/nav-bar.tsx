@@ -189,7 +189,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     {copy.nav.practice}
                   </button>
                 ) : (
-                  <Link href="/practice" onClick={guardedNavigationHandler("/practice")} className={DASHBOARD_BUTTON_CLASS}>
+                  <Link
+                    href="/practice"
+                    data-walkthrough="nav-practice"
+                    onClick={guardedNavigationHandler("/practice")}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
                     {copy.nav.practice}
                   </Link>
                 ))}

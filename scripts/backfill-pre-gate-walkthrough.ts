@@ -159,9 +159,9 @@ async function main() {
   if (!process.env.DATABASE_URL) {
     throw new Error("This maintenance command requires a production DATABASE_URL.");
   }
-  if (CURRENT_WALKTHROUGH_VERSION !== PRE_GATE_WALKTHROUGH_VERSION) {
+  if (CURRENT_WALKTHROUGH_VERSION < PRE_GATE_WALKTHROUGH_VERSION) {
     throw new Error(
-      `Refusing to run: this approved backfill targets walkthrough version ${PRE_GATE_WALKTHROUGH_VERSION}, but the app now uses version ${CURRENT_WALKTHROUGH_VERSION}. Review the cohort policy before proceeding.`,
+      `Refusing to run: this approved backfill targets walkthrough version ${PRE_GATE_WALKTHROUGH_VERSION}, but the app now uses the earlier version ${CURRENT_WALKTHROUGH_VERSION}. Review the cohort policy before proceeding.`,
     );
   }
 

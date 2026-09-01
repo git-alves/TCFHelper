@@ -12,12 +12,12 @@ interface DashboardWalkthroughRunnerProps {
 }
 
 /**
- * The dashboard half of the walkthrough hands off to the /tasks half by a
+ * The dashboard section of the walkthrough hands off to Practice, then the
+ * Practice runner hands off to Tasks, by a
  * real navigation, not shared client state -- finishing this one (as
- * opposed to skipping it) does not itself record a dismissed version. If
- * the learner navigates to /tasks from here, its own runner sees the same
- * still-unrecorded version and auto-starts there too, continuing the tour
- * across the page boundary without any cross-page orchestration.
+ * opposed to skipping it) does not itself record a dismissed version. The
+ * Practice runner therefore sees the same still-unrecorded version and
+ * auto-starts there, then hands the learner to Tasks for the final section.
  *
  * Its "Take a tour" trigger lives in the nav bar, not on this page -- see
  * WalkthroughTriggerProvider -- so this component only registers a starter
@@ -59,9 +59,10 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
       placement: "bottom",
     },
     {
-      id: "nav-tasks",
-      title: copy.walkthrough.dashboardStartWritingTitle,
-      body: copy.walkthrough.dashboardStartWritingBody,
+      id: "nav-practice",
+      title: copy.walkthrough.dashboardPracticeTitle,
+      body: copy.walkthrough.dashboardPracticeBody,
+      placement: "bottom",
     },
   ];
 
@@ -75,13 +76,13 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
     void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
   }, []);
 
-  function continueToTasks() {
+  function continueToPractice() {
     setIsOpen(false);
     // Only meaningful for a manual re-trigger by a learner who has already
     // completed the current version -- shouldAutoStart alone would be false
-    // for them on /tasks. A genuine first-time run doesn't need this: both
+    // for them on /practice. A genuine first-time run doesn't need this: both
     // pages already read the same still-unrecorded (null) version.
-    router.push(`/tasks?${WALKTHROUGH_CONTINUE_PARAM}=${WALKTHROUGH_CONTINUE_VALUE}`);
+    router.push(`/practice?${WALKTHROUGH_CONTINUE_PARAM}=${WALKTHROUGH_CONTINUE_VALUE}`);
   }
 
   return (
@@ -93,7 +94,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
       onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
-      onFinish={continueToTasks}
+      onFinish={continueToPractice}
     />
   );
 }

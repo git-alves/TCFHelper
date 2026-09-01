@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { CURRENT_WALKTHROUGH_VERSION } from "@/lib/walkthrough";
 
 const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, updateMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
@@ -61,7 +62,7 @@ describe("POST /api/walkthrough/dismiss", () => {
     expect(response.status).toBe(204);
     expect(updateMock).toHaveBeenCalledWith({
       where: { id: LOCAL_USER_ID },
-      data: { walkthroughCompletedVersion: 1 },
+      data: { walkthroughCompletedVersion: CURRENT_WALKTHROUGH_VERSION },
     });
   });
 });

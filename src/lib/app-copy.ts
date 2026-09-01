@@ -73,12 +73,12 @@ export interface AppCopy {
     levels: Record<"B2" | "C1" | "C2", { title: string; description: string }>;
     stages: Record<"recognize" | "complete" | "transform" | "organize" | "develop" | "produce", string>;
     completedEyebrow: string;
-    completedTitle: (values: { skill: string }) => string;
+    completedTitle: (values: { part: string }) => string;
     completedDescription: (values: { outcome: string }) => string;
     nextActionDescription: string;
     replayWithVariants: string;
     startFresh: string;
-    chooseAnotherSkill: string;
+    chooseAnotherPart: string;
     tryFullTask: string;
     eyebrow: string;
     title: string;
@@ -86,14 +86,15 @@ export interface AppCopy {
     chooseTask: string;
     chooseLevel: string;
     levelHelp: string;
-    chooseSkill: string;
-    topicPlaceholder: string;
+    choosePart: string;
+    partPlaceholder: string;
+    partLabel: (values: { order: number }) => string;
     previewEyebrow: string;
-    previewTitle: (values: { topic: string }) => string;
+    previewTitle: (values: { part: string }) => string;
     previewOutcomeLabel: string;
     previewStagesLabel: string;
     resumeEyebrow: string;
-    resumeTitle: (values: { topic: string }) => string;
+    resumeTitle: (values: { part: string }) => string;
     resumeDescription: (values: { step: number; total: number }) => string;
     localSessionNotice: string;
     resumeSession: string;
@@ -103,9 +104,9 @@ export interface AppCopy {
     unavailableTitle: (values: { task: string; level: string }) => string;
     unavailableDescription: string;
     availableLevelsLabel: string;
-    availableLevel: (values: { level: string; topics: number }) => string;
-    skillHelp: string;
-    changeSkill: string;
+    availableLevel: (values: { level: string; parts: number }) => string;
+    partHelp: string;
+    changePart: string;
     sequenceDescription: (values: { count: number }) => string;
     progress: (values: { step: number; total: number }) => string;
     stageMap: (values: { current: string; next: string | null }) => string;
@@ -216,8 +217,16 @@ export interface AppCopy {
     dashboardCorrectionsBody: string;
     settingsTitle: string;
     settingsBody: string;
+    dashboardPracticeTitle: string;
+    dashboardPracticeBody: string;
     dashboardStartWritingTitle: string;
     dashboardStartWritingBody: string;
+    practiceIntroTitle: string;
+    practiceIntroBody: string;
+    practicePartsTitle: string;
+    practicePartsBody: string;
+    practiceFullTaskTitle: string;
+    practiceFullTaskBody: string;
     taskPickerTitle: string;
     taskPickerBody: string;
     topicPickerTitle: string;
@@ -498,27 +507,28 @@ export const APP_COPY = {
       },
       stages: { recognize: "Recognise", complete: "Complete", transform: "Transform", organize: "Organise", develop: "Develop", produce: "Produce" },
       completedEyebrow: "Sequence complete",
-      completedTitle: ({ skill }) => `You practised: ${skill}`,
+      completedTitle: ({ part }) => `You practised: ${part}`,
       completedDescription: ({ outcome }) => `You moved from recognition to independent writing. Keep this in mind for your next full response: ${outcome}`,
-      nextActionDescription: "Next, apply this writing move in a complete TCF task or continue with another topic.",
+      nextActionDescription: "Next, apply this task part in a complete TCF task or continue with another part.",
       replayWithVariants: "Replay with new variants",
       startFresh: "Start fresh",
-      chooseAnotherSkill: "Choose another topic",
+      chooseAnotherPart: "Choose another task part",
       tryFullTask: "Try a full task",
       eyebrow: "Focused practice",
-      title: "Work on one writing topic at a time.",
-      description: "This is not an exam simulation. Choose a task, your target level and a topic; you will then follow a fixed, reviewed progression from recognition to independent writing.",
+      title: "Work on one part of the task at a time.",
+      description: "This is not an exam simulation. Choose a task, your target level and a task part; you will then follow a fixed, reviewed progression from recognition to independent writing.",
       chooseTask: "1. Which task would you like to improve?",
       chooseLevel: "2. What is your target level?",
       levelHelp: "Choose a task first: difficulty is linked to its writing purpose.",
-      chooseSkill: "3. Which topic would you like to practise?",
-      topicPlaceholder: "Select a topic",
+      choosePart: "3. Part to work on",
+      partPlaceholder: "Part to work on",
+      partLabel: ({ order }) => `Part ${order}`,
       previewEyebrow: "Your practice plan",
-      previewTitle: ({ topic }) => `Practise: ${topic}`,
+      previewTitle: ({ part }) => `Practise: ${part}`,
       previewOutcomeLabel: "By the end, you will be able to:",
       previewStagesLabel: "Your six stages",
       resumeEyebrow: "Saved on this device",
-      resumeTitle: ({ topic }) => `Resume: ${topic}`,
+      resumeTitle: ({ part }) => `Resume: ${part}`,
       resumeDescription: ({ step, total }) => `Continue at step ${step} of ${total}.`,
       localSessionNotice: "Your responses are stored only in this browser until you finish or discard this session.",
       resumeSession: "Resume practice",
@@ -526,11 +536,11 @@ export const APP_COPY = {
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} curated exercises`,
       unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
       unavailableTitle: ({ task, level }) => `${task} at ${level} is not available yet`,
-      unavailableDescription: "This topic set is still being reviewed. Choose an available level below to practise this task now.",
+      unavailableDescription: "This set of task parts is still being reviewed. Choose an available level below to practise this task now.",
       availableLevelsLabel: "Available levels for this task:",
-      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "topic" : "topics"}`,
-      skillHelp: "The available topics depend on the task and level you choose.",
-      changeSkill: "← Change topic",
+      availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "task part" : "task parts"}`,
+      partHelp: "The available task parts follow the chosen task and target level.",
+      changePart: "← Change task part",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
       progress: ({ step, total }) => `Step ${step} of ${total}`,
       stageMap: ({ current, next }) => (next ? `Now: ${current}. Next: ${next}.` : `Now: ${current}. This is your final stage.`),
@@ -643,8 +653,16 @@ export const APP_COPY = {
         "Every corrected essay's score and estimated level appear below the chart, so you can track exactly how each attempt went.",
       settingsTitle: "Make the app yours",
       settingsBody: "Open Settings to choose the interface language and appearance, or find help and support whenever you need it.",
+      dashboardPracticeTitle: "Build a task part before writing the whole response",
+      dashboardPracticeBody: "Practice is your writing trainer. It helps you rehearse one numbered part of a TCF task at your target level before you attempt a complete response.",
       dashboardStartWritingTitle: "Ready to write?",
       dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
+      practiceIntroTitle: "Practice builds a part of the task",
+      practiceIntroBody: "This page is not an exam simulation. Choose one task part to practise in a progressive, curated sequence before you write a full TCF response.",
+      practicePartsTitle: "The parts stay the same; the level changes the demand",
+      practicePartsBody: "Each task has a fixed numbered structure. B2, C1 and C2 practise the same part, but with increasingly independent, precise and nuanced language. Only reviewed paths can be started.",
+      practiceFullTaskTitle: "Put the parts together in a full task",
+      practiceFullTaskBody: "When you are ready, go to Tasks to apply the writing part you trained in a complete TCF response and receive feedback.",
       taskPickerTitle: "Choose a task",
       taskPickerBody:
         "TCF written expression has three task types: Tâche 1 (describe or recount an experience), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
@@ -1065,27 +1083,28 @@ export const APP_COPY = {
       },
       stages: { recognize: "Reconnaître", complete: "Compléter", transform: "Transformer", organize: "Organiser", develop: "Développer", produce: "Produire" },
       completedEyebrow: "Séquence terminée",
-      completedTitle: ({ skill }) => `Vous avez travaillé : ${skill}`,
+      completedTitle: ({ part }) => `Vous avez travaillé : ${part}`,
       completedDescription: ({ outcome }) => `Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine rédaction complète : ${outcome}`,
-      nextActionDescription: "Réutilisez maintenant cette compétence dans une tâche TCF complète ou choisissez un autre thème.",
+      nextActionDescription: "Réutilisez maintenant cette partie dans une tâche TCF complète ou choisissez une autre partie.",
       replayWithVariants: "Rejouer avec de nouvelles variantes",
       startFresh: "Commencer une nouvelle séance",
-      chooseAnotherSkill: "Choisir un autre thème",
+      chooseAnotherPart: "Choisir une autre partie de la tâche",
       tryFullTask: "Essayer une tâche complète",
       eyebrow: "Entraînement ciblé",
-      title: "Travaillez un thème d’écriture à la fois.",
-      description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et un thème ; vous suivrez ensuite une progression fixe et validée, de la reconnaissance à la production autonome.",
+      title: "Travaillez une partie de la tâche à la fois.",
+      description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et une partie de la tâche ; vous suivrez ensuite une progression fixe et validée, de la reconnaissance à la production autonome.",
       chooseTask: "1. Quelle tâche voulez-vous améliorer ?",
       chooseLevel: "2. Quel est votre niveau cible ?",
       levelHelp: "Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.",
-      chooseSkill: "3. Quel thème voulez-vous entraîner ?",
-      topicPlaceholder: "Choisissez un sujet",
+      choosePart: "3. Partie à travailler",
+      partPlaceholder: "Partie à travailler",
+      partLabel: ({ order }) => `Partie ${order}`,
       previewEyebrow: "Votre plan d’entraînement",
-      previewTitle: ({ topic }) => `Entraîner : ${topic}`,
+      previewTitle: ({ part }) => `Entraîner : ${part}`,
       previewOutcomeLabel: "À la fin, vous saurez :",
       previewStagesLabel: "Vos six étapes",
       resumeEyebrow: "Enregistré sur cet appareil",
-      resumeTitle: ({ topic }) => `Reprendre : ${topic}`,
+      resumeTitle: ({ part }) => `Reprendre : ${part}`,
       resumeDescription: ({ step, total }) => `Reprenez à l’étape ${step} sur ${total}.`,
       localSessionNotice: "Vos réponses restent uniquement dans ce navigateur jusqu’à la fin ou à la suppression de cette séance.",
       resumeSession: "Reprendre l’entraînement",
@@ -1093,11 +1112,11 @@ export const APP_COPY = {
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercices sélectionnés`,
       unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
       unavailableTitle: ({ task, level }) => `${task} au niveau ${level} n’est pas encore disponible`,
-      unavailableDescription: "Cette série est encore en cours de validation. Choisissez ci-dessous un niveau disponible pour vous entraîner dès maintenant.",
+      unavailableDescription: "Ces parties de la tâche sont encore en cours de validation. Choisissez ci-dessous un niveau disponible pour vous entraîner dès maintenant.",
       availableLevelsLabel: "Niveaux disponibles pour cette tâche :",
-      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "thème" : "thèmes"}`,
-      skillHelp: "Les thèmes disponibles dépendent de la tâche et du niveau que vous choisissez.",
-      changeSkill: "← Changer de thème",
+      availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "partie" : "parties"}`,
+      partHelp: "Les parties disponibles suivent la tâche et le niveau cible que vous choisissez.",
+      changePart: "← Changer de partie de la tâche",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
       progress: ({ step, total }) => `Étape ${step} sur ${total}`,
       stageMap: ({ current, next }) => (next ? `En cours : ${current}. Prochaine étape : ${next}.` : `En cours : ${current}. C’est votre dernière étape.`),
@@ -1214,8 +1233,16 @@ export const APP_COPY = {
         "La note et le niveau estimé de chaque rédaction corrigée apparaissent sous le graphique, pour suivre précisément chaque tentative.",
       settingsTitle: "Personnalisez l’application",
       settingsBody: "Ouvrez les paramètres pour choisir la langue et l’apparence de l’interface, ou trouver de l’aide lorsque vous en avez besoin.",
+      dashboardPracticeTitle: "Préparez une partie de la tâche avant la rédaction complète",
+      dashboardPracticeBody: "Pratique est votre entraîneur d’écriture. Il vous aide à travailler une partie numérotée d’une tâche TCF à votre niveau cible avant de rédiger une réponse complète.",
       dashboardStartWritingTitle: "Prêt à écrire ?",
       dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
+      practiceIntroTitle: "La pratique entraîne une partie de la tâche",
+      practiceIntroBody: "Cette page n’est pas une simulation d’examen. Choisissez une partie de la tâche et travaillez-la dans une séquence progressive et validée avant de rédiger une réponse TCF complète.",
+      practicePartsTitle: "Les parties restent les mêmes ; le niveau fait évoluer l’exigence",
+      practicePartsBody: "Chaque tâche suit une structure numérotée fixe. B2, C1 et C2 entraînent la même partie avec une langue de plus en plus autonome, précise et nuancée. Seules les séquences validées peuvent être commencées.",
+      practiceFullTaskTitle: "Assemblez les parties dans une tâche complète",
+      practiceFullTaskBody: "Lorsque vous êtes prêt·e, allez dans Tâches pour réutiliser la partie travaillée dans une réponse TCF complète et recevoir une correction.",
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
         "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (décrire ou raconter une expérience), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
@@ -1643,27 +1670,28 @@ export const APP_COPY = {
       },
       stages: { recognize: "Reconocer", complete: "Completar", transform: "Transformar", organize: "Organizar", develop: "Desarrollar", produce: "Producir" },
       completedEyebrow: "Secuencia completada",
-      completedTitle: ({ skill }) => `Has trabajado: ${skill}`,
+      completedTitle: ({ part }) => `Has trabajado: ${part}`,
       completedDescription: ({ outcome }) => `Has pasado del reconocimiento a la producción autónoma. Tenlo en cuenta para tu próxima redacción completa: ${outcome}`,
-      nextActionDescription: "Ahora aplica esta habilidad en una tarea TCF completa o elige otro tema.",
+      nextActionDescription: "Ahora aplica esta parte en una tarea TCF completa o elige otra parte.",
       replayWithVariants: "Repetir con nuevas variantes",
       startFresh: "Empezar de nuevo",
-      chooseAnotherSkill: "Elegir otro tema",
+      chooseAnotherPart: "Elegir otra parte de la tarea",
       tryFullTask: "Probar una tarea completa",
       eyebrow: "Práctica específica",
-      title: "Trabaja un tema de escritura cada vez.",
-      description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y un tema; después seguirás una progresión fija y revisada, del reconocimiento a la producción autónoma.",
+      title: "Trabaja una parte de la tarea cada vez.",
+      description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y una parte de la tarea; después seguirás una progresión fija y revisada, del reconocimiento a la producción autónoma.",
       chooseTask: "1. ¿Qué tarea quieres mejorar?",
       chooseLevel: "2. ¿Cuál es tu nivel objetivo?",
       levelHelp: "Elige primero una tarea: la dificultad está ligada a su propósito de escritura.",
-      chooseSkill: "3. ¿Qué tema quieres practicar?",
-      topicPlaceholder: "Elige un tema",
+      choosePart: "3. Parte a trabajar",
+      partPlaceholder: "Parte a trabajar",
+      partLabel: ({ order }) => `Parte ${order}`,
       previewEyebrow: "Tu plan de práctica",
-      previewTitle: ({ topic }) => `Practicar: ${topic}`,
+      previewTitle: ({ part }) => `Practicar: ${part}`,
       previewOutcomeLabel: "Al final podrás:",
       previewStagesLabel: "Tus seis etapas",
       resumeEyebrow: "Guardado en este dispositivo",
-      resumeTitle: ({ topic }) => `Reanudar: ${topic}`,
+      resumeTitle: ({ part }) => `Reanudar: ${part}`,
       resumeDescription: ({ step, total }) => `Continúa en el paso ${step} de ${total}.`,
       localSessionNotice: "Tus respuestas solo se guardan en este navegador hasta que termines o descartes esta sesión.",
       resumeSession: "Reanudar la práctica",
@@ -1671,11 +1699,11 @@ export const APP_COPY = {
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} ejercicios seleccionados`,
       unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
       unavailableTitle: ({ task, level }) => `${task} en ${level} aún no está disponible`,
-      unavailableDescription: "Este conjunto sigue en revisión. Elige abajo un nivel disponible para practicar esta tarea ahora.",
+      unavailableDescription: "Estas partes de la tarea siguen en revisión. Elige abajo un nivel disponible para practicar esta tarea ahora.",
       availableLevelsLabel: "Niveles disponibles para esta tarea:",
-      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
-      skillHelp: "Los temas disponibles dependen de la tarea y del nivel que elijas.",
-      changeSkill: "← Cambiar de tema",
+      availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "parte" : "partes"}`,
+      partHelp: "Las partes disponibles siguen la tarea y el nivel objetivo que elijas.",
+      changePart: "← Cambiar de parte de la tarea",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
       progress: ({ step, total }) => `Paso ${step} de ${total}`,
       stageMap: ({ current, next }) => (next ? `Ahora: ${current}. Siguiente: ${next}.` : `Ahora: ${current}. Esta es tu última etapa.`),
@@ -1790,8 +1818,16 @@ export const APP_COPY = {
         "La nota y el nivel estimado de cada redacción corregida aparecen debajo del gráfico, para seguir exactamente cómo te fue en cada intento.",
       settingsTitle: "Personaliza la aplicación",
       settingsBody: "Abre Configuración para elegir el idioma y la apariencia de la interfaz, o encontrar ayuda y soporte cuando lo necesites.",
+      dashboardPracticeTitle: "Prepara una parte de la tarea antes de escribir la respuesta completa",
+      dashboardPracticeBody: "Práctica es tu entrenador de escritura. Te ayuda a ensayar una parte numerada de una tarea TCF en tu nivel objetivo antes de escribir una respuesta completa.",
       dashboardStartWritingTitle: "¿Listo para escribir?",
       dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
+      practiceIntroTitle: "La práctica desarrolla una parte de la tarea",
+      practiceIntroBody: "Esta página no es una simulación de examen. Elige una parte de la tarea y practícala en una secuencia progresiva y revisada antes de escribir una respuesta TCF completa.",
+      practicePartsTitle: "Las partes son las mismas; el nivel cambia la exigencia",
+      practicePartsBody: "Cada tarea tiene una estructura numerada fija. B2, C1 y C2 practican la misma parte con un lenguaje cada vez más autónomo, preciso y matizado. Solo se pueden iniciar secuencias revisadas.",
+      practiceFullTaskTitle: "Reúne las partes en una tarea completa",
+      practiceFullTaskBody: "Cuando estés listo, ve a Tareas para aplicar la parte que practicaste en una respuesta TCF completa y recibir comentarios.",
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
         "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (describir o narrar una experiencia), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
@@ -2219,27 +2255,28 @@ export const APP_COPY = {
       },
       stages: { recognize: "Reconhecer", complete: "Completar", transform: "Transformar", organize: "Organizar", develop: "Desenvolver", produce: "Produzir" },
       completedEyebrow: "Sequência concluída",
-      completedTitle: ({ skill }) => `Você trabalhou: ${skill}`,
+      completedTitle: ({ part }) => `Você trabalhou: ${part}`,
       completedDescription: ({ outcome }) => `Você passou do reconhecimento à produção autônoma. Use isto na sua próxima redação completa: ${outcome}`,
-      nextActionDescription: "Agora aplique essa habilidade em uma tarefa TCF completa ou escolha outro tema.",
+      nextActionDescription: "Agora aplique esta parte em uma tarefa TCF completa ou escolha outra parte.",
       replayWithVariants: "Repetir com novas variantes",
       startFresh: "Começar do zero",
-      chooseAnotherSkill: "Escolher outro tema",
+      chooseAnotherPart: "Escolher outra parte da tarefa",
       tryFullTask: "Experimentar uma tarefa completa",
       eyebrow: "Prática direcionada",
-      title: "Trabalhe um tema de escrita de cada vez.",
-      description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e um tema; em seguida, você seguirá uma progressão fixa e revisada, do reconhecimento à produção autônoma.",
+      title: "Trabalhe uma parte da tarefa de cada vez.",
+      description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e uma parte da tarefa; em seguida, você seguirá uma progressão fixa e revisada, do reconhecimento à produção autônoma.",
       chooseTask: "1. Qual tarefa você quer melhorar?",
       chooseLevel: "2. Qual é seu nível-alvo?",
       levelHelp: "Escolha primeiro uma tarefa: a dificuldade está ligada ao objetivo de escrita.",
-      chooseSkill: "3. Qual tema você quer praticar?",
-      topicPlaceholder: "Escolha um tema",
+      choosePart: "3. Parte a trabalhar",
+      partPlaceholder: "Parte a trabalhar",
+      partLabel: ({ order }) => `Parte ${order}`,
       previewEyebrow: "Seu plano de prática",
-      previewTitle: ({ topic }) => `Praticar: ${topic}`,
+      previewTitle: ({ part }) => `Praticar: ${part}`,
       previewOutcomeLabel: "Ao final, você saberá:",
       previewStagesLabel: "Suas seis etapas",
       resumeEyebrow: "Salvo neste dispositivo",
-      resumeTitle: ({ topic }) => `Retomar: ${topic}`,
+      resumeTitle: ({ part }) => `Retomar: ${part}`,
       resumeDescription: ({ step, total }) => `Continue na etapa ${step} de ${total}.`,
       localSessionNotice: "Suas respostas ficam apenas neste navegador até você concluir ou descartar esta sessão.",
       resumeSession: "Retomar a prática",
@@ -2247,11 +2284,11 @@ export const APP_COPY = {
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercícios selecionados`,
       unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
       unavailableTitle: ({ task, level }) => `${task} no nível ${level} ainda não está disponível`,
-      unavailableDescription: "Este conjunto ainda está em revisão. Escolha abaixo um nível disponível para praticar esta tarefa agora.",
+      unavailableDescription: "Estas partes da tarefa ainda estão em revisão. Escolha abaixo um nível disponível para praticar esta tarefa agora.",
       availableLevelsLabel: "Níveis disponíveis para esta tarefa:",
-      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
-      skillHelp: "Os temas disponíveis dependem da tarefa e do nível escolhidos.",
-      changeSkill: "← Mudar de tema",
+      availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "parte" : "partes"}`,
+      partHelp: "As partes disponíveis seguem a tarefa e o nível-alvo escolhidos.",
+      changePart: "← Mudar de parte da tarefa",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
       progress: ({ step, total }) => `Etapa ${step} de ${total}`,
       stageMap: ({ current, next }) => (next ? `Agora: ${current}. Próxima: ${next}.` : `Agora: ${current}. Esta é sua última etapa.`),
@@ -2366,8 +2403,16 @@ export const APP_COPY = {
         "A nota e o nível estimado de cada redação corrigida aparecem abaixo do gráfico, para você acompanhar exatamente como foi cada tentativa.",
       settingsTitle: "Personalize o aplicativo",
       settingsBody: "Abra Configurações para escolher o idioma e a aparência da interface ou encontrar ajuda e suporte quando precisar.",
+      dashboardPracticeTitle: "Treine uma parte da tarefa antes de redigir a resposta completa",
+      dashboardPracticeBody: "Prática é seu treinador de escrita. Ela ajuda você a treinar uma parte numerada de uma tarefa TCF no seu nível-alvo antes de escrever uma resposta completa.",
       dashboardStartWritingTitle: "Pronto para escrever?",
       dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
+      practiceIntroTitle: "A prática desenvolve uma parte da tarefa",
+      practiceIntroBody: "Esta página não é uma simulação de exame. Escolha uma parte da tarefa e pratique-a em uma sequência progressiva e revisada antes de escrever uma resposta TCF completa.",
+      practicePartsTitle: "As partes são as mesmas; o nível muda a exigência",
+      practicePartsBody: "Cada tarefa tem uma estrutura numerada fixa. B2, C1 e C2 praticam a mesma parte com uma linguagem cada vez mais autônoma, precisa e nuançada. Apenas sequências revisadas podem ser iniciadas.",
+      practiceFullTaskTitle: "Reúna as partes em uma tarefa completa",
+      practiceFullTaskBody: "Quando estiver pronto, vá a Tarefas para aplicar a parte que treinou em uma resposta TCF completa e receber feedback.",
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
         "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (descrever ou narrar uma experiência), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
