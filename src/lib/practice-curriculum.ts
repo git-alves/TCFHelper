@@ -59,6 +59,8 @@ export interface PracticeExercise {
    * an automatic correct/incorrect verdict for Develop and Produce steps.
    */
   selfCheck?: readonly string[];
+  /** Optional editor-authored starting suggestion for open writing. */
+  hint?: string;
 }
 
 const allLevels = (b2: string, c1: string, c2: string): Record<PracticeLevel, string> => ({ B2: b2, C1: c1, C2: c2 });
@@ -364,6 +366,16 @@ export function hasCompletePracticePath(task: TaskType, level: PracticeLevel, sk
     ).map((exercise) => exercise.sequenceOrder),
   );
   return coveredOrders.size === PRACTICE_EXERCISE_SEQUENCE.length;
+}
+
+/**
+ * A hint is a reviewed starting move, not a solution. Existing open-writing
+ * entries use their first exercise-specific self-check criterion until an
+ * editor supplies a separate hint field.
+ */
+export function getPracticeHint(exercise: PracticeExercise): string | null {
+  if (exercise.exerciseType !== "develop" && exercise.exerciseType !== "produce") return null;
+  return exercise.hint ?? exercise.selfCheck?.[0] ?? null;
 }
 
 export function getPracticeExercises(task: TaskType, level: PracticeLevel, skill: string): readonly PracticeExercise[] {

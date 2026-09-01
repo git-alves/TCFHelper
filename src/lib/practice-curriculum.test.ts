@@ -5,6 +5,7 @@ import {
   PRACTICE_LEVELS,
   PRACTICE_TOPICS,
   getPracticeExercises,
+  getPracticeHint,
   getPracticeTopic,
   getPracticeTopics,
   hasCompletePracticePath,
@@ -125,6 +126,7 @@ describe("practice curriculum", () => {
         expect(entry.correctAnswer, entry.id).toBeNull();
         expect(entry.acceptedAnswers, entry.id).toEqual([]);
         expect(entry.selfCheck, entry.id).toHaveLength(3);
+        expect(getPracticeHint(entry), entry.id).toBe(entry.hint ?? entry.selfCheck?.[0]);
       }
       if (entry.exerciseType === "organize") {
         expect(Array.isArray(entry.correctAnswer), entry.id).toBe(true);
