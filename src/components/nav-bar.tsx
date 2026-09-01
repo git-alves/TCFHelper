@@ -172,14 +172,9 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   </Link>
                 )
               ) : (
-                <>
-                  <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
-                    {copy.nav.tasks}
-                  </Link>
-                  <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
-                    {copy.nav.dashboard}
-                  </Link>
-                </>
+                <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
+                  {copy.nav.tasks}
+                </Link>
               )}
               {!isHome &&
                 realPathname !== "/practice" &&

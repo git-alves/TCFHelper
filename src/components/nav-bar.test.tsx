@@ -35,5 +35,6 @@ describe("NavBar", () => {
     expect(markup).toContain('href="/dashboard"');
     expect(markup).toContain(">Dashboard<");
     expect(markup).toContain('href="/tasks"');
+    expect(markup.match(/href="\/dashboard"/g)).toHaveLength(1);
   });
 });
