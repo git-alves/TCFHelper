@@ -172,9 +172,14 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   </Link>
                 )
               ) : (
-                <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
-                  {copy.nav.tasks}
-                </Link>
+                <>
+                  <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
+                    {copy.nav.tasks}
+                  </Link>
+                  <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
+                    {copy.nav.dashboard}
+                  </Link>
+                </>
               )}
               {!isHome &&
                 realPathname !== "/practice" &&
@@ -196,6 +201,33 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     className={DASHBOARD_BUTTON_CLASS}
                   >
                     {copy.nav.practice}
+                  </Link>
+                ))}
+              {/* Practice's primary slot above stays "Tasks" (the walkthrough's
+               * last practice-tour step targets nav-tasks from this page), so
+               * Dashboard has no other way back onto this page -- unlike
+               * /tasks, where onTasks already puts Dashboard in the primary
+               * slot. */}
+              {realPathname === "/practice" &&
+                (isDashboardBlocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    data-walkthrough="nav-dashboard"
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
+                    {copy.nav.dashboard}
+                  </button>
+                ) : (
+                  <Link
+                    href="/dashboard"
+                    data-walkthrough="nav-dashboard"
+                    onClick={guardedNavigationHandler("/dashboard")}
+                    className={DASHBOARD_BUTTON_CLASS}
+                  >
+                    {copy.nav.dashboard}
                   </Link>
                 ))}
               {isAdmin && !isOnAdminPage && (
