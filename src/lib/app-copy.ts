@@ -75,8 +75,11 @@ export interface AppCopy {
     completedEyebrow: string;
     completedTitle: (values: { skill: string }) => string;
     completedDescription: (values: { outcome: string }) => string;
-    reviewSequence: string;
+    nextActionDescription: string;
+    replayWithVariants: string;
+    startFresh: string;
     chooseAnotherSkill: string;
+    tryFullTask: string;
     eyebrow: string;
     title: string;
     description: string;
@@ -85,12 +88,27 @@ export interface AppCopy {
     levelHelp: string;
     chooseSkill: string;
     topicPlaceholder: string;
+    previewEyebrow: string;
+    previewTitle: (values: { topic: string }) => string;
+    previewOutcomeLabel: string;
+    previewStagesLabel: string;
+    resumeEyebrow: string;
+    resumeTitle: (values: { topic: string }) => string;
+    resumeDescription: (values: { step: number; total: number }) => string;
+    localSessionNotice: string;
+    resumeSession: string;
+    discardSavedSession: string;
     durationAndSteps: (values: { minutes: number; steps: number }) => string;
     unavailableCombination: string;
+    unavailableTitle: (values: { task: string; level: string }) => string;
+    unavailableDescription: string;
+    availableLevelsLabel: string;
+    availableLevel: (values: { level: string; topics: number }) => string;
     skillHelp: string;
     changeSkill: string;
     sequenceDescription: (values: { count: number }) => string;
     progress: (values: { step: number; total: number }) => string;
+    stageMap: (values: { current: string; next: string | null }) => string;
     attentionLabel: string;
     selectAnswer: string;
     selectOrder: string;
@@ -113,6 +131,11 @@ export interface AppCopy {
     verify: string;
     revealAnswer: string;
     retryHint: string;
+    difficultyPrompt: string;
+    difficultyTooEasy: string;
+    difficultyAppropriate: string;
+    difficultyTooHard: string;
+    difficultyRecorded: string;
   };
   login: {
     title: string;
@@ -477,8 +500,11 @@ export const APP_COPY = {
       completedEyebrow: "Sequence complete",
       completedTitle: ({ skill }) => `You practised: ${skill}`,
       completedDescription: ({ outcome }) => `You moved from recognition to independent writing. Keep this in mind for your next full response: ${outcome}`,
-      reviewSequence: "Practise again",
+      nextActionDescription: "Next, apply this writing move in a complete TCF task or continue with another topic.",
+      replayWithVariants: "Replay with new variants",
+      startFresh: "Start fresh",
       chooseAnotherSkill: "Choose another topic",
+      tryFullTask: "Try a full task",
       eyebrow: "Focused practice",
       title: "Work on one writing topic at a time.",
       description: "This is not an exam simulation. Choose a task, your target level and a topic; you will then follow a fixed, reviewed progression from recognition to independent writing.",
@@ -487,12 +513,27 @@ export const APP_COPY = {
       levelHelp: "Choose a task first: difficulty is linked to its writing purpose.",
       chooseSkill: "3. Which topic would you like to practise?",
       topicPlaceholder: "Select a topic",
+      previewEyebrow: "Your practice plan",
+      previewTitle: ({ topic }) => `Practise: ${topic}`,
+      previewOutcomeLabel: "By the end, you will be able to:",
+      previewStagesLabel: "Your six stages",
+      resumeEyebrow: "Saved on this device",
+      resumeTitle: ({ topic }) => `Resume: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continue at step ${step} of ${total}.`,
+      localSessionNotice: "Your responses are stored only in this browser until you finish or discard this session.",
+      resumeSession: "Resume practice",
+      discardSavedSession: "Discard saved session",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} curated exercises`,
       unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
+      unavailableTitle: ({ task, level }) => `${task} at ${level} is not available yet`,
+      unavailableDescription: "This topic set is still being reviewed. Choose an available level below to practise this task now.",
+      availableLevelsLabel: "Available levels for this task:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "topic" : "topics"}`,
       skillHelp: "The available topics depend on the task and level you choose.",
       changeSkill: "← Change topic",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
       progress: ({ step, total }) => `Step ${step} of ${total}`,
+      stageMap: ({ current, next }) => (next ? `Now: ${current}. Next: ${next}.` : `Now: ${current}. This is your final stage.`),
       attentionLabel: "Focus point:",
       selectAnswer: "Choose your answer",
       selectOrder: "Choose the most logical order",
@@ -515,6 +556,11 @@ export const APP_COPY = {
       verify: "Check",
       revealAnswer: "Show the answer",
       retryHint: "You can edit your response and try again as many times as you need.",
+      difficultyPrompt: "Optional: how did this exercise feel?",
+      difficultyTooEasy: "Too easy",
+      difficultyAppropriate: "Appropriate",
+      difficultyTooHard: "Too hard",
+      difficultyRecorded: "Thanks — recorded for this practice session.",
     },
     login: {
       title: "Log in",
@@ -1021,8 +1067,11 @@ export const APP_COPY = {
       completedEyebrow: "Séquence terminée",
       completedTitle: ({ skill }) => `Vous avez travaillé : ${skill}`,
       completedDescription: ({ outcome }) => `Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine rédaction complète : ${outcome}`,
-      reviewSequence: "S’entraîner de nouveau",
+      nextActionDescription: "Réutilisez maintenant cette compétence dans une tâche TCF complète ou choisissez un autre thème.",
+      replayWithVariants: "Rejouer avec de nouvelles variantes",
+      startFresh: "Commencer une nouvelle séance",
       chooseAnotherSkill: "Choisir un autre thème",
+      tryFullTask: "Essayer une tâche complète",
       eyebrow: "Entraînement ciblé",
       title: "Travaillez un thème d’écriture à la fois.",
       description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et un thème ; vous suivrez ensuite une progression fixe et validée, de la reconnaissance à la production autonome.",
@@ -1031,12 +1080,27 @@ export const APP_COPY = {
       levelHelp: "Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.",
       chooseSkill: "3. Quel thème voulez-vous entraîner ?",
       topicPlaceholder: "Choisissez un sujet",
+      previewEyebrow: "Votre plan d’entraînement",
+      previewTitle: ({ topic }) => `Entraîner : ${topic}`,
+      previewOutcomeLabel: "À la fin, vous saurez :",
+      previewStagesLabel: "Vos six étapes",
+      resumeEyebrow: "Enregistré sur cet appareil",
+      resumeTitle: ({ topic }) => `Reprendre : ${topic}`,
+      resumeDescription: ({ step, total }) => `Reprenez à l’étape ${step} sur ${total}.`,
+      localSessionNotice: "Vos réponses restent uniquement dans ce navigateur jusqu’à la fin ou à la suppression de cette séance.",
+      resumeSession: "Reprendre l’entraînement",
+      discardSavedSession: "Supprimer la séance enregistrée",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercices sélectionnés`,
       unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
+      unavailableTitle: ({ task, level }) => `${task} au niveau ${level} n’est pas encore disponible`,
+      unavailableDescription: "Cette série est encore en cours de validation. Choisissez ci-dessous un niveau disponible pour vous entraîner dès maintenant.",
+      availableLevelsLabel: "Niveaux disponibles pour cette tâche :",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "thème" : "thèmes"}`,
       skillHelp: "Les thèmes disponibles dépendent de la tâche et du niveau que vous choisissez.",
       changeSkill: "← Changer de thème",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
       progress: ({ step, total }) => `Étape ${step} sur ${total}`,
+      stageMap: ({ current, next }) => (next ? `En cours : ${current}. Prochaine étape : ${next}.` : `En cours : ${current}. C’est votre dernière étape.`),
       attentionLabel: "Point d’attention :",
       selectAnswer: "Choisissez votre réponse",
       selectOrder: "Choisissez l’ordre le plus logique",
@@ -1059,6 +1123,11 @@ export const APP_COPY = {
       verify: "Vérifier",
       revealAnswer: "Voir la réponse",
       retryHint: "Vous pouvez modifier votre réponse autant de fois que nécessaire.",
+      difficultyPrompt: "Facultatif : comment avez-vous trouvé cet exercice ?",
+      difficultyTooEasy: "Trop facile",
+      difficultyAppropriate: "Adapté",
+      difficultyTooHard: "Trop difficile",
+      difficultyRecorded: "Merci — votre réponse est enregistrée pour cette séance.",
     },
     login: {
       title: "Se connecter",
@@ -1576,8 +1645,11 @@ export const APP_COPY = {
       completedEyebrow: "Secuencia completada",
       completedTitle: ({ skill }) => `Has trabajado: ${skill}`,
       completedDescription: ({ outcome }) => `Has pasado del reconocimiento a la producción autónoma. Tenlo en cuenta para tu próxima redacción completa: ${outcome}`,
-      reviewSequence: "Practicar de nuevo",
+      nextActionDescription: "Ahora aplica esta habilidad en una tarea TCF completa o elige otro tema.",
+      replayWithVariants: "Repetir con nuevas variantes",
+      startFresh: "Empezar de nuevo",
       chooseAnotherSkill: "Elegir otro tema",
+      tryFullTask: "Probar una tarea completa",
       eyebrow: "Práctica específica",
       title: "Trabaja un tema de escritura cada vez.",
       description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y un tema; después seguirás una progresión fija y revisada, del reconocimiento a la producción autónoma.",
@@ -1586,12 +1658,27 @@ export const APP_COPY = {
       levelHelp: "Elige primero una tarea: la dificultad está ligada a su propósito de escritura.",
       chooseSkill: "3. ¿Qué tema quieres practicar?",
       topicPlaceholder: "Elige un tema",
+      previewEyebrow: "Tu plan de práctica",
+      previewTitle: ({ topic }) => `Practicar: ${topic}`,
+      previewOutcomeLabel: "Al final podrás:",
+      previewStagesLabel: "Tus seis etapas",
+      resumeEyebrow: "Guardado en este dispositivo",
+      resumeTitle: ({ topic }) => `Reanudar: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continúa en el paso ${step} de ${total}.`,
+      localSessionNotice: "Tus respuestas solo se guardan en este navegador hasta que termines o descartes esta sesión.",
+      resumeSession: "Reanudar la práctica",
+      discardSavedSession: "Descartar la sesión guardada",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} ejercicios seleccionados`,
       unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
+      unavailableTitle: ({ task, level }) => `${task} en ${level} aún no está disponible`,
+      unavailableDescription: "Este conjunto sigue en revisión. Elige abajo un nivel disponible para practicar esta tarea ahora.",
+      availableLevelsLabel: "Niveles disponibles para esta tarea:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
       skillHelp: "Los temas disponibles dependen de la tarea y del nivel que elijas.",
       changeSkill: "← Cambiar de tema",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
       progress: ({ step, total }) => `Paso ${step} de ${total}`,
+      stageMap: ({ current, next }) => (next ? `Ahora: ${current}. Siguiente: ${next}.` : `Ahora: ${current}. Esta es tu última etapa.`),
       attentionLabel: "Punto de atención:",
       selectAnswer: "Elige tu respuesta",
       selectOrder: "Elige el orden más lógico",
@@ -1614,6 +1701,11 @@ export const APP_COPY = {
       verify: "Comprobar",
       revealAnswer: "Ver la respuesta",
       retryHint: "Puedes modificar tu respuesta e intentarlo tantas veces como necesites.",
+      difficultyPrompt: "Opcional: ¿cómo te resultó este ejercicio?",
+      difficultyTooEasy: "Demasiado fácil",
+      difficultyAppropriate: "Adecuado",
+      difficultyTooHard: "Demasiado difícil",
+      difficultyRecorded: "Gracias; se guardó para esta sesión de práctica.",
     },
     login: {
       title: "Iniciar sesión",
@@ -2129,8 +2221,11 @@ export const APP_COPY = {
       completedEyebrow: "Sequência concluída",
       completedTitle: ({ skill }) => `Você trabalhou: ${skill}`,
       completedDescription: ({ outcome }) => `Você passou do reconhecimento à produção autônoma. Use isto na sua próxima redação completa: ${outcome}`,
-      reviewSequence: "Praticar novamente",
+      nextActionDescription: "Agora aplique essa habilidade em uma tarefa TCF completa ou escolha outro tema.",
+      replayWithVariants: "Repetir com novas variantes",
+      startFresh: "Começar do zero",
       chooseAnotherSkill: "Escolher outro tema",
+      tryFullTask: "Experimentar uma tarefa completa",
       eyebrow: "Prática direcionada",
       title: "Trabalhe um tema de escrita de cada vez.",
       description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e um tema; em seguida, você seguirá uma progressão fixa e revisada, do reconhecimento à produção autônoma.",
@@ -2139,12 +2234,27 @@ export const APP_COPY = {
       levelHelp: "Escolha primeiro uma tarefa: a dificuldade está ligada ao objetivo de escrita.",
       chooseSkill: "3. Qual tema você quer praticar?",
       topicPlaceholder: "Escolha um tema",
+      previewEyebrow: "Seu plano de prática",
+      previewTitle: ({ topic }) => `Praticar: ${topic}`,
+      previewOutcomeLabel: "Ao final, você saberá:",
+      previewStagesLabel: "Suas seis etapas",
+      resumeEyebrow: "Salvo neste dispositivo",
+      resumeTitle: ({ topic }) => `Retomar: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continue na etapa ${step} de ${total}.`,
+      localSessionNotice: "Suas respostas ficam apenas neste navegador até você concluir ou descartar esta sessão.",
+      resumeSession: "Retomar a prática",
+      discardSavedSession: "Descartar sessão salva",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercícios selecionados`,
       unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
+      unavailableTitle: ({ task, level }) => `${task} no nível ${level} ainda não está disponível`,
+      unavailableDescription: "Este conjunto ainda está em revisão. Escolha abaixo um nível disponível para praticar esta tarefa agora.",
+      availableLevelsLabel: "Níveis disponíveis para esta tarefa:",
+      availableLevel: ({ level, topics }) => `${level} · ${topics} ${topics === 1 ? "tema" : "temas"}`,
       skillHelp: "Os temas disponíveis dependem da tarefa e do nível escolhidos.",
       changeSkill: "← Mudar de tema",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
       progress: ({ step, total }) => `Etapa ${step} de ${total}`,
+      stageMap: ({ current, next }) => (next ? `Agora: ${current}. Próxima: ${next}.` : `Agora: ${current}. Esta é sua última etapa.`),
       attentionLabel: "Ponto de atenção:",
       selectAnswer: "Escolha sua resposta",
       selectOrder: "Escolha a ordem mais lógica",
@@ -2167,6 +2277,11 @@ export const APP_COPY = {
       verify: "Verificar",
       revealAnswer: "Ver a resposta",
       retryHint: "Você pode modificar sua resposta e tentar novamente quantas vezes precisar.",
+      difficultyPrompt: "Opcional: como este exercício pareceu para você?",
+      difficultyTooEasy: "Fácil demais",
+      difficultyAppropriate: "Adequado",
+      difficultyTooHard: "Difícil demais",
+      difficultyRecorded: "Obrigado — registrado para esta sessão de prática.",
     },
     login: {
       title: "Entrar",

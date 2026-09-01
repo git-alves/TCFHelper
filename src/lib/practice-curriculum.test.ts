@@ -21,9 +21,13 @@ describe("practice curriculum", () => {
 
   it("does not offer a topic at a level before manually reviewed exercises exist", () => {
     expect(getPracticeTopics("TASK_1", "B2").map((topic) => topic.id)).toEqual(["openings"]);
+    expect(getPracticeTopics("TASK_1", "C1").map((topic) => topic.id)).toEqual(["openings", "developing-information"]);
+    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["openings"]);
     expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual(["recounting-events"]);
-    expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["counterarguments"]);
-    expect(getPracticeTopics("TASK_2", "C2")).toEqual([]);
+    expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
+    expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
+    expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
+    expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual(["justifying-position"]);
   });
 
   it("provides an explicit learning goal for every topic and target level", () => {
