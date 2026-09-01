@@ -51,7 +51,7 @@ describe("practice curriculum", () => {
     const taskOneB2Orders = getPracticeTopics("TASK_1", "B2").map((part) => part.taskPartOrder);
     const taskThreeC1Orders = getPracticeTopics("TASK_3", "C1").map((part) => part.taskPartOrder);
 
-    expect(taskOneB2Orders).toEqual([1, 2]);
+    expect(taskOneB2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     expect(taskThreeC1Orders).toEqual([7, 8]);
   });
 
@@ -60,18 +60,29 @@ describe("practice curriculum", () => {
     expect(taskThreeBlueprint).toContain("introducing-topic");
     expect(taskThreeBlueprint).toContain("taking-position");
 
-    const taskOneBlueprint = getPracticeTopics("TASK_1").map((part) => part.id);
-    expect(taskOneBlueprint).toContain("message-purpose");
-    expect(getPracticeTopics("TASK_1", "B2").map((part) => part.id)).not.toContain("message-purpose");
+    const taskTwoBlueprint = getPracticeTopics("TASK_2").map((part) => part.id);
+    expect(taskTwoBlueprint).toContain("chronology");
+    expect(getPracticeTopics("TASK_2", "B2").map((part) => part.id)).not.toContain("chronology");
 
     expect(hasCompletePracticePath("TASK_1", "B2", "salutations")).toBe(true);
-    expect(hasCompletePracticePath("TASK_1", "B2", "message-purpose")).toBe(false);
+    expect(hasCompletePracticePath("TASK_2", "B2", "chronology")).toBe(false);
   });
 
   it("does not offer a topic at a level before manually reviewed exercises exist", () => {
-    expect(getPracticeTopics("TASK_1", "B2").map((topic) => topic.id)).toEqual(["salutations", "openings"]);
+    expect(getPracticeTopics("TASK_1", "B2").map((topic) => topic.id)).toEqual([
+      "salutations",
+      "openings",
+      "message-purpose",
+      "giving-information",
+      "developing-information",
+      "asking-information",
+      "making-requests",
+      "suggestions-invitations",
+      "register",
+      "closing-message",
+    ]);
     expect(getPracticeTopics("TASK_1", "C1").map((topic) => topic.id)).toEqual(["salutations", "openings", "developing-information"]);
-    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["salutations", "openings"]);
+    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["salutations", "openings", "developing-information"]);
     expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
