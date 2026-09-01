@@ -15,7 +15,6 @@ import {
   type PracticeTopic,
 } from "@/lib/practice-curriculum";
 import { TASK_ORDER } from "@/lib/tcf-tasks";
-import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 // The question bank stays the source of truth. This small server-side adapter
 // only translates its author-facing field names to the trainer's serializable
@@ -95,7 +94,7 @@ export default async function PracticePage() {
 
   return (
     <main className="flex w-full flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <PracticeWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
+      <PracticeWalkthroughRunner shouldAutoStart={false} />
       <PracticeTrainer curriculum={getTrainerCurriculum()} />
     </main>
   );

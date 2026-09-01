@@ -4,6 +4,11 @@ import { useCallback, useEffect, useState } from "react";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
+import {
+  getContextualWalkthroughStorage,
+  markContextualWalkthroughSeen,
+  shouldShowContextualWalkthrough,
+} from "@/lib/contextual-walkthrough";
 
 interface PracticeWalkthroughRunnerProps {
   shouldAutoStart: boolean;
@@ -19,6 +24,18 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
   const { register } = useWalkthroughTrigger();
   const [isOpen, setIsOpen] = useState(shouldAutoStart);
   const [stepIndex, setStepIndex] = useState(0);
+
+  // This guide appears only after the learner has deliberately opened
+  // Practice. It is separate from the account-level Dashboard orientation,
+  // so completing one never suppresses the other.
+  useEffect(() => {
+    if (shouldAutoStart || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
+    // Defer the state change until after this synchronization effect so the
+    // page's initial render stays stable (and the overlay measures its
+    // targets only after Practice has painted).
+    const timer = window.setTimeout(() => setIsOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [shouldAutoStart]);
 
   useEffect(() => {
     register(() => {
@@ -43,7 +60,7 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
 
   const dismiss = useCallback(() => {
     setIsOpen(false);
-    void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
+    markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "practice");
   }, []);
 
   return (

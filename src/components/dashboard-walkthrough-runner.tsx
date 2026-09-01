@@ -75,13 +75,6 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
     void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
   }, []);
 
-  // Finishing the welcome only closes this page's single explanatory step.
-  // Keep the walkthrough unrecorded so the concise guide for whichever
-  // learning route the learner deliberately chooses can still open there.
-  const finishWelcome = useCallback(() => {
-    setIsOpen(false);
-  }, []);
-
   return (
     <WalkthroughOverlay
       open={isOpen}
@@ -91,7 +84,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
       onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
-      onFinish={finishWelcome}
+      onFinish={dismiss}
     />
   );
 }

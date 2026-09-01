@@ -5,6 +5,11 @@ import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
+import {
+  getContextualWalkthroughStorage,
+  markContextualWalkthroughSeen,
+  shouldShowContextualWalkthrough,
+} from "@/lib/contextual-walkthrough";
 
 interface TasksWalkthroughRunnerProps {
   // A plain boolean, computed server-side from the signed-in learner's
@@ -16,9 +21,9 @@ interface TasksWalkthroughRunnerProps {
 /**
  * Owns the tour itself for the /tasks workspace. Its "Take a tour" trigger
  * lives in the nav bar, not on this page -- see WalkthroughTriggerProvider --
- * so this component only registers a starter function while mounted.
- * Skipping or finishing both record the current walkthrough version -- same
- * meaning either way, see /api/walkthrough/dismiss.
+ * so this component only registers a starter function while mounted. Its
+ * concise guide is remembered on this browser after either Skip or Finish;
+ * it does not change the account-level Dashboard orientation state.
  *
  * Most of these steps drive WritingWorkspace's real state (select a task,
  * fetch a topic, paste a sample response, show a canned correction preview)
@@ -33,6 +38,16 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   const { applyStep, resetDemo } = useWalkthroughWorkspaceScript();
   const [isOpen, setIsOpen] = useState(shouldAutoStart);
   const [stepIndex, setStepIndex] = useState(0);
+
+  // Show this concise guide when the learner chooses Full task for the first
+  // time on this browser. It does not depend on, or redirect from, Practice.
+  useEffect(() => {
+    if (shouldAutoStart || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
+    // Let the workspace render its first state before opening a guide that
+    // measures targets and drives its illustrative sample.
+    const timer = window.setTimeout(() => setIsOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [shouldAutoStart]);
 
   useEffect(() => {
     register(() => {
@@ -85,7 +100,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   const dismiss = useCallback(() => {
     setIsOpen(false);
     resetDemo();
-    void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
+    markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "tasks");
   }, [resetDemo]);
 
   return (

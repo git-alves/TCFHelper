@@ -7,8 +7,8 @@ type WalkthroughTrigger = () => void;
 interface WalkthroughTriggerContextValue {
   register: (trigger: WalkthroughTrigger | null) => void;
   requestStart: () => void;
-  /** True exactly while a page-specific runner (DashboardWalkthroughRunner
-   * or TasksWalkthroughRunner) is mounted and has registered a trigger. The
+  /** True exactly while a page-specific runner is mounted and has registered
+   * a trigger. The
    * nav bar uses this to decide whether to show "Take a tour" at all --
    * there's nothing to start on pages like /settings or /dashboard/history. */
   isAvailable: boolean;
@@ -19,7 +19,7 @@ const WalkthroughTriggerContext = createContext<WalkthroughTriggerContextValue |
 // Lets the nav bar's "Take a tour" control and whichever page-specific
 // walkthrough runner is actually mounted coordinate without a direct
 // parent/child relationship -- the nav bar renders on every page, but a
-// runner (and thus a tour to start) only exists on /dashboard and /tasks.
+// runner (and thus a tour to start) only exists on a page with a guide.
 // Mirrors DashboardNavGuardProvider's registration pattern for the same
 // kind of cross-component coordination.
 export function WalkthroughTriggerProvider({ children }: { children: ReactNode }) {
