@@ -22,6 +22,24 @@ export interface StoredPracticeSession {
   difficultyRatings: readonly (readonly [string, StoredPracticeDifficultyRating])[];
 }
 
+function isCompletionMethodEntry(value: unknown): value is readonly [string, StoredPracticeCompletionMethod] {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === "string" &&
+    (value[1] === "correct" || value[1] === "revealed" || value[1] === "self-review")
+  );
+}
+
+function isDifficultyRatingEntry(value: unknown): value is readonly [string, StoredPracticeDifficultyRating] {
+  return (
+    Array.isArray(value) &&
+    value.length === 2 &&
+    typeof value[0] === "string" &&
+    (value[1] === "too-easy" || value[1] === "appropriate" || value[1] === "too-hard")
+  );
+}
+
 function isStoredPracticeSession(value: unknown): value is StoredPracticeSession {
   if (!value || typeof value !== "object") return false;
   const session = value as Partial<StoredPracticeSession>;
@@ -35,6 +53,7 @@ function isStoredPracticeSession(value: unknown): value is StoredPracticeSession
     typeof session.currentExerciseIndex === "number" &&
     Number.isInteger(session.currentExerciseIndex) &&
     session.currentExerciseIndex >= 0 &&
+    session.currentExerciseIndex < session.exerciseIds.length &&
     typeof session.answer === "string" &&
     Array.isArray(session.ordering) &&
     session.ordering.every((item) => typeof item === "string") &&
@@ -44,7 +63,9 @@ function isStoredPracticeSession(value: unknown): value is StoredPracticeSession
       session.checkState === "revealed" ||
       session.checkState === "self-review") &&
     Array.isArray(session.completionMethods) &&
-    Array.isArray(session.difficultyRatings)
+    session.completionMethods.every(isCompletionMethodEntry) &&
+    Array.isArray(session.difficultyRatings) &&
+    session.difficultyRatings.every(isDifficultyRatingEntry)
   );
 }
 

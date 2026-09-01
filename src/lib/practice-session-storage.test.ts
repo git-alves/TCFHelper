@@ -44,6 +44,13 @@ describe("practice session storage", () => {
     storage.setItem(ACTIVE_PRACTICE_SESSION_STORAGE_KEY, JSON.stringify({ version: 2 }));
 
     expect(loadStoredPracticeSession(storage)).toBeNull();
+
+    storage.setItem(
+      ACTIVE_PRACTICE_SESSION_STORAGE_KEY,
+      JSON.stringify({ ...session, completionMethods: [["recognize-1", "not-a-completion-method"]] }),
+    );
+
+    expect(loadStoredPracticeSession(storage)).toBeNull();
   });
 
   it("clears a saved session without affecting the current page state", () => {

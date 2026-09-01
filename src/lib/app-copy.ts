@@ -76,7 +76,8 @@ export interface AppCopy {
     completedTitle: (values: { skill: string }) => string;
     completedDescription: (values: { outcome: string }) => string;
     nextActionDescription: string;
-    reviewSequence: string;
+    replayWithVariants: string;
+    startFresh: string;
     chooseAnotherSkill: string;
     tryFullTask: string;
     eyebrow: string;
@@ -91,7 +92,12 @@ export interface AppCopy {
     previewTitle: (values: { topic: string }) => string;
     previewOutcomeLabel: string;
     previewStagesLabel: string;
-    startPractice: string;
+    resumeEyebrow: string;
+    resumeTitle: (values: { topic: string }) => string;
+    resumeDescription: (values: { step: number; total: number }) => string;
+    localSessionNotice: string;
+    resumeSession: string;
+    discardSavedSession: string;
     durationAndSteps: (values: { minutes: number; steps: number }) => string;
     unavailableCombination: string;
     unavailableTitle: (values: { task: string; level: string }) => string;
@@ -495,7 +501,8 @@ export const APP_COPY = {
       completedTitle: ({ skill }) => `You practised: ${skill}`,
       completedDescription: ({ outcome }) => `You moved from recognition to independent writing. Keep this in mind for your next full response: ${outcome}`,
       nextActionDescription: "Next, apply this writing move in a complete TCF task or continue with another topic.",
-      reviewSequence: "Practise again",
+      replayWithVariants: "Replay with new variants",
+      startFresh: "Start fresh",
       chooseAnotherSkill: "Choose another topic",
       tryFullTask: "Try a full task",
       eyebrow: "Focused practice",
@@ -510,7 +517,12 @@ export const APP_COPY = {
       previewTitle: ({ topic }) => `Practise: ${topic}`,
       previewOutcomeLabel: "By the end, you will be able to:",
       previewStagesLabel: "Your six stages",
-      startPractice: "Start practice",
+      resumeEyebrow: "Saved on this device",
+      resumeTitle: ({ topic }) => `Resume: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continue at step ${step} of ${total}.`,
+      localSessionNotice: "Your responses are stored only in this browser until you finish or discard this session.",
+      resumeSession: "Resume practice",
+      discardSavedSession: "Discard saved session",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} curated exercises`,
       unavailableCombination: "This combination does not yet have an approved sequence. Choose another level or task: we never display automatically generated exercises.",
       unavailableTitle: ({ task, level }) => `${task} at ${level} is not available yet`,
@@ -1056,7 +1068,8 @@ export const APP_COPY = {
       completedTitle: ({ skill }) => `Vous avez travaillé : ${skill}`,
       completedDescription: ({ outcome }) => `Vous êtes passé·e de la reconnaissance à la production autonome. Gardez ce repère pour votre prochaine rédaction complète : ${outcome}`,
       nextActionDescription: "Réutilisez maintenant cette compétence dans une tâche TCF complète ou choisissez un autre thème.",
-      reviewSequence: "S’entraîner de nouveau",
+      replayWithVariants: "Rejouer avec de nouvelles variantes",
+      startFresh: "Commencer une nouvelle séance",
       chooseAnotherSkill: "Choisir un autre thème",
       tryFullTask: "Essayer une tâche complète",
       eyebrow: "Entraînement ciblé",
@@ -1071,7 +1084,12 @@ export const APP_COPY = {
       previewTitle: ({ topic }) => `Entraîner : ${topic}`,
       previewOutcomeLabel: "À la fin, vous saurez :",
       previewStagesLabel: "Vos six étapes",
-      startPractice: "Commencer l’entraînement",
+      resumeEyebrow: "Enregistré sur cet appareil",
+      resumeTitle: ({ topic }) => `Reprendre : ${topic}`,
+      resumeDescription: ({ step, total }) => `Reprenez à l’étape ${step} sur ${total}.`,
+      localSessionNotice: "Vos réponses restent uniquement dans ce navigateur jusqu’à la fin ou à la suppression de cette séance.",
+      resumeSession: "Reprendre l’entraînement",
+      discardSavedSession: "Supprimer la séance enregistrée",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercices sélectionnés`,
       unavailableCombination: "Cette combinaison n’a pas encore de séquence validée. Choisissez un autre niveau ou une autre tâche : nous n’affichons jamais d’exercice généré automatiquement.",
       unavailableTitle: ({ task, level }) => `${task} au niveau ${level} n’est pas encore disponible`,
@@ -1628,7 +1646,8 @@ export const APP_COPY = {
       completedTitle: ({ skill }) => `Has trabajado: ${skill}`,
       completedDescription: ({ outcome }) => `Has pasado del reconocimiento a la producción autónoma. Tenlo en cuenta para tu próxima redacción completa: ${outcome}`,
       nextActionDescription: "Ahora aplica esta habilidad en una tarea TCF completa o elige otro tema.",
-      reviewSequence: "Practicar de nuevo",
+      replayWithVariants: "Repetir con nuevas variantes",
+      startFresh: "Empezar de nuevo",
       chooseAnotherSkill: "Elegir otro tema",
       tryFullTask: "Probar una tarea completa",
       eyebrow: "Práctica específica",
@@ -1643,7 +1662,12 @@ export const APP_COPY = {
       previewTitle: ({ topic }) => `Practicar: ${topic}`,
       previewOutcomeLabel: "Al final podrás:",
       previewStagesLabel: "Tus seis etapas",
-      startPractice: "Empezar a practicar",
+      resumeEyebrow: "Guardado en este dispositivo",
+      resumeTitle: ({ topic }) => `Reanudar: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continúa en el paso ${step} de ${total}.`,
+      localSessionNotice: "Tus respuestas solo se guardan en este navegador hasta que termines o descartes esta sesión.",
+      resumeSession: "Reanudar la práctica",
+      discardSavedSession: "Descartar la sesión guardada",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} ejercicios seleccionados`,
       unavailableCombination: "Esta combinación todavía no tiene una secuencia validada. Elige otro nivel u otra tarea: nunca mostramos ejercicios generados automáticamente.",
       unavailableTitle: ({ task, level }) => `${task} en ${level} aún no está disponible`,
@@ -2198,7 +2222,8 @@ export const APP_COPY = {
       completedTitle: ({ skill }) => `Você trabalhou: ${skill}`,
       completedDescription: ({ outcome }) => `Você passou do reconhecimento à produção autônoma. Use isto na sua próxima redação completa: ${outcome}`,
       nextActionDescription: "Agora aplique essa habilidade em uma tarefa TCF completa ou escolha outro tema.",
-      reviewSequence: "Praticar novamente",
+      replayWithVariants: "Repetir com novas variantes",
+      startFresh: "Começar do zero",
       chooseAnotherSkill: "Escolher outro tema",
       tryFullTask: "Experimentar uma tarefa completa",
       eyebrow: "Prática direcionada",
@@ -2213,7 +2238,12 @@ export const APP_COPY = {
       previewTitle: ({ topic }) => `Praticar: ${topic}`,
       previewOutcomeLabel: "Ao final, você saberá:",
       previewStagesLabel: "Suas seis etapas",
-      startPractice: "Começar a praticar",
+      resumeEyebrow: "Salvo neste dispositivo",
+      resumeTitle: ({ topic }) => `Retomar: ${topic}`,
+      resumeDescription: ({ step, total }) => `Continue na etapa ${step} de ${total}.`,
+      localSessionNotice: "Suas respostas ficam apenas neste navegador até você concluir ou descartar esta sessão.",
+      resumeSession: "Retomar a prática",
+      discardSavedSession: "Descartar sessão salva",
       durationAndSteps: ({ minutes, steps }) => `${minutes} min · ${steps} exercícios selecionados`,
       unavailableCombination: "Esta combinação ainda não tem uma sequência validada. Escolha outro nível ou tarefa: nunca exibimos exercícios gerados automaticamente.",
       unavailableTitle: ({ task, level }) => `${task} no nível ${level} ainda não está disponível`,

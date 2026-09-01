@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
 import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
+import {
+  clearStoredPracticeSession,
+  loadStoredPracticeSession,
+  saveStoredPracticeSession,
+  type StoredPracticeSession,
+} from "@/lib/practice-session-storage";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 export type PracticeLevel = "B2" | "C1" | "C2";
@@ -106,6 +112,48 @@ function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly 
   if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
   if (Array.isArray(exercise.correct_answer)) return exercise.correct_answer;
   return exercise.accepted_answers ?? [];
+}
+
+function getExercisesForSkill(
+  curriculum: CuratedPracticeCurriculum,
+  skill: CuratedPracticeSkill,
+): CuratedPracticeExercise[] {
+  return curriculum.exercises.filter(
+    (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
+  );
+}
+
+function resolveStoredSession(
+  curriculum: CuratedPracticeCurriculum,
+  session: StoredPracticeSession,
+): { skill: CuratedPracticeSkill; exercises: readonly CuratedPracticeExercise[] } | null {
+  const skill = curriculum.skills.find(
+    (candidate) => candidate.task === session.task && candidate.level === session.level && candidate.id === session.skillId,
+  );
+  if (!skill) return null;
+
+  const exerciseById = new Map(getExercisesForSkill(curriculum, skill).map((exercise) => [exercise.id, exercise]));
+  const savedExercises = session.exerciseIds.map((id) => exerciseById.get(id));
+  if (
+    savedExercises.length !== EXERCISE_STAGES.length ||
+    savedExercises.some((exercise) => !exercise) ||
+    new Set(session.exerciseIds).size !== session.exerciseIds.length ||
+    session.currentExerciseIndex >= savedExercises.length ||
+    savedExercises.some((exercise, index) => exercise?.exercise_type !== EXERCISE_STAGES[index])
+  ) {
+    return null;
+  }
+
+  return { skill, exercises: savedExercises as CuratedPracticeExercise[] };
+}
+
+function getBrowserStorage(): Storage | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
 }
 
 function ChoiceCard({
@@ -316,6 +364,8 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   // survives navigating to later stages, letting the progress bar keep
   // showing which earlier stages were solved versus revealed.
   const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
+  const [storageLoaded, setStorageLoaded] = useState(false);
+  const [savedSession, setSavedSession] = useState<StoredPracticeSession | null>(null);
 
   const matchingSkills = useMemo(
     () =>
@@ -344,6 +394,68 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const isExerciseComplete =
     checkState === "correct" || checkState === "revealed" || checkState === "self-review";
 
+  function clearLocalSession() {
+    const storage = getBrowserStorage();
+    if (storage) clearStoredPracticeSession(storage);
+    setSavedSession(null);
+  }
+
+  useEffect(() => {
+    const storage = getBrowserStorage();
+    const session = storage ? loadStoredPracticeSession(storage) : null;
+    const timeoutId = window.setTimeout(() => {
+      if (session && resolveStoredSession(curriculum, session)) {
+        setSavedSession(session);
+      } else if (session && storage) {
+        clearStoredPracticeSession(storage);
+      }
+      setStorageLoaded(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [curriculum]);
+
+  useEffect(() => {
+    if (
+      !storageLoaded ||
+      !selectedSkill ||
+      !currentExercise ||
+      exercises.length === 0 ||
+      isSequenceComplete
+    ) {
+      return;
+    }
+
+    const storage = getBrowserStorage();
+    if (!storage) return;
+
+    saveStoredPracticeSession(storage, {
+      version: 1,
+      task: selectedSkill.task,
+      level: selectedSkill.level,
+      skillId: selectedSkill.id,
+      exerciseIds: exercises.map((exercise) => exercise.id),
+      currentExerciseIndex,
+      answer,
+      ordering,
+      checkState,
+      completionMethods: [...completionMethods.entries()],
+      difficultyRatings: [...difficultyRatings.entries()],
+    });
+  }, [
+    answer,
+    checkState,
+    completionMethods,
+    currentExercise,
+    currentExerciseIndex,
+    difficultyRatings,
+    exercises,
+    isSequenceComplete,
+    ordering,
+    selectedSkill,
+    storageLoaded,
+  ]);
+
   function resetExercise(nextExercise: CuratedPracticeExercise | null) {
     setAnswer("");
     setOrdering(nextExercise?.exercise_type === "organize" ? [...(nextExercise.options ?? [])] : []);
@@ -351,6 +463,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function chooseTask(task: PracticeTask) {
+    clearLocalSession();
     setSelectedTask(task);
     setSelectedLevel(null);
     setSelectedSkill(null);
@@ -362,6 +475,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function chooseLevel(level: PracticeLevel) {
+    clearLocalSession();
     setSelectedLevel(level);
     setSelectedSkill(null);
     setExerciseOrder([]);
@@ -371,13 +485,8 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     resetExercise(null);
   }
 
-  function exercisesForSkill(skill: CuratedPracticeSkill): CuratedPracticeExercise[] {
-    return curriculum.exercises.filter(
-      (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
-    );
-  }
-
   function chooseSkill(skill: CuratedPracticeSkill) {
+    clearLocalSession();
     setSelectedSkill(skill);
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
@@ -389,10 +498,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function startSequence() {
     if (!selectedSkill) return;
+    clearLocalSession();
     // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
     // when a stage has more than one reviewed variant, a random one is used
     // so replaying a topic doesn't always show the identical exercise.
-    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill));
+    const nextExercises = selectPracticeExerciseSession(getExercisesForSkill(curriculum, selectedSkill));
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -444,6 +554,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   function moveNext() {
     const nextIndex = currentExerciseIndex + 1;
     if (nextIndex >= exercises.length) {
+      clearLocalSession();
       setIsSequenceComplete(true);
       return;
     }
@@ -453,10 +564,15 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function restartSequence() {
     if (!selectedSkill) return;
+    clearLocalSession();
     // The stage order stays fixed on replay too; only the variant chosen for
     // a stage with more than one reviewed option can change.
     const previousExerciseIds = new Set(exercises.map((exercise) => exercise.id));
-    const nextExercises = selectPracticeExerciseSession(exercisesForSkill(selectedSkill), Math.random, previousExerciseIds);
+    const nextExercises = selectPracticeExerciseSession(
+      getExercisesForSkill(curriculum, selectedSkill),
+      Math.random,
+      previousExerciseIds,
+    );
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -466,6 +582,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function returnToSkills() {
+    clearLocalSession();
     setSelectedSkill(null);
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
@@ -474,6 +591,37 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setDifficultyRatings(new Map());
     resetExercise(null);
   }
+
+  function resumeSavedSession() {
+    if (!savedSession) return;
+    const resolved = resolveStoredSession(curriculum, savedSession);
+    if (!resolved) {
+      clearLocalSession();
+      return;
+    }
+
+    const currentSavedExercise = resolved.exercises[savedSession.currentExerciseIndex];
+    setSelectedTask(resolved.skill.task);
+    setSelectedLevel(resolved.skill.level);
+    setSelectedSkill(resolved.skill);
+    setExerciseOrder(resolved.exercises);
+    setCurrentExerciseIndex(savedSession.currentExerciseIndex);
+    setAnswer(savedSession.answer);
+    setOrdering(
+      currentSavedExercise.exercise_type === "organize"
+        ? savedSession.ordering.length > 0
+          ? savedSession.ordering
+          : [...(currentSavedExercise.options ?? [])]
+        : [],
+    );
+    setCheckState(savedSession.checkState);
+    setCompletionMethods(new Map(savedSession.completionMethods));
+    setDifficultyRatings(new Map(savedSession.difficultyRatings));
+    setIsSequenceComplete(false);
+    setSavedSession(null);
+  }
+
+  const resumableSession = savedSession ? resolveStoredSession(curriculum, savedSession) : null;
 
   // Keeping all three selectors on one screen makes the dependency visible
   // while avoiding a modal or a three-page setup. Disabled later choices
@@ -500,7 +648,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 onClick={restartSequence}
                 className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
               >
-                {practice.reviewSequence}
+                {practice.replayWithVariants}
+              </button>
+              <button
+                type="button"
+                onClick={startSequence}
+                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {practice.startFresh}
               </button>
               <button
                 type="button"
@@ -532,6 +687,38 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             {practice.description}
           </p>
         </header>
+
+        {savedSession && resumableSession && (
+          <aside aria-labelledby="resume-practice-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
+            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.resumeEyebrow}</p>
+            <h2 id="resume-practice-heading" className="mt-1 text-xl font-semibold">
+              {practice.resumeTitle({ topic: resumableSession.skill.label })}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+              {practice.resumeDescription({
+                step: savedSession.currentExerciseIndex + 1,
+                total: resumableSession.exercises.length,
+              })}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">{practice.localSessionNotice}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={resumeSavedSession}
+                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+              >
+                {practice.resumeSession}
+              </button>
+              <button
+                type="button"
+                onClick={clearLocalSession}
+                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+              >
+                {practice.discardSavedSession}
+              </button>
+            </div>
+          </aside>
+        )}
 
         <div className="grid gap-6">
           <fieldset>
@@ -659,7 +846,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 onClick={startSequence}
                 className="mt-5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
               >
-                {practice.startPractice}
+                {practice.startFresh}
               </button>
             </aside>
           )}
