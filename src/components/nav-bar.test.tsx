@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-vi.mock("next/navigation", () => ({ usePathname: () => "/practice" }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/practice",
+  useRouter: () => ({ push: () => {} }),
+}));
 
 vi.mock("@clerk/nextjs", () => ({
   Show: ({ children }: { children: React.ReactNode }) => <>{children}</>,

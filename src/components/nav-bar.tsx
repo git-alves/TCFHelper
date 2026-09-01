@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
+import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
 
 function SettingsIcon() {
   return (
@@ -71,8 +72,9 @@ const ACTIVE_NAV_BUTTON_CLASS =
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
   const pathname = usePathname();
+  const router = useRouter();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
-  const { requestStart: requestWalkthroughStart, isAvailable: isWalkthroughAvailable } = useWalkthroughTrigger();
+  const { isAvailable: isWalkthroughAvailable } = useWalkthroughTrigger();
 
   // The workspace can stay mounted while Settings is open, so it remains
   // the source of truth for whether leaving this page needs a draft guard.
@@ -109,6 +111,14 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
       if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       if (requestNavigation(destination)) event.preventDefault();
     };
+  }
+
+  function startFullWalkthrough() {
+    const destination = `/dashboard?${FULL_WALKTHROUGH_PARAM}=${FULL_WALKTHROUGH_VALUE}`;
+    // Preserve the same draft/correction guard as the Dashboard button when
+    // the learner starts the comprehensive tour from Full task.
+    if (requestNavigation(destination)) return;
+    router.push(destination);
   }
 
   return (
@@ -199,10 +209,15 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
               {isWalkthroughAvailable && (
                 <button
                   type="button"
-                  onClick={requestWalkthroughStart}
-                  title={copy.walkthrough.takeATour}
-                  aria-label={copy.walkthrough.takeATour}
-                  className={ICON_BUTTON_CLASS}
+                  onClick={startFullWalkthrough}
+                  disabled={onTasks && isDashboardBlocked}
+                  title={onTasks && isDashboardBlocked ? dashboardBlockedReason : copy.walkthrough.takeATour}
+                  aria-label={
+                    onTasks && isDashboardBlocked
+                      ? `${copy.walkthrough.takeATour} — ${dashboardBlockedReason}`
+                      : copy.walkthrough.takeATour
+                  }
+                  className={`${ICON_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
                 >
                   <TourIcon />
                 </button>

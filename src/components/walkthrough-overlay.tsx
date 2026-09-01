@@ -30,6 +30,12 @@ interface WalkthroughOverlayProps {
   onBack: () => void;
   onSkip: () => void;
   onFinish: () => void;
+  /** A cross-page tour can show its overall progress, rather than resetting
+   * the count on every page. */
+  progress?: { step: number; total: number };
+  /** Used for a page handoff so the final button never misleadingly says
+   * "Finish" while it navigates to another section. */
+  finishLabel?: string;
 }
 
 /**
@@ -48,6 +54,8 @@ export function WalkthroughOverlay({
   onBack,
   onSkip,
   onFinish,
+  progress,
+  finishLabel,
 }: WalkthroughOverlayProps) {
   const step = steps[stepIndex] ?? null;
   const targetRect = useWalkthroughTargetRect(open ? (step?.id ?? null) : null);
@@ -184,7 +192,10 @@ export function WalkthroughOverlay({
           aria-live="polite"
           className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
         >
-          {copy.stepProgress({ step: stepIndex + 1, total: steps.length })}
+          {copy.stepProgress({
+            step: progress?.step ?? stepIndex + 1,
+            total: progress?.total ?? steps.length,
+          })}
         </p>
         <h2 id={titleId} className="mt-1 text-base font-semibold">
           {step.title}
@@ -216,7 +227,7 @@ export function WalkthroughOverlay({
               onClick={isLastStep ? onFinish : onNext}
               className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
             >
-              {isLastStep ? copy.finish : copy.next}
+              {isLastStep ? (finishLabel ?? copy.finish) : copy.next}
             </button>
           </div>
         </div>
