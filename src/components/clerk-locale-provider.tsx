@@ -26,10 +26,11 @@ export function ClerkLocaleProvider({ children }: { children: ReactNode }) {
     <ClerkProvider
       signInUrl="/login"
       signUpUrl="/signup"
-      // Returning learners land on their progress; a brand-new account has
-      // none yet, so it goes straight to starting a task instead.
+      // The dashboard is the consistent first authenticated landing point:
+      // new learners choose between focused practice and a full task there,
+      // while returning learners can review their progress.
       signInFallbackRedirectUrl="/dashboard"
-      signUpFallbackRedirectUrl="/tasks"
+      signUpFallbackRedirectUrl="/dashboard"
       afterSignOutUrl="/"
       localization={CLERK_LOCALIZATIONS[locale]}
       // @clerk/themes' prebuilt themes are spread directly into `appearance`

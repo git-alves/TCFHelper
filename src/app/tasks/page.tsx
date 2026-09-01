@@ -6,7 +6,6 @@ import { WritingWorkspace } from "@/components/writing-workspace";
 import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
-import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 export default async function TasksPage() {
   let user;
@@ -31,7 +30,7 @@ export default async function TasksPage() {
   return (
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <WalkthroughWorkspaceScriptProvider>
-        <TasksWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
+        <TasksWalkthroughRunner shouldAutoStart={false} />
         <WritingWorkspace />
       </WalkthroughWorkspaceScriptProvider>
     </main>

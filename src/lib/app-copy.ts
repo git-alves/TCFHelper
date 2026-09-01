@@ -167,6 +167,15 @@ export interface AppCopy {
   };
   dashboard: {
     welcome: (name: string) => string;
+    startHereEyebrow: string;
+    startHereTitle: string;
+    startHereDescription: string;
+    practiceStartTitle: string;
+    practiceStartDescription: string;
+    practiceStartAction: string;
+    tasksStartTitle: string;
+    tasksStartDescription: string;
+    tasksStartAction: string;
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
     chartTitle: string;
@@ -483,7 +492,7 @@ export const APP_COPY = {
     },
     nav: {
       dashboard: "Dashboard",
-      tasks: "Tasks",
+      tasks: "Full task",
       practice: "Practice",
       settings: "Settings",
       admin: "Admin",
@@ -604,6 +613,15 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Welcome back, ${name}`,
+      startHereEyebrow: "Your first step",
+      startHereTitle: "How would you like to start?",
+      startHereDescription: "Choose focused skill practice or a complete TCF writing task. Your progress will appear here after your first correction.",
+      practiceStartTitle: "Train a skill first",
+      practiceStartDescription: "Work on one part of a task step by step, from guided practice to independent writing.",
+      practiceStartAction: "Go to Practice",
+      tasksStartTitle: "Try a full task",
+      tasksStartDescription: "Write a full TCF response, then receive feedback on your writing.",
+      tasksStartAction: "Go to Full task",
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
@@ -661,20 +679,20 @@ export const APP_COPY = {
       settingsBody: "Open Settings to choose the interface language and appearance, or find help and support whenever you need it.",
       dashboardPracticeTitle: "Build a task part before writing the whole response",
       dashboardPracticeBody: "Practice is your writing trainer. It helps you rehearse one numbered part of a TCF task at your target level before you attempt a complete response.",
-      dashboardStartWritingTitle: "Ready to write?",
-      dashboardStartWritingBody: "Head to Tasks to pick a writing task and get your first correction.",
+      dashboardStartWritingTitle: "Ready for a full task?",
+      dashboardStartWritingBody: "Open Full task to choose an exam prompt and get your first correction.",
       practiceIntroTitle: "Practice builds a part of the task",
       practiceIntroBody: "This page is not an exam simulation. Choose one task part to practise in a progressive, curated sequence before you write a full TCF response.",
       practicePartsTitle: "The parts stay the same; the level changes the demand",
       practicePartsBody: "Each task has a fixed numbered structure. B2, C1 and C2 practise the same part, but with increasingly independent, precise and nuanced language. Only reviewed paths can be started.",
       practiceFullTaskTitle: "Put the parts together in a full task",
-      practiceFullTaskBody: "When you are ready, go to Tasks to apply the writing part you trained in a complete TCF response and receive feedback.",
+      practiceFullTaskBody: "When you are ready, open Full task to apply the writing part you trained in a complete TCF response and receive feedback.",
       taskPickerTitle: "Choose a task",
       taskPickerBody:
-        "TCF written expression has three task types: Tâche 1 (describe or recount an experience), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
-      topicPickerTitle: "Choose a topic",
+        "TCF written expression has three task types: Tâche 1 (communicate effectively in a short message, for the right reader and in the right register), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
+      topicPickerTitle: "Choose an exam prompt",
       topicPickerBody:
-        "Recent exam topics are pulled directly from real, recently published TCF exams on this site, so you always practice with an authentic prompt. You can also paste in your own topic instead.",
+        "Recent exam prompts are pulled directly from real, recently published TCF exams on this site, so you always practise with an authentic prompt. You can also paste in your own prompt instead.",
       guidedWritingTitle: "Plan before you write",
       guidedWritingBody:
         "Open the Writing guide when you need ideas. Choose the writing situation, then use its planning questions, French phrases, and suggested verb tenses for your target level.",
@@ -725,21 +743,21 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Target length: ${minWords}–${maxWords} words.`,
       },
       topic: {
-        heading: "2. Choose a topic",
-        recentExamTitle: "Get a topic from recent exams",
-        recentExamDescription: "Load a topic for the task you selected.",
-        customTitle: "Write or paste my own topic",
-        customDescription: "Use a prompt you already have.",
-        loading: "Getting a topic from recent exams…",
-        fetchError: "We couldn't get a topic from recent exams. Please try again or write your own.",
-        unavailableError: "The recent-exam topic was unavailable. Please try again or write your own.",
+        heading: "2. Choose an exam prompt",
+        recentExamTitle: "Get a prompt from recent exams",
+        recentExamDescription: "Load an authentic prompt for the task you selected.",
+        customTitle: "Write or paste my own prompt",
+        customDescription: "Use an exam prompt you already have.",
+        loading: "Getting a prompt from recent exams…",
+        fetchError: "We couldn't get a prompt from recent exams. Please try again or write your own.",
+        unavailableError: "The recent-exam prompt was unavailable. Please try again or write your own.",
         notPublishedError:
-          "No recent-exam topics have been published for this month or the previous month. Write or paste your own topic.",
-        selectedRecentExamAriaLabel: "Selected recent-exam topic",
+          "No recent-exam prompts have been published for this month or the previous month. Write or paste your own prompt.",
+        selectedRecentExamAriaLabel: "Selected recent-exam prompt",
         sourceLabel: "Source:",
         recentExamsSource: ({ month }) => `Recent exams — ${month}`,
-        customTopicLabel: "Your topic or prompt",
-        customTopicPlaceholder: "Paste or write the topic/prompt you want to respond to…",
+        customTopicLabel: "Your exam prompt",
+        customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
       editor: {
         heading: "3. Write",
@@ -751,9 +769,9 @@ export const APP_COPY = {
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
         alreadyCorrected:
-          "This version has already been corrected. Edit your response or topic to request a new correction.",
+          "This version has already been corrected. Edit your response or exam prompt to request a new correction.",
         correctionInProgress:
-          "A correction for this exact response is already in progress. Wait for it to finish or edit the response or topic before requesting another one.",
+          "A correction for this exact response is already in progress. Wait for it to finish or edit the response or exam prompt before requesting another one.",
         exampleLevelLabel: "Target level",
         generateExample: "Generate example",
         generatingExample: "Generating…",
@@ -763,7 +781,7 @@ export const APP_COPY = {
         exampleUnavailableError: "The example generator isn't available right now.",
         exampleGenericError: "We couldn't generate an example. Please try again.",
         exampleNeedsTopicWarning:
-          "Choose a topic from recent exams or paste your own before generating an example.",
+          "Choose an exam prompt from recent exams or paste your own before generating an example.",
         copy: "Copy text",
         copied: "Copied!",
         copyFailed: "Couldn't copy",
@@ -1042,10 +1060,10 @@ export const APP_COPY = {
       },
       dialog: {
         title: "Discard your current work?",
-        taskSwitchDescription: "Switching tasks will discard your current topic, draft, and feedback.",
-        dashboardSwitchDescription: "Going to the dashboard will discard your current topic, draft, and feedback.",
-        adminSwitchDescription: "Going to Admin will discard your current topic, draft, and feedback.",
-        topicSwitchDescription: "Switching topics will discard your current topic, draft, and feedback.",
+        taskSwitchDescription: "Switching tasks will discard your current exam prompt, draft, and feedback.",
+        dashboardSwitchDescription: "Going to the dashboard will discard your current exam prompt, draft, and feedback.",
+        adminSwitchDescription: "Going to Admin will discard your current exam prompt, draft, and feedback.",
+        topicSwitchDescription: "Switching exam prompts will discard your current prompt, draft, and feedback.",
         exampleOverwriteDescription: "Generating an example will replace your current draft.",
         exampleOverwriteConfirm: "Replace draft",
         clearDraftDescription: "Clearing will discard your current draft and feedback.",
@@ -1062,7 +1080,7 @@ export const APP_COPY = {
     },
     nav: {
       dashboard: "Tableau de bord",
-      tasks: "Tâches",
+      tasks: "Tâche complète",
       practice: "Pratique",
       settings: "Paramètres",
       admin: "Admin",
@@ -1184,6 +1202,15 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Content de vous revoir, ${name}`,
+      startHereEyebrow: "Votre première étape",
+      startHereTitle: "Comment souhaitez-vous commencer ?",
+      startHereDescription: "Choisissez un entraînement ciblé ou une tâche TCF complète. Vos progrès apparaîtront ici après votre première correction.",
+      practiceStartTitle: "Travailler une compétence d’abord",
+      practiceStartDescription: "Entraînez une partie de la tâche pas à pas, de l’exercice guidé à une rédaction autonome.",
+      practiceStartAction: "Aller à Pratique",
+      tasksStartTitle: "Essayer une tâche complète",
+      tasksStartDescription: "Rédigez une réponse TCF complète, puis recevez des commentaires sur votre rédaction.",
+      tasksStartAction: "Aller à la tâche complète",
       accountUnavailableTitle: "Votre compte doit être finalisé",
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
@@ -1244,20 +1271,20 @@ export const APP_COPY = {
       settingsBody: "Ouvrez les paramètres pour choisir la langue et l’apparence de l’interface, ou trouver de l’aide lorsque vous en avez besoin.",
       dashboardPracticeTitle: "Préparez une partie de la tâche avant la rédaction complète",
       dashboardPracticeBody: "Pratique est votre entraîneur d’écriture. Il vous aide à travailler une partie numérotée d’une tâche TCF à votre niveau cible avant de rédiger une réponse complète.",
-      dashboardStartWritingTitle: "Prêt à écrire ?",
-      dashboardStartWritingBody: "Allez dans Tâches pour choisir un sujet de rédaction et obtenir votre première correction.",
+      dashboardStartWritingTitle: "Prêt·e pour une tâche complète ?",
+      dashboardStartWritingBody: "Ouvrez la tâche complète pour choisir une consigne d’examen et obtenir votre première correction.",
       practiceIntroTitle: "La pratique entraîne une partie de la tâche",
       practiceIntroBody: "Cette page n’est pas une simulation d’examen. Choisissez une partie de la tâche et travaillez-la dans une séquence progressive et validée avant de rédiger une réponse TCF complète.",
       practicePartsTitle: "Les parties restent les mêmes ; le niveau fait évoluer l’exigence",
       practicePartsBody: "Chaque tâche suit une structure numérotée fixe. B2, C1 et C2 entraînent la même partie avec une langue de plus en plus autonome, précise et nuancée. Seules les séquences validées peuvent être commencées.",
       practiceFullTaskTitle: "Assemblez les parties dans une tâche complète",
-      practiceFullTaskBody: "Lorsque vous êtes prêt·e, allez dans Tâches pour réutiliser la partie travaillée dans une réponse TCF complète et recevoir une correction.",
+      practiceFullTaskBody: "Lorsque vous êtes prêt·e, ouvrez la tâche complète pour réutiliser la partie travaillée dans une réponse TCF complète et recevoir une correction.",
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
-        "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (décrire ou raconter une expérience), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
-      topicPickerTitle: "Choisissez un sujet",
+        "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (communiquer efficacement dans un message court, au bon destinataire et dans le registre adapté), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
+      topicPickerTitle: "Choisissez une consigne d’examen",
       topicPickerBody:
-        "Les sujets d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des sujets authentiques. Vous pouvez aussi coller votre propre sujet.",
+        "Les consignes d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des consignes authentiques. Vous pouvez aussi coller la vôtre.",
       guidedWritingTitle: "Planifiez avant d’écrire",
       guidedWritingBody:
         "Ouvrez le guide de rédaction lorsque vous manquez d’idées. Choisissez la situation d’écriture, puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour votre niveau visé.",
@@ -1309,23 +1336,23 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Longueur visée : ${minWords}–${maxWords} mots.`,
       },
       topic: {
-        heading: "2. Choisissez un sujet",
-        recentExamTitle: "Obtenir un sujet d’examens récents",
-        recentExamDescription: "Chargez un sujet pour la tâche que vous avez choisie.",
-        customTitle: "Écrire ou coller mon propre sujet",
-        customDescription: "Utilisez un sujet que vous avez déjà.",
-        loading: "Récupération d’un sujet d’examens récents…",
+        heading: "2. Choisissez une consigne d’examen",
+        recentExamTitle: "Obtenir une consigne d’examens récents",
+        recentExamDescription: "Chargez une consigne authentique pour la tâche choisie.",
+        customTitle: "Écrire ou coller ma propre consigne",
+        customDescription: "Utilisez une consigne d’examen que vous avez déjà.",
+        loading: "Récupération d’une consigne d’examens récents…",
         fetchError:
-          "Nous n’avons pas pu obtenir un sujet d’examens récents. Réessayez ou rédigez votre propre sujet.",
+          "Nous n’avons pas pu obtenir une consigne d’examens récents. Réessayez ou rédigez la vôtre.",
         unavailableError:
-          "Le sujet d’examens récents n’est pas disponible. Réessayez ou rédigez votre propre sujet.",
+          "La consigne d’examens récents n’est pas disponible. Réessayez ou rédigez la vôtre.",
         notPublishedError:
-          "Aucun sujet d’examens récents n’a été publié pour ce mois-ci ni le mois précédent. Rédigez ou collez votre propre sujet.",
-        selectedRecentExamAriaLabel: "Sujet d’examen récent sélectionné",
+          "Aucune consigne d’examens récents n’a été publiée pour ce mois-ci ni le mois précédent. Rédigez ou collez la vôtre.",
+        selectedRecentExamAriaLabel: "Consigne d’examen récent sélectionnée",
         sourceLabel: "Source :",
         recentExamsSource: ({ month }) => `Examens récents — ${month}`,
-        customTopicLabel: "Votre sujet ou consigne",
-        customTopicPlaceholder: "Collez ou rédigez le sujet ou la consigne auquel vous souhaitez répondre…",
+        customTopicLabel: "Votre consigne d’examen",
+        customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
       editor: {
         heading: "3. Rédigez",
@@ -1337,9 +1364,9 @@ export const APP_COPY = {
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
         alreadyCorrected:
-          "Cette version a déjà été corrigée. Modifiez votre réponse ou votre sujet pour demander une nouvelle correction.",
+          "Cette version a déjà été corrigée. Modifiez votre réponse ou votre consigne d’examen pour demander une nouvelle correction.",
         correctionInProgress:
-          "Une correction de cette réponse exacte est déjà en cours. Attendez sa fin ou modifiez la réponse ou le sujet avant d’en demander une autre.",
+          "Une correction de cette réponse exacte est déjà en cours. Attendez sa fin ou modifiez la réponse ou la consigne d’examen avant d’en demander une autre.",
         exampleLevelLabel: "Niveau visé",
         generateExample: "Générer un exemple",
         generatingExample: "Génération en cours…",
@@ -1349,7 +1376,7 @@ export const APP_COPY = {
         exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
         exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
         exampleNeedsTopicWarning:
-          "Choisissez un sujet d’examens récents ou collez le vôtre avant de générer un exemple.",
+          "Choisissez une consigne d’examens récents ou collez la vôtre avant de générer un exemple.",
         copy: "Copier le texte",
         copied: "Copié !",
         copyFailed: "Impossible de copier",
@@ -1631,11 +1658,11 @@ export const APP_COPY = {
       },
       dialog: {
         title: "Supprimer votre travail actuel ?",
-        taskSwitchDescription: "Changer de tâche supprimera votre sujet, brouillon et commentaires actuels.",
+        taskSwitchDescription: "Changer de tâche supprimera votre consigne, brouillon et commentaires actuels.",
         dashboardSwitchDescription:
-          "Accéder au tableau de bord supprimera votre sujet, brouillon et commentaires actuels.",
-        adminSwitchDescription: "Accéder à l’administration supprimera votre sujet, brouillon et commentaires actuels.",
-        topicSwitchDescription: "Changer de sujet supprimera votre sujet, brouillon et commentaires actuels.",
+          "Accéder au tableau de bord supprimera votre consigne, brouillon et commentaires actuels.",
+        adminSwitchDescription: "Accéder à l’administration supprimera votre consigne, brouillon et commentaires actuels.",
+        topicSwitchDescription: "Changer de consigne supprimera votre consigne, brouillon et commentaires actuels.",
         exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
         exampleOverwriteConfirm: "Remplacer le brouillon",
         clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
@@ -1652,7 +1679,7 @@ export const APP_COPY = {
     },
     nav: {
       dashboard: "Panel",
-      tasks: "Tareas",
+      tasks: "Tarea completa",
       practice: "Práctica",
       settings: "Configuración",
       admin: "Admin",
@@ -1774,6 +1801,15 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Bienvenido de nuevo, ${name}`,
+      startHereEyebrow: "Tu primer paso",
+      startHereTitle: "¿Cómo te gustaría empezar?",
+      startHereDescription: "Elige práctica de una habilidad o una tarea TCF completa. Tu progreso aparecerá aquí después de tu primera corrección.",
+      practiceStartTitle: "Entrena una habilidad primero",
+      practiceStartDescription: "Trabaja una parte de la tarea paso a paso, desde la práctica guiada hasta la escritura independiente.",
+      practiceStartAction: "Ir a Práctica",
+      tasksStartTitle: "Prueba una tarea completa",
+      tasksStartDescription: "Escribe una respuesta TCF completa y recibe comentarios sobre tu escritura.",
+      tasksStartAction: "Ir a la tarea completa",
       accountUnavailableTitle: "Tu cuenta necesita configurarse",
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
@@ -1832,20 +1868,20 @@ export const APP_COPY = {
       settingsBody: "Abre Configuración para elegir el idioma y la apariencia de la interfaz, o encontrar ayuda y soporte cuando lo necesites.",
       dashboardPracticeTitle: "Prepara una parte de la tarea antes de escribir la respuesta completa",
       dashboardPracticeBody: "Práctica es tu entrenador de escritura. Te ayuda a ensayar una parte numerada de una tarea TCF en tu nivel objetivo antes de escribir una respuesta completa.",
-      dashboardStartWritingTitle: "¿Listo para escribir?",
-      dashboardStartWritingBody: "Ve a Tareas para elegir una tarea de escritura y obtener tu primera corrección.",
+      dashboardStartWritingTitle: "¿Listo para una tarea completa?",
+      dashboardStartWritingBody: "Abre la tarea completa para elegir una consigna de examen y obtener tu primera corrección.",
       practiceIntroTitle: "La práctica desarrolla una parte de la tarea",
       practiceIntroBody: "Esta página no es una simulación de examen. Elige una parte de la tarea y practícala en una secuencia progresiva y revisada antes de escribir una respuesta TCF completa.",
       practicePartsTitle: "Las partes son las mismas; el nivel cambia la exigencia",
       practicePartsBody: "Cada tarea tiene una estructura numerada fija. B2, C1 y C2 practican la misma parte con un lenguaje cada vez más autónomo, preciso y matizado. Solo se pueden iniciar secuencias revisadas.",
       practiceFullTaskTitle: "Reúne las partes en una tarea completa",
-      practiceFullTaskBody: "Cuando estés listo, ve a Tareas para aplicar la parte que practicaste en una respuesta TCF completa y recibir comentarios.",
+      practiceFullTaskBody: "Cuando estés listo, abre la tarea completa para aplicar la parte que practicaste en una respuesta TCF completa y recibir comentarios.",
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
-        "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (describir o narrar una experiencia), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
-      topicPickerTitle: "Elige un tema",
+        "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (comunicarse eficazmente en un mensaje breve, para el destinatario y el registro adecuados), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
+      topicPickerTitle: "Elige una consigna de examen",
       topicPickerBody:
-        "Los temas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con un enunciado auténtico. También puedes pegar tu propio tema.",
+        "Las consignas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con una consigna auténtica. También puedes pegar la tuya.",
       guidedWritingTitle: "Planifica antes de escribir",
       guidedWritingBody:
         "Abre la Guía de redacción cuando necesites ideas. Elige la situación de escritura y usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para tu nivel objetivo.",
@@ -1897,23 +1933,23 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Extensión objetivo: ${minWords}–${maxWords} palabras.`,
       },
       topic: {
-        heading: "2. Elige un tema",
-        recentExamTitle: "Obtén un tema de exámenes recientes",
-        recentExamDescription: "Carga un tema para la tarea que seleccionaste.",
-        customTitle: "Escribe o pega mi propio tema",
-        customDescription: "Usa una consigna que ya tengas.",
-        loading: "Obteniendo un tema de exámenes recientes…",
+        heading: "2. Elige una consigna de examen",
+        recentExamTitle: "Obtén una consigna de exámenes recientes",
+        recentExamDescription: "Carga una consigna auténtica para la tarea que seleccionaste.",
+        customTitle: "Escribe o pega mi propia consigna",
+        customDescription: "Usa una consigna de examen que ya tengas.",
+        loading: "Obteniendo una consigna de exámenes recientes…",
         fetchError:
-          "No pudimos obtener un tema de exámenes recientes. Inténtalo de nuevo o escribe el tuyo.",
+          "No pudimos obtener una consigna de exámenes recientes. Inténtalo de nuevo o escribe la tuya.",
         unavailableError:
-          "El tema de exámenes recientes no estaba disponible. Inténtalo de nuevo o escribe el tuyo.",
+          "La consigna de exámenes recientes no estaba disponible. Inténtalo de nuevo o escribe la tuya.",
         notPublishedError:
-          "No se ha publicado ningún tema de exámenes recientes para este mes ni el anterior. Escribe o pega tu propio tema.",
-        selectedRecentExamAriaLabel: "Tema de examen reciente seleccionado",
+          "No se ha publicado ninguna consigna de exámenes recientes para este mes ni el anterior. Escribe o pega la tuya.",
+        selectedRecentExamAriaLabel: "Consigna de examen reciente seleccionada",
         sourceLabel: "Fuente:",
         recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
-        customTopicLabel: "Tu tema o consigna",
-        customTopicPlaceholder: "Pega o escribe el tema o la consigna a la que quieres responder…",
+        customTopicLabel: "Tu consigna de examen",
+        customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
       editor: {
         heading: "3. Escribe",
@@ -1925,9 +1961,9 @@ export const APP_COPY = {
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
         alreadyCorrected:
-          "Esta versión ya se ha corregido. Modifica tu respuesta o tema para solicitar una nueva corrección.",
+          "Esta versión ya se ha corregido. Modifica tu respuesta o consigna de examen para solicitar una nueva corrección.",
         correctionInProgress:
-          "Ya hay una corrección de esta respuesta exacta en curso. Espera a que termine o modifica la respuesta o el tema antes de solicitar otra.",
+          "Ya hay una corrección de esta respuesta exacta en curso. Espera a que termine o modifica la respuesta o la consigna de examen antes de solicitar otra.",
         exampleLevelLabel: "Nivel objetivo",
         generateExample: "Generar ejemplo",
         generatingExample: "Generando…",
@@ -1937,7 +1973,7 @@ export const APP_COPY = {
         exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
         exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
         exampleNeedsTopicWarning:
-          "Elige un tema de exámenes recientes o pega el tuyo antes de generar un ejemplo.",
+          "Elige una consigna de exámenes recientes o pega la tuya antes de generar un ejemplo.",
         copy: "Copiar texto",
         copied: "¡Copiado!",
         copyFailed: "No se pudo copiar",
@@ -2219,11 +2255,11 @@ export const APP_COPY = {
       },
       dialog: {
         title: "¿Descartar tu trabajo actual?",
-        taskSwitchDescription: "Al cambiar de tarea se descartarán el tema, el borrador y los comentarios actuales.",
+        taskSwitchDescription: "Al cambiar de tarea se descartarán la consigna, el borrador y los comentarios actuales.",
         dashboardSwitchDescription:
-          "Al ir al panel se descartarán el tema, el borrador y los comentarios actuales.",
-        adminSwitchDescription: "Al ir a Administración se descartarán el tema, el borrador y los comentarios actuales.",
-        topicSwitchDescription: "Al cambiar de tema se descartarán el tema, el borrador y los comentarios actuales.",
+          "Al ir al panel se descartarán la consigna, el borrador y los comentarios actuales.",
+        adminSwitchDescription: "Al ir a Administración se descartarán la consigna, el borrador y los comentarios actuales.",
+        topicSwitchDescription: "Al cambiar de consigna se descartarán la consigna, el borrador y los comentarios actuales.",
         exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
         exampleOverwriteConfirm: "Reemplazar borrador",
         clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
@@ -2240,7 +2276,7 @@ export const APP_COPY = {
     },
     nav: {
       dashboard: "Painel",
-      tasks: "Tarefas",
+      tasks: "Tarefa completa",
       practice: "Prática",
       settings: "Configurações",
       admin: "Admin",
@@ -2362,6 +2398,15 @@ export const APP_COPY = {
     },
     dashboard: {
       welcome: (name) => `Bem-vindo de volta, ${name}`,
+      startHereEyebrow: "Seu primeiro passo",
+      startHereTitle: "Como você gostaria de começar?",
+      startHereDescription: "Escolha a prática de uma habilidade ou uma tarefa TCF completa. Seu progresso aparecerá aqui após sua primeira correção.",
+      practiceStartTitle: "Treine uma habilidade primeiro",
+      practiceStartDescription: "Trabalhe uma parte da tarefa passo a passo, da prática guiada à escrita independente.",
+      practiceStartAction: "Ir para Prática",
+      tasksStartTitle: "Experimente uma tarefa completa",
+      tasksStartDescription: "Escreva uma resposta TCF completa e receba feedback sobre sua escrita.",
+      tasksStartAction: "Ir para a tarefa completa",
       accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
@@ -2420,20 +2465,20 @@ export const APP_COPY = {
       settingsBody: "Abra Configurações para escolher o idioma e a aparência da interface ou encontrar ajuda e suporte quando precisar.",
       dashboardPracticeTitle: "Treine uma parte da tarefa antes de redigir a resposta completa",
       dashboardPracticeBody: "Prática é seu treinador de escrita. Ela ajuda você a treinar uma parte numerada de uma tarefa TCF no seu nível-alvo antes de escrever uma resposta completa.",
-      dashboardStartWritingTitle: "Pronto para escrever?",
-      dashboardStartWritingBody: "Vá em Tarefas para escolher uma tarefa de redação e obter sua primeira correção.",
+      dashboardStartWritingTitle: "Pronto para uma tarefa completa?",
+      dashboardStartWritingBody: "Abra a tarefa completa para escolher um enunciado de exame e receber sua primeira correção.",
       practiceIntroTitle: "A prática desenvolve uma parte da tarefa",
       practiceIntroBody: "Esta página não é uma simulação de exame. Escolha uma parte da tarefa e pratique-a em uma sequência progressiva e revisada antes de escrever uma resposta TCF completa.",
       practicePartsTitle: "As partes são as mesmas; o nível muda a exigência",
       practicePartsBody: "Cada tarefa tem uma estrutura numerada fixa. B2, C1 e C2 praticam a mesma parte com uma linguagem cada vez mais autônoma, precisa e nuançada. Apenas sequências revisadas podem ser iniciadas.",
       practiceFullTaskTitle: "Reúna as partes em uma tarefa completa",
-      practiceFullTaskBody: "Quando estiver pronto, vá a Tarefas para aplicar a parte que treinou em uma resposta TCF completa e receber feedback.",
+      practiceFullTaskBody: "Quando estiver pronto, abra a tarefa completa para aplicar a parte que treinou em uma resposta TCF completa e receber feedback.",
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
-        "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (descrever ou narrar uma experiência), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
-      topicPickerTitle: "Escolha um tema",
+        "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (comunicar-se com eficácia em uma mensagem curta, para o destinatário e o registro adequados), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
+      topicPickerTitle: "Escolha um enunciado de exame",
       topicPickerBody:
-        "Os temas de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio tema.",
+        "Os enunciados de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio enunciado.",
       guidedWritingTitle: "Planeje antes de escrever",
       guidedWritingBody:
         "Abra o Guia de escrita quando precisar de ideias. Escolha a situação de escrita e use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para o nível desejado.",
@@ -2485,23 +2530,23 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Extensão desejada: ${minWords}–${maxWords} palavras.`,
       },
       topic: {
-        heading: "2. Escolha um tema",
-        recentExamTitle: "Obtenha um tema de exames recentes",
-        recentExamDescription: "Carregue um tema para a tarefa escolhida.",
-        customTitle: "Escreva ou cole meu próprio tema",
-        customDescription: "Use uma proposta que você já tenha.",
-        loading: "Obtendo um tema de exames recentes…",
+        heading: "2. Escolha um enunciado de exame",
+        recentExamTitle: "Obtenha um enunciado de exames recentes",
+        recentExamDescription: "Carregue um enunciado autêntico para a tarefa escolhida.",
+        customTitle: "Escreva ou cole meu próprio enunciado",
+        customDescription: "Use um enunciado de exame que você já tenha.",
+        loading: "Obtendo um enunciado de exames recentes…",
         fetchError:
-          "Não foi possível obter um tema de exames recentes. Tente novamente ou escreva o seu próprio tema.",
+          "Não foi possível obter um enunciado de exames recentes. Tente novamente ou escreva o seu.",
         unavailableError:
-          "O tema de exames recentes não está disponível. Tente novamente ou escreva o seu próprio tema.",
+          "O enunciado de exames recentes não está disponível. Tente novamente ou escreva o seu.",
         notPublishedError:
-          "Nenhum tema de exames recentes foi publicado para este mês nem para o anterior. Escreva ou cole o seu próprio tema.",
-        selectedRecentExamAriaLabel: "Tema de exame recente selecionado",
+          "Nenhum enunciado de exames recentes foi publicado para este mês nem para o anterior. Escreva ou cole o seu.",
+        selectedRecentExamAriaLabel: "Enunciado de exame recente selecionado",
         sourceLabel: "Fonte:",
         recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
-        customTopicLabel: "Seu tema ou proposta",
-        customTopicPlaceholder: "Cole ou escreva o tema ou a proposta à qual você quer responder…",
+        customTopicLabel: "Seu enunciado de exame",
+        customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },
       editor: {
         heading: "3. Escreva",
@@ -2513,9 +2558,9 @@ export const APP_COPY = {
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
         alreadyCorrected:
-          "Esta versão já foi corrigida. Edite sua resposta ou tema para solicitar uma nova correção.",
+          "Esta versão já foi corrigida. Edite sua resposta ou enunciado de exame para solicitar uma nova correção.",
         correctionInProgress:
-          "Já existe uma correção desta resposta exata em andamento. Aguarde a conclusão ou edite a resposta ou o tema antes de solicitar outra.",
+          "Já existe uma correção desta resposta exata em andamento. Aguarde a conclusão ou edite a resposta ou o enunciado de exame antes de solicitar outra.",
         exampleLevelLabel: "Nível desejado",
         generateExample: "Gerar exemplo",
         generatingExample: "Gerando…",
@@ -2525,7 +2570,7 @@ export const APP_COPY = {
         exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
         exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
         exampleNeedsTopicWarning:
-          "Escolha um tema de exames recentes ou cole o seu antes de gerar um exemplo.",
+          "Escolha um enunciado de exames recentes ou cole o seu antes de gerar um exemplo.",
         copy: "Copiar texto",
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",
@@ -2807,10 +2852,10 @@ export const APP_COPY = {
       },
       dialog: {
         title: "Descartar seu trabalho atual?",
-        taskSwitchDescription: "Trocar de tarefa descartará o tema, o rascunho e os comentários atuais.",
-        dashboardSwitchDescription: "Ir para o painel descartará o tema, o rascunho e os comentários atuais.",
-        adminSwitchDescription: "Ir para a administração descartará o tema, o rascunho e os comentários atuais.",
-        topicSwitchDescription: "Trocar de tema descartará o tema, o rascunho e os comentários atuais.",
+        taskSwitchDescription: "Trocar de tarefa descartará o enunciado, o rascunho e os comentários atuais.",
+        dashboardSwitchDescription: "Ir para o painel descartará o enunciado, o rascunho e os comentários atuais.",
+        adminSwitchDescription: "Ir para a administração descartará o enunciado, o rascunho e os comentários atuais.",
+        topicSwitchDescription: "Trocar de enunciado descartará o enunciado, o rascunho e os comentários atuais.",
         exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
         exampleOverwriteConfirm: "Substituir rascunho",
         clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",

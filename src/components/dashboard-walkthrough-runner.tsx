@@ -1,36 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { WalkthroughOverlay, type WalkthroughStepContent } from "@/components/walkthrough-overlay";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
-import { WALKTHROUGH_CONTINUE_PARAM, WALKTHROUGH_CONTINUE_VALUE } from "@/lib/walkthrough";
 
 interface DashboardWalkthroughRunnerProps {
   shouldAutoStart: boolean;
+  /** The choice panel only exists while the learner has no prior work. */
+  hasGettingStarted: boolean;
 }
 
 /**
- * The dashboard section of the walkthrough hands off to Practice, then the
- * Practice runner hands off to Tasks, by a
- * real navigation, not shared client state -- finishing this one (as
- * opposed to skipping it) does not itself record a dismissed version. The
- * Practice runner therefore sees the same still-unrecorded version and
- * auto-starts there, then hands the learner to Tasks for the final section.
- *
- * Its "Take a tour" trigger lives in the nav bar, not on this page -- see
- * WalkthroughTriggerProvider -- so this component only registers a starter
- * function while mounted, rather than rendering its own button.
+ * The dashboard tour introduces the learner's starting choice. It does not
+ * force a cross-page sequence: selecting Practice or Tasks remains the
+ * learner's decision, and each page can offer its own concise guide later.
  */
-export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthroughRunnerProps) {
+export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted }: DashboardWalkthroughRunnerProps) {
   const copy = useAppCopy();
-  const router = useRouter();
   const { register } = useWalkthroughTrigger();
   // Seeded from the prop rather than set in an effect after mount: it's a
   // stable, server-computed value for this page load, so there's no
   // external system to synchronize with here, just an initial value.
-  const [isOpen, setIsOpen] = useState(shouldAutoStart);
+  // Returning learners may receive a newer tour version, but the first-use
+  // choice panel is intentionally absent once they have work. Do not open a
+  // tour against a target that is not rendered; the reusable manual tour
+  // below instead points at the permanent dashboard content.
+  const [isOpen, setIsOpen] = useState(shouldAutoStart && hasGettingStarted);
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
@@ -41,30 +37,33 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
     return () => register(null);
   }, [register]);
 
-  const steps: WalkthroughStepContent[] = [
-    {
-      id: "dashboard-welcome",
-      title: copy.walkthrough.dashboardWelcomeTitle,
-      body: copy.walkthrough.dashboardWelcomeBody,
-    },
-    {
-      id: "dashboard-corrections",
-      title: copy.walkthrough.dashboardCorrectionsTitle,
-      body: copy.walkthrough.dashboardCorrectionsBody,
-    },
-    {
-      id: "nav-settings",
-      title: copy.walkthrough.settingsTitle,
-      body: copy.walkthrough.settingsBody,
-      placement: "bottom",
-    },
-    {
-      id: "nav-practice",
-      title: copy.walkthrough.dashboardPracticeTitle,
-      body: copy.walkthrough.dashboardPracticeBody,
-      placement: "bottom",
-    },
-  ];
+  const steps: WalkthroughStepContent[] = hasGettingStarted
+    ? [
+        {
+          id: "dashboard-start",
+          title: copy.walkthrough.dashboardWelcomeTitle,
+          body: copy.walkthrough.dashboardWelcomeBody,
+        },
+        {
+          id: "nav-practice",
+          title: copy.walkthrough.dashboardPracticeTitle,
+          body: copy.walkthrough.dashboardPracticeBody,
+          placement: "bottom",
+        },
+        {
+          id: "nav-tasks",
+          title: copy.walkthrough.dashboardStartWritingTitle,
+          body: copy.walkthrough.dashboardStartWritingBody,
+          placement: "bottom",
+        },
+      ]
+    : [
+        {
+          id: "dashboard-welcome",
+          title: copy.walkthrough.dashboardWelcomeTitle,
+          body: copy.walkthrough.dashboardWelcomeBody,
+        },
+      ];
 
   // Stable across renders (not a plain function, recreated every render):
   // WalkthroughOverlay's focus-trap effect keys on this via onSkip, so a
@@ -76,15 +75,6 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
     void fetch("/api/walkthrough/dismiss", { method: "POST" }).catch(() => {});
   }, []);
 
-  function continueToPractice() {
-    setIsOpen(false);
-    // Only meaningful for a manual re-trigger by a learner who has already
-    // completed the current version -- shouldAutoStart alone would be false
-    // for them on /practice. A genuine first-time run doesn't need this: both
-    // pages already read the same still-unrecorded (null) version.
-    router.push(`/practice?${WALKTHROUGH_CONTINUE_PARAM}=${WALKTHROUGH_CONTINUE_VALUE}`);
-  }
-
   return (
     <WalkthroughOverlay
       open={isOpen}
@@ -94,7 +84,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart }: DashboardWalkthr
       onNext={() => setStepIndex((index) => Math.min(index + 1, steps.length - 1))}
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
-      onFinish={continueToPractice}
+      onFinish={dismiss}
     />
   );
 }

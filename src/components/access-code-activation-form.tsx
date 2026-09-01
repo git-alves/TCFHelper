@@ -71,7 +71,12 @@ export function AccessCodeActivationForm() {
   }
 
   if (welcomeDestination) {
-    return <AccessCodeWelcomeModal onContinue={handleContinue} />;
+    return (
+      <AccessCodeWelcomeModal
+        destination={welcomeDestination === "/dashboard" ? "/dashboard" : "/tasks"}
+        onContinue={handleContinue}
+      />
+    );
   }
 
   return (

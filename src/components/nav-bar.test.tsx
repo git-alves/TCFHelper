@@ -29,12 +29,17 @@ vi.mock("@/components/walkthrough-trigger", () => ({
 const { NavBar } = await import("./nav-bar");
 
 describe("NavBar", () => {
-  it("keeps Dashboard reachable from the Practice screen", () => {
+  it("keeps the three learning destinations visible in a stable order", () => {
     const markup = renderToStaticMarkup(<NavBar />);
 
-    expect(markup).toContain('href="/dashboard"');
-    expect(markup).toContain(">Dashboard<");
-    expect(markup).toContain('href="/tasks"');
+    const dashboard = markup.indexOf('href="/dashboard"');
+    const practice = markup.indexOf('href="/practice"');
+    const tasks = markup.indexOf('href="/tasks"');
+
+    expect(dashboard).toBeGreaterThanOrEqual(0);
+    expect(practice).toBeGreaterThan(dashboard);
+    expect(tasks).toBeGreaterThan(practice);
     expect(markup.match(/href="\/dashboard"/g)).toHaveLength(1);
+    expect(markup).toContain('aria-current="page"');
   });
 });
