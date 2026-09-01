@@ -20,6 +20,10 @@ export interface StoredPracticeSession {
   checkState: StoredPracticeCheckState;
   completionMethods: readonly (readonly [string, StoredPracticeCompletionMethod])[];
   difficultyRatings: readonly (readonly [string, StoredPracticeDifficultyRating])[];
+  // Optional so saved sessions from before durable Dashboard activity remain
+  // resumable. Once present, it prevents a browser refresh from creating a
+  // second server session for the same six exercises.
+  progressSessionId?: string;
 }
 
 function isCompletionMethodEntry(value: unknown): value is readonly [string, StoredPracticeCompletionMethod] {
@@ -65,7 +69,8 @@ function isStoredPracticeSession(value: unknown): value is StoredPracticeSession
     Array.isArray(session.completionMethods) &&
     session.completionMethods.every(isCompletionMethodEntry) &&
     Array.isArray(session.difficultyRatings) &&
-    session.difficultyRatings.every(isDifficultyRatingEntry)
+    session.difficultyRatings.every(isDifficultyRatingEntry) &&
+    (session.progressSessionId === undefined || typeof session.progressSessionId === "string")
   );
 }
 

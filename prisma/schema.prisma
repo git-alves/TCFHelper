@@ -68,6 +68,25 @@ enum CefrLevel {
   C2
 }
 
+// The target level of a curated Practice sequence. This is intentionally
+// separate from the assessment-oriented CefrLevel enum: a learner can train
+// a C1 sequence before any correction has established (or even estimated)
+// their current level.
+enum PracticeLevel {
+  B2
+  C1
+  C2
+}
+
+// A completion records how the learner resolved a fixed exercise. Revealing
+// an answer remains a valid completed activity, but stays distinct from an
+// independent response in Dashboard reporting.
+enum PracticeCompletionMethod {
+  CORRECT
+  SELF_REVIEW
+  REVEALED
+}
+
 enum SubscriptionStatus {
   INCOMPLETE
   INCOMPLETE_EXPIRED
@@ -128,6 +147,7 @@ model User {
   exampleGenerationLeases ExampleGenerationLease[]
   correctionLeases        CorrectionLease[]
   correctionUsage         CorrectionUsage?
+  practiceSessions        PracticeSession[]
   translationQuota        TranslationQuota?
   quotaOverride           UserQuotaOverride?
   redeemedAccessCodes     AccessCode[]          @relation("AccessCodeRedeemedBy")
@@ -244,6 +264,44 @@ model Feedback {
   translatedText String?
   meetsWordCount Boolean    @default(false)
   createdAt      DateTime   @default(now())
+}
+
+/// A learner's run through one reviewed, six-stage Practice sequence. The
+/// selected exercise IDs are stored as a snapshot because a stage can have
+/// several editorial variants; completion writes are accepted only for this
+/// server-validated set, never for arbitrary browser-supplied IDs.
+model PracticeSession {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  taskType    TaskType
+  targetLevel PracticeLevel
+  skillId     String
+  exerciseIds Json
+  completedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  completions PracticeExerciseCompletion[]
+
+  @@index([userId, completedAt])
+  @@index([userId, taskType, targetLevel, skillId])
+}
+
+/// One resolved exercise in a PracticeSession. The composite unique key makes
+/// retries and duplicate browser requests idempotent without overwriting the
+/// first recorded completion method.
+model PracticeExerciseCompletion {
+  id               String                   @id @default(cuid())
+  sessionId        String
+  session          PracticeSession          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  exerciseId       String
+  exerciseType     String
+  completionMethod PracticeCompletionMethod
+  completedAt      DateTime                 @default(now())
+
+  @@unique([sessionId, exerciseId])
+  @@index([completedAt])
 }
 
 /// A short-lived, per-learner claim protects a provider call after its

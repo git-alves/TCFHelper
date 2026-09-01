@@ -28,4 +28,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // to use the deterministic guide classifier until they are curated, so the
   // column is forward compatible with the already-deployed application.
   "20260826120000_add_topic_guide_context",
+  // A standalone learner-owned activity ledger. It neither changes an
+  // existing record's meaning nor backfills writing content, so it is safe
+  // to apply alongside the Dashboard that begins reading it.
+  "20260901190000_add_practice_progress",
 ]);

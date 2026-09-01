@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
@@ -82,6 +82,7 @@ const EXERCISE_STAGES: readonly PracticeExerciseType[] = [
 type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
 type CompletionMethod = "correct" | "revealed" | "self-review";
 type DifficultyRating = "too-easy" | "appropriate" | "too-hard";
+type PendingProgressCompletion = { exerciseId: string; completionMethod: CompletionMethod };
 
 const DIFFICULTY_RATINGS: readonly DifficultyRating[] = ["too-easy", "appropriate", "too-hard"];
 
@@ -386,6 +387,15 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [savedSession, setSavedSession] = useState<StoredPracticeSession | null>(null);
+  // Local storage remains the fast, private resume mechanism. This separate
+  // server session is intentionally just an activity ledger for the
+  // Dashboard; its request must never block a learner from working through a
+  // curated sequence when they are offline or the network is unavailable.
+  const progressSessionIdRef = useRef<string | null>(null);
+  const progressSessionGenerationRef = useRef(0);
+  const pendingProgressCompletionsRef = useRef<PendingProgressCompletion[]>([]);
+  const reportedExerciseIdsRef = useRef<Set<string>>(new Set());
+  const [progressSessionId, setProgressSessionId] = useState<string | null>(null);
 
   const matchingSkills = useMemo(
     () =>
@@ -430,6 +440,108 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setSavedSession(null);
   }
 
+  function resetProgressTracking() {
+    progressSessionGenerationRef.current += 1;
+    progressSessionIdRef.current = null;
+    pendingProgressCompletionsRef.current = [];
+    reportedExerciseIdsRef.current = new Set();
+    setProgressSessionId(null);
+  }
+
+  async function persistProgressCompletion(
+    sessionId: string,
+    completion: PendingProgressCompletion,
+  ) {
+    try {
+      await fetch(`/api/practice/sessions/${encodeURIComponent(sessionId)}/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(completion),
+      });
+    } catch {
+      // Practice itself is always usable without this optional progress
+      // report. A later sequence will establish a fresh durable session.
+    }
+  }
+
+  function reportExerciseCompletion(exerciseId: string, completionMethod: CompletionMethod) {
+    if (reportedExerciseIdsRef.current.has(exerciseId)) return;
+    reportedExerciseIdsRef.current.add(exerciseId);
+
+    const completion = { exerciseId, completionMethod };
+    const sessionId = progressSessionIdRef.current;
+    if (!sessionId) {
+      pendingProgressCompletionsRef.current.push(completion);
+      return;
+    }
+    void persistProgressCompletion(sessionId, completion);
+  }
+
+  function beginProgressSession(
+    skill: CuratedPracticeSkill,
+    sessionExercises: readonly CuratedPracticeExercise[],
+    existingCompletions: readonly (readonly [string, CompletionMethod])[] = [],
+    existingProgressSessionId?: string,
+  ) {
+    resetProgressTracking();
+    const generation = progressSessionGenerationRef.current;
+    const exerciseIds = sessionExercises.map((exercise) => exercise.id);
+    const validExerciseIds = new Set(exerciseIds);
+    const completed = existingCompletions.filter(([exerciseId]) => validExerciseIds.has(exerciseId));
+    reportedExerciseIdsRef.current = new Set(completed.map(([exerciseId]) => exerciseId));
+    pendingProgressCompletionsRef.current = completed.map(([exerciseId, completionMethod]) => ({
+      exerciseId,
+      completionMethod,
+    }));
+
+    function flushPendingCompletions(sessionId: string) {
+      const pending = pendingProgressCompletionsRef.current;
+      pendingProgressCompletionsRef.current = [];
+      for (const completion of pending) {
+        void persistProgressCompletion(sessionId, completion);
+      }
+    }
+
+    // A saved browser session can reconnect to its original durable ledger.
+    // The completion endpoint independently owner-scopes and validates it;
+    // a stale session never creates duplicate activity when the learner
+    // resumes their local exercise state.
+    if (existingProgressSessionId) {
+      progressSessionIdRef.current = existingProgressSessionId;
+      setProgressSessionId(existingProgressSessionId);
+      flushPendingCompletions(existingProgressSessionId);
+      return;
+    }
+
+    void fetch("/api/practice/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        task: skill.task,
+        level: skill.level,
+        skillId: skill.id,
+        exerciseIds,
+      }),
+    })
+      .then(async (response) => {
+        if (!response.ok) return null;
+        const body: unknown = await response.json().catch(() => null);
+        return body && typeof body === "object" && "sessionId" in body && typeof body.sessionId === "string"
+          ? body.sessionId
+          : null;
+      })
+      .then((sessionId) => {
+        if (!sessionId || generation !== progressSessionGenerationRef.current) return;
+        progressSessionIdRef.current = sessionId;
+        setProgressSessionId(sessionId);
+        flushPendingCompletions(sessionId);
+      })
+      .catch(() => {
+        // See persistProgressCompletion: reporting is deliberately best
+        // effort and cannot turn a Practice activity into a failed exercise.
+      });
+  }
+
   useEffect(() => {
     const storage = getBrowserStorage();
     const session = storage ? loadStoredPracticeSession(storage) : null;
@@ -471,6 +583,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
       checkState,
       completionMethods: [...completionMethods.entries()],
       difficultyRatings: [...difficultyRatings.entries()],
+      progressSessionId: progressSessionId ?? undefined,
     });
   }, [
     answer,
@@ -482,6 +595,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     exercises,
     isSequenceComplete,
     ordering,
+    progressSessionId,
     selectedSkill,
     storageLoaded,
   ]);
@@ -495,6 +609,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseTask(task: PracticeTask) {
     clearLocalSession();
+    resetProgressTracking();
     setSelectedTask(task);
     setSelectedLevel(null);
     setSelectedSkill(null);
@@ -507,6 +622,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseLevel(level: PracticeLevel) {
     clearLocalSession();
+    resetProgressTracking();
     setSelectedLevel(level);
     setSelectedSkill(null);
     setExerciseOrder([]);
@@ -518,6 +634,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function chooseSkill(skill: CuratedPracticeSkill) {
     clearLocalSession();
+    resetProgressTracking();
     setSelectedSkill(skill);
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
@@ -534,6 +651,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     // when a stage has more than one reviewed variant, a random one is used
     // so replaying a task part doesn't always show the identical exercise.
     const nextExercises = selectPracticeExerciseSession(getExercisesForSkill(curriculum, selectedSkill));
+    beginProgressSession(selectedSkill, nextExercises);
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -554,6 +672,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function markCompletion(exerciseId: string, method: CompletionMethod) {
     setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
+    reportExerciseCompletion(exerciseId, method);
   }
 
   function rateExercise(exerciseId: string, rating: DifficultyRating) {
@@ -604,6 +723,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
       Math.random,
       previousExerciseIds,
     );
+    beginProgressSession(selectedSkill, nextExercises);
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
     setIsSequenceComplete(false);
@@ -614,6 +734,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function returnToSkills() {
     clearLocalSession();
+    resetProgressTracking();
     setSelectedSkill(null);
     setExerciseOrder([]);
     setCurrentExerciseIndex(0);
@@ -650,6 +771,12 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setDifficultyRatings(new Map(savedSession.difficultyRatings));
     setIsSequenceComplete(false);
     setSavedSession(null);
+    beginProgressSession(
+      resolved.skill,
+      resolved.exercises,
+      savedSession.completionMethods,
+      savedSession.progressSessionId,
+    );
   }
 
   const resumableSession = savedSession ? resolveStoredSession(curriculum, savedSession) : null;

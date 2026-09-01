@@ -177,6 +177,11 @@ export interface AppCopy {
     tasksStartTitle: string;
     tasksStartDescription: string;
     tasksStartAction: string;
+    practiceActivityTitle: string;
+    practiceExercisesCompleted: (values: { count: number }) => string;
+    practiceCompletionBreakdown: (values: { independent: number; helped: number }) => string;
+    practiceTaskPartsCompleted: (values: { count: number }) => string;
+    continuePractice: string;
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
     chartTitle: string;
@@ -621,13 +626,18 @@ export const APP_COPY = {
       welcome: (name) => `Welcome back, ${name}`,
       startHereEyebrow: "Your first step",
       startHereTitle: "How would you like to start?",
-      startHereDescription: "Choose focused skill practice or a complete TCF writing task. Your progress will appear here after your first correction.",
+      startHereDescription: "Choose focused skill practice or a complete TCF writing task. Your progress will appear here after your first activity.",
       practiceStartTitle: "Train a skill first",
       practiceStartDescription: "Work on one part of a task step by step, from guided practice to independent writing.",
       practiceStartAction: "Go to Practice",
       tasksStartTitle: "Try a full task",
       tasksStartDescription: "Write a full TCF response, then receive feedback on your writing.",
       tasksStartAction: "Go to Full task",
+      practiceActivityTitle: "Practice activity",
+      practiceExercisesCompleted: ({ count }) => `${count} exercise${count === 1 ? "" : "s"} completed`,
+      practiceCompletionBreakdown: ({ independent, helped }) => `${independent} independently · ${helped} with help`,
+      practiceTaskPartsCompleted: ({ count }) => `${count} task part${count === 1 ? "" : "s"} trained`,
+      continuePractice: "Continue Practice",
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
@@ -1215,13 +1225,18 @@ export const APP_COPY = {
       welcome: (name) => `Content de vous revoir, ${name}`,
       startHereEyebrow: "Votre première étape",
       startHereTitle: "Comment souhaitez-vous commencer ?",
-      startHereDescription: "Choisissez un entraînement ciblé ou une tâche TCF complète. Vos progrès apparaîtront ici après votre première correction.",
+      startHereDescription: "Choisissez un entraînement ciblé ou une tâche TCF complète. Vos progrès apparaîtront ici après votre première activité.",
       practiceStartTitle: "Travailler une compétence d’abord",
       practiceStartDescription: "Entraînez une partie de la tâche pas à pas, de l’exercice guidé à une rédaction autonome.",
       practiceStartAction: "Aller à Pratique",
       tasksStartTitle: "Essayer une tâche complète",
       tasksStartDescription: "Rédigez une réponse TCF complète, puis recevez des commentaires sur votre rédaction.",
       tasksStartAction: "Aller à la tâche complète",
+      practiceActivityTitle: "Activité de pratique",
+      practiceExercisesCompleted: ({ count }) => `${count} exercice${count === 1 ? "" : "s"} terminé${count === 1 ? "" : "s"}`,
+      practiceCompletionBreakdown: ({ independent, helped }) => `${independent} en autonomie · ${helped} avec aide`,
+      practiceTaskPartsCompleted: ({ count }) => `${count} partie${count === 1 ? "" : "s"} de tâche travaillée${count === 1 ? "" : "s"}`,
+      continuePractice: "Continuer la pratique",
       accountUnavailableTitle: "Votre compte doit être finalisé",
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
@@ -1819,13 +1834,18 @@ export const APP_COPY = {
       welcome: (name) => `Bienvenido de nuevo, ${name}`,
       startHereEyebrow: "Tu primer paso",
       startHereTitle: "¿Cómo te gustaría empezar?",
-      startHereDescription: "Elige práctica de una habilidad o una tarea TCF completa. Tu progreso aparecerá aquí después de tu primera corrección.",
+      startHereDescription: "Elige práctica de una habilidad o una tarea TCF completa. Tu progreso aparecerá aquí después de tu primera actividad.",
       practiceStartTitle: "Entrena una habilidad primero",
       practiceStartDescription: "Trabaja una parte de la tarea paso a paso, desde la práctica guiada hasta la escritura independiente.",
       practiceStartAction: "Ir a Práctica",
       tasksStartTitle: "Prueba una tarea completa",
       tasksStartDescription: "Escribe una respuesta TCF completa y recibe comentarios sobre tu escritura.",
       tasksStartAction: "Ir a la tarea completa",
+      practiceActivityTitle: "Actividad de práctica",
+      practiceExercisesCompleted: ({ count }) => `${count} ejercicio${count === 1 ? "" : "s"} completado${count === 1 ? "" : "s"}`,
+      practiceCompletionBreakdown: ({ independent, helped }) => `${independent} de forma independiente · ${helped} con ayuda`,
+      practiceTaskPartsCompleted: ({ count }) => `${count} parte${count === 1 ? "" : "s"} de la tarea trabajada${count === 1 ? "" : "s"}`,
+      continuePractice: "Continuar practicando",
       accountUnavailableTitle: "Tu cuenta necesita configurarse",
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
@@ -2421,13 +2441,18 @@ export const APP_COPY = {
       welcome: (name) => `Bem-vindo de volta, ${name}`,
       startHereEyebrow: "Seu primeiro passo",
       startHereTitle: "Como você gostaria de começar?",
-      startHereDescription: "Escolha a prática de uma habilidade ou uma tarefa TCF completa. Seu progresso aparecerá aqui após sua primeira correção.",
+      startHereDescription: "Escolha a prática de uma habilidade ou uma tarefa TCF completa. Seu progresso aparecerá aqui após sua primeira atividade.",
       practiceStartTitle: "Treine uma habilidade primeiro",
       practiceStartDescription: "Trabalhe uma parte da tarefa passo a passo, da prática guiada à escrita independente.",
       practiceStartAction: "Ir para Prática",
       tasksStartTitle: "Experimente uma tarefa completa",
       tasksStartDescription: "Escreva uma resposta TCF completa e receba feedback sobre sua escrita.",
       tasksStartAction: "Ir para a tarefa completa",
+      practiceActivityTitle: "Atividade de prática",
+      practiceExercisesCompleted: ({ count }) => `${count} exercício${count === 1 ? "" : "s"} concluído${count === 1 ? "" : "s"}`,
+      practiceCompletionBreakdown: ({ independent, helped }) => `${independent} de forma independente · ${helped} com ajuda`,
+      practiceTaskPartsCompleted: ({ count }) => `${count} parte${count === 1 ? "" : "s"} da tarefa trabalhada${count === 1 ? "" : "s"}`,
+      continuePractice: "Continuar praticando",
       accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",
