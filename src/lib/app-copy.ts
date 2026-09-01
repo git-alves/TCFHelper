@@ -130,6 +130,7 @@ export interface AppCopy {
     nextExercise: string;
     selfReview: string;
     showHint: string;
+    hideHint: string;
     hintLabel: string;
     hintNotice: string;
     verify: string;
@@ -576,6 +577,7 @@ export const APP_COPY = {
       nextExercise: "Next exercise",
       selfReview: "See my self-check checklist",
       showHint: "Show a hint",
+      hideHint: "Hide hint",
       hintLabel: "A way to begin:",
       hintNotice: "This is a suggestion, not an answer. Keep writing in your own words.",
       verify: "Check",
@@ -1164,6 +1166,7 @@ export const APP_COPY = {
       nextExercise: "Exercice suivant",
       selfReview: "Voir ma grille d’auto-vérification",
       showHint: "Voir un indice",
+      hideHint: "Masquer l’indice",
       hintLabel: "Une piste pour commencer :",
       hintNotice: "C’est une suggestion, pas une réponse. Continuez à rédiger avec vos propres mots.",
       verify: "Vérifier",
@@ -1763,6 +1766,7 @@ export const APP_COPY = {
       nextExercise: "Siguiente ejercicio",
       selfReview: "Ver mi lista de autoevaluación",
       showHint: "Ver una pista",
+      hideHint: "Ocultar la pista",
       hintLabel: "Una forma de empezar:",
       hintNotice: "Es una sugerencia, no una respuesta. Sigue escribiendo con tus propias palabras.",
       verify: "Comprobar",
@@ -2360,6 +2364,7 @@ export const APP_COPY = {
       nextExercise: "Próximo exercício",
       selfReview: "Ver minha lista de autoavaliação",
       showHint: "Ver uma dica",
+      hideHint: "Ocultar a dica",
       hintLabel: "Uma forma de começar:",
       hintNotice: "É uma sugestão, não uma resposta. Continue escrevendo com suas próprias palavras.",
       verify: "Verificar",
