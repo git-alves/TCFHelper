@@ -26,7 +26,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
-  const [isFullTour] = useState(
+  const [isFullTour, setIsFullTour] = useState(
     () => shouldAutoStart || isFullWalkthrough(searchParams.get(FULL_WALKTHROUGH_PARAM)),
   );
   // Seeded from the prop rather than set in an effect after mount: it's a
@@ -45,6 +45,26 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
     });
     return () => register(null);
   }, [register, router]);
+
+  // The nav bar's "Take a tour" control always navigates here first (see
+  // startFullWalkthrough in nav-bar.tsx), including from a learner who is
+  // already on /dashboard -- that push only changes the search param on an
+  // otherwise identical route, which Next does not remount this component
+  // for, so the lazy initializers above never re-run and the tour silently
+  // failed to reopen. Detecting the param change during render (React's
+  // documented pattern for deriving state from a changed value) instead of
+  // in an effect makes a same-route retrigger work the same as a cross-page
+  // one, without the extra render pass a setState-in-effect would cost.
+  const fullTourParam = searchParams.get(FULL_WALKTHROUGH_PARAM);
+  const [prevFullTourParam, setPrevFullTourParam] = useState(fullTourParam);
+  if (fullTourParam !== prevFullTourParam) {
+    setPrevFullTourParam(fullTourParam);
+    if (isFullWalkthrough(fullTourParam)) {
+      setIsFullTour(true);
+      setStepIndex(0);
+      setIsOpen(true);
+    }
+  }
 
   // Consume the start signal so a refresh does not reopen a manual tour.
   // isFullTour is preserved in state for this mounted run, so replacing the
