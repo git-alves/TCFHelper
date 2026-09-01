@@ -16,8 +16,7 @@ describe("shouldAutoStartWalkthrough", () => {
   });
 
   it("reintroduces the full cross-page tour after it changes", () => {
-    expect(CURRENT_WALKTHROUGH_VERSION).toBe(4);
-    expect(shouldAutoStartWalkthrough(3)).toBe(true);
+    expect(shouldAutoStartWalkthrough(CURRENT_WALKTHROUGH_VERSION - 1)).toBe(true);
   });
 
   it("does not auto-start for a learner already at the current version", () => {

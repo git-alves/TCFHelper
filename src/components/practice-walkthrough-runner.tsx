@@ -69,10 +69,9 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
     ...(isFullTour
       ? [
           {
-            id: "nav-tasks",
-            title: copy.walkthrough.practiceFullTaskTitle,
-            body: copy.walkthrough.practiceFullTaskBody,
-            placement: "left" as const,
+            id: "practice-stages-preview",
+            title: copy.walkthrough.practiceStagesTitle,
+            body: copy.walkthrough.practiceStagesBody,
           },
         ]
       : []),
@@ -102,7 +101,7 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToTasks : dismiss}
-      progress={isFullTour ? { step: stepIndex + 5, total: 18 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 5, total: 19 } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToFullTask : undefined}
     />
   );

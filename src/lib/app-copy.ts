@@ -240,14 +240,16 @@ export interface AppCopy {
     practiceIntroBody: string;
     practicePartsTitle: string;
     practicePartsBody: string;
-    practiceFullTaskTitle: string;
-    practiceFullTaskBody: string;
+    practiceStagesTitle: string;
+    practiceStagesBody: string;
     taskPickerTitle: string;
     taskPickerBody: string;
     topicPickerTitle: string;
     topicPickerBody: string;
     guidedWritingTitle: string;
     guidedWritingBody: string;
+    timedTaskTourTitle: string;
+    timedTaskTourBody: string;
     editorTitle: string;
     editorBody: string;
     correctButtonTitle: string;
@@ -691,14 +693,16 @@ export const APP_COPY = {
       practiceIntroBody: "This page is not an exam simulation. Choose one task part to practise in a progressive, curated sequence before you write a full TCF response.",
       practicePartsTitle: "The parts stay the same; the level changes the demand",
       practicePartsBody: "Each task has a fixed numbered structure. B2, C1 and C2 practise the same part, but with increasingly independent, precise and nuanced language. Only reviewed paths can be started.",
-      practiceFullTaskTitle: "Put the parts together in a full task",
-      practiceFullTaskBody: "When you are ready, open Full task to apply the writing part you trained in a complete TCF response and receive feedback.",
+      practiceStagesTitle: "Six stages, from recognition to independent writing",
+      practiceStagesBody: "Every part follows the same fixed plan: Recognise, Complete, Transform, Organise, Develop, then Produce. Each stage removes a little more support, so you finish able to write it yourself. When you are ready, open Full task to apply what you trained in a complete TCF response.",
       taskPickerTitle: "Choose a task",
       taskPickerBody:
         "TCF written expression has three task types: Tâche 1 (communicate effectively in a short message, for the right reader and in the right register), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
       topicPickerTitle: "Choose an exam prompt",
       topicPickerBody:
         "Recent exam prompts are pulled directly from real, recently published TCF exams on this site, so you always practise with an authentic prompt. You can also paste in your own prompt instead.",
+      timedTaskTourTitle: "Practise under exam conditions",
+      timedTaskTourBody: "Start a timed task when you want to rehearse the real time pressure of the exam. It tracks the suggested time for this task and keeps running in the background while you write.",
       guidedWritingTitle: "Plan before you write",
       guidedWritingBody:
         "Open the Writing guide when you need ideas. Choose the writing situation, then use its planning questions, French phrases, and suggested verb tenses for your target level.",
@@ -1286,14 +1290,16 @@ export const APP_COPY = {
       practiceIntroBody: "Cette page n’est pas une simulation d’examen. Choisissez une partie de la tâche et travaillez-la dans une séquence progressive et validée avant de rédiger une réponse TCF complète.",
       practicePartsTitle: "Les parties restent les mêmes ; le niveau fait évoluer l’exigence",
       practicePartsBody: "Chaque tâche suit une structure numérotée fixe. B2, C1 et C2 entraînent la même partie avec une langue de plus en plus autonome, précise et nuancée. Seules les séquences validées peuvent être commencées.",
-      practiceFullTaskTitle: "Assemblez les parties dans une tâche complète",
-      practiceFullTaskBody: "Lorsque vous êtes prêt·e, ouvrez la tâche complète pour réutiliser la partie travaillée dans une réponse TCF complète et recevoir une correction.",
+      practiceStagesTitle: "Six étapes, de la reconnaissance à la rédaction autonome",
+      practiceStagesBody: "Chaque partie suit le même plan fixe : Reconnaître, Compléter, Transformer, Organiser, Développer, puis Produire. Chaque étape retire un peu plus de soutien, pour que vous terminiez capable de l'écrire seul·e. Lorsque vous êtes prêt·e, ouvrez la tâche complète pour réutiliser ce que vous avez travaillé dans une réponse TCF complète.",
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
         "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (communiquer efficacement dans un message court, au bon destinataire et dans le registre adapté), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
       topicPickerTitle: "Choisissez une consigne d’examen",
       topicPickerBody:
         "Les consignes d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des consignes authentiques. Vous pouvez aussi coller la vôtre.",
+      timedTaskTourTitle: "Entraînez-vous dans les conditions de l'examen",
+      timedTaskTourBody: "Démarrez une tâche chronométrée pour vous entraîner avec la vraie pression de temps de l'examen. Elle suit la durée suggérée pour cette tâche et continue en arrière-plan pendant que vous écrivez.",
       guidedWritingTitle: "Planifiez avant d’écrire",
       guidedWritingBody:
         "Ouvrez le guide de rédaction lorsque vous manquez d’idées. Choisissez la situation d’écriture, puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour votre niveau visé.",
@@ -1886,14 +1892,16 @@ export const APP_COPY = {
       practiceIntroBody: "Esta página no es una simulación de examen. Elige una parte de la tarea y practícala en una secuencia progresiva y revisada antes de escribir una respuesta TCF completa.",
       practicePartsTitle: "Las partes son las mismas; el nivel cambia la exigencia",
       practicePartsBody: "Cada tarea tiene una estructura numerada fija. B2, C1 y C2 practican la misma parte con un lenguaje cada vez más autónomo, preciso y matizado. Solo se pueden iniciar secuencias revisadas.",
-      practiceFullTaskTitle: "Reúne las partes en una tarea completa",
-      practiceFullTaskBody: "Cuando estés listo, abre la tarea completa para aplicar la parte que practicaste en una respuesta TCF completa y recibir comentarios.",
+      practiceStagesTitle: "Seis etapas, del reconocimiento a la escritura autónoma",
+      practiceStagesBody: "Cada parte sigue el mismo plan fijo: Reconocer, Completar, Transformar, Organizar, Desarrollar y luego Producir. Cada etapa retira un poco más de ayuda, para que termines siendo capaz de escribirla tú mismo. Cuando estés listo, abre la tarea completa para aplicar lo que practicaste en una respuesta TCF completa.",
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
         "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (comunicarse eficazmente en un mensaje breve, para el destinatario y el registro adecuados), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
       topicPickerTitle: "Elige una consigna de examen",
       topicPickerBody:
         "Las consignas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con una consigna auténtica. También puedes pegar la tuya.",
+      timedTaskTourTitle: "Practica en condiciones de examen",
+      timedTaskTourBody: "Inicia una tarea cronometrada cuando quieras practicar con la presión de tiempo real del examen. Sigue el tiempo sugerido para esta tarea y continúa en segundo plano mientras escribes.",
       guidedWritingTitle: "Planifica antes de escribir",
       guidedWritingBody:
         "Abre la Guía de redacción cuando necesites ideas. Elige la situación de escritura y usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para tu nivel objetivo.",
@@ -2486,14 +2494,16 @@ export const APP_COPY = {
       practiceIntroBody: "Esta página não é uma simulação de exame. Escolha uma parte da tarefa e pratique-a em uma sequência progressiva e revisada antes de escrever uma resposta TCF completa.",
       practicePartsTitle: "As partes são as mesmas; o nível muda a exigência",
       practicePartsBody: "Cada tarefa tem uma estrutura numerada fixa. B2, C1 e C2 praticam a mesma parte com uma linguagem cada vez mais autônoma, precisa e nuançada. Apenas sequências revisadas podem ser iniciadas.",
-      practiceFullTaskTitle: "Reúna as partes em uma tarefa completa",
-      practiceFullTaskBody: "Quando estiver pronto, abra a tarefa completa para aplicar a parte que treinou em uma resposta TCF completa e receber feedback.",
+      practiceStagesTitle: "Seis etapas, do reconhecimento à escrita autônoma",
+      practiceStagesBody: "Cada parte segue o mesmo plano fixo: Reconhecer, Completar, Transformar, Organizar, Desenvolver e depois Produzir. Cada etapa retira um pouco mais de apoio, para que você termine capaz de escrevê-la sozinho. Quando estiver pronto, abra a tarefa completa para aplicar o que treinou em uma resposta TCF completa.",
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
         "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (comunicar-se com eficácia em uma mensagem curta, para o destinatário e o registro adequados), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
       topicPickerTitle: "Escolha um enunciado de exame",
       topicPickerBody:
         "Os enunciados de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio enunciado.",
+      timedTaskTourTitle: "Pratique nas condições da prova",
+      timedTaskTourBody: "Inicie uma tarefa cronometrada quando quiser praticar com a pressão de tempo real da prova. Ela acompanha o tempo sugerido para esta tarefa e continua em segundo plano enquanto você escreve.",
       guidedWritingTitle: "Planeje antes de escrever",
       guidedWritingBody:
         "Abra o Guia de escrita quando precisar de ideias. Escolha a situação de escrita e use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para o nível desejado.",
