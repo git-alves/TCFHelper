@@ -9,6 +9,7 @@ describe("DashboardWalkthroughRunner", () => {
   it("accepts only a primitive shouldAutoStart prop from its server-page caller", () => {
     expectTypeOf<ComponentProps<typeof DashboardWalkthroughRunner>>().toEqualTypeOf<{
       shouldAutoStart: boolean;
+      hasGettingStarted: boolean;
     }>();
   });
 });

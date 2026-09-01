@@ -63,13 +63,10 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
-// A filled primary action, not the outlined pill used for secondary nav
-// controls -- this is the one control on the dashboard that actually starts
-// the core writing loop, so it should read as more than a plain nav link.
-const TASKS_BUTTON_CLASS =
-  "shrink-0 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
-const DASHBOARD_BUTTON_CLASS =
-  "rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
+const NAV_BUTTON_CLASS =
+  "shrink-0 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
+const ACTIVE_NAV_BUTTON_CLASS =
+  "shrink-0 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background dark:bg-white dark:text-black";
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
@@ -77,24 +74,13 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
   const { requestStart: requestWalkthroughStart, isAvailable: isWalkthroughAvailable } = useWalkthroughTrigger();
 
-  // Toggles between the two screens: while the workspace is mounted, this
-  // offers Dashboard; otherwise it offers Tasks. Driven by whether the
-  // workspace is actually mounted, not the URL: opening Settings from
-  // /tasks intercepts the route and changes the URL to /settings while
-  // /tasks stays mounted behind the modal, so usePathname() would wrongly
-  // flip this to "Tasks" the moment Settings opens.
+  // The workspace can stay mounted while Settings is open, so it remains
+  // the source of truth for whether leaving this page needs a draft guard.
   const onTasks = isWorkspaceMounted;
 
-  // The home page already has its own "start a task" hero CTA, so the nav
-  // bar's job there is just getting a signed-in visitor to their dashboard
-  // -- a plain link, not the same prominent action button that starts the
-  // writing loop from the dashboard. Same interception problem as onTasks
-  // above: Settings turns pathname into "/settings" while home stays
-  // mounted underneath, so this remembers the last real (non-/settings)
-  // pathname instead of trusting pathname directly. Adjusted during render
-  // (React's documented pattern for deriving state from a prop change)
-  // rather than an effect, so there's no one-frame flash of the wrong
-  // button.
+  // Settings changes the URL while leaving the underlying page mounted.
+  // Preserve that page identity so the active navigation item does not
+  // change just because the Settings modal is open.
   const [prevPathname, setPrevPathname] = useState(pathname);
   const [lastRealPathname, setLastRealPathname] = useState(pathname);
   if (pathname !== prevPathname) {
@@ -102,7 +88,6 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
     if (pathname !== "/settings") setLastRealPathname(pathname);
   }
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
-  const isHome = realPathname === "/";
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
 
   // Settings sets the URL to exactly /settings while its own modal is open
@@ -135,96 +120,62 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           <Show when="signed-in">
             <>
-              {isHome ? (
+              {/* Keep the three main destinations in one stable order. The
+               * active treatment describes where the learner is; prominence
+               * for the next learning action belongs inside each page. */}
+              {onTasks && isDashboardBlocked ? (
                 <>
-                  <Link href="/practice" className={DASHBOARD_BUTTON_CLASS}>
-                    {copy.nav.practice}
-                  </Link>
-                  <Link href="/dashboard" data-walkthrough="nav-dashboard" className={DASHBOARD_BUTTON_CLASS}>
-                    {copy.nav.dashboard}
-                  </Link>
-                </>
-              ) : onTasks ? (
-                // A correction the server already received can't be
-                // recalled by leaving the page, or the Settings modal
-                // covering the workspace's own confirmation dialog, are
-                // both real reasons to make this a genuinely disabled
-                // control rather than just a styled one.
-                isDashboardBlocked ? (
                   <button
                     type="button"
                     disabled
                     data-walkthrough="nav-dashboard"
                     title={dashboardBlockedReason}
                     aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
-                    className={DASHBOARD_BUTTON_CLASS}
+                    className={NAV_BUTTON_CLASS}
                   >
                     {copy.nav.dashboard}
                   </button>
-                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    data-walkthrough="nav-practice"
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.practice} — ${dashboardBlockedReason}`}
+                    className={NAV_BUTTON_CLASS}
+                  >
+                    {copy.nav.practice}
+                  </button>
+                </>
+              ) : (
+                <>
                   <Link
                     href="/dashboard"
                     data-walkthrough="nav-dashboard"
                     onClick={guardedNavigationHandler("/dashboard")}
-                    className={DASHBOARD_BUTTON_CLASS}
+                    aria-current={realPathname === "/dashboard" ? "page" : undefined}
+                    className={realPathname === "/dashboard" ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
                   >
                     {copy.nav.dashboard}
                   </Link>
-                )
-              ) : (
-                <Link href="/tasks" data-walkthrough="nav-tasks" className={TASKS_BUTTON_CLASS}>
-                  {copy.nav.tasks}
-                </Link>
-              )}
-              {!isHome &&
-                realPathname !== "/practice" &&
-                (onTasks && isDashboardBlocked ? (
-                  <button
-                    type="button"
-                    disabled
-                    title={dashboardBlockedReason}
-                    aria-label={`${copy.nav.practice} — ${dashboardBlockedReason}`}
-                    className={DASHBOARD_BUTTON_CLASS}
-                  >
-                    {copy.nav.practice}
-                  </button>
-                ) : (
                   <Link
                     href="/practice"
                     data-walkthrough="nav-practice"
                     onClick={guardedNavigationHandler("/practice")}
-                    className={DASHBOARD_BUTTON_CLASS}
+                    aria-current={realPathname === "/practice" ? "page" : undefined}
+                    className={realPathname === "/practice" ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
                   >
                     {copy.nav.practice}
                   </Link>
-                ))}
-              {/* Practice's primary slot above stays "Tasks" (the walkthrough's
-               * last practice-tour step targets nav-tasks from this page), so
-               * Dashboard has no other way back onto this page -- unlike
-               * /tasks, where onTasks already puts Dashboard in the primary
-               * slot. */}
-              {realPathname === "/practice" &&
-                (isDashboardBlocked ? (
-                  <button
-                    type="button"
-                    disabled
-                    data-walkthrough="nav-dashboard"
-                    title={dashboardBlockedReason}
-                    aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
-                    className={DASHBOARD_BUTTON_CLASS}
-                  >
-                    {copy.nav.dashboard}
-                  </button>
-                ) : (
-                  <Link
-                    href="/dashboard"
-                    data-walkthrough="nav-dashboard"
-                    onClick={guardedNavigationHandler("/dashboard")}
-                    className={DASHBOARD_BUTTON_CLASS}
-                  >
-                    {copy.nav.dashboard}
-                  </Link>
-                ))}
+                </>
+              )}
+              <Link
+                href="/tasks"
+                data-walkthrough="nav-tasks"
+                aria-current={onTasks ? "page" : undefined}
+                className={onTasks ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
+              >
+                {copy.nav.tasks}
+              </Link>
               {isAdmin && !isOnAdminPage && (
                 // Same in-flight-work protection as Dashboard above: reachable
                 // from /tasks, so it must not let an owner leave a draft or an
@@ -235,12 +186,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     disabled
                     title={dashboardBlockedReason}
                     aria-label={`${copy.nav.admin} — ${dashboardBlockedReason}`}
-                    className={DASHBOARD_BUTTON_CLASS}
+                    className={NAV_BUTTON_CLASS}
                   >
                     {copy.nav.admin}
                   </button>
                 ) : (
-                  <Link href="/admin" onClick={guardedNavigationHandler("/admin")} className={DASHBOARD_BUTTON_CLASS}>
+                  <Link href="/admin" onClick={guardedNavigationHandler("/admin")} className={NAV_BUTTON_CLASS}>
                     {copy.nav.admin}
                   </Link>
                 )

@@ -3,6 +3,7 @@ import { CorrectionHistoryList } from "@/components/correction-history-list";
 import { redirect } from "next/navigation";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
 import { DashboardHeading } from "@/components/dashboard-heading";
+import { DashboardGettingStarted } from "@/components/dashboard-getting-started";
 import { DashboardWalkthroughRunner } from "@/components/dashboard-walkthrough-runner";
 import { ProgressChart } from "@/components/progress-chart";
 import { hasRedeemedAccessCode } from "@/lib/access-code";
@@ -40,12 +41,18 @@ export default async function DashboardPage() {
     getRequestLocale(),
   ]);
   const copy = getAppCopy(locale);
+  const hasGettingStarted = points.length === 0 && recentCorrections.length === 0;
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <DashboardWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
+      <DashboardWalkthroughRunner
+        shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)}
+        hasGettingStarted={hasGettingStarted}
+      />
 
       <DashboardHeading name={user.name ?? user.email} />
+
+      {hasGettingStarted && <DashboardGettingStarted copy={copy.dashboard} />}
 
       <section aria-labelledby="progress-chart-heading" data-walkthrough="dashboard-welcome" className="flex flex-col gap-3">
         <h2 id="progress-chart-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
