@@ -20,9 +20,9 @@ describe("practice curriculum", () => {
   });
 
   it("does not offer a topic at a level before manually reviewed exercises exist", () => {
-    expect(getPracticeTopics("TASK_1", "B2").map((topic) => topic.id)).toEqual(["openings"]);
-    expect(getPracticeTopics("TASK_1", "C1").map((topic) => topic.id)).toEqual(["openings", "developing-information"]);
-    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["openings"]);
+    expect(getPracticeTopics("TASK_1", "B2").map((topic) => topic.id)).toEqual(["openings", "salutations"]);
+    expect(getPracticeTopics("TASK_1", "C1").map((topic) => topic.id)).toEqual(["openings", "salutations", "developing-information"]);
+    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["openings", "salutations"]);
     expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
