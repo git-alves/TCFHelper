@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { PracticeTrainer, type CuratedPracticeCurriculum, type CuratedPracticeExercise, type CuratedPracticeSkill } from "@/components/practice-trainer";
+import { PracticeWalkthroughRunner } from "@/components/practice-walkthrough-runner";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
 import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
@@ -7,11 +8,13 @@ import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redi
 import {
   PRACTICE_EXERCISES,
   PRACTICE_LEVELS,
+  hasCompletePracticePath,
   getPracticeTopics,
   type PracticeExercise,
   type PracticeTopic,
 } from "@/lib/practice-curriculum";
 import { TASK_ORDER } from "@/lib/tcf-tasks";
+import { shouldAutoStartWalkthrough } from "@/lib/walkthrough";
 
 // The question bank stays the source of truth. This small server-side adapter
 // only translates its author-facing field names to the trainer's serializable
@@ -21,6 +24,8 @@ function toSkill(topic: PracticeTopic, level: "B2" | "C1" | "C2"): CuratedPracti
     id: topic.id,
     task: topic.task,
     level,
+    part_order: topic.taskPartOrder,
+    is_available: hasCompletePracticePath(topic.task, level, topic.id),
     label: topic.label,
     description: topic.description,
     learning_outcome: topic.learningGoal[level],
@@ -53,10 +58,11 @@ function toExercise(exercise: PracticeExercise): CuratedPracticeExercise {
 
 function getTrainerCurriculum(): CuratedPracticeCurriculum {
   return {
-    // `getPracticeTopics` applies the launch-quality gate: a topic appears
-    // only when all six reviewed scaffold steps exist for that task + level.
+    // Every target level receives the same ordered task blueprint. A part's
+    // `is_available` flag records whether its reviewed six-stage path exists;
+    // the UI never fills an unavailable path with generated content.
     skills: TASK_ORDER.flatMap((task) =>
-      PRACTICE_LEVELS.flatMap((level) => getPracticeTopics(task, level).map((topic) => toSkill(topic, level))),
+      PRACTICE_LEVELS.flatMap((level) => getPracticeTopics(task).map((topic) => toSkill(topic, level))),
     ),
     exercises: PRACTICE_EXERCISES.map(toExercise),
   };
@@ -84,6 +90,7 @@ export default async function PracticePage() {
 
   return (
     <main className="flex w-full flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+      <PracticeWalkthroughRunner shouldAutoStart={shouldAutoStartWalkthrough(user.walkthroughCompletedVersion)} />
       <PracticeTrainer curriculum={getTrainerCurriculum()} />
     </main>
   );

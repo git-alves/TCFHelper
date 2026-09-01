@@ -134,7 +134,7 @@ describe("POST /api/access-codes/redeem", () => {
     await expect(response.json()).resolves.toEqual({ activated: true, showWelcome: false });
   });
 
-  it("shows the one-time welcome to a backfilled pre-gate learner, then sends them to tasks", async () => {
+  it("restarts the welcome at dashboard for a learner below the current walkthrough version", async () => {
     getCurrentAppUserMock.mockResolvedValue({ id: USER_ID, walkthroughCompletedVersion: 1 });
 
     const response = await POST(redemptionRequest({ code: "INVITE-AB12" }));
@@ -143,7 +143,7 @@ describe("POST /api/access-codes/redeem", () => {
     await expect(response.json()).resolves.toEqual({
       activated: true,
       showWelcome: true,
-      welcomeDestination: "/tasks",
+      welcomeDestination: "/dashboard",
     });
   });
 

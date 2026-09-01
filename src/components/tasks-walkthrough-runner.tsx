@@ -36,23 +36,23 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   const { register } = useWalkthroughTrigger();
   const { applyStep, resetDemo } = useWalkthroughWorkspaceScript();
   // A learner who already completed the current version has shouldAutoStart
-  // === false here even when they just clicked "Take a tour" on the
-  // dashboard and are continuing into these steps -- see
-  // DashboardWalkthroughRunner.continueToTasks for where this is set.
-  const continueFromDashboard = searchParams.get(WALKTHROUGH_CONTINUE_PARAM) === WALKTHROUGH_CONTINUE_VALUE;
+  // === false here even when they just clicked "Take a tour" and continued
+  // through Practice into these steps -- see
+  // PracticeWalkthroughRunner.continueToTasks for where this is set.
+  const continueFromPractice = searchParams.get(WALKTHROUGH_CONTINUE_PARAM) === WALKTHROUGH_CONTINUE_VALUE;
   // Seeded from these rather than set in an effect after mount: both are
   // stable, already-known values for this page load, so there's no external
   // system to synchronize with here, just an initial value.
-  const [isOpen, setIsOpen] = useState(shouldAutoStart || continueFromDashboard);
+  const [isOpen, setIsOpen] = useState(shouldAutoStart || continueFromPractice);
   const [stepIndex, setStepIndex] = useState(0);
 
   // Consumes the one-time handoff param so refreshing /tasks afterward
-  // doesn't reopen the tour. Re-running as continueFromDashboard flips back
+  // doesn't reopen the tour. Re-running as continueFromPractice flips back
   // to false once the param is gone is fine -- it's just a no-op then.
   useEffect(() => {
-    if (!continueFromDashboard) return;
+    if (!continueFromPractice) return;
     router.replace("/tasks", { scroll: false });
-  }, [continueFromDashboard, router]);
+  }, [continueFromPractice, router]);
 
   useEffect(() => {
     register(() => {

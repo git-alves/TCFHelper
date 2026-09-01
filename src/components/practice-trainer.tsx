@@ -24,6 +24,10 @@ export interface CuratedPracticeSkill {
   id: string;
   task: PracticeTask;
   level: PracticeLevel;
+  /** Stable position of this part within the selected TCF task. */
+  part_order: number;
+  /** Whether this level has a complete fixed, reviewed six-stage path. */
+  is_available: boolean;
   label: string;
   description: string;
   learning_outcome: string;
@@ -370,16 +374,26 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const matchingSkills = useMemo(
     () =>
       selectedTask && selectedLevel
-        ? curriculum.skills.filter((skill) => skill.task === selectedTask && skill.level === selectedLevel)
+        ? curriculum.skills
+            .filter((skill) => skill.task === selectedTask && skill.level === selectedLevel)
+            .sort((left, right) => left.part_order - right.part_order)
         : [],
     [curriculum.skills, selectedLevel, selectedTask],
   );
   const availableLevels = useMemo(
     () =>
       selectedTask
-        ? LEVELS.filter((level) => curriculum.skills.some((skill) => skill.task === selectedTask && skill.level === level))
+        ? LEVELS.filter((level) =>
+            curriculum.skills.some(
+              (skill) =>
+                skill.task === selectedTask &&
+                skill.level === level &&
+                skill.is_available &&
+                (!selectedSkill || skill.id === selectedSkill.id),
+            ),
+          )
         : [],
-    [curriculum.skills, selectedTask],
+    [curriculum.skills, selectedSkill, selectedTask],
   );
   const exercises = exerciseOrder;
   const currentExercise = exercises[currentExerciseIndex] ?? null;
@@ -497,11 +511,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function startSequence() {
-    if (!selectedSkill) return;
+    if (!selectedSkill || !selectedSkill.is_available) return;
     clearLocalSession();
     // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
     // when a stage has more than one reviewed variant, a random one is used
-    // so replaying a topic doesn't always show the identical exercise.
+    // so replaying a task part doesn't always show the identical exercise.
     const nextExercises = selectPracticeExerciseSession(getExercisesForSkill(curriculum, selectedSkill));
     setExerciseOrder(nextExercises);
     setCurrentExerciseIndex(0);
@@ -634,7 +648,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           <div className="rounded-3xl border border-violet-200 bg-violet-50 p-6 sm:p-8 dark:border-violet-900 dark:bg-violet-950/40">
             <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.completedEyebrow}</p>
             <h1 id="practice-complete-heading" className="mt-2 text-3xl font-semibold tracking-tight">
-              {practice.completedTitle({ skill: selectedSkill.label })}
+              {practice.completedTitle({ part: selectedSkill.label })}
             </h1>
             <p className="mt-3 max-w-2xl leading-7 text-zinc-700 dark:text-zinc-300">
               {practice.completedDescription({ outcome: selectedSkill.learning_outcome })}
@@ -662,7 +676,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 onClick={returnToSkills}
                 className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                {practice.chooseAnotherSkill}
+                {practice.chooseAnotherPart}
               </button>
               <Link
                 href="/tasks"
@@ -678,7 +692,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
     return (
       <section aria-labelledby="practice-heading" className="flex w-full flex-col gap-8">
-        <header>
+        <header data-walkthrough="practice-intro">
           <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">{practice.eyebrow}</p>
           <h1 id="practice-heading" className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
             {practice.title}
@@ -692,7 +706,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           <aside aria-labelledby="resume-practice-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
             <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.resumeEyebrow}</p>
             <h2 id="resume-practice-heading" className="mt-1 text-xl font-semibold">
-              {practice.resumeTitle({ topic: resumableSession.skill.label })}
+              {practice.resumeTitle({ part: resumableSession.skill.label })}
             </h2>
             <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
               {practice.resumeDescription({
@@ -755,19 +769,23 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             )}
           </fieldset>
 
-          <fieldset disabled={!selectedTask || !selectedLevel} aria-describedby={!selectedLevel ? "skill-help" : undefined}>
-            <legend id="practice-skill-label" className="text-sm font-semibold">{practice.chooseSkill}</legend>
+          <fieldset
+            data-walkthrough="practice-part-selector"
+            disabled={!selectedTask || !selectedLevel}
+            aria-describedby={!selectedLevel ? "part-help" : undefined}
+          >
+            <legend id="practice-part-label" className="text-sm font-semibold">{practice.choosePart}</legend>
             <ThemedSelect<string>
               value={selectedSkill?.id ?? ""}
               options={[
-                { value: "", label: practice.topicPlaceholder },
+                { value: "", label: practice.partPlaceholder },
                 ...matchingSkills.map((skill) => ({
                   value: skill.id,
-                  label: `${skill.label} — ${skill.description}`,
+                  label: `${practice.partLabel({ order: skill.part_order })}: ${skill.label} — ${skill.description}`,
                 })),
               ] satisfies readonly ThemedSelectOption<string>[]}
               disabled={!selectedTask || !selectedLevel}
-              ariaLabelledBy="practice-skill-label"
+              ariaLabelledBy="practice-part-label"
               onChange={(skillId) => {
                 const skill = matchingSkills.find((candidate) => candidate.id === skillId);
                 if (skill) {
@@ -779,10 +797,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               buttonClassName={`mt-3 ${SELECT_BUTTON_CLASS}`}
               listClassName={SELECT_LIST_CLASS}
             />
-            {selectedTask && selectedLevel && matchingSkills.length === 0 && (
+            {selectedSkill && !selectedSkill.is_available && (
               <aside className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
                 <p className="font-semibold">
-                  {practice.unavailableTitle({ task: practice.tasks[selectedTask].title, level: selectedLevel })}
+                  {practice.unavailableTitle({
+                    task: `${practice.tasks[selectedSkill.task].title} · ${practice.partLabel({ order: selectedSkill.part_order })}: ${selectedSkill.label}`,
+                    level: selectedSkill.level,
+                  })}
                 </p>
                 <p className="mt-1">{practice.unavailableDescription}</p>
                 {availableLevels.length > 0 ? (
@@ -791,7 +812,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                     <div className="mt-2 flex flex-wrap gap-2">
                       {availableLevels.map((level) => {
                         const topicCount = curriculum.skills.filter(
-                          (skill) => skill.task === selectedTask && skill.level === level,
+                          (skill) => skill.task === selectedTask && skill.level === level && skill.is_available,
                         ).length;
                         return (
                           <button
@@ -800,7 +821,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                             onClick={() => chooseLevel(level)}
                             className="rounded-full border border-amber-700/30 bg-white/70 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white dark:border-amber-200/30 dark:bg-black/10 dark:hover:bg-black/20"
                           >
-                            {practice.availableLevel({ level, topics: topicCount })}
+                            {practice.availableLevel({ level, parts: topicCount })}
                           </button>
                         );
                       })}
@@ -812,17 +833,17 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
               </aside>
             )}
             {(!selectedTask || !selectedLevel) && (
-              <p id="skill-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {practice.skillHelp}
+              <p id="part-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                {practice.partHelp}
               </p>
             )}
           </fieldset>
 
-          {selectedSkill && (
+          {selectedSkill?.is_available && (
             <aside aria-labelledby="practice-preview-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
               <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.previewEyebrow}</p>
               <h2 id="practice-preview-heading" className="mt-1 text-xl font-semibold">
-                {practice.previewTitle({ topic: selectedSkill.label })}
+                {practice.previewTitle({ part: `${practice.partLabel({ order: selectedSkill.part_order })}: ${selectedSkill.label}` })}
               </h2>
               <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
                 <span className="font-semibold">{practice.previewOutcomeLabel}</span> {selectedSkill.learning_outcome}
@@ -862,12 +883,12 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         onClick={returnToSkills}
         className="w-fit text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
       >
-        {practice.changeSkill}
+        {practice.changePart}
       </button>
 
       <header>
         <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
-          {practice.tasks[selectedSkill.task].title} · {selectedSkill.level} · {selectedSkill.label}
+          {practice.tasks[selectedSkill.task].title} · {selectedSkill.level} · {practice.partLabel({ order: selectedSkill.part_order })}: {selectedSkill.label}
         </p>
         <h1 id="exercise-heading" className="mt-2 text-3xl font-semibold tracking-tight">
           {selectedSkill.learning_outcome}
