@@ -140,7 +140,11 @@ describe("practice curriculum", () => {
       "commenting-on-experience",
     ]);
     expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
-    expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual(["justifying-position"]);
+    expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual([
+      "introducing-topic",
+      "reformulating-sources",
+      "justifying-position",
+    ]);
   });
 
   it("provides an explicit learning goal for every topic and target level", () => {
