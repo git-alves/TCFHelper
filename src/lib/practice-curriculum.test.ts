@@ -144,6 +144,7 @@ describe("practice curriculum", () => {
       "introducing-topic",
       "reformulating-sources",
       "identifying-arguments",
+      "comparing-viewpoints",
       "justifying-position",
     ]);
   });
