@@ -10,6 +10,7 @@ const { prismaMock } = vi.hoisted(() => ({
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     practiceExerciseCompletion: {
       groupBy: vi.fn(),
@@ -20,7 +21,8 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 
-const { createPracticeSession, getPracticeProgressSummary, recordPracticeCompletion } = await import("./practice-progress");
+const { clearPracticeProgress, createPracticeSession, getPracticeProgressSummary, recordPracticeCompletion } =
+  await import("./practice-progress");
 
 const USER_ID = "learner_1";
 const EXERCISES = ["recognize", "complete", "transform", "organize", "develop", "produce"].map((exerciseType) => {
@@ -41,6 +43,7 @@ beforeEach(() => {
   prismaMock.practiceSession.create.mockReset();
   prismaMock.practiceSession.findFirst.mockReset();
   prismaMock.practiceSession.findMany.mockReset();
+  prismaMock.practiceSession.deleteMany.mockReset();
   prismaMock.practiceExerciseCompletion.groupBy.mockReset();
   prismaMock.$transaction.mockReset();
 });
@@ -144,5 +147,15 @@ describe("getPracticeProgressSummary", () => {
       completedWithHelp: 4,
       completedTaskParts: 3,
     });
+  });
+});
+
+describe("clearPracticeProgress", () => {
+  it("deletes only this learner's practice sessions", async () => {
+    prismaMock.practiceSession.deleteMany.mockResolvedValue({ count: 3 });
+
+    await clearPracticeProgress(USER_ID);
+
+    expect(prismaMock.practiceSession.deleteMany).toHaveBeenCalledWith({ where: { userId: USER_ID } });
   });
 });

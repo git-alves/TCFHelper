@@ -65,10 +65,10 @@ export default async function AdminAccessCodesPage({ searchParams }: AdminAccess
             Operational log
           </Link>
           <Link
-            href="/admin/settings"
+            href="/admin/api-keys"
             className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
           >
-            Settings
+            API Keys
           </Link>
         </nav>
       </div>

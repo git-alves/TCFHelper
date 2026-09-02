@@ -182,6 +182,13 @@ export interface AppCopy {
     practiceCompletionBreakdown: (values: { independent: number; helped: number }) => string;
     practiceTaskPartsCompleted: (values: { count: number }) => string;
     continuePractice: string;
+    practiceActionsMenu: string;
+    clearPracticeProgressAction: string;
+    clearPracticeProgressConfirmTitle: string;
+    clearPracticeProgressConfirmDescription: string;
+    clearPracticeProgressConfirm: string;
+    clearPracticeProgressError: string;
+    clearPracticeProgressSuccess: string;
     accountUnavailableTitle: string;
     accountUnavailableDescription: string;
     chartTitle: string;
@@ -510,7 +517,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Close Settings first",
     },
     home: {
-      title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
+      title: "Write for the TCF exam. Get feedback that gets you to B2, C1 or C2.",
       description:
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
       startATask: "Start a task",
@@ -638,6 +645,14 @@ export const APP_COPY = {
       practiceCompletionBreakdown: ({ independent, helped }) => `${independent} independently · ${helped} with help`,
       practiceTaskPartsCompleted: ({ count }) => `${count} task part${count === 1 ? "" : "s"} trained`,
       continuePractice: "Continue Practice",
+      practiceActionsMenu: "More options",
+      clearPracticeProgressAction: "Clear progress",
+      clearPracticeProgressConfirmTitle: "Clear all practice progress?",
+      clearPracticeProgressConfirmDescription:
+        "This removes every completed exercise and trained task part. You'll start every sequence fresh next time. This can't be undone.",
+      clearPracticeProgressConfirm: "Clear progress",
+      clearPracticeProgressError: "Couldn't clear your practice progress. Please try again.",
+      clearPracticeProgressSuccess: "Practice progress cleared.",
       accountUnavailableTitle: "Your account needs to be set up",
       accountUnavailableDescription:
         "We can’t connect this Clerk account to your MyTCFLab data yet. Try again in a moment. If you already had an account, it needs to be imported first.",
@@ -1108,7 +1123,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Fermez d’abord les paramètres",
     },
     home: {
-      title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
+      title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2, C1 ou C2.",
       description:
         "Entraînez-vous aux tâches 1, 2 et 3, puis recevez en quelques secondes des commentaires sur la grammaire, le vocabulaire et votre niveau du CECRL.",
       startATask: "Commencer une tâche",
@@ -1237,6 +1252,14 @@ export const APP_COPY = {
       practiceCompletionBreakdown: ({ independent, helped }) => `${independent} en autonomie · ${helped} avec aide`,
       practiceTaskPartsCompleted: ({ count }) => `${count} partie${count === 1 ? "" : "s"} de tâche travaillée${count === 1 ? "" : "s"}`,
       continuePractice: "Continuer la pratique",
+      practiceActionsMenu: "Plus d’options",
+      clearPracticeProgressAction: "Effacer la progression",
+      clearPracticeProgressConfirmTitle: "Effacer toute la progression en pratique ?",
+      clearPracticeProgressConfirmDescription:
+        "Cela supprime tous les exercices terminés et les parties de tâche entraînées. Vous recommencerez chaque séquence à zéro la prochaine fois. Cette action est irréversible.",
+      clearPracticeProgressConfirm: "Effacer la progression",
+      clearPracticeProgressError: "Impossible d’effacer votre progression en pratique. Veuillez réessayer.",
+      clearPracticeProgressSuccess: "Progression en pratique effacée.",
       accountUnavailableTitle: "Votre compte doit être finalisé",
       accountUnavailableDescription:
         "Nous ne pouvons pas encore associer ce compte Clerk à vos données MyTCFLab. Réessayez dans quelques instants. Si vous aviez déjà un compte, il doit d’abord être importé.",
@@ -1717,7 +1740,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Cierra primero la configuración",
     },
     home: {
-      title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
+      title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2, C1 o C2.",
       description:
         "Practica las tareas 1, 2 y 3 y recibe en segundos comentarios sobre gramática, vocabulario y nivel MCER.",
       startATask: "Empezar una tarea",
@@ -1846,6 +1869,14 @@ export const APP_COPY = {
       practiceCompletionBreakdown: ({ independent, helped }) => `${independent} de forma independiente · ${helped} con ayuda`,
       practiceTaskPartsCompleted: ({ count }) => `${count} parte${count === 1 ? "" : "s"} de la tarea trabajada${count === 1 ? "" : "s"}`,
       continuePractice: "Continuar practicando",
+      practiceActionsMenu: "Más opciones",
+      clearPracticeProgressAction: "Borrar progreso",
+      clearPracticeProgressConfirmTitle: "¿Borrar todo el progreso de práctica?",
+      clearPracticeProgressConfirmDescription:
+        "Esto elimina todos los ejercicios completados y las partes de la tarea entrenadas. La próxima vez empezarás cada secuencia desde cero. Esta acción no se puede deshacer.",
+      clearPracticeProgressConfirm: "Borrar progreso",
+      clearPracticeProgressError: "No se pudo borrar tu progreso de práctica. Inténtalo de nuevo.",
+      clearPracticeProgressSuccess: "Progreso de práctica borrado.",
       accountUnavailableTitle: "Tu cuenta necesita configurarse",
       accountUnavailableDescription:
         "Todavía no podemos vincular esta cuenta de Clerk con tus datos de MyTCFLab. Vuelve a intentarlo en unos minutos. Si ya tenías una cuenta, primero debe importarse.",
@@ -2324,7 +2355,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Feche as configurações primeiro",
     },
     home: {
-      title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",
+      title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2, C1 ou C2.",
       description:
         "Pratique as tarefas 1, 2 e 3 e receba em segundos comentários sobre gramática, vocabulário e nível do QECR.",
       startATask: "Começar uma tarefa",
@@ -2453,6 +2484,14 @@ export const APP_COPY = {
       practiceCompletionBreakdown: ({ independent, helped }) => `${independent} de forma independente · ${helped} com ajuda`,
       practiceTaskPartsCompleted: ({ count }) => `${count} parte${count === 1 ? "" : "s"} da tarefa trabalhada${count === 1 ? "" : "s"}`,
       continuePractice: "Continuar praticando",
+      practiceActionsMenu: "Mais opções",
+      clearPracticeProgressAction: "Limpar progresso",
+      clearPracticeProgressConfirmTitle: "Limpar todo o progresso de prática?",
+      clearPracticeProgressConfirmDescription:
+        "Isso remove todos os exercícios concluídos e as partes da tarefa treinadas. Você começará cada sequência do zero da próxima vez. Essa ação não pode ser desfeita.",
+      clearPracticeProgressConfirm: "Limpar progresso",
+      clearPracticeProgressError: "Não foi possível limpar seu progresso de prática. Tente novamente.",
+      clearPracticeProgressSuccess: "Progresso de prática limpo.",
       accountUnavailableTitle: "É preciso concluir a configuração da sua conta",
       accountUnavailableDescription:
         "Ainda não conseguimos vincular esta conta do Clerk aos seus dados do MyTCFLab. Tente novamente em alguns instantes. Se você já tinha uma conta, ela precisa ser importada primeiro.",

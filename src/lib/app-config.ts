@@ -8,7 +8,7 @@ const CONFIG_ID = "singleton";
 
 // A conservative starting point for Google AI Studio's free tier, not an
 // enforced cap -- purely a reference point for the settings-page
-// consumption bar. The owner can tune it per key/model from /admin/settings.
+// consumption bar. The owner can tune it per key/model from /admin/api-keys.
 export const DEFAULT_GEMINI_DAILY_REQUEST_LIMIT = 1000;
 
 export interface AppConfigValue {

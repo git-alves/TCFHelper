@@ -141,6 +141,16 @@ export async function recordPracticeCompletion(
   });
 }
 
+/**
+ * Deletes every recorded Practice session (and, via cascade, its exercise
+ * completions) for this learner, so a fixed sequence they already finished
+ * can be started fresh. Scoped to userId in the query itself rather than
+ * checked afterward, so this can never touch another learner's rows.
+ */
+export async function clearPracticeProgress(userId: string): Promise<void> {
+  await prisma.practiceSession.deleteMany({ where: { userId } });
+}
+
 /** Dashboard-safe aggregate: no answers, exercise prompts, or free writing. */
 export async function getPracticeProgressSummary(userId: string): Promise<PracticeProgressSummary> {
   const [groups, completedSessions] = await Promise.all([
