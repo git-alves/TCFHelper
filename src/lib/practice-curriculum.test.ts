@@ -117,7 +117,7 @@ describe("practice curriculum", () => {
       "contrasting-expectations",
       "conclusion",
     ]);
-    expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
+    expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["format-and-audience", "recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
     expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual(["justifying-position"]);
