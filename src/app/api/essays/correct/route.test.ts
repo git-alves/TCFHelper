@@ -8,6 +8,7 @@ const {
   essayCreateMock,
   gradeEssayWithGeminiMock,
   hasConfiguredGeminiMock,
+  getAppConfigMock,
   GeminiCorrectionParseErrorMock,
   GeminiNotConfiguredErrorMock,
   GeminiRateLimitedErrorMock,
@@ -38,6 +39,7 @@ const {
     essayCreateMock: vi.fn(),
     gradeEssayWithGeminiMock: vi.fn(),
     hasConfiguredGeminiMock: vi.fn(),
+    getAppConfigMock: vi.fn(),
     GeminiCorrectionParseErrorMock,
     GeminiNotConfiguredErrorMock,
     GeminiRateLimitedErrorMock,
@@ -62,6 +64,9 @@ vi.mock("@/lib/prisma", () => ({
     topic: { findUnique: findUniqueMock, create: topicCreateMock },
     essay: { create: essayCreateMock },
   },
+}));
+vi.mock("@/lib/app-config", () => ({
+  getAppConfig: getAppConfigMock,
 }));
 vi.mock("@/lib/gemini", () => ({
   gradeEssayWithGemini: gradeEssayWithGeminiMock,
@@ -115,6 +120,7 @@ beforeEach(() => {
   essayCreateMock.mockReset();
   gradeEssayWithGeminiMock.mockReset();
   hasConfiguredGeminiMock.mockReset();
+  getAppConfigMock.mockReset();
   claimCorrectionMock.mockReset();
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
@@ -122,6 +128,12 @@ beforeEach(() => {
   recordAdminEventMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   hasConfiguredGeminiMock.mockReturnValue(true);
+  getAppConfigMock.mockResolvedValue({
+    correctionApiKey: null,
+    correctionModel: null,
+    exampleApiKey: null,
+    exampleModel: null,
+  });
   gradeEssayWithGeminiMock.mockResolvedValue(feedback);
   claimCorrectionMock.mockResolvedValue({
     kind: "claimed",
@@ -292,6 +304,7 @@ describe("POST /api/essays/correct", () => {
     expect(response.status).toBe(200);
     expect(gradeEssayWithGeminiMock).toHaveBeenCalledWith(
       expect.objectContaining({ userPrompt: expect.stringContaining(`Student's essay (2 words):\n${content}`) }),
+      { apiKey: null, model: null },
     );
     expect(claimCorrectionMock).toHaveBeenCalledWith(
       expect.objectContaining({ content }),

@@ -26,7 +26,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-const { getAdminOverviewStats } = await import("./admin-overview");
+const { getAdminOverviewStats, getGeminiRequestsToday } = await import("./admin-overview");
 
 const NOW = new Date("2026-08-10T12:00:00.000Z");
 
@@ -127,5 +127,29 @@ describe("getAdminOverviewStats", () => {
     expect(stats.usage.examples.requestsToday).toBe(0);
     expect(stats.usage.corrections.requestsToday).toBe(0);
     expect(stats.usage.corrections.requestsThisMonth).toBe(0);
+  });
+});
+
+describe("getGeminiRequestsToday", () => {
+  it("sums today's correction and example request counts", async () => {
+    exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: 12 }, _count: { _all: 3 } });
+    correctionAggregateMock.mockReset();
+    correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: 7 }, _count: { _all: 2 } });
+
+    await expect(getGeminiRequestsToday(NOW)).resolves.toEqual({
+      correctionRequestsToday: 7,
+      exampleRequestsToday: 12,
+    });
+  });
+
+  it("treats missing sums as zero", async () => {
+    exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
+    correctionAggregateMock.mockReset();
+    correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
+
+    await expect(getGeminiRequestsToday(NOW)).resolves.toEqual({
+      correctionRequestsToday: 0,
+      exampleRequestsToday: 0,
+    });
   });
 });

@@ -63,6 +63,7 @@ export default async function AdminLogsPage({ searchParams }: AdminLogsPageProps
           <Link href="/admin" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Overview</Link>
           <Link href="/admin/users" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Users</Link>
           <Link href="/admin/access-codes" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Access codes</Link>
+          <Link href="/admin/settings" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Settings</Link>
         </nav>
       </div>
 

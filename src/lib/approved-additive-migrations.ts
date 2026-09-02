@@ -32,4 +32,11 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // existing record's meaning nor backfills writing content, so it is safe
   // to apply alongside the Dashboard that begins reading it.
   "20260901190000_add_practice_progress",
+  // A new, empty singleton table. No existing row is touched, and every
+  // column is nullable, so the app behaves exactly as before until the
+  // owner explicitly sets a value from the admin settings panel.
+  "20260902120000_add_app_config",
+  // Two nullable columns on the same singleton table, for the settings-page
+  // consumption bar. Null continues to mean "use the built-in default".
+  "20260902150000_add_app_config_daily_limits",
 ]);
