@@ -31,6 +31,41 @@ function startOfUtcMonth(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
 }
 
+export interface GeminiRequestsToday {
+  correctionRequestsToday: number;
+  exampleRequestsToday: number;
+}
+
+/**
+ * Shared by the overview stats below and the admin settings API's
+ * per-key consumption bar (src/lib/app-config.ts), so both read the exact
+ * same reservation-time counters instead of drifting on what "today's
+ * Gemini requests" means.
+ */
+export async function getGeminiRequestsToday(now = new Date()): Promise<GeminiRequestsToday> {
+  const currentDayStart = startOfUtcDay(now);
+
+  const [exampleDayAgg, correctionDayAgg] = await Promise.all([
+    prisma.exampleGenerationQuota.aggregate({
+      // Failed provider calls refund dailyRequestCount but leave a cooldown
+      // row behind. Do not report zero-work rows as active learners.
+      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
+      _sum: { dailyRequestCount: true },
+      _count: { _all: true },
+    }),
+    prisma.correctionUsage.aggregate({
+      where: { dayStartedAt: currentDayStart },
+      _sum: { dailyRequestCount: true },
+      _count: { _all: true },
+    }),
+  ]);
+
+  return {
+    correctionRequestsToday: correctionDayAgg._sum.dailyRequestCount ?? 0,
+    exampleRequestsToday: exampleDayAgg._sum.dailyRequestCount ?? 0,
+  };
+}
+
 /**
  * Aggregates only the currently-active rolling window for each quota table
  * (matching the same day/month boundary each reservation transaction writes),

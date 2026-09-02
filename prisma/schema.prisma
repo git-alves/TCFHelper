@@ -99,26 +99,26 @@ enum SubscriptionStatus {
 }
 
 model User {
-  id                          String   @id @default(cuid())
-  email                       String   @unique
+  id                          String    @id @default(cuid())
+  email                       String    @unique
   // Legacy bcrypt hashes remain only for the Clerk import/cutover. New
   // Clerk users (including Google sign-ins) have no app-managed password.
   passwordHash                String?
   name                        String?
-  locale                      Locale   @default(en)
+  locale                      Locale    @default(en)
   // Additive Clerk identity mapping. Nullable until each existing learner is
   // imported into Clerk; every essay/subscription/quota FK keeps pointing at
   // `id` (the CUID), never at this Clerk subject, so no foreign key needs to
   // be rewritten as part of the Clerk cutover.
-  clerkUserId                 String?  @unique
+  clerkUserId                 String?   @unique
   // There is deliberately no self-service role assignment. The single owner
   // account is promoted through an operational database change.
-  isAdmin                     Boolean  @default(false)
+  isAdmin                     Boolean   @default(false)
   // Blocked accounts resolve as unauthenticated at the application boundary
   // so every existing protected page and API route denies access uniformly.
-  isBlocked                   Boolean  @default(false)
-  createdAt                   DateTime @default(now())
-  updatedAt                   DateTime @updatedAt
+  isBlocked                   Boolean   @default(false)
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
   // Null means this learner has never completed or skipped a walkthrough.
   // Compared against the app's CURRENT_WALKTHROUGH_VERSION constant to
   // decide whether to auto-start it -- bumping that constant re-shows a
@@ -131,7 +131,7 @@ model User {
   // Set atomically with the first successful access-code redemption. It keeps
   // the welcome handoff one-time even if the owner later deactivates access
   // and the learner redeems a newly issued code.
-  activationWelcomeShownAt  DateTime?
+  activationWelcomeShownAt    DateTime?
   // Presence for the admin "online now" count. Updated (throttled -- see
   // ACTIVITY_HEARTBEAT_THROTTLE_MS in app-user.ts) whenever an already-linked,
   // non-blocked account resolves a request. Null means never observed active.
@@ -150,7 +150,7 @@ model User {
   practiceSessions        PracticeSession[]
   translationQuota        TranslationQuota?
   quotaOverride           UserQuotaOverride?
-  redeemedAccessCodes     AccessCode[]          @relation("AccessCodeRedeemedBy")
+  redeemedAccessCodes     AccessCode[]             @relation("AccessCodeRedeemedBy")
 
   @@index([lastActiveAt])
 }
@@ -189,18 +189,18 @@ model StripeEvent {
 }
 
 model Topic {
-  id          String      @id @default(cuid())
-  taskType    TaskType
-  title       String
-  prompt      String
-  source      TopicSource @default(USER_SUBMITTED)
+  id           String        @id @default(cuid())
+  taskType     TaskType
+  title        String
+  prompt       String
+  source       TopicSource   @default(USER_SUBMITTED)
   // Provenance for a server-fetched prompt. Both fields stay null for the
   // existing seeded and learner-supplied topics.
-  sourceUrl   String?
+  sourceUrl    String?
   // This includes a content hash so revised upstream prompts produce a new,
   // immutable Topic rather than mutating the context of saved essays.
-  externalRef String?     @unique
-  createdAt   DateTime    @default(now())
+  externalRef  String?       @unique
+  createdAt    DateTime      @default(now())
   // Set when a managed OFFICIAL_EXAM starter topic's prompt text is
   // corrected: the existing row is retired (this timestamp set) rather than
   // its prompt mutated in place, and a new row with the corrected prompt is
@@ -212,7 +212,7 @@ model Topic {
   // traffic has fully cut over to the new deployment. Only the topic
   // picker (retiredAt: null) and the seed sync's own "find the current
   // version" lookup filter on it.
-  retiredAt   DateTime?
+  retiredAt    DateTime?
   // Editorially assigned writing-context profile for the guided-writing
   // feature (see docs/guided-writing.md). Nullable and additive: existing
   // rows and recent-exam/custom topics that have no curated profile fall
@@ -338,15 +338,15 @@ model CorrectionUsage {
 /// metric nullable lets an owner adjust one abuse-control dimension without
 /// accidentally pinning the rest when product-wide defaults later change.
 model UserQuotaOverride {
-  userId                          String   @id
-  user                            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  translationRequestsPerMinute    Int?
-  translationCharactersPerMinute  Int?
-  translationCharactersPerMonth   Int?
-  exampleGenerationsPerDay        Int?
-  correctionRequestsPerDay        Int?
-  createdAt                       DateTime @default(now())
-  updatedAt                       DateTime @updatedAt
+  userId                         String   @id
+  user                           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  translationRequestsPerMinute   Int?
+  translationCharactersPerMinute Int?
+  translationCharactersPerMonth  Int?
+  exampleGenerationsPerDay       Int?
+  correctionRequestsPerDay       Int?
+  createdAt                      DateTime @default(now())
+  updatedAt                      DateTime @updatedAt
 }
 
 /// A code activates exactly one learner account. A unique redeemedByUserId
@@ -444,13 +444,13 @@ model AdminEvent {
 /// with a version prefix and are never selected into an owner-facing response.
 /// Rows expire with AdminEvent after 30 days.
 model AuthSecuritySession {
-  id                   String   @id @default(cuid())
+  id                   String    @id @default(cuid())
   userId               String
   occurredAt           DateTime
-  sessionFingerprint   String   @unique
+  sessionFingerprint   String    @unique
   ipFingerprint        String?
   alertBucketStartedAt DateTime?
-  createdAt            DateTime @default(now())
+  createdAt            DateTime  @default(now())
 
   @@unique([userId, alertBucketStartedAt])
   @@index([userId, occurredAt])
@@ -571,10 +571,16 @@ model ClerkWebhookEvent {
 /// app's single-owner threat model (see User.isAdmin above) rather than
 /// introducing separate encryption-key management for a single admin field.
 model AppConfig {
-  id               String   @id @default("singleton")
-  correctionApiKey String?
-  correctionModel  String?
-  exampleApiKey    String?
-  exampleModel     String?
-  updatedAt        DateTime @updatedAt
+  id                   String   @id @default("singleton")
+  correctionApiKey     String?
+  correctionModel      String?
+  exampleApiKey        String?
+  exampleModel         String?
+  // Admin-editable reference point for the settings-page consumption bar
+  // only (src/lib/app-config.ts) -- an approximate daily Gemini request
+  // count against a limit the owner sets, not an enforced quota. Null uses
+  // DEFAULT_GEMINI_DAILY_REQUEST_LIMIT.
+  correctionDailyLimit Int?
+  exampleDailyLimit    Int?
+  updatedAt            DateTime @updatedAt
 }

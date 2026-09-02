@@ -2,9 +2,10 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-const { findUniqueMock, upsertMock } = vi.hoisted(() => ({
+const { findUniqueMock, upsertMock, getGeminiRequestsTodayMock } = vi.hoisted(() => ({
   findUniqueMock: vi.fn(),
   upsertMock: vi.fn(),
+  getGeminiRequestsTodayMock: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -15,10 +16,23 @@ vi.mock("@/lib/prisma", () => ({
     },
   },
 }));
+vi.mock("@/lib/admin-overview", () => ({
+  getGeminiRequestsToday: getGeminiRequestsTodayMock,
+}));
 
-const { getAppConfig, updateAppConfig, maskSecret, toAppConfigDisplay, getAppConfigDisplay } = await import(
-  "./app-config"
-);
+const { getAppConfig, updateAppConfig, maskSecret, getAppConfigDisplay, DEFAULT_GEMINI_DAILY_REQUEST_LIMIT } =
+  await import("./app-config");
+
+const EMPTY_ROW = {
+  id: "singleton",
+  correctionApiKey: null,
+  correctionModel: null,
+  correctionDailyLimit: null,
+  exampleApiKey: null,
+  exampleModel: null,
+  exampleDailyLimit: null,
+  updatedAt: new Date(),
+};
 
 const originalGeminiApiKey = process.env.GEMINI_API_KEY;
 const originalGeminiModel = process.env.GEMINI_MODEL;
@@ -27,6 +41,8 @@ const originalGeminiCorrectionModel = process.env.GEMINI_CORRECTION_MODEL;
 beforeEach(() => {
   findUniqueMock.mockReset();
   upsertMock.mockReset();
+  getGeminiRequestsTodayMock.mockReset();
+  getGeminiRequestsTodayMock.mockResolvedValue({ correctionRequestsToday: 0, exampleRequestsToday: 0 });
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.GEMINI_CORRECTION_MODEL;
@@ -48,40 +64,35 @@ describe("getAppConfig", () => {
     await expect(getAppConfig()).resolves.toEqual({
       correctionApiKey: null,
       correctionModel: null,
+      correctionDailyLimit: null,
       exampleApiKey: null,
       exampleModel: null,
+      exampleDailyLimit: null,
     });
   });
 
   it("returns the stored row's fields", async () => {
     findUniqueMock.mockResolvedValue({
-      id: "singleton",
+      ...EMPTY_ROW,
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
-      exampleApiKey: null,
-      exampleModel: null,
-      updatedAt: new Date(),
+      correctionDailyLimit: 250,
     });
 
     await expect(getAppConfig()).resolves.toEqual({
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
+      correctionDailyLimit: 250,
       exampleApiKey: null,
       exampleModel: null,
+      exampleDailyLimit: null,
     });
   });
 });
 
 describe("updateAppConfig", () => {
   it("upserts against the fixed singleton id", async () => {
-    upsertMock.mockResolvedValue({
-      id: "singleton",
-      correctionApiKey: "sk-new-key",
-      correctionModel: null,
-      exampleApiKey: null,
-      exampleModel: null,
-      updatedAt: new Date(),
-    });
+    upsertMock.mockResolvedValue({ ...EMPTY_ROW, correctionApiKey: "sk-new-key" });
 
     await updateAppConfig({ correctionApiKey: "sk-new-key" });
 
@@ -92,15 +103,8 @@ describe("updateAppConfig", () => {
     });
   });
 
-  it("trims a provided value and drops fields the caller did not send", async () => {
-    upsertMock.mockResolvedValue({
-      id: "singleton",
-      correctionApiKey: "  sk-padded  ",
-      correctionModel: null,
-      exampleApiKey: null,
-      exampleModel: null,
-      updatedAt: new Date(),
-    });
+  it("trims a provided text value and drops fields the caller did not send", async () => {
+    upsertMock.mockResolvedValue({ ...EMPTY_ROW, correctionApiKey: "sk-padded" });
 
     await updateAppConfig({ correctionApiKey: "  sk-padded  " });
 
@@ -111,15 +115,8 @@ describe("updateAppConfig", () => {
     });
   });
 
-  it("clears a field back to its env default with an empty string or null", async () => {
-    upsertMock.mockResolvedValue({
-      id: "singleton",
-      correctionApiKey: null,
-      correctionModel: null,
-      exampleApiKey: null,
-      exampleModel: null,
-      updatedAt: new Date(),
-    });
+  it("clears a text field back to its env default with an empty string or null", async () => {
+    upsertMock.mockResolvedValue(EMPTY_ROW);
 
     await updateAppConfig({ correctionApiKey: "", exampleApiKey: null });
 
@@ -127,6 +124,30 @@ describe("updateAppConfig", () => {
       where: { id: "singleton" },
       create: { id: "singleton", correctionApiKey: null, exampleApiKey: null },
       update: { correctionApiKey: null, exampleApiKey: null },
+    });
+  });
+
+  it("passes a numeric daily limit through untrimmed", async () => {
+    upsertMock.mockResolvedValue({ ...EMPTY_ROW, correctionDailyLimit: 500 });
+
+    await updateAppConfig({ correctionDailyLimit: 500 });
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { id: "singleton" },
+      create: { id: "singleton", correctionDailyLimit: 500 },
+      update: { correctionDailyLimit: 500 },
+    });
+  });
+
+  it("clears a daily limit back to the built-in default with null", async () => {
+    upsertMock.mockResolvedValue(EMPTY_ROW);
+
+    await updateAppConfig({ exampleDailyLimit: null });
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { id: "singleton" },
+      create: { id: "singleton", exampleDailyLimit: null },
+      update: { exampleDailyLimit: null },
     });
   });
 });
@@ -147,19 +168,22 @@ describe("maskSecret", () => {
   });
 });
 
-describe("toAppConfigDisplay", () => {
-  const EMPTY_CONFIG = { correctionApiKey: null, correctionModel: null, exampleApiKey: null, exampleModel: null };
-
-  it("reports the env default model and env-derived key when nothing is admin-set", () => {
+describe("getAppConfigDisplay", () => {
+  it("reports the env default model, env-derived key, and built-in daily limit when nothing is admin-set", async () => {
     process.env.GEMINI_API_KEY = "env-key";
+    findUniqueMock.mockResolvedValue(null);
 
-    expect(toAppConfigDisplay(EMPTY_CONFIG)).toEqual({
+    await expect(getAppConfigDisplay()).resolves.toEqual({
       correction: {
         apiKeySet: false,
         apiKeyMasked: null,
         apiKeyFromEnv: true,
         model: null,
         modelDefault: "gemini-3.5-flash-lite",
+        dailyLimit: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
+        dailyLimitDefault: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
+        dailyLimitIsDefault: true,
+        requestsToday: 0,
       },
       example: {
         apiKeySet: false,
@@ -167,55 +191,60 @@ describe("toAppConfigDisplay", () => {
         apiKeyFromEnv: true,
         model: null,
         modelDefault: "gemini-3.5-flash",
+        dailyLimit: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
+        dailyLimitDefault: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
+        dailyLimitIsDefault: true,
+        requestsToday: 0,
       },
     });
   });
 
-  it("reports neither admin-set nor env-derived when nothing is configured at all", () => {
-    expect(toAppConfigDisplay(EMPTY_CONFIG).correction.apiKeyFromEnv).toBe(false);
+  it("reports neither admin-set nor env-derived when nothing is configured at all", async () => {
+    findUniqueMock.mockResolvedValue(null);
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correction.apiKeyFromEnv).toBe(false);
   });
 
-  it("reports an admin-set key as such, independent of any env var", () => {
+  it("reports an admin-set key and a custom daily limit, independent of any env var", async () => {
     process.env.GEMINI_API_KEY = "env-key";
-
-    const display = toAppConfigDisplay({
+    findUniqueMock.mockResolvedValue({
+      ...EMPTY_ROW,
       correctionApiKey: "sk-correction-1234",
       correctionModel: "gemini-3.5-pro",
-      exampleApiKey: null,
-      exampleModel: null,
-    });
-
-    expect(display.correction).toEqual({
-      apiKeySet: true,
-      apiKeyMasked: "••••1234",
-      apiKeyFromEnv: false,
-      model: "gemini-3.5-pro",
-      modelDefault: "gemini-3.5-flash-lite",
-    });
-    expect(display.example.apiKeyFromEnv).toBe(true);
-  });
-
-  it("prefers an env-var model override over the hardcoded default", () => {
-    process.env.GEMINI_MODEL = "gemini-custom";
-
-    expect(toAppConfigDisplay(EMPTY_CONFIG).example.modelDefault).toBe("gemini-custom");
-  });
-});
-
-describe("getAppConfigDisplay", () => {
-  it("combines a DB read with the display projection", async () => {
-    findUniqueMock.mockResolvedValue({
-      id: "singleton",
-      correctionApiKey: "sk-correction-1234",
-      correctionModel: null,
-      exampleApiKey: null,
-      exampleModel: null,
-      updatedAt: new Date(),
+      correctionDailyLimit: 250,
     });
 
     const display = await getAppConfigDisplay();
 
-    expect(display.correction.apiKeySet).toBe(true);
-    expect(display.correction.apiKeyMasked).toBe("••••1234");
+    expect(display.correction).toMatchObject({
+      apiKeySet: true,
+      apiKeyMasked: "••••1234",
+      apiKeyFromEnv: false,
+      model: "gemini-3.5-pro",
+      dailyLimit: 250,
+      dailyLimitIsDefault: false,
+    });
+    expect(display.example.apiKeyFromEnv).toBe(true);
+  });
+
+  it("prefers an env-var model override over the hardcoded default", async () => {
+    process.env.GEMINI_MODEL = "gemini-custom";
+    findUniqueMock.mockResolvedValue(null);
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.example.modelDefault).toBe("gemini-custom");
+  });
+
+  it("reports today's actual request counts from getGeminiRequestsToday", async () => {
+    findUniqueMock.mockResolvedValue(null);
+    getGeminiRequestsTodayMock.mockResolvedValue({ correctionRequestsToday: 42, exampleRequestsToday: 7 });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correction.requestsToday).toBe(42);
+    expect(display.example.requestsToday).toBe(7);
   });
 });

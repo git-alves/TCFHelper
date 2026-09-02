@@ -1,13 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getAdminApiUserMock, getAppConfigDisplayMock, toAppConfigDisplayMock, updateAppConfigMock } = vi.hoisted(
-  () => ({
-    getAdminApiUserMock: vi.fn(),
-    getAppConfigDisplayMock: vi.fn(),
-    toAppConfigDisplayMock: vi.fn(),
-    updateAppConfigMock: vi.fn(),
-  }),
-);
+const { getAdminApiUserMock, getAppConfigDisplayMock, updateAppConfigMock } = vi.hoisted(() => ({
+  getAdminApiUserMock: vi.fn(),
+  getAppConfigDisplayMock: vi.fn(),
+  updateAppConfigMock: vi.fn(),
+}));
 
 vi.mock("@/lib/admin-api", () => ({
   getAdminApiUser: getAdminApiUserMock,
@@ -17,7 +14,6 @@ vi.mock("@/lib/admin-api", () => ({
 }));
 vi.mock("@/lib/app-config", () => ({
   getAppConfigDisplay: getAppConfigDisplayMock,
-  toAppConfigDisplay: toAppConfigDisplayMock,
   updateAppConfig: updateAppConfigMock,
 }));
 
@@ -25,14 +21,31 @@ const { GET, PUT } = await import("./route");
 
 const ADMIN = { id: "cuid_admin_1", isAdmin: true };
 const DISPLAY = {
-  correction: { apiKeySet: false, apiKeyMasked: null, apiKeyFromEnv: true, model: null, modelDefault: "gemini-3.5-flash-lite" },
-  example: { apiKeySet: false, apiKeyMasked: null, apiKeyFromEnv: true, model: null, modelDefault: "gemini-3.5-flash" },
+  correction: {
+    apiKeySet: false,
+    apiKeyMasked: null,
+    apiKeyFromEnv: true,
+    model: null,
+    modelDefault: "gemini-3.5-flash-lite",
+    dailyLimit: 1000,
+    dailyLimitIsDefault: true,
+    requestsToday: 12,
+  },
+  example: {
+    apiKeySet: false,
+    apiKeyMasked: null,
+    apiKeyFromEnv: true,
+    model: null,
+    modelDefault: "gemini-3.5-flash",
+    dailyLimit: 1000,
+    dailyLimitIsDefault: true,
+    requestsToday: 3,
+  },
 };
 
 beforeEach(() => {
   getAdminApiUserMock.mockReset();
   getAppConfigDisplayMock.mockReset();
-  toAppConfigDisplayMock.mockReset();
   updateAppConfigMock.mockReset();
   getAdminApiUserMock.mockResolvedValue(ADMIN);
   getAppConfigDisplayMock.mockResolvedValue(DISPLAY);
@@ -79,7 +92,7 @@ describe("PUT /api/admin/settings", () => {
     expect(updateAppConfigMock).not.toHaveBeenCalled();
   });
 
-  it("rejects a field that is too long", async () => {
+  it("rejects a text field that is too long", async () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/settings", {
         method: "PUT",
@@ -91,29 +104,58 @@ describe("PUT /api/admin/settings", () => {
     expect(updateAppConfigMock).not.toHaveBeenCalled();
   });
 
-  it("only forwards fields present in the request body", async () => {
-    const updatedConfig = { correctionApiKey: "sk-new", correctionModel: null, exampleApiKey: null, exampleModel: null };
-    updateAppConfigMock.mockResolvedValue(updatedConfig);
-    toAppConfigDisplayMock.mockReturnValue(DISPLAY);
-
+  it("rejects a daily limit of zero or below", async () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/settings", {
         method: "PUT",
-        body: JSON.stringify({ correctionApiKey: "sk-new" }),
+        body: JSON.stringify({ correctionDailyLimit: 0 }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateAppConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a non-integer daily limit", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ exampleDailyLimit: 12.5 }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateAppConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a null daily limit to reset it to the default", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ correctionDailyLimit: null }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionDailyLimit: null });
+  });
+
+  it("only forwards fields present in the request body, then returns the fresh display state", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify({ correctionApiKey: "sk-new", correctionDailyLimit: 500 }),
       }),
     );
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionApiKey: "sk-new" });
-    expect(toAppConfigDisplayMock).toHaveBeenCalledWith(updatedConfig);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionApiKey: "sk-new", correctionDailyLimit: 500 });
+    expect(getAppConfigDisplayMock).toHaveBeenCalledTimes(1);
     expect(body).toEqual(DISPLAY);
   });
 
-  it("clears a field with an empty string", async () => {
-    updateAppConfigMock.mockResolvedValue({});
-    toAppConfigDisplayMock.mockReturnValue(DISPLAY);
-
+  it("clears an api key field with an empty string", async () => {
     await PUT(
       new Request("http://localhost/api/admin/settings", {
         method: "PUT",

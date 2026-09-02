@@ -66,6 +66,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260902120000_add_app_config");
   });
 
+  it("allows the additive AppConfig daily-limit columns", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260902150000_add_app_config_daily_limits");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

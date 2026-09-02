@@ -36,4 +36,7 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // column is nullable, so the app behaves exactly as before until the
   // owner explicitly sets a value from the admin settings panel.
   "20260902120000_add_app_config",
+  // Two nullable columns on the same singleton table, for the settings-page
+  // consumption bar. Null continues to mean "use the built-in default".
+  "20260902150000_add_app_config_daily_limits",
 ]);
