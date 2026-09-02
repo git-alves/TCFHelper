@@ -52,7 +52,7 @@ describe("practice curriculum", () => {
     const taskThreeC1Orders = getPracticeTopics("TASK_3", "C1").map((part) => part.taskPartOrder);
 
     expect(taskOneB2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(taskThreeC1Orders).toEqual([7, 8]);
+    expect(taskThreeC1Orders).toEqual([1, 2, 3, 7, 8]);
   });
 
   it("keeps the task blueprint stable across levels and marks unpublished paths explicitly", () => {
@@ -156,7 +156,13 @@ describe("practice curriculum", () => {
       "nuancing-position",
       "conclusion",
     ]);
-    expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
+    expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual([
+      "introducing-topic",
+      "reformulating-sources",
+      "identifying-arguments",
+      "justifying-position",
+      "counterarguments",
+    ]);
     expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual([
       "introducing-topic",
       "reformulating-sources",

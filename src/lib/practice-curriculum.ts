@@ -1,6 +1,7 @@
 import type { TaskType } from "@prisma/client";
 import { TASK_1_C2_EXERCISES } from "./practice-task1-c2-exercises";
 import { TASK_3_B2_EXERCISES } from "./practice-task3-b2-exercises";
+import { TASK_3_C1_EXERCISES } from "./practice-task3-c1-exercises";
 import { TASK_3_C2_EXERCISES } from "./practice-task3-c2-exercises";
 
 /**
@@ -989,6 +990,7 @@ export const PRACTICE_EXERCISES: readonly PracticeExercise[] = [
   exercise({ id: "t1-c2-salutations-a6", task: "TASK_1", level: "C2", skill: "salutations", subSkill: "independent-precise-reconnection-alternative", exerciseType: "produce", prompt: "Vous écrivez à Mme Aït Ali, responsable d'un réseau professionnel, après avoir assisté à une rencontre qu'elle animait. Vous souhaitez corriger avec tact une information qui vous concerne dans le compte rendu public et proposer le texte exact.", instructions: "Rédigez les 4 ou 5 premières phrases. Votre salutation et votre entrée doivent être personnalisées, précises, non défensives et orientées vers une correction simple.", options: [], correctAnswer: null, acceptedAnswers: [], explanation: "La production C2 allie une relation respectueuse, un objet vérifiable et une solution immédiate ; elle évite à la fois l'effacement du problème et la dramatisation.", targetLanguageFeature: "salutation autonome et correction collaborative", difficulty: 6, sequenceOrder: 6, prerequisiteExerciseId: "t1-c2-salutations-a5", tags: ["salutation", "production", "precision", "variant"], selfCheck: ["Ma salutation correspond à une relation professionnelle brève mais réelle.", "Je situe la rencontre et l'information à corriger de manière précise.", "Je propose une correction factuelle sans attribuer d'intention à Mme Aït Ali."] }),
   ...TASK_1_C2_EXERCISES,
   ...TASK_3_B2_EXERCISES,
+  ...TASK_3_C1_EXERCISES,
   ...TASK_3_C2_EXERCISES,
 ];
 
