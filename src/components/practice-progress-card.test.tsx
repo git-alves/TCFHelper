@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { getAppCopy } from "@/lib/app-copy";
-import { PracticeProgressCard } from "./practice-progress-card";
+import { PracticeProgressCardContent } from "./practice-progress-card";
 
-describe("PracticeProgressCard", () => {
+describe("PracticeProgressCardContent", () => {
   it("keeps curated-practice activity separate from CEFR corrections", () => {
     const markup = renderToStaticMarkup(
-      <PracticeProgressCard
-        copy={getAppCopy("en").dashboard}
+      <PracticeProgressCardContent
+        copy={getAppCopy("en")}
         summary={{
           completedExercises: 18,
           completedIndependently: 14,
@@ -22,12 +22,13 @@ describe("PracticeProgressCard", () => {
     expect(markup).toContain("14 independently · 4 with help");
     expect(markup).toContain("3 task parts trained");
     expect(markup).toContain('href="/practice"');
+    expect(markup).toContain("More options");
   });
 
   it("does not add another empty report to a brand-new Dashboard", () => {
     const markup = renderToStaticMarkup(
-      <PracticeProgressCard
-        copy={getAppCopy("en").dashboard}
+      <PracticeProgressCardContent
+        copy={getAppCopy("en")}
         summary={{
           completedExercises: 0,
           completedIndependently: 0,

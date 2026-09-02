@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
-import { createPracticeSession } from "@/lib/practice-progress";
+import { clearPracticeProgress, createPracticeSession } from "@/lib/practice-progress";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -50,4 +50,30 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ sessionId: session.id }, { status: 201, headers: NO_STORE_HEADERS });
+}
+
+/** Clears every recorded Practice session for the caller so they can redo completed exercises. */
+export async function DELETE() {
+  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
+  try {
+    user = await getCurrentActivatedAppUser();
+  } catch (error) {
+    if (error instanceof AppUserProvisioningError) {
+      return NextResponse.json(
+        {
+          error: "Your account is still being set up. Please try again.",
+          code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
+        },
+        { status: 503, headers: NO_STORE_HEADERS },
+      );
+    }
+    throw error;
+  }
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers: NO_STORE_HEADERS });
+  }
+
+  await clearPracticeProgress(user.id);
+  return new NextResponse(null, { status: 204, headers: NO_STORE_HEADERS });
 }

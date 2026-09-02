@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, createPracticeSessionMock } = vi.hoisted(() => {
-  class AppUserProvisioningErrorMock extends Error {}
-  return {
-    getCurrentActivatedAppUserMock: vi.fn(),
-    AppUserProvisioningErrorMock,
-    createPracticeSessionMock: vi.fn(),
-  };
-});
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, createPracticeSessionMock, clearPracticeProgressMock } =
+  vi.hoisted(() => {
+    class AppUserProvisioningErrorMock extends Error {}
+    return {
+      getCurrentActivatedAppUserMock: vi.fn(),
+      AppUserProvisioningErrorMock,
+      createPracticeSessionMock: vi.fn(),
+      clearPracticeProgressMock: vi.fn(),
+    };
+  });
 
 vi.mock("@/lib/activated-app-user", () => ({
   getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
@@ -17,9 +19,10 @@ vi.mock("@/lib/app-user", () => ({
 }));
 vi.mock("@/lib/practice-progress", () => ({
   createPracticeSession: createPracticeSessionMock,
+  clearPracticeProgress: clearPracticeProgressMock,
 }));
 
-const { POST } = await import("./route");
+const { POST, DELETE } = await import("./route");
 
 const USER_ID = "learner_1";
 const validBody = {
@@ -42,8 +45,10 @@ function post(body: unknown) {
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   createPracticeSessionMock.mockReset();
+  clearPracticeProgressMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: USER_ID });
   createPracticeSessionMock.mockResolvedValue({ id: "practice_session_1" });
+  clearPracticeProgressMock.mockResolvedValue(undefined);
 });
 
 describe("POST /api/practice/sessions", () => {
@@ -86,5 +91,32 @@ describe("POST /api/practice/sessions", () => {
     const response = await post(validBody);
 
     expect(response.status).toBe(400);
+  });
+});
+
+describe("DELETE /api/practice/sessions", () => {
+  it("requires an activated learner", async () => {
+    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+
+    const response = await DELETE();
+
+    expect(response.status).toBe(401);
+    expect(clearPracticeProgressMock).not.toHaveBeenCalled();
+  });
+
+  it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
+    getCurrentActivatedAppUserMock.mockRejectedValue(new AppUserProvisioningErrorMock());
+
+    const response = await DELETE();
+
+    expect(response.status).toBe(503);
+    expect(clearPracticeProgressMock).not.toHaveBeenCalled();
+  });
+
+  it("clears every practice session for the authenticated learner", async () => {
+    const response = await DELETE();
+
+    expect(response.status).toBe(204);
+    expect(clearPracticeProgressMock).toHaveBeenCalledWith(USER_ID);
   });
 });

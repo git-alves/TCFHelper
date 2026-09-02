@@ -58,7 +58,7 @@ export default async function DashboardPage() {
 
       {hasGettingStarted && <DashboardGettingStarted copy={copy.dashboard} />}
 
-      <PracticeProgressCard copy={copy.dashboard} summary={practiceProgress} />
+      <PracticeProgressCard summary={practiceProgress} />
 
       <section aria-labelledby="progress-chart-heading" data-walkthrough="dashboard-welcome" className="flex flex-col gap-3">
         <h2 id="progress-chart-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
