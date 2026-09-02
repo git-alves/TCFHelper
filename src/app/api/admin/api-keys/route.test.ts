@@ -51,7 +51,7 @@ beforeEach(() => {
   getAppConfigDisplayMock.mockResolvedValue(DISPLAY);
 });
 
-describe("GET /api/admin/settings", () => {
+describe("GET /api/admin/api-keys", () => {
   it("answers 404 for a non-admin caller", async () => {
     getAdminApiUserMock.mockResolvedValue(null);
 
@@ -70,11 +70,11 @@ describe("GET /api/admin/settings", () => {
   });
 });
 
-describe("PUT /api/admin/settings", () => {
+describe("PUT /api/admin/api-keys", () => {
   it("answers 404 for a non-admin caller", async () => {
     getAdminApiUserMock.mockResolvedValue(null);
 
-    const response = await PUT(new Request("http://localhost/api/admin/settings", { method: "PUT", body: "{}" }));
+    const response = await PUT(new Request("http://localhost/api/admin/api-keys", { method: "PUT", body: "{}" }));
 
     expect(response.status).toBe(404);
     expect(updateAppConfigMock).not.toHaveBeenCalled();
@@ -82,7 +82,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("rejects an unrecognized field", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ unexpectedField: "value" }),
       }),
@@ -94,7 +94,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("rejects a text field that is too long", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ correctionApiKey: "x".repeat(501) }),
       }),
@@ -106,7 +106,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("rejects a daily limit of zero or below", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ correctionDailyLimit: 0 }),
       }),
@@ -118,7 +118,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("rejects a non-integer daily limit", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ exampleDailyLimit: 12.5 }),
       }),
@@ -130,7 +130,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("accepts a null daily limit to reset it to the default", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ correctionDailyLimit: null }),
       }),
@@ -142,7 +142,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("only forwards fields present in the request body, then returns the fresh display state", async () => {
     const response = await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ correctionApiKey: "sk-new", correctionDailyLimit: 500 }),
       }),
@@ -157,7 +157,7 @@ describe("PUT /api/admin/settings", () => {
 
   it("clears an api key field with an empty string", async () => {
     await PUT(
-      new Request("http://localhost/api/admin/settings", {
+      new Request("http://localhost/api/admin/api-keys", {
         method: "PUT",
         body: JSON.stringify({ correctionApiKey: "" }),
       }),

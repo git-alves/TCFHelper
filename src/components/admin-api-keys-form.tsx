@@ -4,7 +4,7 @@ import { type FormEvent, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppConfigDisplay, AppConfigDisplaySection } from "@/lib/app-config";
 
-interface AdminAiSettingsFormProps {
+interface AdminApiKeysFormProps {
   initialDisplay: AppConfigDisplay;
 }
 
@@ -167,7 +167,7 @@ function AiSettingsSection({
   );
 }
 
-export function AdminAiSettingsForm({ initialDisplay }: AdminAiSettingsFormProps) {
+export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
   const router = useRouter();
   const [display, setDisplay] = useState(initialDisplay);
   const [correction, setCorrection] = useState<SectionFormState>(() => sectionStateFromDisplay(initialDisplay.correction));
@@ -199,7 +199,7 @@ export function AdminAiSettingsForm({ initialDisplay }: AdminAiSettingsFormProps
       if (example.apiKeyCleared) body.exampleApiKey = "";
       else if (example.apiKeyInput.trim()) body.exampleApiKey = example.apiKeyInput.trim();
 
-      const response = await fetch("/api/admin/settings", {
+      const response = await fetch("/api/admin/api-keys", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
