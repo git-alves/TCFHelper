@@ -12,6 +12,7 @@ const {
   refundExampleGenerationLeaseMock,
   generatePreferredModelAnswerMock,
   hasConfiguredModelAnswerProviderMock,
+  getAppConfigMock,
   ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputErrorMock,
@@ -33,6 +34,7 @@ const {
     refundExampleGenerationLeaseMock: vi.fn(),
     generatePreferredModelAnswerMock: vi.fn(),
     hasConfiguredModelAnswerProviderMock: vi.fn(),
+    getAppConfigMock: vi.fn(),
     ModelAnswerNotConfiguredErrorMock,
     ModelAnswerRateLimitedErrorMock,
     ModelAnswerInvalidOutputErrorMock,
@@ -47,6 +49,7 @@ vi.mock("@/lib/activated-app-user", () => ({
   getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock } } }));
+vi.mock("@/lib/app-config", () => ({ getAppConfig: getAppConfigMock }));
 vi.mock("@/lib/example-answer-cache", () => ({
   hashExampleTopic: vi.fn(() => "topic_hash"),
   findCachedExample: findCachedExampleMock,
@@ -78,6 +81,7 @@ beforeEach(() => {
   refundExampleGenerationLeaseMock.mockReset();
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredModelAnswerProviderMock.mockReset();
+  getAppConfigMock.mockReset();
   recordAdminEventMock.mockReset();
 
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
@@ -88,6 +92,12 @@ beforeEach(() => {
   releaseExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   refundExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   hasConfiguredModelAnswerProviderMock.mockReturnValue(true);
+  getAppConfigMock.mockResolvedValue({
+    correctionApiKey: null,
+    correctionModel: null,
+    exampleApiKey: null,
+    exampleModel: null,
+  });
 });
 
 function post(body: unknown) {
@@ -149,6 +159,7 @@ describe("POST /api/essays/example", () => {
     expect(response.status).toBe(200);
     expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
       expect.objectContaining({ topicPrompt: "Écrivez à votre voisin pour décrire votre quartier.", level: "C1" }),
+      { apiKey: null, model: null },
     );
   });
 
@@ -174,6 +185,7 @@ describe("POST /api/essays/example", () => {
     expect(response.status).toBe(200);
     expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
       expect.objectContaining({ topicPrompt: "Écrivez à votre voisin pour décrire votre quartier.", level: "C1" }),
+      { apiKey: null, model: null },
     );
   });
 

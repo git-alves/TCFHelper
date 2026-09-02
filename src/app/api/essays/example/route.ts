@@ -4,6 +4,7 @@ import { TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
+import { getAppConfig } from "@/lib/app-config";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
@@ -126,9 +127,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ text: cached.content, cached: true }, { headers: NO_STORE_HEADERS });
   }
 
+  // Admin-panel overrides (see src/lib/app-config.ts), layered over the
+  // GEMINI_API_KEY/GEMINI_MODEL env vars -- fetched once and reused for both
+  // the availability check below and the actual call.
+  const appConfig = await getAppConfig();
+  const geminiOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
+
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.
-  if (!hasConfiguredModelAnswerProvider()) {
+  if (!hasConfiguredModelAnswerProvider(geminiOverrides)) {
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
@@ -212,12 +219,15 @@ export async function POST(request: Request) {
   }
 
   try {
-    const generated = await generatePreferredModelAnswer({
-      task,
-      taskType,
-      level: typedLevel,
-      topicPrompt: resolvedTopicPrompt,
-    });
+    const generated = await generatePreferredModelAnswer(
+      {
+        task,
+        taskType,
+        level: typedLevel,
+        topicPrompt: resolvedTopicPrompt,
+      },
+      geminiOverrides,
+    );
     // The fixed provider name remains in the cache metadata and logs so each
     // saved example has a clear provenance record.
     console.log("Example generated:", generated.provider);

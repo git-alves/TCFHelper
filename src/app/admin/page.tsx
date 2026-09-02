@@ -71,6 +71,12 @@ export default async function AdminOverviewPage() {
           >
             Operational log
           </Link>
+          <Link
+            href="/admin/settings"
+            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
+          >
+            Settings
+          </Link>
         </nav>
       </div>
 

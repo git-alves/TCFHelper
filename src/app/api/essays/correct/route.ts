@@ -4,6 +4,7 @@ import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
+import { getAppConfig } from "@/lib/app-config";
 import {
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
@@ -215,11 +216,17 @@ export async function POST(request: Request) {
   if (claim.kind === "existing") return duplicateCorrectionResponse(claim.essayId);
   if (claim.kind === "inProgress") return correctionInProgressResponse(claim.retryAt);
 
+  // Admin-panel overrides (see src/lib/app-config.ts), layered over the
+  // GEMINI_API_KEY/GEMINI_CORRECTION_MODEL env vars -- fetched once and
+  // reused for both the availability check below and the actual call.
+  const appConfig = await getAppConfig();
+  const geminiOverrides = { apiKey: appConfig.correctionApiKey, model: appConfig.correctionModel };
+
   // Preserve duplicate/in-progress responses during an outage, but do not
   // reserve an unrefundable slot if this newly claimed request cannot reach
   // Gemini. Release only this caller's lease so a later configured retry can
   // claim it normally.
-  if (!hasConfiguredGemini()) {
+  if (!hasConfiguredGemini(geminiOverrides)) {
     await recordAdminEvent({
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: user.id,
@@ -284,7 +291,7 @@ export async function POST(request: Request) {
   try {
     let rawFeedback: unknown;
     try {
-      rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt });
+      rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt }, geminiOverrides);
     } catch (error) {
       const reasonCode = classifyCorrectionProviderFailure(error);
       await recordAdminEvent({

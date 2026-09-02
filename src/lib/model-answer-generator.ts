@@ -4,6 +4,7 @@ import {
   generateModelAnswer,
   hasConfiguredGemini,
   type GenerateModelAnswerParams,
+  type GeminiOverrides,
 } from "@/lib/gemini";
 
 export type ModelAnswerProvider = "gemini";
@@ -13,8 +14,8 @@ export class ModelAnswerRateLimitedError extends Error {}
 export class ModelAnswerInvalidOutputError extends Error {}
 
 /** True when the configured Gemini model can be called. */
-export function hasConfiguredModelAnswerProvider() {
-  return hasConfiguredGemini();
+export function hasConfiguredModelAnswerProvider(overrides?: GeminiOverrides) {
+  return hasConfiguredGemini(overrides);
 }
 
 // Free-tier models frequently miss an exact word target by a modest margin
@@ -40,9 +41,10 @@ function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
 
 export async function generatePreferredModelAnswer(
   params: GenerateModelAnswerParams,
+  overrides?: GeminiOverrides,
 ): Promise<{ text: string; provider: ModelAnswerProvider }> {
   try {
-    return { text: validateAnswerLength(await generateModelAnswer(params), params), provider: "gemini" };
+    return { text: validateAnswerLength(await generateModelAnswer(params, overrides), params), provider: "gemini" };
   } catch (error) {
     if (error instanceof GeminiNotConfiguredError) {
       throw new ModelAnswerNotConfiguredError("Gemini is not configured.");

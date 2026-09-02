@@ -7,13 +7,13 @@ const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models
 // Google AI Studio's free tier (no credit card, no billing) — kept
 // overridable via GEMINI_MODEL since free-tier model names are retired and
 // replaced over time.
-const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
 // Deliberately separate from GEMINI_MODEL/DEFAULT_GEMINI_MODEL above:
 // learner-facing correction should not silently share whatever model the
 // model-answer generator happens to use. Flash-Lite is the cheaper/faster
 // line suited to structured grading, while full Flash remains available for
 // learner-facing model answers.
-const DEFAULT_GEMINI_CORRECTION_MODEL = "gemini-3.5-flash-lite";
+export const DEFAULT_GEMINI_CORRECTION_MODEL = "gemini-3.5-flash-lite";
 const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
@@ -25,9 +25,26 @@ export type ExampleCefrLevel = "B2" | "C1" | "C2";
 export class GeminiNotConfiguredError extends Error {}
 export class GeminiRateLimitedError extends Error {}
 
+/**
+ * Admin-panel overrides (AppConfig, see src/lib/app-config.ts) for a single
+ * call, layered over the GEMINI_API_KEY/GEMINI_MODEL/GEMINI_CORRECTION_MODEL
+ * env vars. Kept as a plain optional parameter rather than an internal DB
+ * read so this module stays free of a Prisma dependency: callers (the
+ * correction and example routes) already read AppConfig once per request and
+ * pass the result in here.
+ */
+export interface GeminiOverrides {
+  apiKey?: string | null;
+  model?: string | null;
+}
+
+function resolveApiKey(overrides?: GeminiOverrides) {
+  return overrides?.apiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
+}
+
 /** True when a server-side Gemini credential is available for a provider call. */
-export function hasConfiguredGemini() {
-  return Boolean(process.env.GEMINI_API_KEY?.trim());
+export function hasConfiguredGemini(overrides?: GeminiOverrides) {
+  return Boolean(resolveApiKey(overrides));
 }
 
 /**
@@ -207,13 +224,16 @@ function extractText(payload: unknown): string {
  * separately configurable model from correction so example quality and
  * correction quality can evolve independently.
  */
-export async function generateModelAnswer(params: GenerateModelAnswerParams): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!hasConfiguredGemini() || !apiKey) {
+export async function generateModelAnswer(
+  params: GenerateModelAnswerParams,
+  overrides?: GeminiOverrides,
+): Promise<string> {
+  const apiKey = resolveApiKey(overrides);
+  if (!apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
   }
 
-  const model = process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+  const model = overrides?.model?.trim() || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 
   // The key is sent only via the x-goog-api-key header, never as a ?key=
   // query parameter: a URL-embedded secret is far more likely to end up in
@@ -369,18 +389,18 @@ export interface GradeEssayWithGeminiParams {
  * Gemini's response schema narrows the shape, but a provider response remains
  * untrusted at the application boundary.
  */
-export async function gradeEssayWithGemini({
-  systemPrompt,
-  userPrompt,
-}: GradeEssayWithGeminiParams): Promise<unknown> {
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!hasConfiguredGemini() || !apiKey) {
+export async function gradeEssayWithGemini(
+  { systemPrompt, userPrompt }: GradeEssayWithGeminiParams,
+  overrides?: GeminiOverrides,
+): Promise<unknown> {
+  const apiKey = resolveApiKey(overrides);
+  if (!apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
   }
 
   // No fallback to GEMINI_MODEL: correction has its own setting so grading
   // never implicitly rides on the model-answer generator's configuration.
-  const model = process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
+  const model = overrides?.model?.trim() || process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
 
   let response: Response;
   try {

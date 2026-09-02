@@ -560,3 +560,21 @@ model ClerkWebhookEvent {
   type      String
   createdAt DateTime @default(now())
 }
+
+/// Single fixed-id row (the app only ever reads/writes id "singleton").
+/// Lets the owner override the Gemini API key and model used for correction
+/// and for example generation independently, from the admin panel, without
+/// an env var change and redeploy. Any null field falls back to the
+/// GEMINI_API_KEY / GEMINI_MODEL / GEMINI_CORRECTION_MODEL env vars (see
+/// src/lib/app-config.ts and src/lib/gemini.ts). Stored in plaintext: this
+/// table is reachable only through the owner-only admin API, matching the
+/// app's single-owner threat model (see User.isAdmin above) rather than
+/// introducing separate encryption-key management for a single admin field.
+model AppConfig {
+  id               String   @id @default("singleton")
+  correctionApiKey String?
+  correctionModel  String?
+  exampleApiKey    String?
+  exampleModel     String?
+  updatedAt        DateTime @updatedAt
+}

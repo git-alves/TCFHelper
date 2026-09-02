@@ -62,6 +62,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260901190000_add_practice_progress");
   });
 
+  it("allows the additive AppConfig singleton table", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260902120000_add_app_config");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
