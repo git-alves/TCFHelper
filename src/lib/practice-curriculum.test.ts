@@ -61,11 +61,11 @@ describe("practice curriculum", () => {
     expect(taskThreeBlueprint).toContain("taking-position");
 
     const taskTwoBlueprint = getPracticeTopics("TASK_2").map((part) => part.id);
-    expect(taskTwoBlueprint).toContain("chronology");
-    expect(getPracticeTopics("TASK_2", "B2").map((part) => part.id)).not.toContain("chronology");
+    expect(taskTwoBlueprint).toContain("describing-experience");
+    expect(getPracticeTopics("TASK_2", "B2").map((part) => part.id)).not.toContain("describing-experience");
 
     expect(hasCompletePracticePath("TASK_1", "B2", "salutations")).toBe(true);
-    expect(hasCompletePracticePath("TASK_2", "B2", "chronology")).toBe(false);
+    expect(hasCompletePracticePath("TASK_2", "B2", "describing-experience")).toBe(false);
   });
 
   it("does not offer a topic at a level before manually reviewed exercises exist", () => {
@@ -105,7 +105,12 @@ describe("practice curriculum", () => {
       "register",
       "closing-message",
     ]);
-    expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual(["recounting-events"]);
+    expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual([
+      "format-and-audience",
+      "introducing-experience",
+      "recounting-events",
+      "chronology",
+    ]);
     expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
