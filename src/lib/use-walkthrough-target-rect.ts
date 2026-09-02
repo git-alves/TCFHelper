@@ -16,7 +16,6 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
   useLayoutEffect(() => {
     if (!targetId) return;
 
-    let observer: MutationObserver | null = null;
     let hasScrolledIntoView = false;
 
     function measure() {
@@ -25,14 +24,6 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
         setRect(null);
         return;
       }
-
-      // A scripted tour step (see WritingWorkspace's applyWalkthroughStep)
-      // can make its own target appear asynchronously -- targetId itself
-      // doesn't change when that happens, so nothing else here would ever
-      // notice. Keep watching until it shows up, then stop; resize/scroll
-      // stay covered by the listeners below for as long as the step lasts.
-      observer?.disconnect();
-      observer = null;
 
       if (!hasScrolledIntoView) {
         hasScrolledIntoView = true;
@@ -49,15 +40,34 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
       }
 
       const domRect = element.getBoundingClientRect();
-      setRect({ top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height });
+      // Bails out of the setState when nothing actually moved, since the
+      // observer below can fire on every unrelated DOM change on the page
+      // for as long as this step is open.
+      setRect((previous) => {
+        if (
+          previous &&
+          previous.top === domRect.top &&
+          previous.left === domRect.left &&
+          previous.width === domRect.width &&
+          previous.height === domRect.height
+        ) {
+          return previous;
+        }
+        return { top: domRect.top, left: domRect.left, width: domRect.width, height: domRect.height };
+      });
     }
 
     measure();
 
-    if (!hasScrolledIntoView) {
-      observer = new MutationObserver(measure);
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
+    // Kept running for the whole step, not just until the target is first
+    // found: a scripted tour step (see WritingWorkspace's
+    // applyWalkthroughStep) can change its own target's surrounding layout
+    // -- or make the target itself appear asynchronously -- after targetId
+    // has already stopped changing, which nothing else here would notice.
+    // childList/subtree only fires on nodes being added or removed, not on
+    // this component's own inline-style updates below, so this cannot loop.
+    const observer = new MutationObserver(measure);
+    observer.observe(document.body, { childList: true, subtree: true });
 
     window.addEventListener("resize", measure);
     // Capture phase: a target can sit inside a scrollable ancestor other
@@ -65,7 +75,7 @@ export function useWalkthroughTargetRect(targetId: string | null): Rect | null {
     // catches that scroll at all.
     window.addEventListener("scroll", measure, true);
     return () => {
-      observer?.disconnect();
+      observer.disconnect();
       window.removeEventListener("resize", measure);
       window.removeEventListener("scroll", measure, true);
     };
