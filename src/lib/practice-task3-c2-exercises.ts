@@ -474,4 +474,220 @@ export const TASK_3_C2_EXERCISES: readonly PracticeExercise[] = [
       },
     ],
   ]),
+  ...taskThreeC2Path("t3-c2-identifying-arguments", "identifying-arguments", [
+    [
+      {
+        subSkill: "distinguish-claim-evidence-and-inference",
+        prompt: "Source : « Après la création de voies cyclables séparées, les accidents impliquant des cyclistes ont diminué sur trois axes très fréquentés. La ville devrait donc prolonger le réseau dans les quartiers voisins. »",
+        instructions: "Choisissez l'analyse qui identifie correctement l'argument et ce qu'il reste à vérifier.",
+        options: [
+          "La source prouve que toutes les voies cyclables sont sans danger.",
+          "La source s'appuie sur une baisse observée sur trois axes pour recommander une extension ; son raisonnement suppose que les quartiers voisins présentent des conditions suffisamment comparables et que d'autres facteurs n'expliquent pas seuls la baisse.",
+          "La source parle uniquement d'accidents et ne propose aucune idée.",
+          "La source affirme que les cyclistes sont responsables de tous les accidents.",
+        ],
+        correctAnswer:
+          "La source s'appuie sur une baisse observée sur trois axes pour recommander une extension ; son raisonnement suppose que les quartiers voisins présentent des conditions suffisamment comparables et que d'autres facteurs n'expliquent pas seuls la baisse.",
+        acceptedAnswers: [],
+        explanation:
+          "Au C2, identifier un argument consiste à distinguer le fait observé de la recommandation et à rendre visible la condition qui relie l'un à l'autre.",
+        targetLanguageFeature: "thèse, indice empirique et présupposé de généralisation",
+        tags: ["arguments", "evidence", "assumption", "recognize"],
+      },
+      {
+        subSkill: "distinguish-claim-evidence-and-inference-alternative",
+        prompt: "Source : « Les élèves qui participent régulièrement à des ateliers de débat déclarent davantage se sentir capables de défendre une idée devant un groupe. Les établissements devraient donc intégrer ces ateliers à l'emploi du temps. »",
+        instructions: "Choisissez l'analyse la plus rigoureuse de ce raisonnement.",
+        options: [
+          "La source démontre que tous les élèves aiment débattre.",
+          "La source associe une participation régulière à un sentiment accru d'aisance et en déduit une recommandation ; il faudrait encore savoir si cet effet est durable, accessible à des élèves différents et lié aux ateliers eux-mêmes.",
+          "La source dit que les emplois du temps sont inutiles.",
+          "La source refuse toute autre activité scolaire.",
+        ],
+        correctAnswer:
+          "La source associe une participation régulière à un sentiment accru d'aisance et en déduit une recommandation ; il faudrait encore savoir si cet effet est durable, accessible à des élèves différents et lié aux ateliers eux-mêmes.",
+        acceptedAnswers: [],
+        explanation:
+          "L'analyse C2 ne rejette pas le résultat : elle examine les conditions qui permettraient de passer d'une observation à une règle générale.",
+        targetLanguageFeature: "évaluation de la portée d'un indice",
+        tags: ["arguments", "evidence", "scope", "recognize", "variant"],
+      },
+    ],
+    [
+      {
+        subSkill: "make-the-warrant-explicit",
+        prompt: "Argument : « Le taux de participation a augmenté après l'ouverture du centre le samedi ; il serait donc pertinent de maintenir cette ouverture. »",
+        instructions: "Complétez : « Ce raisonnement est convaincant à condition de vérifier que cette hausse ne s'explique pas seulement par un événement ponctuel et ______ les personnes qui viennent le samedi correspondent bien au public que le centre cherche à atteindre. »",
+        options: [],
+        correctAnswer: "que",
+        acceptedAnswers: ["que l'on établisse que"],
+        explanation:
+          "La complétive rend explicite une condition qui soutient réellement la conclusion, au lieu de traiter une corrélation comme une preuve suffisante.",
+        targetLanguageFeature: "explicitation d'une condition de validité",
+        tags: ["arguments", "warrant", "complete"],
+      },
+      {
+        subSkill: "make-the-warrant-explicit-alternative",
+        prompt: "Argument : « Les usagers répondent plus souvent quand les démarches sont simplifiées en ligne ; l'administration devrait donc dématérialiser tous ses formulaires. »",
+        instructions: "Complétez : « Cette conclusion suppose notamment que la simplification en ligne n'exclut pas les personnes ______ l'accès ou la maîtrise du numérique restent limités. »",
+        options: [],
+        correctAnswer: "dont",
+        acceptedAnswers: ["pour lesquelles"],
+        explanation:
+          "La relative identifie le public pour lequel la généralisation peut échouer ; elle transforme un avantage observé en question d'accessibilité.",
+        targetLanguageFeature: "identification du public exclu par une généralisation",
+        tags: ["arguments", "assumption", "complete", "variant"],
+      },
+    ],
+    [
+      {
+        subSkill: "turn-assertion-into-qualified-argument",
+        prompt: "Transformez : « Il faut interdire les voitures près des écoles parce que c'est dangereux. »",
+        instructions: "Construisez un argument C2 : précisez le mécanisme de risque, indiquez l'effet attendu et formulez une limite ou une condition qui évite une conclusion absolue.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [
+          "Limiter la circulation motorisée aux abords des écoles peut réduire l'exposition des enfants aux conflits de circulation et à la pollution aux heures d'entrée et de sortie ; cette mesure serait toutefois plus justifiable si des itinéraires alternatifs et des solutions pour les personnes à mobilité réduite étaient prévus.",
+          "Une restriction ciblée près des écoles se justifie par la concentration prévisible des risques aux heures d'affluence, à condition qu'elle soit accompagnée d'aménagements permettant aux familles sans alternative réaliste de rejoindre l'établissement.",
+        ],
+        explanation:
+          "La transformation C2 remplace une affirmation par une chaîne explicite : mesure, mécanisme, effet attendu et condition de proportionnalité.",
+        targetLanguageFeature: "argument causal avec limite de mise en œuvre",
+        tags: ["arguments", "transform", "causality", "conditions"],
+      },
+      {
+        subSkill: "turn-assertion-into-qualified-argument-alternative",
+        prompt: "Transformez : « Les entreprises devraient obliger leurs salariés à travailler de chez eux pour protéger la planète. »",
+        instructions: "Reformulez en argument rigoureux. Distinguez un effet possible d'une certitude et tenez compte des conditions de travail différentes selon les salariés.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [
+          "Lorsque les déplacements domicile-travail représentent une part importante des trajets, le télétravail peut contribuer à réduire certaines émissions ; une politique généralisée devrait néanmoins tenir compte des métiers incompatibles avec cette organisation et des conditions matérielles nécessaires à un travail soutenable.",
+          "Encourager le télétravail peut avoir un intérêt environnemental dans les secteurs où il évite réellement des déplacements, sans pour autant justifier une obligation qui ignorerait les contraintes des postes, des logements et de l'organisation collective.",
+        ],
+        explanation:
+          "Une argumentation C2 module le lien causal et situe les limites de l'application d'une mesure au lieu d'invoquer un objectif général comme une preuve.",
+        targetLanguageFeature: "modalisation d'un effet et délimitation d'une politique",
+        tags: ["arguments", "transform", "scope", "variant"],
+      },
+    ],
+    [
+      {
+        subSkill: "claim-evidence-warrant-limit-order",
+        prompt: "Vous analysez l'argument selon lequel les villes devraient planter davantage d'arbres dans les quartiers denses.",
+        instructions: "Organisez les éléments pour rendre le raisonnement vérifiable plutôt que simplement persuasif.",
+        options: [
+          "Dans les zones où l'ombre est rare, cet effet peut réduire l'exposition des habitants les plus vulnérables aux fortes chaleurs.",
+          "Toutefois, la priorité donnée à ces quartiers suppose que l'entretien, l'accès à l'eau et l'usage de l'espace public soient prévus à long terme.",
+          "Les relevés de température montrent que les rues très minéralisées restent sensiblement plus chaudes pendant les épisodes caniculaires.",
+          "Il serait donc justifié de concentrer les plantations là où le déficit d'ombre affecte le plus directement la santé et le confort des habitants.",
+        ],
+        correctAnswer: [
+          "Les relevés de température montrent que les rues très minéralisées restent sensiblement plus chaudes pendant les épisodes caniculaires.",
+          "Dans les zones où l'ombre est rare, cet effet peut réduire l'exposition des habitants les plus vulnérables aux fortes chaleurs.",
+          "Il serait donc justifié de concentrer les plantations là où le déficit d'ombre affecte le plus directement la santé et le confort des habitants.",
+          "Toutefois, la priorité donnée à ces quartiers suppose que l'entretien, l'accès à l'eau et l'usage de l'espace public soient prévus à long terme.",
+        ],
+        acceptedAnswers: [],
+        explanation:
+          "L'ordre fait apparaître l'indice, le mécanisme, la conclusion puis la condition qui encadre la proposition.",
+        targetLanguageFeature: "indice → mécanisme → thèse → limite",
+        tags: ["arguments", "organization", "reasoning"],
+      },
+      {
+        subSkill: "claim-evidence-warrant-limit-order-alternative",
+        prompt: "Vous analysez l'argument en faveur d'un accès gratuit aux activités sportives pour les adolescents.",
+        instructions: "Mettez les phrases dans l'ordre d'un raisonnement complet.",
+        options: [
+          "Il serait donc pertinent de réduire le coût d'inscription dans les quartiers où cette barrière pèse le plus fortement.",
+          "Des enquêtes locales montrent que le prix de l'inscription est cité par de nombreuses familles comme un frein à la participation régulière.",
+          "Cette mesure ne produira toutefois l'effet recherché que si les horaires, les transports et l'accueil ne créent pas d'autres obstacles pour les jeunes concernés.",
+          "Réduire ce coût peut permettre à des adolescents qui en sont écartés de participer plus durablement à une activité encadrée.",
+        ],
+        correctAnswer: [
+          "Des enquêtes locales montrent que le prix de l'inscription est cité par de nombreuses familles comme un frein à la participation régulière.",
+          "Réduire ce coût peut permettre à des adolescents qui en sont écartés de participer plus durablement à une activité encadrée.",
+          "Il serait donc pertinent de réduire le coût d'inscription dans les quartiers où cette barrière pèse le plus fortement.",
+          "Cette mesure ne produira toutefois l'effet recherché que si les horaires, les transports et l'accueil ne créent pas d'autres obstacles pour les jeunes concernés.",
+        ],
+        acceptedAnswers: [],
+        explanation:
+          "La structure évite de confondre un obstacle documenté avec une solution suffisante : elle rend la conclusion et ses conditions lisibles.",
+        targetLanguageFeature: "obstacle documenté → effet attendu → proposition → condition",
+        tags: ["arguments", "organization", "equity", "variant"],
+      },
+    ],
+    [
+      {
+        subSkill: "guided-evaluation-of-argument-strength",
+        prompt: "Une source affirme que les médiathèques devraient prêter des ordinateurs portables, car de nombreux demandeurs d'emploi n'ont pas d'équipement fiable à domicile. Elle reconnaît toutefois que le prêt peut provoquer des pertes ou des usages inégaux selon les quartiers.",
+        instructions: "Rédigez 4 ou 5 phrases : identifiez la conclusion, le fait qui l'appuie et la réserve ; dites quelles informations permettraient d'évaluer si l'argument justifie réellement la mesure.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [],
+        explanation:
+          "Au C2, évaluer un argument ne signifie pas choisir son camp immédiatement : il faut déterminer quelles données et quelles garanties rendraient sa conclusion proportionnée.",
+        targetLanguageFeature: "évaluation guidée de la force d'un argument",
+        tags: ["arguments", "development", "evaluation", "evidence"],
+        selfCheck: [
+          "Je distingue clairement la thèse, son appui et sa réserve.",
+          "Je propose une information ou un critère qui permettrait d'évaluer l'ampleur réelle du besoin.",
+          "Je mentionne une garantie ou une limite liée aux risques indiqués.",
+        ],
+      },
+      {
+        subSkill: "guided-evaluation-of-argument-strength-alternative",
+        prompt: "Une source propose d'étendre l'éclairage nocturne dans les parcs, en s'appuyant sur le sentiment d'insécurité exprimé par certains usagers. Une autre donnée montre que l'éclairage peut perturber la faune et ne répond pas à tous les problèmes de sécurité.",
+        instructions: "Rédigez 4 ou 5 phrases : reconstituez le raisonnement initial, identifiez ce qu'il ne suffit pas à établir et indiquez un moyen de juger si une extension ciblée serait justifiée.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [],
+        explanation:
+          "La réponse C2 relie la perception d'un risque, son traitement possible et les effets secondaires qui doivent être comparés avant une généralisation.",
+        targetLanguageFeature: "mise à l'épreuve d'un argument par ses effets secondaires",
+        tags: ["arguments", "development", "evaluation", "variant"],
+        selfCheck: [
+          "Je ne transforme pas le sentiment d'insécurité en preuve automatique d'une solution.",
+          "J'identifie un effet secondaire qui limite la portée de l'argument.",
+          "Je formule un critère ou une donnée qui rendrait une décision ciblée justifiable.",
+        ],
+      },
+    ],
+    [
+      {
+        subSkill: "independent-argument-mapping",
+        prompt: "Un document soutient que les municipalités devraient réserver une part de leurs marchés publics aux entreprises locales. Il invoque le maintien de l'emploi et des circuits économiques courts. Un autre document avertit que cette préférence peut réduire la concurrence, augmenter les coûts et exclure des entreprises innovantes situées hors du territoire.",
+        instructions: "Rédigez 110 à 130 mots sans donner encore votre position. Présentez l'argument central de chaque document, distinguez les éléments qui l'appuient de la conclusion, puis identifiez une hypothèse ou une donnée qui serait nécessaire pour comparer leur portée.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [],
+        explanation:
+          "Une cartographie C2 d'arguments rend visibles les mécanismes et les conditions de chaque position avant que le lecteur tranche entre elles.",
+        targetLanguageFeature: "analyse autonome de thèses, appuis et hypothèses",
+        tags: ["arguments", "production", "analysis", "sources"],
+        selfCheck: [
+          "Je sépare les objectifs invoqués, les effets attendus et les conclusions proposées.",
+          "Je restitue le coût ou le risque indiqué sans en faire une objection vague.",
+          "Je précise une hypothèse ou une donnée qui permettrait de comparer les deux raisonnements.",
+        ],
+      },
+      {
+        subSkill: "independent-argument-mapping-alternative",
+        prompt: "Deux documents discutent de l'obligation de proposer une alimentation végétarienne par défaut dans les cantines. Le premier avance que ce choix peut réduire l'empreinte environnementale sans supprimer les autres options. Le second craint que l'acceptation des menus et les besoins nutritionnels de certains publics soient négligés.",
+        instructions: "Rédigez 110 à 130 mots, sans prendre position. Identifiez les conclusions des documents, les raisons qui les soutiennent et les conditions dont dépendrait la validité de chacun des arguments.",
+        options: [],
+        correctAnswer: null,
+        acceptedAnswers: [],
+        explanation:
+          "La production C2 exige de distinguer une mesure, le mécanisme attendu et les publics pour lesquels ses conditions de réussite peuvent varier.",
+        targetLanguageFeature: "analyse autonome d'arguments conditionnels",
+        tags: ["arguments", "production", "analysis", "conditions", "variant"],
+        selfCheck: [
+          "Je formule les deux conclusions sans les confondre avec leurs raisons.",
+          "Je relie chaque argument à un effet ou à un public précis.",
+          "Je rends explicite au moins une condition qui limiterait ou confirmerait la portée du raisonnement.",
+        ],
+      },
+    ],
+  ]),
 ];
