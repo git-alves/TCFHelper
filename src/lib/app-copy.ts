@@ -517,7 +517,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Close Settings first",
     },
     home: {
-      title: "Write for the TCF exam. Get feedback that gets you to B2 or C1.",
+      title: "Write for the TCF exam. Get feedback that gets you to B2, C1 or C2.",
       description:
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
       startATask: "Start a task",
@@ -1123,7 +1123,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Fermez d’abord les paramètres",
     },
     home: {
-      title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2 ou C1.",
+      title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau B2, C1 ou C2.",
       description:
         "Entraînez-vous aux tâches 1, 2 et 3, puis recevez en quelques secondes des commentaires sur la grammaire, le vocabulaire et votre niveau du CECRL.",
       startATask: "Commencer une tâche",
@@ -1740,7 +1740,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Cierra primero la configuración",
     },
     home: {
-      title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2 o C1.",
+      title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar B2, C1 o C2.",
       description:
         "Practica las tareas 1, 2 y 3 y recibe en segundos comentarios sobre gramática, vocabulario y nivel MCER.",
       startATask: "Empezar una tarea",
@@ -2355,7 +2355,7 @@ export const APP_COPY = {
       closeSettingsFirst: "Feche as configurações primeiro",
     },
     home: {
-      title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2 ou C1.",
+      title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar B2, C1 ou C2.",
       description:
         "Pratique as tarefas 1, 2 e 3 e receba em segundos comentários sobre gramática, vocabulário e nível do QECR.",
       startATask: "Começar uma tarefa",
