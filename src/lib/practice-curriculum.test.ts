@@ -52,7 +52,7 @@ describe("practice curriculum", () => {
     const taskThreeC2Orders = getPracticeTopics("TASK_3", "C2").map((part) => part.taskPartOrder);
 
     expect(taskOneB2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(taskThreeC2Orders).toEqual([1, 2, 3, 4, 7]);
+    expect(taskThreeC2Orders).toEqual([1, 2, 3, 4, 5, 7]);
   });
 
   it("keeps the task blueprint stable across levels and marks unpublished paths explicitly", () => {
@@ -174,6 +174,7 @@ describe("practice curriculum", () => {
       "reformulating-sources",
       "identifying-arguments",
       "comparing-viewpoints",
+      "synthesizing",
       "justifying-position",
     ]);
   });
