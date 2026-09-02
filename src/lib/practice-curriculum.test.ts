@@ -93,7 +93,18 @@ describe("practice curriculum", () => {
       "register",
       "closing-message",
     ]);
-    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual(["salutations", "openings", "developing-information"]);
+    expect(getPracticeTopics("TASK_1", "C2").map((topic) => topic.id)).toEqual([
+      "salutations",
+      "openings",
+      "message-purpose",
+      "giving-information",
+      "developing-information",
+      "asking-information",
+      "making-requests",
+      "suggestions-invitations",
+      "register",
+      "closing-message",
+    ]);
     expect(getPracticeTopics("TASK_2", "B2").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C1").map((topic) => topic.id)).toEqual(["recounting-events"]);
     expect(getPracticeTopics("TASK_2", "C2").map((topic) => topic.id)).toEqual(["recounting-events"]);
