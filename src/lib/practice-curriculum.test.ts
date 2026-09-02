@@ -47,12 +47,16 @@ describe("practice curriculum", () => {
     ]);
   });
 
-  it("keeps the authored task-part order when a level has a published subset", () => {
+  it("keeps the authored task-part order at every level, not the declaration order in the bank", () => {
+    // Full coverage now means every level publishes every part of its task,
+    // so this no longer exercises a partially published level -- it still
+    // guards against order coming from file position instead of
+    // taskPartOrder, which is what actually matters to learners.
     const taskOneB2Orders = getPracticeTopics("TASK_1", "B2").map((part) => part.taskPartOrder);
     const taskThreeC2Orders = getPracticeTopics("TASK_3", "C2").map((part) => part.taskPartOrder);
 
     expect(taskOneB2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    expect(taskThreeC2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 9]);
+    expect(taskThreeC2Orders).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
   it("keeps the task blueprint stable across levels and marks unpublished paths explicitly", () => {
@@ -177,7 +181,10 @@ describe("practice curriculum", () => {
       "synthesizing",
       "taking-position",
       "justifying-position",
+      "counterarguments",
       "responding-counterarguments",
+      "nuancing-position",
+      "conclusion",
     ]);
   });
 

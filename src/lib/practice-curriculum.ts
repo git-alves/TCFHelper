@@ -3,6 +3,7 @@ import { TASK_1_C2_EXERCISES } from "./practice-task1-c2-exercises";
 import { TASK_3_B2_EXERCISES } from "./practice-task3-b2-exercises";
 import { TASK_3_C1_EXERCISES } from "./practice-task3-c1-exercises";
 import { TASK_3_C2_EXERCISES } from "./practice-task3-c2-exercises";
+import { TASK_3_C2_EXERCISES_2 } from "./practice-task3-c2-exercises-2";
 
 /**
  * Fixed, reviewed curriculum content for the writing trainer.
@@ -992,6 +993,7 @@ export const PRACTICE_EXERCISES: readonly PracticeExercise[] = [
   ...TASK_3_B2_EXERCISES,
   ...TASK_3_C1_EXERCISES,
   ...TASK_3_C2_EXERCISES,
+  ...TASK_3_C2_EXERCISES_2,
 ];
 
 export function getPracticeTopics(task: TaskType, level?: PracticeLevel): readonly PracticeTopic[] {
