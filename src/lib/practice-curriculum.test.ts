@@ -64,7 +64,7 @@ describe("practice curriculum", () => {
     expect(taskTwoBlueprint).toContain("giving-examples");
 
     expect(hasCompletePracticePath("TASK_1", "B2", "salutations")).toBe(true);
-    expect(hasCompletePracticePath("TASK_3", "B2", "introducing-topic")).toBe(false);
+    expect(hasCompletePracticePath("TASK_3", "B2", "introducing-topic")).toBe(true);
   });
 
   it("does not offer a topic at a level before manually reviewed exercises exist", () => {
@@ -138,6 +138,11 @@ describe("practice curriculum", () => {
       "describing-experience",
       "expressing-reaction",
       "commenting-on-experience",
+    ]);
+    expect(getPracticeTopics("TASK_3", "B2").map((topic) => topic.id)).toEqual([
+      "introducing-topic",
+      "reformulating-sources",
+      "justifying-position",
     ]);
     expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
     expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual([
