@@ -140,6 +140,8 @@ describe("practice curriculum", () => {
       "commenting-on-experience",
       "giving-examples",
       "adding-details",
+      "contrasting-expectations",
+      "conclusion",
     ]);
     expect(getPracticeTopics("TASK_3", "B2").map((topic) => topic.id)).toEqual([
       "introducing-topic",
