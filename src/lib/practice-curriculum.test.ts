@@ -149,6 +149,8 @@ describe("practice curriculum", () => {
       "justifying-position",
       "counterarguments",
       "responding-counterarguments",
+      "nuancing-position",
+      "conclusion",
     ]);
     expect(getPracticeTopics("TASK_3", "C1").map((topic) => topic.id)).toEqual(["justifying-position", "counterarguments"]);
     expect(getPracticeTopics("TASK_3", "C2").map((topic) => topic.id)).toEqual([
