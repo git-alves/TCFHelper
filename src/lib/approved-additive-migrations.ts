@@ -42,4 +42,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // Empty support tables plus a new closed category enum. No existing
   // application record changes meaning during this rollout.
   "20260903160000_add_support_requests",
+  // Nullable HubSpot delivery-tracking columns on the existing
+  // SupportRequest table. No existing row's meaning changes; a null
+  // hubspotSyncedAt just means the mirror hasn't (yet) succeeded.
+  "20260903180000_add_support_request_hubspot_sync",
 ]);

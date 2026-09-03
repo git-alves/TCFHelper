@@ -253,6 +253,9 @@ export interface AppCopy {
     successTitle: string;
     successDescription: string;
     sendAnother: string;
+    discardDraftTitle: string;
+    discardDraftDescription: string;
+    discardDraftConfirm: string;
   };
   // Step titles/bodies are added per-step once the tour component exists;
   // this is only the chrome shared by every step.
@@ -754,6 +757,9 @@ export const APP_COPY = {
       successTitle: "Thanks for reaching out",
       successDescription: "Your message has been sent to the MyTCFLab team.",
       sendAnother: "Send another message",
+      discardDraftTitle: "Discard this message?",
+      discardDraftDescription: "Closing now will discard what you've written. This can't be undone.",
+      discardDraftConfirm: "Discard message",
     },
     walkthrough: {
       takeATour: "Take a tour",
@@ -1399,6 +1405,9 @@ export const APP_COPY = {
       successTitle: "Merci de nous avoir contactés",
       successDescription: "Votre message a été envoyé à l’équipe MyTCFLab.",
       sendAnother: "Envoyer un autre message",
+      discardDraftTitle: "Abandonner ce message ?",
+      discardDraftDescription: "Fermer maintenant supprimera ce que vous avez écrit. Cette action est irréversible.",
+      discardDraftConfirm: "Abandonner le message",
     },
     walkthrough: {
       takeATour: "Faire la visite guidée",
@@ -2049,6 +2058,9 @@ export const APP_COPY = {
       successTitle: "Gracias por escribirnos",
       successDescription: "Tu mensaje se envió al equipo de MyTCFLab.",
       sendAnother: "Enviar otro mensaje",
+      discardDraftTitle: "¿Descartar este mensaje?",
+      discardDraftDescription: "Si cierras ahora se descartará lo que escribiste. Esta acción no se puede deshacer.",
+      discardDraftConfirm: "Descartar mensaje",
     },
     walkthrough: {
       takeATour: "Hacer el recorrido",
@@ -2699,6 +2711,9 @@ export const APP_COPY = {
       successTitle: "Obrigado por entrar em contato",
       successDescription: "Sua mensagem foi enviada para a equipe MyTCFLab.",
       sendAnother: "Enviar outra mensagem",
+      discardDraftTitle: "Descartar esta mensagem?",
+      discardDraftDescription: "Fechar agora vai descartar o que você escreveu. Essa ação não pode ser desfeita.",
+      discardDraftConfirm: "Descartar mensagem",
     },
     walkthrough: {
       takeATour: "Fazer o tour",

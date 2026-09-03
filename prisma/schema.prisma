@@ -607,12 +607,33 @@ model SupportRequest {
   category    SupportRequestCategory
   details     String
   createdAt   DateTime               @default(now())
+  // Set once the request has been fully mirrored to HubSpot (ticket, contact
+  // association, and attachment note if any). Null means either sync hasn't
+  // run yet, HubSpot isn't configured, or every attempt so far has failed --
+  // the local row is always the source of truth, so a missing mirror never
+  // blocks anything the learner or admin does here. The retry cron
+  // (/api/cron/hubspot-support-sync-retry) re-attempts rows where this is
+  // still null.
+  hubspotTicketId String?
+  // Set once the attachment has been uploaded to HubSpot, independently of
+  // hubspotAttachmentSyncedAt below, so a retry after a failure creating the
+  // attachment note never re-uploads the file (HubSpot's Files API has no
+  // dedupe key of its own to prevent that).
+  hubspotAttachmentFileId String?
+  // Set once the ticket's attachment note has been created, independently of
+  // hubspotSyncedAt, so a retry after a failure elsewhere in the sync never
+  // creates a duplicate note.
+  hubspotAttachmentSyncedAt DateTime?
+  hubspotSyncedAt           DateTime?
+  hubspotSyncAttempts       Int        @default(0)
+  hubspotLastSyncError      String?
 
   attachment SupportAttachment?
 
   @@index([createdAt, id])
   @@index([userId, createdAt])
   @@index([category, createdAt])
+  @@index([hubspotSyncedAt, hubspotSyncAttempts])
 }
 
 /// A single optional evidence file for a support request. Keeping it private

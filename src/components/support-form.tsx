@@ -2,6 +2,8 @@
 
 import { useId, useRef, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useModalCloseControl, useModalCloseGuard } from "@/components/modal";
 import { ThemedSelect } from "@/components/themed-select";
 import {
   SUPPORT_ATTACHMENT_ACCEPT,
@@ -14,14 +16,20 @@ import {
 } from "@/lib/support-request";
 
 type SupportCategoryChoice = SupportCategory | "";
+type InvalidField = "category" | "details" | null;
 
 interface SupportFormProps {
   email: string;
   name: string | null;
 }
 
+// Referenced by the intercepted-route page so Modal can send initial focus
+// here instead of its default (the first focusable element, which would
+// otherwise be the close button).
+export const SUPPORT_CATEGORY_TRIGGER_ID = "support-category-trigger";
+
 const SELECT_BUTTON_CLASSNAME =
-  "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/[.2] dark:focus:border-violet-300 dark:focus:ring-violet-300/20";
+  "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/[.2] dark:focus:border-violet-300 dark:focus:ring-violet-300/20 aria-invalid:border-red-500 dark:aria-invalid:border-red-400";
 const SELECT_LIST_CLASSNAME =
   "absolute left-0 right-0 z-30 mt-1 flex max-h-60 flex-col gap-0.5 overflow-auto rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]";
 
@@ -51,12 +59,24 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const categoryHeadingId = useId();
   const detailsId = useId();
   const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const detailsRef = useRef<HTMLTextAreaElement>(null);
   const [category, setCategory] = useState<SupportCategoryChoice>("");
   const [details, setDetails] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const [error, setError] = useState("");
+  const [invalidField, setInvalidField] = useState<InvalidField>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
+
+  const isDirty = category !== "" || details.trim() !== "" || attachment !== null;
+  const { closeImmediately } = useModalCloseControl();
+  useModalCloseGuard(() => {
+    if (isSubmitting) return false;
+    if (!isDirty) return true;
+    setShowDiscardConfirm(true);
+    return false;
+  });
 
   const sender = name ? `${name} · ${email}` : email;
   const attachmentLimit = formatSupportAttachmentLimit(locale);
@@ -102,15 +122,20 @@ export function SupportForm({ email, name }: SupportFormProps) {
 
     if (!isSupportCategory(category)) {
       setError(copy.support.categoryRequired);
+      setInvalidField("category");
+      document.getElementById(SUPPORT_CATEGORY_TRIGGER_ID)?.focus();
       return;
     }
 
     if (!details.trim()) {
       setError(copy.support.detailsRequired);
+      setInvalidField("details");
+      detailsRef.current?.focus();
       return;
     }
 
     setError("");
+    setInvalidField(null);
     setIsSubmitting(true);
     try {
       const body = new FormData();
@@ -173,16 +198,20 @@ export function SupportForm({ email, name }: SupportFormProps) {
 
       <div className="flex flex-col gap-2">
         <span id={categoryHeadingId} className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
-          {copy.support.categoryLabel}
+          {copy.support.categoryLabel} <span aria-hidden="true" className="text-red-600 dark:text-red-400">*</span>
         </span>
         <ThemedSelect<SupportCategoryChoice>
+          id={SUPPORT_CATEGORY_TRIGGER_ID}
           value={category}
           onChange={(nextCategory) => {
             setCategory(nextCategory);
             setError("");
+            setInvalidField(null);
           }}
           options={categoryOptions}
           ariaLabelledBy={categoryHeadingId}
+          ariaRequired
+          ariaInvalid={invalidField === "category"}
           buttonClassName={SELECT_BUTTON_CLASSNAME}
           listClassName={SELECT_LIST_CLASSNAME}
         />
@@ -190,17 +219,26 @@ export function SupportForm({ email, name }: SupportFormProps) {
 
       <div className="flex flex-col gap-2">
         <label htmlFor={detailsId} className="text-xs font-medium uppercase tracking-[0.12em] text-zinc-500 dark:text-zinc-400">
-          {copy.support.detailsLabel}
+          {copy.support.detailsLabel} <span aria-hidden="true" className="text-red-600 dark:text-red-400">*</span>
         </label>
         <textarea
+          ref={detailsRef}
           id={detailsId}
           value={details}
-          onChange={(event) => setDetails(event.target.value)}
+          onChange={(event) => {
+            setDetails(event.target.value);
+            if (invalidField === "details") {
+              setError("");
+              setInvalidField(null);
+            }
+          }}
           required
+          aria-required="true"
+          aria-invalid={invalidField === "details"}
           maxLength={10_000}
           rows={5}
           placeholder={copy.support.detailsPlaceholder}
-          className="w-full resize-y rounded-xl border border-black/[.15] bg-background px-4 py-3 text-sm leading-6 outline-none placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/[.2] dark:placeholder:text-zinc-400 dark:focus:border-violet-300 dark:focus:ring-violet-300/20"
+          className="w-full resize-y rounded-xl border border-black/[.15] bg-background px-4 py-3 text-sm leading-6 outline-none placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 aria-invalid:border-red-500 dark:border-white/[.2] dark:placeholder:text-zinc-400 dark:focus:border-violet-300 dark:focus:ring-violet-300/20 dark:aria-invalid:border-red-400"
         />
       </div>
 
@@ -255,6 +293,19 @@ export function SupportForm({ email, name }: SupportFormProps) {
       >
         {isSubmitting ? copy.support.submitting : copy.support.submit}
       </button>
+
+      <ConfirmDialog
+        open={showDiscardConfirm}
+        title={copy.support.discardDraftTitle}
+        description={copy.support.discardDraftDescription}
+        confirmLabel={copy.support.discardDraftConfirm}
+        cancelLabel={copy.common.cancel}
+        onCancel={() => setShowDiscardConfirm(false)}
+        onConfirm={() => {
+          setShowDiscardConfirm(false);
+          closeImmediately();
+        }}
+      />
     </form>
   );
 }

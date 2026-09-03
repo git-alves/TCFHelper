@@ -563,6 +563,59 @@ signature and keeps the `Subscription` table in sync for subscription
 lifecycle events, but nothing in the app reads subscription status yet —
 there's no checkout flow and no feature gate. That's follow-up work.
 
+## HubSpot support sync
+
+Every submitted support request (`POST /api/support`) is stored in Postgres
+first — that row is always the source of truth and is what `/admin/support`
+reads. If `HUBSPOT_ACCESS_TOKEN` is set, the route also best-effort mirrors
+the request into HubSpot as a ticket: it upserts a contact by the learner's
+signed-in email (splitting their account name into first/last name), creates
+a ticket with the category and details, associates the two, and — if the
+learner attached a file — uploads it to HubSpot's Files API and attaches it
+to the ticket via a note. A HubSpot outage or misconfiguration never fails
+the learner's submission; it only leaves that row's `hubspotSyncedAt` unset,
+and the failure (plus an attempt count) is recorded on the row and logged
+server-side without the request's sensitive text.
+
+A daily cron (`/api/cron/hubspot-support-sync-retry`, authenticated the same
+way as the admin-event retention cron with `CRON_SECRET`) re-attempts any
+request that hasn't fully synced yet. It resumes from whatever a previous
+attempt already got done — reusing an already-created ticket id, skipping an
+already-uploaded attachment. Duplicate creation is prevented two ways: a
+locally persisted id lets a normal retry skip work it already finished, and
+every ticket/note this integration creates carries a `support_request_id`
+property that HubSpot enforces as unique — so even if a retry follows a crash
+between HubSpot accepting a create and that id being persisted locally, or
+the initial submit races the retry cron on the same row, the loser's create
+gets rejected and it looks up the winner's object instead of creating a
+second one. After 6 failed attempts a request stops retrying automatically
+and stays visible with its last error under `/admin/support` for manual
+follow-up.
+
+To turn it on:
+
+1. In HubSpot, go to **Settings > Integrations > Private Apps** and create
+   one (any name, e.g. "myTCFLab support sync").
+2. Grant it these scopes: `crm.objects.contacts.read`,
+   `crm.objects.contacts.write`, `tickets`, `files`. Per HubSpot's own API
+   docs, the single `tickets` scope covers every ticket operation this
+   integration uses (create, search, and creating the `support_request_id`
+   property), and the Notes API guide lists `crm.objects.contacts.read`/
+   `.write` as its required scope, so no separate notes scope is needed.
+   HubSpot's scope catalog has changed over time and is easy to get wrong
+   from documentation alone; if a request still fails with a 403, the
+   server log now includes HubSpot's own error message naming the exact
+   missing scope (see `syncSupportRequestToHubspot` call sites), which is
+   the most reliable way to confirm what's actually required for your app.
+3. Copy the generated access token into `HUBSPOT_ACCESS_TOKEN`.
+4. Optional: if your portal's support pipeline isn't the default one, set
+   `HUBSPOT_TICKET_PIPELINE_ID` and `HUBSPOT_TICKET_PIPELINE_STAGE_ID` to the
+   pipeline/stage IDs you want new tickets created in (find them under
+   **Settings > Objects > Tickets > Pipelines**, or via the Pipelines API).
+
+Leaving `HUBSPOT_ACCESS_TOKEN` unset disables the sync entirely; the support
+feature works the same as before, just without a HubSpot mirror.
+
 ## Deploying to Vercel
 
 There are two Vercel-hosted build paths; pick one and do not enable both for
@@ -597,7 +650,10 @@ Either way, set these environment variables on the Vercel project (with
 `GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`,
 `CRON_SECRET` (Production scope only -- required for the admin-event
-retention cron to authenticate; see `.env.example`).
+retention and HubSpot support-sync retry crons to authenticate; see
+`.env.example`), `HUBSPOT_ACCESS_TOKEN` and, if needed,
+`HUBSPOT_TICKET_PIPELINE_ID` / `HUBSPOT_TICKET_PIPELINE_STAGE_ID` (see
+"HubSpot support sync" above).
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary
