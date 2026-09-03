@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 
 interface ModalProps {
   children: ReactNode;
@@ -9,6 +9,48 @@ interface ModalProps {
   ariaLabel: string;
   title?: string;
   panelClassName?: string;
+  // CSS selector (evaluated within the dialog) for where initial focus
+  // should land. Falls back to the first focusable element when omitted or
+  // not found -- most modals don't need to opt out of that default.
+  initialFocusSelector?: string;
+}
+
+type CloseGuard = () => boolean;
+
+interface ModalCloseControl {
+  // Registers a predicate that can veto an Escape/backdrop/close-button
+  // attempt by returning false. A guard is free to trigger its own UI (e.g.
+  // a discard-draft confirmation) as a side effect of vetoing, then call
+  // closeImmediately() once the user actually confirms.
+  registerCloseGuard: (guard: CloseGuard | null) => void;
+  closeImmediately: () => void;
+}
+
+const ModalCloseContext = createContext<ModalCloseControl | null>(null);
+
+// Lets a descendant of Modal veto an in-progress close -- e.g. to block
+// closing outright while a submission is in flight, or to intercept the
+// attempt and show its own confirmation before allowing it. Re-registers
+// automatically whenever `guard`'s identity changes, so it always sees
+// current component state without the caller needing useCallback.
+export function useModalCloseGuard(guard: CloseGuard | null) {
+  const control = useContext(ModalCloseContext);
+  useEffect(() => {
+    control?.registerCloseGuard(guard);
+    return () => control?.registerCloseGuard(null);
+  }, [control, guard]);
+}
+
+const NOOP_CLOSE = () => {};
+
+// For a guard's own confirmation UI to finish closing the modal once the
+// user has explicitly confirmed, bypassing the guard that vetoed it. Safe to
+// call from a component that sometimes renders outside any Modal (e.g. a
+// form shared between a modal and its full-page equivalent): closeImmediately
+// is a no-op with no ancestor Modal, since there's then nothing to close.
+export function useModalCloseControl(): Pick<ModalCloseControl, "closeImmediately"> {
+  const control = useContext(ModalCloseContext);
+  return control ?? { closeImmediately: NOOP_CLOSE };
 }
 
 const DEFAULT_PANEL_CLASSNAME =
@@ -21,9 +63,20 @@ const FOCUSABLE_SELECTOR =
 // always goes through router.back() so the URL and browser history stay in
 // sync with what's actually on screen, per Next's parallel + intercepting
 // routes convention for modals.
-export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }: ModalProps) {
+export function Modal({ children, closeLabel, ariaLabel, title, panelClassName, initialFocusSelector }: ModalProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
+  const closeGuardRef = useRef<CloseGuard | null>(null);
+
+  const registerCloseGuard = useCallback((guard: CloseGuard | null) => {
+    closeGuardRef.current = guard;
+  }, []);
+  const closeImmediately = useCallback(() => router.back(), [router]);
+
+  function requestClose() {
+    if (closeGuardRef.current && !closeGuardRef.current()) return;
+    closeImmediately();
+  }
 
   useEffect(() => {
     // Move focus into the dialog on open, and give it back to whatever
@@ -33,14 +86,22 @@ export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }
     const initialFocusable = dialogRef.current
       ? Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
       : [];
+    const requestedFocus = initialFocusSelector
+      ? (dialogRef.current?.querySelector<HTMLElement>(initialFocusSelector) ?? null)
+      : null;
     // Focus the first real control, not the dialog container itself: the
     // container is only a Tab boundary, so starting there makes Shift+Tab's
     // very first press match neither boundary and escape to the page behind.
-    (initialFocusable[0] ?? dialogRef.current)?.focus();
+    (requestedFocus ?? initialFocusable[0] ?? dialogRef.current)?.focus();
 
     function onKeyDown(event: KeyboardEvent) {
+      // A nested alertdialog (e.g. a discard-draft confirmation) owns
+      // Escape/Tab while it's open; defer to it instead of this outer trap
+      // competing over the same keydown.
+      if ((document.activeElement as HTMLElement | null)?.closest('[role="alertdialog"]')) return;
+
       if (event.key === "Escape") {
-        router.back();
+        requestClose();
         return;
       }
 
@@ -69,10 +130,11 @@ export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }
       document.removeEventListener("keydown", onKeyDown);
       previouslyFocused?.focus();
     };
-  }, [router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router, initialFocusSelector]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={() => router.back()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={requestClose}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -86,7 +148,7 @@ export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }
           {title && <h1 className="text-xl font-semibold tracking-tight">{title}</h1>}
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={requestClose}
             aria-label={closeLabel}
             className="rounded-full p-1.5 text-zinc-500 transition-colors hover:bg-black/[.05] hover:text-foreground dark:text-zinc-400 dark:hover:bg-white/[.08]"
           >
@@ -95,7 +157,9 @@ export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }
             </svg>
           </button>
         </div>
-        {children}
+        <ModalCloseContext.Provider value={{ registerCloseGuard, closeImmediately }}>
+          {children}
+        </ModalCloseContext.Provider>
       </div>
     </div>
   );

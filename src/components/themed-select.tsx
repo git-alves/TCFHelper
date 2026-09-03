@@ -19,6 +19,8 @@ interface ThemedSelectProps<T extends string> {
   onChange: (value: T) => void;
   ariaLabelledBy?: string;
   ariaLabel?: string;
+  ariaRequired?: boolean;
+  ariaInvalid?: boolean;
   disabled?: boolean;
   buttonClassName: string;
   listClassName: string;
@@ -32,6 +34,8 @@ export function ThemedSelect<T extends string>({
   onChange,
   ariaLabelledBy,
   ariaLabel,
+  ariaRequired,
+  ariaInvalid,
   disabled,
   buttonClassName,
   listClassName,
@@ -71,6 +75,8 @@ export function ThemedSelect<T extends string>({
         aria-expanded={isOpen}
         aria-labelledby={ariaLabelledBy}
         aria-label={ariaLabel}
+        aria-required={ariaRequired}
+        aria-invalid={ariaInvalid}
         disabled={disabled}
         onClick={() => setIsOpen((open) => !open)}
         className={buttonClassName}
