@@ -219,8 +219,6 @@ describe("APP_COPY", () => {
         copy.settings.themeSystem,
         copy.settings.languageHeading,
         copy.settings.languageDescription,
-        copy.settings.helpHeading,
-        copy.settings.helpDescription,
         copy.support.title,
         copy.support.intro,
         copy.support.sendAs,

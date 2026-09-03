@@ -226,8 +226,6 @@ export interface AppCopy {
     themeSystem: string;
     languageHeading: string;
     languageDescription: string;
-    helpHeading: string;
-    helpDescription: string;
   };
   support: {
     title: string;
@@ -724,8 +722,6 @@ export const APP_COPY = {
       themeSystem: "System",
       languageHeading: "Language",
       languageDescription: "Choose the language used across the interface, feedback, and translation panel.",
-      helpHeading: "Help & support",
-      helpDescription: "Have a question or found a problem? Reach out and we'll help.",
     },
     support: {
       title: "Support",
@@ -1372,8 +1368,6 @@ export const APP_COPY = {
       languageHeading: "Langue",
       languageDescription:
         "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction.",
-      helpHeading: "Aide et assistance",
-      helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
     },
     support: {
       title: "Assistance",
@@ -2025,8 +2019,6 @@ export const APP_COPY = {
       themeSystem: "Sistema",
       languageHeading: "Idioma",
       languageDescription: "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción.",
-      helpHeading: "Ayuda y soporte",
-      helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
     support: {
       title: "Soporte",
@@ -2678,8 +2670,6 @@ export const APP_COPY = {
       themeSystem: "Sistema",
       languageHeading: "Idioma",
       languageDescription: "Escolha o idioma usado na interface, nos comentários e no painel de tradução.",
-      helpHeading: "Ajuda e suporte",
-      helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
     },
     support: {
       title: "Suporte",
