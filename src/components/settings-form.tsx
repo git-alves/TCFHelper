@@ -4,12 +4,51 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useAppTheme } from "@/components/app-theme-provider";
 import { ThemedSelect } from "@/components/themed-select";
 import { APP_LOCALES, APP_LOCALE_LABELS } from "@/lib/app-locale";
-import { APP_THEMES, type AppTheme } from "@/lib/app-theme";
+import type { AppTheme } from "@/lib/app-theme";
 
 const SELECT_BUTTON_CLASSNAME =
   "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-black/[.4] dark:border-white/[.2] dark:focus:border-white/[.5]";
 const SELECT_LIST_CLASSNAME =
   "absolute left-0 right-0 z-20 mt-1 flex max-h-60 flex-col gap-0.5 overflow-auto rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]";
+
+// System / Dark / Light, matching the reference layout -- deliberately not
+// APP_THEMES's own declaration order ("light", "dark", "system").
+const THEME_TOGGLE_ORDER: readonly AppTheme[] = ["system", "dark", "light"];
+
+function MonitorIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+      <rect x="2.5" y="4" width="15" height="10" rx="1.5" />
+      <path strokeLinecap="round" d="M7 17h6M10 14v3" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.5a6.5 6.5 0 1 1-7-9.9 5.25 5.25 0 0 0 7 9.9Z" />
+    </svg>
+  );
+}
+
+function SunIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4" aria-hidden="true">
+      <circle cx="10" cy="10" r="3.25" />
+      <path
+        strokeLinecap="round"
+        d="M10 2.5v1.75M10 15.75v1.75M17.5 10h-1.75M4.25 10H2.5M15.3 4.7l-1.24 1.24M5.94 14.06l-1.24 1.24M15.3 15.3l-1.24-1.24M5.94 5.94 4.7 4.7"
+      />
+    </svg>
+  );
+}
+
+const THEME_ICONS: Record<AppTheme, () => React.JSX.Element> = {
+  system: MonitorIcon,
+  dark: MoonIcon,
+  light: SunIcon,
+};
 
 interface SettingsFormProps {
   name: string | null;
@@ -52,14 +91,33 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.appearanceDescription}
           </p>
         </div>
-        <ThemedSelect<AppTheme>
-          ariaLabelledBy="appearance-heading"
-          value={theme}
-          onChange={setTheme}
-          options={APP_THEMES.map((option) => ({ value: option, label: themeLabels[option] }))}
-          buttonClassName={SELECT_BUTTON_CLASSNAME}
-          listClassName={SELECT_LIST_CLASSNAME}
-        />
+        <div
+          role="radiogroup"
+          aria-labelledby="appearance-heading"
+          className="flex w-full rounded-xl border border-black/[.15] bg-black/[.02] p-1 dark:border-white/[.2] dark:bg-white/[.03]"
+        >
+          {THEME_TOGGLE_ORDER.map((option) => {
+            const isActive = theme === option;
+            const Icon = THEME_ICONS[option];
+            return (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={isActive}
+                onClick={() => setTheme(option)}
+                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-zinc-500 hover:text-foreground dark:text-zinc-400"
+                }`}
+              >
+                <Icon />
+                {themeLabels[option]}
+              </button>
+            );
+          })}
+        </div>
       </section>
 
       <section className="flex flex-col gap-2" aria-labelledby="language-heading">
