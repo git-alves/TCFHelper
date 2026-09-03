@@ -12,6 +12,33 @@ export interface ThemedSelectOption<T extends string> {
   label: string;
 }
 
+type MenuPlacement = "auto" | "above" | "below";
+
+interface MenuBounds {
+  triggerTop: number;
+  triggerBottom: number;
+  boundaryTop: number;
+  boundaryBottom: number;
+  menuHeight: number;
+}
+
+// A dropdown inside a scrollable modal must fit within the modal's visible
+// slice, not merely the browser viewport. Otherwise a trigger near the
+// bottom opens its list into clipped, scrollable space (as Settings' language
+// picker used to). Prefer the usual downward direction when it fits; only
+// flip when above has more usable room.
+export function selectMenuPlacement({
+  triggerTop,
+  triggerBottom,
+  boundaryTop,
+  boundaryBottom,
+  menuHeight,
+}: MenuBounds): Exclude<MenuPlacement, "auto"> {
+  const roomBelow = boundaryBottom - triggerBottom;
+  const roomAbove = triggerTop - boundaryTop;
+  return roomBelow >= menuHeight || roomBelow >= roomAbove ? "below" : "above";
+}
+
 interface ThemedSelectProps<T extends string> {
   id?: string;
   value: T;
@@ -22,6 +49,7 @@ interface ThemedSelectProps<T extends string> {
   ariaRequired?: boolean;
   ariaInvalid?: boolean;
   disabled?: boolean;
+  menuPlacement?: MenuPlacement;
   buttonClassName: string;
   listClassName: string;
   optionClassName?: string;
@@ -37,11 +65,13 @@ export function ThemedSelect<T extends string>({
   ariaRequired,
   ariaInvalid,
   disabled,
+  menuPlacement = "auto",
   buttonClassName,
   listClassName,
   optionClassName = "w-full rounded-lg px-3 py-1.5 text-left text-sm hover:bg-black/[.04] dark:hover:bg-white/[.06]",
 }: ThemedSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
+  const [resolvedPlacement, setResolvedPlacement] = useState<Exclude<MenuPlacement, "auto">>("below");
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
@@ -66,6 +96,51 @@ export function ThemedSelect<T extends string>({
     };
   }, [isOpen]);
 
+  function visibleBoundaryFor(element: HTMLElement) {
+    let ancestor = element.parentElement;
+    while (ancestor) {
+      const { overflow, overflowY } = window.getComputedStyle(ancestor);
+      if (/(auto|scroll|hidden|clip)/.test(`${overflow} ${overflowY}`)) {
+        const bounds = ancestor.getBoundingClientRect();
+        return {
+          top: Math.max(0, bounds.top),
+          bottom: Math.min(window.innerHeight, bounds.bottom),
+        };
+      }
+      ancestor = ancestor.parentElement;
+    }
+    return { top: 0, bottom: window.innerHeight };
+  }
+
+  function resolveMenuPlacement(): Exclude<MenuPlacement, "auto"> {
+    if (menuPlacement !== "auto") return menuPlacement;
+    const trigger = containerRef.current?.getBoundingClientRect();
+    if (!trigger) return "below";
+
+    const boundary = visibleBoundaryFor(containerRef.current!);
+    // Options use text-sm with py-1.5; this slightly generous estimate avoids
+    // opening downward for a list that would immediately be clipped. The
+    // existing max-h-60 is retained by consumers for unusually long lists.
+    const estimatedHeight = Math.min(options.length * 38 + 10, 240);
+    return selectMenuPlacement({
+      triggerTop: trigger.top,
+      triggerBottom: trigger.bottom,
+      boundaryTop: boundary.top,
+      boundaryBottom: boundary.bottom,
+      menuHeight: estimatedHeight,
+    });
+  }
+
+  function toggleMenu() {
+    if (!isOpen) setResolvedPlacement(resolveMenuPlacement());
+    setIsOpen((open) => !open);
+  }
+
+  const listStyle =
+    resolvedPlacement === "above"
+      ? { bottom: "100%", marginTop: 0, marginBottom: "0.25rem" }
+      : { top: "100%" };
+
   return (
     <div ref={containerRef} className="relative">
       <button
@@ -78,7 +153,7 @@ export function ThemedSelect<T extends string>({
         aria-required={ariaRequired}
         aria-invalid={ariaInvalid}
         disabled={disabled}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={toggleMenu}
         className={buttonClassName}
       >
         <span className="truncate">{selected?.label ?? value}</span>
@@ -87,7 +162,13 @@ export function ThemedSelect<T extends string>({
         </span>
       </button>
       {isOpen && (
-        <ul id={listboxId} role="listbox" aria-labelledby={ariaLabelledBy} className={listClassName}>
+        <ul
+          id={listboxId}
+          role="listbox"
+          aria-labelledby={ariaLabelledBy}
+          className={listClassName}
+          style={listStyle}
+        >
           {options.map((option) => (
             <li key={option.value} role="presentation">
               <button
