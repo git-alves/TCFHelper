@@ -597,12 +597,16 @@ To turn it on:
 1. In HubSpot, go to **Settings > Integrations > Private Apps** and create
    one (any name, e.g. "myTCFLab support sync").
 2. Grant it these scopes: `crm.objects.contacts.read`,
-   `crm.objects.contacts.write`, `crm.objects.tickets.read`,
-   `crm.objects.tickets.write`, `crm.schemas.tickets.write`,
-   `crm.objects.notes.read`, `crm.objects.notes.write`,
-   `crm.schemas.notes.write`, `files`. The `crm.schemas.*.write` scopes are
-   needed once, the first time the app runs, to create the
-   `support_request_id` property used for dedupe.
+   `crm.objects.contacts.write`, `tickets`, `files`. Per HubSpot's own API
+   docs, the single `tickets` scope covers every ticket operation this
+   integration uses (create, search, and creating the `support_request_id`
+   property), and the Notes API guide lists `crm.objects.contacts.read`/
+   `.write` as its required scope, so no separate notes scope is needed.
+   HubSpot's scope catalog has changed over time and is easy to get wrong
+   from documentation alone; if a request still fails with a 403, the
+   server log now includes HubSpot's own error message naming the exact
+   missing scope (see `syncSupportRequestToHubspot` call sites), which is
+   the most reliable way to confirm what's actually required for your app.
 3. Copy the generated access token into `HUBSPOT_ACCESS_TOKEN`.
 4. Optional: if your portal's support pipeline isn't the default one, set
    `HUBSPOT_TICKET_PIPELINE_ID` and `HUBSPOT_TICKET_PIPELINE_STAGE_ID` to the

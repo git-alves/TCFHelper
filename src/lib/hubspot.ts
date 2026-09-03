@@ -39,6 +39,19 @@ export class HubspotHttpError extends Error {
   }
 }
 
+// HubSpot's scope catalog has changed shape over time and is easy to get
+// wrong from documentation alone, so a 401/403 body -- which is always
+// HubSpot's own diagnostic about the token/app, e.g. "This app hasn't been
+// granted all required scopes" -- is worth surfacing verbatim. Every other
+// status keeps a terse message instead: those bodies can echo back the
+// value that failed validation, which may be the learner's own submitted
+// text, so they're not safe to log.
+async function hubspotErrorDetail(response: Response): Promise<string> {
+  if (response.status !== 401 && response.status !== 403) return "";
+  const body = await response.text().catch(() => "");
+  return body ? `: ${body.slice(0, 500)}` : "";
+}
+
 async function hubspotJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = requireHubspotAccessToken();
   const response = await fetch(`${HUBSPOT_API_BASE}${path}`, {
@@ -50,7 +63,11 @@ async function hubspotJson<T>(path: string, init: RequestInit = {}): Promise<T> 
     },
   });
   if (!response.ok) {
-    throw new HubspotHttpError(`HubSpot ${init.method ?? "GET"} ${path} failed with ${response.status}`, response.status);
+    const detail = await hubspotErrorDetail(response);
+    throw new HubspotHttpError(
+      `HubSpot ${init.method ?? "GET"} ${path} failed with ${response.status}${detail}`,
+      response.status,
+    );
   }
   // Some endpoints (e.g. the v4 default-association PUT) can return an empty
   // body on success, so don't assume every 2xx response is parseable JSON.
@@ -111,8 +128,9 @@ async function hubspotPropertyExists(objectType: string, propertyName: string): 
   });
   if (response.status === 404) return false;
   if (!response.ok) {
+    const detail = await hubspotErrorDetail(response);
     throw new HubspotHttpError(
-      `HubSpot GET property ${objectType}/${propertyName} failed with ${response.status}`,
+      `HubSpot GET property ${objectType}/${propertyName} failed with ${response.status}${detail}`,
       response.status,
     );
   }
@@ -243,7 +261,8 @@ export async function uploadHubspotFile({
     body: form,
   });
   if (!response.ok) {
-    throw new HubspotHttpError(`HubSpot file upload failed with ${response.status}`, response.status);
+    const detail = await hubspotErrorDetail(response);
+    throw new HubspotHttpError(`HubSpot file upload failed with ${response.status}${detail}`, response.status);
   }
   const uploaded = (await response.json()) as { id: string };
   return uploaded.id;

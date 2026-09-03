@@ -92,6 +92,26 @@ describe("upsertHubspotContact", () => {
     );
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("surfaces HubSpot's own message on a 403 to make missing scopes diagnosable", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('{"message":"This app hasn\'t been granted all required scopes: tickets"}', { status: 403 }),
+    );
+
+    await expect(upsertHubspotContact({ email: "learner@example.com", name: null })).rejects.toThrow(
+      /failed with 403: .*required scopes/i,
+    );
+  });
+
+  it("does not include the response body for a non-auth failure", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("possibly-sensitive-field-echo", { status: 400 }));
+
+    const error = await upsertHubspotContact({ email: "learner@example.com", name: null }).catch((e: Error) => e);
+
+    expect((error as Error).message).toBe(
+      "HubSpot POST /crm/v3/objects/contacts/batch/upsert failed with 400",
+    );
+  });
 });
 
 describe("findOrCreateHubspotTicket", () => {
