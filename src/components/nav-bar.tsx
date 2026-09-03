@@ -45,16 +45,27 @@ function TourIcon() {
   );
 }
 
-// A CSS-drawn question mark stays crisp and high-contrast at the compact nav
-// size (unlike the fine strokes of an SVG help glyph at some display scales).
+// A circled question mark: the one glyph learners already recognize as
+// "help" from other software, so Support reads at a glance without a label
+// the way the gear (Settings) and compass (Tour) icons beside it do.
 function SupportIcon() {
   return (
-    <span
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-5 w-5"
       aria-hidden="true"
-      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-xs font-semibold leading-none"
     >
-      ?
-    </span>
+      <circle cx="10" cy="10" r="7.25" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7.75 7.75a2.25 2.25 0 1 1 3.4 1.94c-.72.44-1.15.86-1.15 1.71v.35"
+      />
+      <circle cx="10" cy="14.15" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
   );
 }
 
@@ -81,7 +92,6 @@ const NAV_BUTTON_CLASS =
   "shrink-0 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 const ACTIVE_NAV_BUTTON_CLASS =
   "shrink-0 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background dark:bg-white dark:text-black";
-const SUPPORT_BUTTON_CLASS = `${NAV_BUTTON_CLASS} inline-flex items-center gap-1.5`;
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
@@ -238,18 +248,20 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   <TourIcon />
                 </button>
               )}
-              {/* Keep the familiar help glyph, but pair it with its label so
-               * support is discoverable instead of competing with the other
-               * utility icons. It still opens in context, preserving work. */}
+              {/* A recognizable help icon, not a labelled pill: Support is a
+               * secondary, always-available utility action (same tier as
+               * Settings/Tour), not one of the primary destinations above.
+               * It uses the same intercepted-route pattern as Settings, so
+               * opening it never abandons work in progress. */}
               <Link
                 href="/support"
                 prefetch={false}
                 data-walkthrough="nav-support"
                 title={copy.nav.support}
-                className={SUPPORT_BUTTON_CLASS}
+                aria-label={copy.nav.support}
+                className={ICON_BUTTON_CLASS}
               >
                 <SupportIcon />
-                {copy.nav.support}
               </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
@@ -282,10 +294,17 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           <Show when="signed-out">
             <>
               {/* /support redirects through sign-in when necessary, then
-               * returns here with the verified account email prefilled. */}
-              <Link href="/support" prefetch={false} className={SUPPORT_BUTTON_CLASS}>
+               * returns here with the verified account email prefilled. Same
+               * icon-only treatment as the signed-in nav for a consistent,
+               * at-a-glance help affordance. */}
+              <Link
+                href="/support"
+                prefetch={false}
+                title={copy.nav.support}
+                aria-label={copy.nav.support}
+                className={ICON_BUTTON_CLASS}
+              >
                 <SupportIcon />
-                {copy.nav.support}
               </Link>
               <SignInButton mode="modal">
                 <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
