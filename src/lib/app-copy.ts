@@ -57,10 +57,12 @@ export interface AppCopy {
     dashboard: string;
     tasks: string;
     practice: string;
+    support: string;
     settings: string;
     admin: string;
     logIn: string;
     closeSettingsFirst: string;
+    closeSupportFirst: string;
   };
   home: {
     title: string;
@@ -226,6 +228,31 @@ export interface AppCopy {
     languageDescription: string;
     helpHeading: string;
     helpDescription: string;
+  };
+  support: {
+    title: string;
+    intro: string;
+    sendAs: string;
+    categoryLabel: string;
+    categoryPlaceholder: string;
+    categoryRequired: string;
+    categories: Record<"BUG" | "QUESTION" | "FEATURE_REQUEST_FEEDBACK" | "ACCOUNT_ACCESS" | "OTHER", string>;
+    detailsLabel: string;
+    detailsPlaceholder: string;
+    detailsRequired: string;
+    attachmentsLabel: string;
+    optional: string;
+    dropFile: string;
+    browse: string;
+    attachmentHint: (values: { limit: string }) => string;
+    removeAttachment: string;
+    attachmentUnsupported: string;
+    submit: string;
+    submitting: string;
+    submitError: string;
+    successTitle: string;
+    successDescription: string;
+    sendAnother: string;
   };
   // Step titles/bodies are added per-step once the tour component exists;
   // this is only the chrome shared by every step.
@@ -511,10 +538,12 @@ export const APP_COPY = {
       dashboard: "Dashboard",
       tasks: "Full task",
       practice: "Practice",
+      support: "Support",
       settings: "Settings",
       admin: "Admin",
       logIn: "Log in",
       closeSettingsFirst: "Close Settings first",
+      closeSupportFirst: "Close Support first",
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to C2.",
@@ -692,6 +721,37 @@ export const APP_COPY = {
       languageDescription: "Choose the language used across the interface, feedback, and translation panel.",
       helpHeading: "Help & support",
       helpDescription: "Have a question or found a problem? Reach out and we'll help.",
+    },
+    support: {
+      title: "Support",
+      intro: "Tell us what’s up — a bug, a question, or an idea. We read every message.",
+      sendAs: "Send as",
+      categoryLabel: "What’s this about?",
+      categoryPlaceholder: "Choose one…",
+      categoryRequired: "Choose a category before sending your message.",
+      categories: {
+        BUG: "Bug",
+        QUESTION: "Question",
+        FEATURE_REQUEST_FEEDBACK: "Feature request / feedback",
+        ACCOUNT_ACCESS: "Account & access",
+        OTHER: "Other",
+      },
+      detailsLabel: "Details",
+      detailsPlaceholder: "What happened, or what do you need? Links, reproduction steps, and screenshots help us move faster.",
+      detailsRequired: "Tell us a little more before sending your message.",
+      attachmentsLabel: "Attachment",
+      optional: "optional",
+      dropFile: "Drag a file here, or",
+      browse: "browse",
+      attachmentHint: ({ limit }) => `Images, text, PDF, JSON, or ZIP · up to ${limit} MB`,
+      removeAttachment: "Remove attachment",
+      attachmentUnsupported: "Choose an image, text, PDF, JSON, or ZIP file no larger than 4 MB.",
+      submit: "Send",
+      submitting: "Sending…",
+      submitError: "We couldn’t send your message. Please try again.",
+      successTitle: "Thanks for reaching out",
+      successDescription: "Your message has been sent to the MyTCFLab team.",
+      sendAnother: "Send another message",
     },
     walkthrough: {
       takeATour: "Take a tour",
@@ -1117,10 +1177,12 @@ export const APP_COPY = {
       dashboard: "Tableau de bord",
       tasks: "Tâche complète",
       practice: "Pratique",
+      support: "Assistance",
       settings: "Paramètres",
       admin: "Admin",
       logIn: "Se connecter",
       closeSettingsFirst: "Fermez d’abord les paramètres",
+      closeSupportFirst: "Fermez d’abord l’assistance",
     },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau C2.",
@@ -1302,6 +1364,37 @@ export const APP_COPY = {
         "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction.",
       helpHeading: "Aide et assistance",
       helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
+    },
+    support: {
+      title: "Assistance",
+      intro: "Dites-nous ce qui se passe : un bug, une question ou une idée. Nous lisons chaque message.",
+      sendAs: "Envoyer en tant que",
+      categoryLabel: "Quel est le sujet ?",
+      categoryPlaceholder: "Choisissez une option…",
+      categoryRequired: "Choisissez une catégorie avant d’envoyer votre message.",
+      categories: {
+        BUG: "Bug",
+        QUESTION: "Question",
+        FEATURE_REQUEST_FEEDBACK: "Demande de fonctionnalité / avis",
+        ACCOUNT_ACCESS: "Compte et accès",
+        OTHER: "Autre",
+      },
+      detailsLabel: "Détails",
+      detailsPlaceholder: "Que s’est-il passé ou de quoi avez-vous besoin ? Des liens, étapes de reproduction et captures d’écran nous aident à aller plus vite.",
+      detailsRequired: "Ajoutez quelques détails avant d’envoyer votre message.",
+      attachmentsLabel: "Pièce jointe",
+      optional: "facultatif",
+      dropFile: "Déposez un fichier ici ou",
+      browse: "parcourez",
+      attachmentHint: ({ limit }) => `Images, texte, PDF, JSON ou ZIP · jusqu’à ${limit} Mo`,
+      removeAttachment: "Supprimer la pièce jointe",
+      attachmentUnsupported: "Choisissez une image, un fichier texte, PDF, JSON ou ZIP de 4 Mo maximum.",
+      submit: "Envoyer",
+      submitting: "Envoi…",
+      submitError: "Nous n’avons pas pu envoyer votre message. Réessayez.",
+      successTitle: "Merci de nous avoir contactés",
+      successDescription: "Votre message a été envoyé à l’équipe MyTCFLab.",
+      sendAnother: "Envoyer un autre message",
     },
     walkthrough: {
       takeATour: "Faire la visite guidée",
@@ -1734,10 +1827,12 @@ export const APP_COPY = {
       dashboard: "Panel",
       tasks: "Tarea completa",
       practice: "Práctica",
+      support: "Soporte",
       settings: "Configuración",
       admin: "Admin",
       logIn: "Iniciar sesión",
       closeSettingsFirst: "Cierra primero la configuración",
+      closeSupportFirst: "Cierra primero el soporte",
     },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar C2.",
@@ -1917,6 +2012,37 @@ export const APP_COPY = {
       languageDescription: "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción.",
       helpHeading: "Ayuda y soporte",
       helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
+    },
+    support: {
+      title: "Soporte",
+      intro: "Cuéntanos qué sucede: un error, una pregunta o una idea. Leemos cada mensaje.",
+      sendAs: "Enviar como",
+      categoryLabel: "¿De qué se trata?",
+      categoryPlaceholder: "Elige una opción…",
+      categoryRequired: "Elige una categoría antes de enviar tu mensaje.",
+      categories: {
+        BUG: "Error",
+        QUESTION: "Pregunta",
+        FEATURE_REQUEST_FEEDBACK: "Solicitud de función / comentarios",
+        ACCOUNT_ACCESS: "Cuenta y acceso",
+        OTHER: "Otro",
+      },
+      detailsLabel: "Detalles",
+      detailsPlaceholder: "¿Qué ocurrió o qué necesitas? Los enlaces, pasos para reproducirlo y capturas de pantalla nos ayudan a avanzar más rápido.",
+      detailsRequired: "Cuéntanos un poco más antes de enviar tu mensaje.",
+      attachmentsLabel: "Archivo adjunto",
+      optional: "opcional",
+      dropFile: "Arrastra un archivo aquí o",
+      browse: "explora",
+      attachmentHint: ({ limit }) => `Imágenes, texto, PDF, JSON o ZIP · hasta ${limit} MB`,
+      removeAttachment: "Quitar archivo adjunto",
+      attachmentUnsupported: "Elige una imagen, archivo de texto, PDF, JSON o ZIP de hasta 4 MB.",
+      submit: "Enviar",
+      submitting: "Enviando…",
+      submitError: "No pudimos enviar tu mensaje. Inténtalo de nuevo.",
+      successTitle: "Gracias por escribirnos",
+      successDescription: "Tu mensaje se envió al equipo de MyTCFLab.",
+      sendAnother: "Enviar otro mensaje",
     },
     walkthrough: {
       takeATour: "Hacer el recorrido",
@@ -2349,10 +2475,12 @@ export const APP_COPY = {
       dashboard: "Painel",
       tasks: "Tarefa completa",
       practice: "Prática",
+      support: "Suporte",
       settings: "Configurações",
       admin: "Admin",
       logIn: "Entrar",
       closeSettingsFirst: "Feche as configurações primeiro",
+      closeSupportFirst: "Feche o suporte primeiro",
     },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar C2.",
@@ -2532,6 +2660,37 @@ export const APP_COPY = {
       languageDescription: "Escolha o idioma usado na interface, nos comentários e no painel de tradução.",
       helpHeading: "Ajuda e suporte",
       helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
+    },
+    support: {
+      title: "Suporte",
+      intro: "Conte o que está acontecendo: um erro, uma dúvida ou uma ideia. Lemos todas as mensagens.",
+      sendAs: "Enviar como",
+      categoryLabel: "Sobre o que é isso?",
+      categoryPlaceholder: "Escolha uma opção…",
+      categoryRequired: "Escolha uma categoria antes de enviar sua mensagem.",
+      categories: {
+        BUG: "Erro",
+        QUESTION: "Dúvida",
+        FEATURE_REQUEST_FEEDBACK: "Pedido de recurso / feedback",
+        ACCOUNT_ACCESS: "Conta e acesso",
+        OTHER: "Outro",
+      },
+      detailsLabel: "Detalhes",
+      detailsPlaceholder: "O que aconteceu ou do que você precisa? Links, etapas para reproduzir e capturas de tela nos ajudam a agir mais rápido.",
+      detailsRequired: "Conte um pouco mais antes de enviar sua mensagem.",
+      attachmentsLabel: "Anexo",
+      optional: "opcional",
+      dropFile: "Arraste um arquivo aqui ou",
+      browse: "procure",
+      attachmentHint: ({ limit }) => `Imagens, texto, PDF, JSON ou ZIP · até ${limit} MB`,
+      removeAttachment: "Remover anexo",
+      attachmentUnsupported: "Escolha uma imagem, arquivo de texto, PDF, JSON ou ZIP de até 4 MB.",
+      submit: "Enviar",
+      submitting: "Enviando…",
+      submitError: "Não foi possível enviar sua mensagem. Tente novamente.",
+      successTitle: "Obrigado por entrar em contato",
+      successDescription: "Sua mensagem foi enviada para a equipe MyTCFLab.",
+      sendAnother: "Enviar outra mensagem",
     },
     walkthrough: {
       takeATour: "Fazer o tour",

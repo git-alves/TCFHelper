@@ -98,6 +98,16 @@ enum SubscriptionStatus {
   UNPAID
 }
 
+/// The subject chosen by a learner when contacting support. Kept as a closed
+/// database enum so support triage does not depend on browser-provided labels.
+enum SupportRequestCategory {
+  BUG
+  QUESTION
+  FEATURE_REQUEST_FEEDBACK
+  ACCOUNT_ACCESS
+  OTHER
+}
+
 model User {
   id                          String    @id @default(cuid())
   email                       String    @unique
@@ -151,6 +161,7 @@ model User {
   translationQuota        TranslationQuota?
   quotaOverride           UserQuotaOverride?
   redeemedAccessCodes     AccessCode[]             @relation("AccessCodeRedeemedBy")
+  supportRequests         SupportRequest[]
 
   @@index([lastActiveAt])
 }
@@ -583,4 +594,38 @@ model AppConfig {
   correctionDailyLimit Int?
   exampleDailyLimit    Int?
   updatedAt            DateTime @updatedAt
+}
+
+/// A learner-authored support message. senderEmail is intentionally a
+/// submission-time snapshot: the owner can answer the address the learner saw
+/// in "Send as", even if the account profile changes before triage.
+model SupportRequest {
+  id          String                 @id @default(cuid())
+  userId      String
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  senderEmail String
+  category    SupportRequestCategory
+  details     String
+  createdAt   DateTime               @default(now())
+
+  attachment SupportAttachment?
+
+  @@index([createdAt, id])
+  @@index([userId, createdAt])
+  @@index([category, createdAt])
+}
+
+/// A single optional evidence file for a support request. Keeping it private
+/// and as an attachment (not a public URL) prevents an upload from becoming a
+/// newly exposed hosting surface. A future owner-only download route can
+/// stream this as Content-Disposition: attachment.
+model SupportAttachment {
+  id               String         @id @default(cuid())
+  supportRequestId String         @unique
+  supportRequest   SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+  originalName     String
+  mimeType         String
+  byteSize         Int
+  data             Bytes
+  createdAt        DateTime       @default(now())
 }

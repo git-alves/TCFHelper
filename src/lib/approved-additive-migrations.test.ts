@@ -70,6 +70,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260902150000_add_app_config_daily_limits");
   });
 
+  it("allows the additive private support-request ledger", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260903160000_add_support_requests");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

@@ -75,7 +75,6 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const router = useRouter();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
   const { isAvailable: isWalkthroughAvailable } = useWalkthroughTrigger();
-
   // The workspace can stay mounted while Settings is open, so it remains
   // the source of truth for whether leaving this page needs a draft guard.
   const onTasks = isWorkspaceMounted;
@@ -100,10 +99,13 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   // in the DOM, so Settings would cover it and both dialogs' focus traps
   // would compete. Blocking the click instead of racing the two modals.
   const isSettingsOpen = pathname === "/settings";
-  const isDashboardBlocked = isNavigationBusy || isSettingsOpen;
+  const isSupportOpen = pathname === "/support";
+  const isDashboardBlocked = isNavigationBusy || isSettingsOpen || isSupportOpen;
   const dashboardBlockedReason = isNavigationBusy
     ? copy.workspace.editor.correctingStatus
-    : copy.nav.closeSettingsFirst;
+    : isSettingsOpen
+      ? copy.nav.closeSettingsFirst
+      : copy.nav.closeSupportFirst;
 
   function guardedNavigationHandler(destination: string) {
     return (event: MouseEvent<HTMLAnchorElement>) => {
@@ -222,6 +224,18 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   <TourIcon />
                 </button>
               )}
+              {/* Support stays visibly labelled (rather than a mystery icon)
+               * while using the same intercepted-route pattern as Settings,
+               * so opening it never abandons work in progress. */}
+              <Link
+                href="/support"
+                prefetch={false}
+                data-walkthrough="nav-support"
+                title={copy.nav.support}
+                className={NAV_BUTTON_CLASS}
+              >
+                {copy.nav.support}
+              </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
                * while a direct visit or refresh still renders the full page.
