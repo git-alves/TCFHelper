@@ -92,6 +92,7 @@ const NAV_BUTTON_CLASS =
   "shrink-0 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
 const ACTIVE_NAV_BUTTON_CLASS =
   "shrink-0 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background dark:bg-white dark:text-black";
+const SUPPORT_BUTTON_CLASS = `${NAV_BUTTON_CLASS} inline-flex items-center gap-1.5`;
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
@@ -248,20 +249,18 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   <TourIcon />
                 </button>
               )}
-              {/* A recognizable help icon, not a labelled pill: Support is a
-               * secondary, always-available utility action (same tier as
-               * Settings/Tour), not one of the primary destinations above.
-               * It uses the same intercepted-route pattern as Settings, so
-               * opening it never abandons work in progress. */}
+              {/* Keep the familiar help glyph, but pair it with its label so
+               * support is discoverable instead of competing with the other
+               * utility icons. It still opens in context, preserving work. */}
               <Link
                 href="/support"
                 prefetch={false}
                 data-walkthrough="nav-support"
                 title={copy.nav.support}
-                aria-label={copy.nav.support}
-                className={ICON_BUTTON_CLASS}
+                className={SUPPORT_BUTTON_CLASS}
               >
                 <SupportIcon />
+                {copy.nav.support}
               </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
@@ -292,11 +291,19 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
             </>
           </Show>
           <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
-                <AccountIcon />
-              </button>
-            </SignInButton>
+            <>
+              {/* /support redirects through sign-in when necessary, then
+               * returns here with the verified account email prefilled. */}
+              <Link href="/support" prefetch={false} className={SUPPORT_BUTTON_CLASS}>
+                <SupportIcon />
+                {copy.nav.support}
+              </Link>
+              <SignInButton mode="modal">
+                <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
+                  <AccountIcon />
+                </button>
+              </SignInButton>
+            </>
           </Show>
         </div>
       </nav>
