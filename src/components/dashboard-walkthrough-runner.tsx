@@ -92,6 +92,12 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
       placement: "bottom",
     },
     {
+      id: "nav-support",
+      title: copy.walkthrough.supportTitle,
+      body: copy.walkthrough.supportBody,
+      placement: "bottom",
+    },
+    {
       id: "nav-practice",
       title: copy.walkthrough.dashboardPracticeTitle,
       body: copy.walkthrough.dashboardPracticeBody,
@@ -153,7 +159,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToPractice : dismiss}
-      progress={isFullTour ? { step: stepIndex + 1, total: 19 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 1, total: 20 } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToPractice : undefined}
     />
   );

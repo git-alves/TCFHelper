@@ -101,7 +101,7 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToTasks : dismiss}
-      progress={isFullTour ? { step: stepIndex + 5, total: 19 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 6, total: 20 } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToFullTask : undefined}
     />
   );
