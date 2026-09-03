@@ -275,19 +275,34 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                * used to spotlight no longer exists as its own element, and
                * the existing "Open Settings to..." copy reads fine pointed
                * at the account menu instead.
-               * Clerk's UserButton.Link only takes {href, label, labelIcon}
-               * -- no onClick/disabled -- so Admin can't show the same
-               * "why is this disabled" tooltip Dashboard/Practice do above.
-               * It is hidden instead while blocked, which keeps the actual
-               * guard (never navigate away from an unsaved draft or an
-               * in-flight correction) without a tooltip this menu can't
-               * render. */}
+               * UserButton.Action, not UserButton.Link: Clerk's Link renders
+               * a plain href outside Next's router, which would hard-navigate
+               * past the /settings intercepted-route modal instead of opening
+               * it, and can't carry an onClick to guard Admin's navigation.
+               * router.push() is what a real <Link> click resolves to, so it
+               * goes through the same client-side transition Next's
+               * intercepting routes require. */}
               <span data-walkthrough="nav-settings" className="inline-flex">
                 <UserButton>
                   <UserButton.MenuItems>
-                    <UserButton.Link href="/settings" label={copy.nav.settings} labelIcon={<SettingsIcon />} />
+                    <UserButton.Action
+                      label={copy.nav.settings}
+                      labelIcon={<SettingsIcon />}
+                      onClick={() => router.push("/settings")}
+                    />
                     {isAdmin && !isOnAdminPage && !(onTasks && isDashboardBlocked) && (
-                      <UserButton.Link href="/admin" label={copy.nav.admin} labelIcon={<AdminIcon />} />
+                      // Same unsaved-draft guard Dashboard/Practice apply via
+                      // guardedNavigationHandler above -- Admin previously
+                      // carried it too, and moving into the account menu must
+                      // not silently drop it.
+                      <UserButton.Action
+                        label={copy.nav.admin}
+                        labelIcon={<AdminIcon />}
+                        onClick={() => {
+                          if (requestNavigation("/admin")) return;
+                          router.push("/admin");
+                        }}
+                      />
                     )}
                   </UserButton.MenuItems>
                 </UserButton>
