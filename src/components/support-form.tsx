@@ -5,6 +5,7 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useModalCloseControl, useModalCloseGuard } from "@/components/modal";
 import { ThemedSelect } from "@/components/themed-select";
+import { EMPTY_SUPPORT_DRAFT, useSupportDraft } from "@/lib/support-draft";
 import {
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_ATTACHMENT_MAX_BYTES,
@@ -56,8 +57,9 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const detailsId = useId();
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLTextAreaElement>(null);
-  const [category, setCategory] = useState<SupportCategoryChoice>("");
-  const [details, setDetails] = useState("");
+  const [draft, writeDraft] = useSupportDraft();
+  const category = (draft.category === "" || isSupportCategory(draft.category) ? draft.category : "") as SupportCategoryChoice;
+  const details = draft.details;
   const [attachment, setAttachment] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [invalidField, setInvalidField] = useState<InvalidField>(null);
@@ -143,9 +145,8 @@ export function SupportForm({ email, name }: SupportFormProps) {
       if (!response.ok) throw new Error("Support request failed");
 
       setIsSent(true);
-      setDetails("");
+      writeDraft(EMPTY_SUPPORT_DRAFT);
       clearAttachment();
-      setCategory("");
     } catch {
       setError(copy.support.submitError);
     } finally {
@@ -200,7 +201,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={SUPPORT_CATEGORY_TRIGGER_ID}
           value={category}
           onChange={(nextCategory) => {
-            setCategory(nextCategory);
+            writeDraft({ category: nextCategory, details });
             setError("");
             setInvalidField(null);
           }}
@@ -222,7 +223,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={detailsId}
           value={details}
           onChange={(event) => {
-            setDetails(event.target.value);
+            writeDraft({ category, details: event.target.value });
             if (invalidField === "details") {
               setError("");
               setInvalidField(null);
@@ -299,6 +300,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
         onCancel={() => setShowDiscardConfirm(false)}
         onConfirm={() => {
           setShowDiscardConfirm(false);
+          writeDraft(EMPTY_SUPPORT_DRAFT);
           closeImmediately();
         }}
       />
