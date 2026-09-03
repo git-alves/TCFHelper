@@ -45,27 +45,16 @@ function TourIcon() {
   );
 }
 
-// A circled question mark: the one glyph learners already recognize as
-// "help" from other software, so Support reads at a glance without a label
-// the way the gear (Settings) and compass (Tour) icons beside it do.
+// A CSS-drawn question mark stays crisp and high-contrast at the compact nav
+// size (unlike the fine strokes of an SVG help glyph at some display scales).
 function SupportIcon() {
   return (
-    <svg
-      viewBox="0 0 20 20"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      className="h-5 w-5"
+    <span
       aria-hidden="true"
+      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-current text-xs font-semibold leading-none"
     >
-      <circle cx="10" cy="10" r="7.25" />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M7.75 7.75a2.25 2.25 0 1 1 3.4 1.94c-.72.44-1.15.86-1.15 1.71v.35"
-      />
-      <circle cx="10" cy="14.15" r="0.75" fill="currentColor" stroke="none" />
-    </svg>
+      ?
+    </span>
   );
 }
 

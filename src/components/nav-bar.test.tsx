@@ -51,6 +51,6 @@ describe("NavBar", () => {
 
     expect(markup.match(/href="\/support"/g)).toHaveLength(2);
     expect(markup.match(/>Support<\/a>/g)).toHaveLength(2);
-    expect(markup.match(/<svg/g)).toHaveLength(4);
+    expect(markup.match(/>\?<\/span>/g)).toHaveLength(2);
   });
 });
