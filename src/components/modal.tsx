@@ -7,7 +7,12 @@ interface ModalProps {
   children: ReactNode;
   closeLabel: string;
   ariaLabel: string;
+  title?: string;
+  panelClassName?: string;
 }
+
+const DEFAULT_PANEL_CLASSNAME =
+  "absolute right-4 top-[4.25rem] max-h-[calc(100vh-5.5rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-2xl border border-black/[.08] bg-background p-5 shadow-xl outline-none dark:border-white/[.145] sm:right-6 lg:right-8";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -16,7 +21,7 @@ const FOCUSABLE_SELECTOR =
 // always goes through router.back() so the URL and browser history stay in
 // sync with what's actually on screen, per Next's parallel + intercepting
 // routes convention for modals.
-export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
+export function Modal({ children, closeLabel, ariaLabel, title, panelClassName }: ModalProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +72,7 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
   }, [router]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/20" onClick={() => router.back()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4" onClick={() => router.back()}>
       <div
         ref={dialogRef}
         role="dialog"
@@ -75,9 +80,10 @@ export function Modal({ children, closeLabel, ariaLabel }: ModalProps) {
         aria-label={ariaLabel}
         tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
-        className="absolute right-4 top-[4.25rem] max-h-[calc(100vh-5.5rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-2xl border border-black/[.08] bg-background p-5 shadow-xl outline-none dark:border-white/[.145] sm:right-6 lg:right-8"
+        className={panelClassName ?? DEFAULT_PANEL_CLASSNAME}
       >
-        <div className="flex justify-end">
+        <div className={title ? "flex items-center justify-between border-b border-black/[.08] px-5 py-4 dark:border-white/[.145] sm:px-6" : "flex justify-end"}>
+          {title && <h1 className="text-xl font-semibold tracking-tight">{title}</h1>}
           <button
             type="button"
             onClick={() => router.back()}

@@ -34,9 +34,11 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({
   children,
   settings,
+  support,
 }: Readonly<{
   children: React.ReactNode;
   settings: React.ReactNode;
+  support: React.ReactNode;
 }>) {
   const [locale, adminUser] = await Promise.all([
     getRequestLocale(),
@@ -70,6 +72,7 @@ export default async function RootLayout({
                   <NavBar isAdmin={isAdmin} />
                   <div className="flex flex-1 flex-col">{children}</div>
                   {settings}
+                  {support}
                 </WalkthroughTriggerProvider>
               </DashboardNavGuardProvider>
             </ClerkLocaleProvider>

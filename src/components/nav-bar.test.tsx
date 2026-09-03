@@ -45,4 +45,11 @@ describe("NavBar", () => {
     expect(markup.match(/href="\/dashboard"/g)).toHaveLength(1);
     expect(markup).toContain('aria-current="page"');
   });
+
+  it("offers a visible Support control in the signed-in navigation", () => {
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toContain('href="/support"');
+    expect(markup).toContain(">Support<");
+  });
 });

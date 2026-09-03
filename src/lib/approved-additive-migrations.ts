@@ -39,4 +39,7 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // Two nullable columns on the same singleton table, for the settings-page
   // consumption bar. Null continues to mean "use the built-in default".
   "20260902150000_add_app_config_daily_limits",
+  // Empty support tables plus a new closed category enum. No existing
+  // application record changes meaning during this rollout.
+  "20260903160000_add_support_requests",
 ]);
