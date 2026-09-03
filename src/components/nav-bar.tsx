@@ -45,6 +45,30 @@ function TourIcon() {
   );
 }
 
+// A circled question mark: the one glyph learners already recognize as
+// "help" from other software, so Support reads at a glance without a label
+// the way the gear (Settings) and compass (Tour) icons beside it do.
+function SupportIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-5 w-5"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="10" r="7.25" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M7.75 7.75a2.25 2.25 0 1 1 3.4 1.94c-.72.44-1.15.86-1.15 1.71v.35"
+      />
+      <circle cx="10" cy="14.15" r="0.75" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 function AccountIcon() {
   return (
     <svg
@@ -224,17 +248,20 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                   <TourIcon />
                 </button>
               )}
-              {/* Support stays visibly labelled (rather than a mystery icon)
-               * while using the same intercepted-route pattern as Settings,
-               * so opening it never abandons work in progress. */}
+              {/* A recognizable help icon, not a labelled pill: Support is a
+               * secondary, always-available utility action (same tier as
+               * Settings/Tour), not one of the primary destinations above.
+               * It uses the same intercepted-route pattern as Settings, so
+               * opening it never abandons work in progress. */}
               <Link
                 href="/support"
                 prefetch={false}
                 data-walkthrough="nav-support"
                 title={copy.nav.support}
-                className={NAV_BUTTON_CLASS}
+                aria-label={copy.nav.support}
+                className={ICON_BUTTON_CLASS}
               >
-                {copy.nav.support}
+                <SupportIcon />
               </Link>
               {/* A plain Link (not a button/onClick) so the intercepted route
                * in app/@settings opens this as a modal on soft navigation,
@@ -265,11 +292,26 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
             </>
           </Show>
           <Show when="signed-out">
-            <SignInButton mode="modal">
-              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
-                <AccountIcon />
-              </button>
-            </SignInButton>
+            <>
+              {/* /support redirects through sign-in when necessary, then
+               * returns here with the verified account email prefilled. Same
+               * icon-only treatment as the signed-in nav for a consistent,
+               * at-a-glance help affordance. */}
+              <Link
+                href="/support"
+                prefetch={false}
+                title={copy.nav.support}
+                aria-label={copy.nav.support}
+                className={ICON_BUTTON_CLASS}
+              >
+                <SupportIcon />
+              </Link>
+              <SignInButton mode="modal">
+                <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
+                  <AccountIcon />
+                </button>
+              </SignInButton>
+            </>
           </Show>
         </div>
       </nav>
