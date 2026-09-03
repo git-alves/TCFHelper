@@ -9,6 +9,9 @@ import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
 
+// Sized for Clerk's UserButton menu rows (16px), not the larger standalone
+// icon buttons elsewhere in this file -- Settings and Admin now live inside
+// the account menu instead of the persistent bar.
 function SettingsIcon() {
   return (
     <svg
@@ -16,7 +19,7 @@ function SettingsIcon() {
       fill="none"
       stroke="currentColor"
       strokeWidth="1.5"
-      className="h-5 w-5"
+      className="h-4 w-4"
       aria-hidden="true"
     >
       <path
@@ -25,6 +28,25 @@ function SettingsIcon() {
         d="M8.34 2.5h3.32l.46 2.32a6.5 6.5 0 0 1 1.68.98l2.24-.78 1.66 2.88-1.8 1.54a6.5 6.5 0 0 1 0 1.94l1.8 1.54-1.66 2.88-2.24-.78a6.5 6.5 0 0 1-1.68.98l-.46 2.32H8.34l-.46-2.32a6.5 6.5 0 0 1-1.68-.98l-2.24.78-1.66-2.88 1.8-1.54a6.5 6.5 0 0 1 0-1.94l-1.8-1.54 1.66-2.88 2.24.78a6.5 6.5 0 0 1 1.68-.98l.46-2.32Z"
       />
       <circle cx="10" cy="10" r="2.5" />
+    </svg>
+  );
+}
+
+function AdminIcon() {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      className="h-4 w-4"
+      aria-hidden="true"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M10 2.5c2.05 1.1 3.68 1.5 5.5 1.5 0 6.5-2.5 10.5-5.5 12.5C7 14.5 4.5 10.5 4.5 4c1.82 0 3.45-.4 5.5-1.5Z"
+      />
     </svg>
   );
 }
@@ -88,10 +110,13 @@ function AccountIcon() {
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
-const NAV_BUTTON_CLASS =
-  "shrink-0 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent dark:border-white/[.2] dark:hover:bg-white/[.06]";
-const ACTIVE_NAV_BUTTON_CLASS =
-  "shrink-0 rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background dark:bg-white dark:text-black";
+// Plain text, not a bordered pill: with only the three learning destinations
+// left at this tier, one underlined active state reads clearly on its own --
+// outlining every inactive item too just added visual weight for no reason.
+const NAV_LINK_CLASS =
+  "shrink-0 px-1 py-1.5 text-sm text-zinc-600 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-zinc-600 dark:text-zinc-300 dark:disabled:hover:text-zinc-300";
+const ACTIVE_NAV_LINK_CLASS =
+  "shrink-0 px-1 py-1.5 text-sm font-medium text-foreground underline decoration-2 underline-offset-4";
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
@@ -167,7 +192,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-dashboard"
                     title={dashboardBlockedReason}
                     aria-label={`${copy.nav.dashboard} — ${dashboardBlockedReason}`}
-                    className={NAV_BUTTON_CLASS}
+                    className={NAV_LINK_CLASS}
                   >
                     {copy.nav.dashboard}
                   </button>
@@ -177,7 +202,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-practice"
                     title={dashboardBlockedReason}
                     aria-label={`${copy.nav.practice} — ${dashboardBlockedReason}`}
-                    className={NAV_BUTTON_CLASS}
+                    className={NAV_LINK_CLASS}
                   >
                     {copy.nav.practice}
                   </button>
@@ -189,7 +214,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-dashboard"
                     onClick={guardedNavigationHandler("/dashboard")}
                     aria-current={realPathname === "/dashboard" ? "page" : undefined}
-                    className={realPathname === "/dashboard" ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
+                    className={realPathname === "/dashboard" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
                   >
                     {copy.nav.dashboard}
                   </Link>
@@ -198,7 +223,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-practice"
                     onClick={guardedNavigationHandler("/practice")}
                     aria-current={realPathname === "/practice" ? "page" : undefined}
-                    className={realPathname === "/practice" ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
+                    className={realPathname === "/practice" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
                   >
                     {copy.nav.practice}
                   </Link>
@@ -208,30 +233,10 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                 href="/tasks"
                 data-walkthrough="nav-tasks"
                 aria-current={onTasks ? "page" : undefined}
-                className={onTasks ? ACTIVE_NAV_BUTTON_CLASS : NAV_BUTTON_CLASS}
+                className={onTasks ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
               >
                 {copy.nav.tasks}
               </Link>
-              {isAdmin && !isOnAdminPage && (
-                // Same in-flight-work protection as Dashboard above: reachable
-                // from /tasks, so it must not let an owner leave a draft or an
-                // unabortable in-flight correction behind unconfirmed.
-                onTasks && isDashboardBlocked ? (
-                  <button
-                    type="button"
-                    disabled
-                    title={dashboardBlockedReason}
-                    aria-label={`${copy.nav.admin} — ${dashboardBlockedReason}`}
-                    className={NAV_BUTTON_CLASS}
-                  >
-                    {copy.nav.admin}
-                  </button>
-                ) : (
-                  <Link href="/admin" onClick={guardedNavigationHandler("/admin")} className={NAV_BUTTON_CLASS}>
-                    {copy.nav.admin}
-                  </Link>
-                )
-              )}
               {isWalkthroughAvailable && (
                 <button
                   type="button"
@@ -263,32 +268,30 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
               >
                 <SupportIcon />
               </Link>
-              {/* A plain Link (not a button/onClick) so the intercepted route
-               * in app/@settings opens this as a modal on soft navigation,
-               * while a direct visit or refresh still renders the full page.
-               * prefetch={false}: this Link is persistent across every
-               * client-side navigation in the app (it lives in the nav bar,
-               * outside {children}), so Next's background prefetch for it
-               * gets established once, from whatever page happened to be
-               * active when it first entered the viewport, and is then
-               * reused on click regardless of the page the learner is
-               * actually on. Interception depends on the referring page at
-               * click time, so a reused prefetch cached under a different
-               * referrer can serve the plain, non-intercepted /settings page
-               * instead of the modal. Disabling prefetch forces a fresh
-               * request on every click, always carrying the correct
-               * referrer. */}
-              <Link
-                href="/settings"
-                prefetch={false}
-                data-walkthrough="nav-settings"
-                title={copy.nav.settings}
-                aria-label={copy.nav.settings}
-                className={ICON_BUTTON_CLASS}
-              >
-                <SettingsIcon />
-              </Link>
-              <UserButton />
+              {/* Settings and Admin are account/role utilities, not learning
+               * destinations, so they live in the account menu instead of
+               * the persistent bar. The wrapper (not UserButton itself)
+               * carries the walkthrough target: the gear icon this step
+               * used to spotlight no longer exists as its own element, and
+               * the existing "Open Settings to..." copy reads fine pointed
+               * at the account menu instead.
+               * Clerk's UserButton.Link only takes {href, label, labelIcon}
+               * -- no onClick/disabled -- so Admin can't show the same
+               * "why is this disabled" tooltip Dashboard/Practice do above.
+               * It is hidden instead while blocked, which keeps the actual
+               * guard (never navigate away from an unsaved draft or an
+               * in-flight correction) without a tooltip this menu can't
+               * render. */}
+              <span data-walkthrough="nav-settings" className="inline-flex">
+                <UserButton>
+                  <UserButton.MenuItems>
+                    <UserButton.Link href="/settings" label={copy.nav.settings} labelIcon={<SettingsIcon />} />
+                    {isAdmin && !isOnAdminPage && !(onTasks && isDashboardBlocked) && (
+                      <UserButton.Link href="/admin" label={copy.nav.admin} labelIcon={<AdminIcon />} />
+                    )}
+                  </UserButton.MenuItems>
+                </UserButton>
+              </span>
             </>
           </Show>
           <Show when="signed-out">

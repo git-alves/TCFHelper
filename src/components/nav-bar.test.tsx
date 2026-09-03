@@ -6,11 +6,21 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: () => {} }),
 }));
 
-vi.mock("@clerk/nextjs", () => ({
-  Show: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  UserButton: () => null,
-}));
+vi.mock("@clerk/nextjs", () => {
+  const UserButton = Object.assign(
+    ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+    {
+      MenuItems: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+      Link: ({ href, label }: { href: string; label: string }) => <a href={href}>{label}</a>,
+    },
+  );
+
+  return {
+    Show: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    UserButton,
+  };
+});
 
 vi.mock("@/components/app-locale-provider", async () => {
   const { getAppCopy } = await import("@/lib/app-copy");
@@ -51,5 +61,28 @@ describe("NavBar", () => {
 
     expect(markup.match(/href="\/support"/g)).toHaveLength(1);
     expect(markup.match(/aria-label="Support"/g)).toHaveLength(1);
+  });
+
+  it("keeps the three learning links as plain text, not bordered pills", () => {
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).not.toContain("rounded-full border");
+  });
+
+  it("moves Settings into the account menu instead of a standalone icon", () => {
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toContain('href="/settings"');
+    expect(markup).toContain(">Settings<");
+    expect(markup).toContain('data-walkthrough="nav-settings"');
+  });
+
+  it("shows Admin in the account menu for an admin, and hides it otherwise", () => {
+    const adminMarkup = renderToStaticMarkup(<NavBar isAdmin />);
+    expect(adminMarkup).toContain('href="/admin"');
+    expect(adminMarkup).toContain(">Admin<");
+
+    const learnerMarkup = renderToStaticMarkup(<NavBar />);
+    expect(learnerMarkup).not.toContain('href="/admin"');
   });
 });
