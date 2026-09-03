@@ -236,6 +236,7 @@ describe("APP_COPY", () => {
         copy.support.attachmentHint({ limit: "4" }),
         copy.support.removeAttachment,
         copy.support.attachmentUnsupported,
+        copy.support.attachmentNotRestored({ name: "notes.txt" }),
         copy.support.submit,
         copy.support.submitting,
         copy.support.submitError,

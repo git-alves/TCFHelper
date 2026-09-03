@@ -16,35 +16,50 @@ describe("support draft persistence", () => {
     expect(loadSupportDraft(fakeStorage())).toBeNull();
   });
 
-  it("round-trips a saved draft", () => {
+  it("round-trips a saved draft, including the restored-attachment marker", () => {
     const storage = fakeStorage();
 
-    saveSupportDraft(storage, { category: "BUG", details: "The editor freezes." });
+    saveSupportDraft(storage, { category: "BUG", details: "The editor freezes.", attachmentName: "screenshot.png" });
 
-    expect(loadSupportDraft(storage)).toEqual({ category: "BUG", details: "The editor freezes." });
+    expect(loadSupportDraft(storage)).toEqual({
+      category: "BUG",
+      details: "The editor freezes.",
+      attachmentName: "screenshot.png",
+    });
   });
 
   it("overwrites the previous draft on every save rather than accumulating", () => {
     const storage = fakeStorage();
 
-    saveSupportDraft(storage, { category: "BUG", details: "First." });
-    saveSupportDraft(storage, { category: "QUESTION", details: "Second." });
+    saveSupportDraft(storage, { category: "BUG", details: "First.", attachmentName: null });
+    saveSupportDraft(storage, { category: "QUESTION", details: "Second.", attachmentName: null });
 
-    expect(loadSupportDraft(storage)).toEqual({ category: "QUESTION", details: "Second." });
+    expect(loadSupportDraft(storage)).toEqual({ category: "QUESTION", details: "Second.", attachmentName: null });
   });
 
   it("removes the draft entirely once cleared", () => {
     const storage = fakeStorage();
-    saveSupportDraft(storage, { category: "BUG", details: "Broken." });
+    saveSupportDraft(storage, { category: "BUG", details: "Broken.", attachmentName: null });
 
     clearSupportDraft(storage);
 
     expect(loadSupportDraft(storage)).toBeNull();
   });
 
+  it("defaults attachmentName to null for a draft saved before that field existed", () => {
+    const storage = fakeStorage({ "support-draft": JSON.stringify({ category: "BUG", details: "Broken." }) });
+
+    expect(loadSupportDraft(storage)).toEqual({ category: "BUG", details: "Broken.", attachmentName: null });
+  });
+
   it("treats a corrupted or incompatible stored value as no draft, instead of throwing", () => {
     expect(loadSupportDraft(fakeStorage({ "support-draft": "not json" }))).toBeNull();
     expect(loadSupportDraft(fakeStorage({ "support-draft": JSON.stringify({ category: "BUG" }) }))).toBeNull();
     expect(loadSupportDraft(fakeStorage({ "support-draft": JSON.stringify(42) }))).toBeNull();
+    expect(
+      loadSupportDraft(
+        fakeStorage({ "support-draft": JSON.stringify({ category: "BUG", details: "x", attachmentName: 7 }) }),
+      ),
+    ).toBeNull();
   });
 });

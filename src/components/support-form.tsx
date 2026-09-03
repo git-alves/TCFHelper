@@ -67,7 +67,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const [isSent, setIsSent] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-  const isDirty = category !== "" || details.trim() !== "" || attachment !== null;
+  const isDirty = category !== "" || details.trim() !== "" || attachment !== null || draft.attachmentName !== null;
   const { closeImmediately } = useModalCloseControl();
   useModalCloseGuard(() => {
     if (isSubmitting) return false;
@@ -88,6 +88,16 @@ export function SupportForm({ email, name }: SupportFormProps) {
     if (attachmentInputRef.current) attachmentInputRef.current.value = "";
   }
 
+  // Only for the explicit "Remove attachment" click: also drops the
+  // restored-but-unreattached marker below, since the learner just made an
+  // affirmative choice about it. An internal reset from a rejected file (see
+  // selectAttachment) must not touch that marker -- the original restored
+  // attachment is still pending reattachment either way.
+  function removeAttachment() {
+    clearAttachment();
+    if (draft.attachmentName !== null) writeDraft({ ...draft, attachmentName: null });
+  }
+
   function selectAttachment(file: File | null) {
     if (!file) return;
 
@@ -103,6 +113,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
 
     setAttachment(file);
     setError("");
+    writeDraft({ ...draft, attachmentName: file.name });
   }
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -201,7 +212,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={SUPPORT_CATEGORY_TRIGGER_ID}
           value={category}
           onChange={(nextCategory) => {
-            writeDraft({ category: nextCategory, details });
+            writeDraft({ ...draft, category: nextCategory });
             setError("");
             setInvalidField(null);
           }}
@@ -223,7 +234,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={detailsId}
           value={details}
           onChange={(event) => {
-            writeDraft({ category, details: event.target.value });
+            writeDraft({ ...draft, details: event.target.value });
             if (invalidField === "details") {
               setError("");
               setInvalidField(null);
@@ -251,7 +262,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
             </div>
             <button
               type="button"
-              onClick={clearAttachment}
+              onClick={removeAttachment}
               className="shrink-0 text-sm text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
             >
               {copy.support.removeAttachment}
@@ -270,6 +281,11 @@ export function SupportForm({ email, name }: SupportFormProps) {
             </span>
             <span className="mt-1 text-xs">{copy.support.attachmentHint({ limit: attachmentLimit })}</span>
           </label>
+        )}
+        {!attachment && draft.attachmentName && (
+          <p role="alert" className="text-xs text-amber-700 dark:text-amber-400">
+            {copy.support.attachmentNotRestored({ name: draft.attachmentName })}
+          </p>
         )}
         <input
           ref={attachmentInputRef}
