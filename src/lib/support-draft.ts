@@ -83,6 +83,22 @@ export function clearSupportDraft(storage: ClearableStorage, key: string): void 
   }
 }
 
+// The bare `sessionStorage` reference is itself evaluated by the caller
+// before loadSupportDraft/saveSupportDraft/clearSupportDraft are ever
+// entered, so their own internal try/catch cannot protect against a getter
+// that throws (some sandboxed/cross-origin embedding contexts raise
+// SecurityError merely accessing window.sessionStorage, not just calling
+// its methods). Every real access to the browser global goes through this
+// instead, so that failure mode degrades the same way a throwing method
+// call does -- storage treated as unavailable, in-memory cache untouched.
+export function getSessionStorage(): Storage | null {
+  try {
+    return sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 // sessionStorage is the actual source of truth here, read through
 // useSyncExternalStore rather than seeded into local component state from an
 // effect: getSnapshot below only reads it after the hydration-safe
@@ -111,7 +127,8 @@ function subscribe(listener: () => void) {
 function getSnapshot(storageKey: string): SupportDraft {
   if (!hasReadFromStorage.has(storageKey)) {
     hasReadFromStorage.add(storageKey);
-    const stored = loadSupportDraft(sessionStorage, storageKey);
+    const storage = getSessionStorage();
+    const stored = storage ? loadSupportDraft(storage, storageKey) : null;
     if (stored) draftCache.set(storageKey, stored);
   }
   return draftCache.get(storageKey) ?? EMPTY_SUPPORT_DRAFT;
@@ -143,10 +160,13 @@ export function useSupportDraft(userKey: string): [SupportDraft, (next: SupportD
   const writeDraft = useCallback(
     (next: SupportDraft) => {
       draftCache.set(storageKey, next);
-      if (next.category !== "" || next.details.trim() !== "" || next.attachmentName !== null) {
-        saveSupportDraft(sessionStorage, storageKey, next);
-      } else {
-        clearSupportDraft(sessionStorage, storageKey);
+      const storage = getSessionStorage();
+      if (storage) {
+        if (next.category !== "" || next.details.trim() !== "" || next.attachmentName !== null) {
+          saveSupportDraft(storage, storageKey, next);
+        } else {
+          clearSupportDraft(storage, storageKey);
+        }
       }
       notifyListeners();
     },

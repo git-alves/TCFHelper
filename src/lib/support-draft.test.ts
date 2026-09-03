@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { clearSupportDraft, loadSupportDraft, saveSupportDraft } from "./support-draft";
+import { afterEach, describe, expect, it } from "vitest";
+import { clearSupportDraft, getSessionStorage, loadSupportDraft, saveSupportDraft } from "./support-draft";
 
 function fakeStorage(initial: Record<string, string> = {}) {
   const store = new Map(Object.entries(initial));
@@ -100,5 +100,28 @@ describe("support draft persistence", () => {
 
   it("swallows a clear failure instead of throwing", () => {
     expect(() => clearSupportDraft(throwingStorage(), KEY)).not.toThrow();
+  });
+});
+
+describe("getSessionStorage", () => {
+  const originalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
+
+  afterEach(() => {
+    if (originalDescriptor) {
+      Object.defineProperty(globalThis, "sessionStorage", originalDescriptor);
+    } else {
+      delete (globalThis as { sessionStorage?: unknown }).sessionStorage;
+    }
+  });
+
+  it("returns null instead of throwing when the sessionStorage getter itself raises (e.g. a sandboxed embedding context)", () => {
+    Object.defineProperty(globalThis, "sessionStorage", {
+      configurable: true,
+      get(): Storage {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    });
+
+    expect(getSessionStorage()).toBeNull();
   });
 });
