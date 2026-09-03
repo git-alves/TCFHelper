@@ -91,6 +91,11 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             {copy.settings.appearanceDescription}
           </p>
         </div>
+        {/* Native radios, not button role="radio": a fake ARIA radiogroup
+         * still needs its own arrow-key/roving-tabindex handling to behave
+         * like one, which plain buttons never got here. Real inputs give
+         * that keyboard behavior (arrows move and select, one tab stop) for
+         * free, so this only has to style them, not reimplement them. */}
         <div
           role="radiogroup"
           aria-labelledby="appearance-heading"
@@ -100,21 +105,25 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
             const isActive = theme === option;
             const Icon = THEME_ICONS[option];
             return (
-              <button
+              <label
                 key={option}
-                type="button"
-                role="radio"
-                aria-checked={isActive}
-                onClick={() => setTheme(option)}
-                className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors focus-within:ring-2 focus-within:ring-violet-500/50 ${
                   isActive
-                    ? "bg-background text-foreground shadow-sm"
+                    ? "bg-background text-foreground shadow-sm dark:bg-white/[.12]"
                     : "text-zinc-500 hover:text-foreground dark:text-zinc-400"
                 }`}
               >
+                <input
+                  type="radio"
+                  name="appearance-theme"
+                  value={option}
+                  checked={isActive}
+                  onChange={() => setTheme(option)}
+                  className="sr-only"
+                />
                 <Icon />
                 {themeLabels[option]}
-              </button>
+              </label>
             );
           })}
         </div>

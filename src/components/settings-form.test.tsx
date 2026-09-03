@@ -20,6 +20,11 @@ describe("SettingsForm appearance toggle", () => {
     const markup = renderToStaticMarkup(<SettingsForm name="Ada Learner" email="learner@example.com" avatarUrl={null} />);
 
     expect(markup).toContain('role="radiogroup"');
+    expect(markup.match(/type="radio"/g)).toHaveLength(3);
+    // Real inputs, not button role="radio": arrow-key/tab-stop behavior
+    // between options must come from the browser, not custom key handling.
+    expect(markup).not.toContain('role="radio"');
+
     const system = markup.indexOf(">System<");
     const dark = markup.indexOf(">Dark<");
     const light = markup.indexOf(">Light<");
@@ -28,8 +33,8 @@ describe("SettingsForm appearance toggle", () => {
     expect(light).toBeGreaterThan(dark);
 
     // The mocked theme is "dark": exactly one option should be checked.
-    expect(markup.match(/aria-checked="true"/g)).toHaveLength(1);
-    const darkButtonStart = markup.lastIndexOf("<button", dark);
-    expect(markup.slice(darkButtonStart, dark)).toContain('aria-checked="true"');
+    expect(markup.match(/checked=""/g)).toHaveLength(1);
+    const darkLabelStart = markup.lastIndexOf("<label", dark);
+    expect(markup.slice(darkLabelStart, dark)).toContain('checked=""');
   });
 });
