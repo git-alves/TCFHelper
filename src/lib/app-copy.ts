@@ -271,6 +271,8 @@ export interface AppCopy {
     dashboardCorrectionsBody: string;
     settingsTitle: string;
     settingsBody: string;
+    supportTitle: string;
+    supportBody: string;
     dashboardPracticeTitle: string;
     dashboardPracticeBody: string;
     dashboardStartWritingTitle: string;
@@ -769,7 +771,9 @@ export const APP_COPY = {
       dashboardCorrectionsBody:
         "Every corrected essay's score and estimated level appear below the chart, so you can track exactly how each attempt went.",
       settingsTitle: "Make the app yours",
-      settingsBody: "Open Settings to choose the interface language and appearance, or find help and support whenever you need it.",
+      settingsBody: "Open the account menu and choose Settings to change the interface language and appearance.",
+      supportTitle: "Need help?",
+      supportBody: "Report a bug, ask a question, or share an idea. We use the email on your signed-in account so the team can reply.",
       dashboardPracticeTitle: "Build a task part before writing the whole response",
       dashboardPracticeBody: "Practice is your writing trainer. It helps you rehearse one numbered part of a TCF task at your target level before you attempt a complete response.",
       dashboardStartWritingTitle: "Ready for a full task?",
@@ -1412,7 +1416,9 @@ export const APP_COPY = {
       dashboardCorrectionsBody:
         "La note et le niveau estimé de chaque rédaction corrigée apparaissent sous le graphique, pour suivre précisément chaque tentative.",
       settingsTitle: "Personnalisez l’application",
-      settingsBody: "Ouvrez les paramètres pour choisir la langue et l’apparence de l’interface, ou trouver de l’aide lorsque vous en avez besoin.",
+      settingsBody: "Ouvrez le menu du compte et choisissez Paramètres pour changer la langue et l’apparence de l’interface.",
+      supportTitle: "Besoin d’aide ?",
+      supportBody: "Signalez un bug, posez une question ou partagez une idée. Nous utilisons l’adresse e-mail de votre compte connecté pour que l’équipe puisse vous répondre.",
       dashboardPracticeTitle: "Préparez une partie de la tâche avant la rédaction complète",
       dashboardPracticeBody: "Pratique est votre entraîneur d’écriture. Il vous aide à travailler une partie numérotée d’une tâche TCF à votre niveau cible avant de rédiger une réponse complète.",
       dashboardStartWritingTitle: "Prêt·e pour une tâche complète ?",
@@ -2060,7 +2066,9 @@ export const APP_COPY = {
       dashboardCorrectionsBody:
         "La nota y el nivel estimado de cada redacción corregida aparecen debajo del gráfico, para seguir exactamente cómo te fue en cada intento.",
       settingsTitle: "Personaliza la aplicación",
-      settingsBody: "Abre Configuración para elegir el idioma y la apariencia de la interfaz, o encontrar ayuda y soporte cuando lo necesites.",
+      settingsBody: "Abre el menú de la cuenta y elige Configuración para cambiar el idioma y la apariencia de la interfaz.",
+      supportTitle: "¿Necesitas ayuda?",
+      supportBody: "Informa un error, haz una pregunta o comparte una idea. Usamos el correo de tu cuenta conectada para que el equipo pueda responderte.",
       dashboardPracticeTitle: "Prepara una parte de la tarea antes de escribir la respuesta completa",
       dashboardPracticeBody: "Práctica es tu entrenador de escritura. Te ayuda a ensayar una parte numerada de una tarea TCF en tu nivel objetivo antes de escribir una respuesta completa.",
       dashboardStartWritingTitle: "¿Listo para una tarea completa?",
@@ -2708,7 +2716,9 @@ export const APP_COPY = {
       dashboardCorrectionsBody:
         "A nota e o nível estimado de cada redação corrigida aparecem abaixo do gráfico, para você acompanhar exatamente como foi cada tentativa.",
       settingsTitle: "Personalize o aplicativo",
-      settingsBody: "Abra Configurações para escolher o idioma e a aparência da interface ou encontrar ajuda e suporte quando precisar.",
+      settingsBody: "Abra o menu da conta e escolha Configurações para mudar o idioma e a aparência da interface.",
+      supportTitle: "Precisa de ajuda?",
+      supportBody: "Relate um bug, faça uma pergunta ou compartilhe uma ideia. Usamos o e-mail da sua conta conectada para que a equipe possa responder.",
       dashboardPracticeTitle: "Treine uma parte da tarefa antes de redigir a resposta completa",
       dashboardPracticeBody: "Prática é seu treinador de escrita. Ela ajuda você a treinar uma parte numerada de uma tarefa TCF no seu nível-alvo antes de escrever uma resposta completa.",
       dashboardStartWritingTitle: "Pronto para uma tarefa completa?",

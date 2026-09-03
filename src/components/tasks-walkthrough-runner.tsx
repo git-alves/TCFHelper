@@ -146,7 +146,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={dismiss}
-      progress={isFullTour ? { step: stepIndex + 8, total: 19 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 9, total: 20 } : undefined}
     />
   );
 }

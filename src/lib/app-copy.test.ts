@@ -165,6 +165,8 @@ describe("APP_COPY", () => {
         copy.walkthrough.dashboardCorrectionsBody,
         copy.walkthrough.settingsTitle,
         copy.walkthrough.settingsBody,
+        copy.walkthrough.supportTitle,
+        copy.walkthrough.supportBody,
         copy.walkthrough.dashboardPracticeTitle,
         copy.walkthrough.dashboardPracticeBody,
         copy.walkthrough.dashboardStartWritingTitle,
