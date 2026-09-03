@@ -1,13 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SUPPORT_ATTACHMENT_MAX_BYTES } from "@/lib/support-request";
 
-const { getCurrentAppUserMock, AppUserProvisioningErrorMock, createMock } = vi.hoisted(() => {
+const {
+  getCurrentAppUserMock,
+  AppUserProvisioningErrorMock,
+  createMock,
+  updateMock,
+  isHubspotConfiguredMock,
+  syncSupportRequestToHubspotMock,
+} = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
     getCurrentAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     createMock: vi.fn(),
+    updateMock: vi.fn(),
+    isHubspotConfiguredMock: vi.fn(),
+    syncSupportRequestToHubspotMock: vi.fn(),
   };
 });
 
@@ -16,7 +26,11 @@ vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { supportRequest: { create: createMock } },
+  prisma: { supportRequest: { create: createMock, update: updateMock } },
+}));
+vi.mock("@/lib/hubspot", () => ({
+  isHubspotConfigured: isHubspotConfiguredMock,
+  syncSupportRequestToHubspot: syncSupportRequestToHubspotMock,
 }));
 
 const { POST } = await import("./route");
@@ -44,9 +58,13 @@ function supportRequest(fields: Record<string, Array<string | SubmittedFile>>): 
 beforeEach(() => {
   getCurrentAppUserMock.mockReset();
   createMock.mockReset();
+  updateMock.mockReset();
+  isHubspotConfiguredMock.mockReset();
+  syncSupportRequestToHubspotMock.mockReset();
 
-  getCurrentAppUserMock.mockResolvedValue({ id: "learner_1", email: "learner@example.com" });
+  getCurrentAppUserMock.mockResolvedValue({ id: "learner_1", email: "learner@example.com", name: "Ada Lovelace" });
   createMock.mockResolvedValue({ id: "support_1" });
+  isHubspotConfiguredMock.mockReturnValue(false);
 });
 
 describe("POST /api/support", () => {
@@ -152,5 +170,48 @@ describe("POST /api/support", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Support is temporarily unavailable. Please try again.",
     });
+  });
+
+  it("skips HubSpot sync entirely when it isn't configured", async () => {
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(201);
+    expect(syncSupportRequestToHubspotMock).not.toHaveBeenCalled();
+    expect(updateMock).not.toHaveBeenCalled();
+  });
+
+  it("mirrors a stored request to HubSpot and records the returned ticket id", async () => {
+    isHubspotConfiguredMock.mockReturnValue(true);
+    syncSupportRequestToHubspotMock.mockResolvedValue({ ticketId: "ticket_1" });
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(201);
+    expect(syncSupportRequestToHubspotMock).toHaveBeenCalledWith({
+      senderEmail: "learner@example.com",
+      senderName: "Ada Lovelace",
+      category: "BUG",
+      details: "The editor freezes.",
+      attachment: null,
+    });
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: "support_1" },
+      data: { hubspotTicketId: "ticket_1", hubspotSyncedAt: expect.any(Date) },
+    });
+  });
+
+  it("still returns success to the learner when HubSpot sync fails", async () => {
+    isHubspotConfiguredMock.mockReturnValue(true);
+    syncSupportRequestToHubspotMock.mockRejectedValue(new Error("HubSpot is down"));
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ id: "support_1" });
+    expect(updateMock).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalledWith("HubSpot support sync failed", "HubSpot is down");
+
+    consoleErrorSpy.mockRestore();
   });
 });

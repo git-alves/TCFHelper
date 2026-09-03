@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { isHubspotConfigured, syncSupportRequestToHubspot } from "@/lib/hubspot";
 import { prisma } from "@/lib/prisma";
 import {
   SUPPORT_ATTACHMENT_MAX_BYTES,
@@ -142,6 +143,28 @@ export async function POST(request: Request) {
       },
       select: { id: true },
     });
+
+    if (isHubspotConfigured()) {
+      // The learner's request is already durably stored above, so a HubSpot
+      // outage or misconfiguration must never turn into a failed submission
+      // -- it only means this row's hubspotSyncedAt stays null for now.
+      try {
+        const { ticketId } = await syncSupportRequestToHubspot({
+          senderEmail: user.email,
+          senderName: user.name,
+          category: parsed.data.category,
+          details: parsed.data.details.trim(),
+          attachment: attachment ?? null,
+        });
+        await prisma.supportRequest.update({
+          where: { id: created.id },
+          data: { hubspotTicketId: ticketId, hubspotSyncedAt: new Date() },
+        });
+      } catch (error) {
+        console.error("HubSpot support sync failed", error instanceof Error ? error.message : error);
+      }
+    }
+
     return response({ id: created.id }, 201);
   } catch {
     // A support message can contain sensitive free-form text and files, so do

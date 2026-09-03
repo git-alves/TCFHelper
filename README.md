@@ -563,6 +563,34 @@ signature and keeps the `Subscription` table in sync for subscription
 lifecycle events, but nothing in the app reads subscription status yet —
 there's no checkout flow and no feature gate. That's follow-up work.
 
+## HubSpot support sync
+
+Every submitted support request (`POST /api/support`) is stored in Postgres
+first — that row is always the source of truth and is what `/admin/support`
+reads. If `HUBSPOT_ACCESS_TOKEN` is set, the route also best-effort mirrors
+the request into HubSpot as a ticket: it upserts a contact by the learner's
+signed-in email (splitting their account name into first/last name), creates
+a ticket with the category and details, associates the two, and — if the
+learner attached a file — uploads it to HubSpot's Files API and attaches it
+to the ticket via a note. A HubSpot outage or misconfiguration never fails
+the learner's submission; it only leaves that row's `hubspotSyncedAt` unset,
+and the failure is logged server-side without the request's sensitive text.
+
+To turn it on:
+
+1. In HubSpot, go to **Settings > Integrations > Private Apps** and create
+   one (any name, e.g. "myTCFLab support sync").
+2. Grant it these scopes: `crm.objects.contacts.read`,
+   `crm.objects.contacts.write`, `tickets`, `files`.
+3. Copy the generated access token into `HUBSPOT_ACCESS_TOKEN`.
+4. Optional: if your portal's support pipeline isn't the default one, set
+   `HUBSPOT_TICKET_PIPELINE_ID` and `HUBSPOT_TICKET_PIPELINE_STAGE_ID` to the
+   pipeline/stage IDs you want new tickets created in (find them under
+   **Settings > Objects > Tickets > Pipelines**, or via the Pipelines API).
+
+Leaving `HUBSPOT_ACCESS_TOKEN` unset disables the sync entirely; the support
+feature works the same as before, just without a HubSpot mirror.
+
 ## Deploying to Vercel
 
 There are two Vercel-hosted build paths; pick one and do not enable both for

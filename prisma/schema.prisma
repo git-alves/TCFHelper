@@ -607,6 +607,12 @@ model SupportRequest {
   category    SupportRequestCategory
   details     String
   createdAt   DateTime               @default(now())
+  // Set once the request has been mirrored to HubSpot as a ticket. Null
+  // means either sync hasn't run yet, HubSpot isn't configured, or the last
+  // attempt failed -- the local row is always the source of truth, so a
+  // missing mirror never blocks anything the learner or admin does here.
+  hubspotTicketId String?
+  hubspotSyncedAt DateTime?
 
   attachment SupportAttachment?
 

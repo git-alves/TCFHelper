@@ -38,6 +38,7 @@ export default async function AdminSupportPage() {
       category: true,
       details: true,
       createdAt: true,
+      hubspotTicketId: true,
       attachment: {
         select: { originalName: true, byteSize: true },
       },
@@ -91,6 +92,11 @@ export default async function AdminSupportPage() {
                     ({Math.ceil(request.attachment.byteSize / 1024).toLocaleString("en-US")} KB)
                   </span>
                 </a>
+              )}
+              {request.hubspotTicketId && (
+                <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
+                  Synced to HubSpot (ticket {request.hubspotTicketId})
+                </p>
               )}
             </li>
           ))}
