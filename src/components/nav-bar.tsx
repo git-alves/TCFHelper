@@ -292,26 +292,11 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
             </>
           </Show>
           <Show when="signed-out">
-            <>
-              {/* /support redirects through sign-in when necessary, then
-               * returns here with the verified account email prefilled. Same
-               * icon-only treatment as the signed-in nav for a consistent,
-               * at-a-glance help affordance. */}
-              <Link
-                href="/support"
-                prefetch={false}
-                title={copy.nav.support}
-                aria-label={copy.nav.support}
-                className={ICON_BUTTON_CLASS}
-              >
-                <SupportIcon />
-              </Link>
-              <SignInButton mode="modal">
-                <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
-                  <AccountIcon />
-                </button>
-              </SignInButton>
-            </>
+            <SignInButton mode="modal">
+              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
+                <AccountIcon />
+              </button>
+            </SignInButton>
           </Show>
         </div>
       </nav>
