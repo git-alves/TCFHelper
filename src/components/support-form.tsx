@@ -9,6 +9,7 @@ import {
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_ATTACHMENT_MAX_BYTES,
   SUPPORT_CATEGORIES,
+  SUPPORT_CATEGORY_TRIGGER_ID,
   formatSupportAttachmentLimit,
   isAcceptedSupportAttachment,
   isSupportCategory,
@@ -22,11 +23,6 @@ interface SupportFormProps {
   email: string;
   name: string | null;
 }
-
-// Referenced by the intercepted-route page so Modal can send initial focus
-// here instead of its default (the first focusable element, which would
-// otherwise be the close button).
-export const SUPPORT_CATEGORY_TRIGGER_ID = "support-category-trigger";
 
 const SELECT_BUTTON_CLASSNAME =
   "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/[.2] dark:focus:border-violet-300 dark:focus:ring-violet-300/20 aria-invalid:border-red-500 dark:aria-invalid:border-red-400";

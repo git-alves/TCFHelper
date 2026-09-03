@@ -1,8 +1,8 @@
 import { Modal } from "@/components/modal";
-import { SUPPORT_CATEGORY_TRIGGER_ID } from "@/components/support-form";
 import { SupportPageContent } from "@/components/support-page-content";
 import { getAppCopy } from "@/lib/app-copy";
 import { getRequestLocale } from "@/lib/request-locale";
+import { SUPPORT_CATEGORY_TRIGGER_ID } from "@/lib/support-request";
 
 // A client-side navigation to /support stays in context as a modal; a direct
 // visit and refresh use app/support/page.tsx as a normal, shareable page.

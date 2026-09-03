@@ -10,6 +10,16 @@ export const SUPPORT_CATEGORIES = [
 
 export type SupportCategory = (typeof SUPPORT_CATEGORIES)[number];
 
+// Read by both the client form and the server-rendered intercepted-route
+// page (so Modal can send initial focus there instead of its default, the
+// close button). Defined in this directive-free module, not support-form.tsx
+// itself: a plain constant re-exported from a "use client" file becomes an
+// opaque client reference when imported into a Server Component, which
+// throws at render time the moment the server tries to read its value
+// (e.g. to interpolate it into a template literal), not just if it were
+// called as a function.
+export const SUPPORT_CATEGORY_TRIGGER_ID = "support-category-trigger";
+
 export const SUPPORT_DESCRIPTION_MAX_CHARS = 10_000;
 // Vercel Functions cap request bodies at 4.5 MB. Leaving headroom for the
 // multipart envelope keeps an attachment that the form accepts deployable,
