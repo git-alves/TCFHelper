@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
@@ -103,14 +104,17 @@ export default async function AdminSupportPage() {
                 </p>
               ) : (
                 request.hubspotSyncAttempts > 0 && (
-                  <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
-                    Not yet in HubSpot after {request.hubspotSyncAttempts}{" "}
-                    {request.hubspotSyncAttempts === 1 ? "attempt" : "attempts"}
-                    {request.hubspotSyncAttempts >= MAX_HUBSPOT_SYNC_ATTEMPTS
-                      ? " — retries stopped automatically."
-                      : " — will retry automatically."}
-                    {request.hubspotLastSyncError ? ` (${request.hubspotLastSyncError})` : ""}
-                  </p>
+                  <>
+                    <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                      Not yet in HubSpot after {request.hubspotSyncAttempts}{" "}
+                      {request.hubspotSyncAttempts === 1 ? "attempt" : "attempts"}
+                      {request.hubspotSyncAttempts >= MAX_HUBSPOT_SYNC_ATTEMPTS
+                        ? " — retries stopped automatically."
+                        : " — will retry automatically."}
+                      {request.hubspotLastSyncError ? ` (${request.hubspotLastSyncError})` : ""}
+                    </p>
+                    <AdminSupportRetryButton requestId={request.id} />
+                  </>
                 )
               )}
             </li>

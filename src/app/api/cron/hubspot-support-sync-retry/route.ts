@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isHubspotConfigured } from "@/lib/hubspot";
 import { prisma } from "@/lib/prisma";
-import { MAX_HUBSPOT_SYNC_ATTEMPTS, syncSupportRequestToHubspot } from "@/lib/support-hubspot-sync";
+import {
+  MAX_HUBSPOT_SYNC_ATTEMPTS,
+  SYNCABLE_SUPPORT_REQUEST_SELECT,
+  syncSupportRequestToHubspot,
+  toSyncableSupportRequest,
+} from "@/lib/support-hubspot-sync";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 // Bounds each run to a fixed number of HubSpot API round trips regardless of
@@ -37,40 +42,14 @@ export async function GET(request: NextRequest) {
     where: { hubspotSyncedAt: null, hubspotSyncAttempts: { lt: MAX_HUBSPOT_SYNC_ATTEMPTS } },
     orderBy: { createdAt: "asc" },
     take: MAX_REQUESTS_PER_RUN,
-    select: {
-      id: true,
-      senderEmail: true,
-      category: true,
-      details: true,
-      hubspotTicketId: true,
-      hubspotAttachmentFileId: true,
-      hubspotAttachmentSyncedAt: true,
-      user: { select: { name: true } },
-      attachment: { select: { data: true, originalName: true, mimeType: true } },
-    },
+    select: SYNCABLE_SUPPORT_REQUEST_SELECT,
   });
 
   let succeeded = 0;
   let failed = 0;
   for (const item of pending) {
     try {
-      await syncSupportRequestToHubspot({
-        id: item.id,
-        senderEmail: item.senderEmail,
-        senderName: item.user.name,
-        category: item.category,
-        details: item.details,
-        hubspotTicketId: item.hubspotTicketId,
-        hubspotAttachmentFileId: item.hubspotAttachmentFileId,
-        hubspotAttachmentSyncedAt: item.hubspotAttachmentSyncedAt,
-        attachment: item.attachment
-          ? {
-              data: item.attachment.data,
-              originalName: item.attachment.originalName,
-              mimeType: item.attachment.mimeType,
-            }
-          : null,
-      });
+      await syncSupportRequestToHubspot(toSyncableSupportRequest(item));
       succeeded += 1;
     } catch (error) {
       failed += 1;

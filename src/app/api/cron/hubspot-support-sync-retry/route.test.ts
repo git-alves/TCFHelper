@@ -9,8 +9,9 @@ const { isHubspotConfiguredMock, findManyMock, syncSupportRequestToHubspotMock }
 
 vi.mock("@/lib/hubspot", () => ({ isHubspotConfigured: isHubspotConfiguredMock }));
 vi.mock("@/lib/prisma", () => ({ prisma: { supportRequest: { findMany: findManyMock } } }));
-vi.mock("@/lib/support-hubspot-sync", () => ({
-  MAX_HUBSPOT_SYNC_ATTEMPTS: 6,
+vi.mock("server-only", () => ({}));
+vi.mock(import("@/lib/support-hubspot-sync"), async (importOriginal) => ({
+  ...(await importOriginal()),
   syncSupportRequestToHubspot: syncSupportRequestToHubspotMock,
 }));
 
