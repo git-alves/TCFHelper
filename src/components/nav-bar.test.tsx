@@ -46,10 +46,10 @@ describe("NavBar", () => {
     expect(markup).toContain('aria-current="page"');
   });
 
-  it("offers a visible Support control in the signed-in navigation", () => {
+  it("offers an accessibly labelled Support icon in both navigation states", () => {
     const markup = renderToStaticMarkup(<NavBar />);
 
-    expect(markup).toContain('href="/support"');
-    expect(markup).toContain(">Support<");
+    expect(markup.match(/href="\/support"/g)).toHaveLength(2);
+    expect(markup.match(/aria-label="Support"/g)).toHaveLength(2);
   });
 });

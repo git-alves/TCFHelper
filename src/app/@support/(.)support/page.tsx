@@ -14,7 +14,7 @@ export default async function InterceptedSupportModal() {
       closeLabel={copy.common.close}
       ariaLabel={copy.support.title}
       title={copy.support.title}
-      panelClassName="relative max-h-[calc(100dvh-2rem)] w-full max-w-2xl overflow-y-auto rounded-2xl border border-black/[.1] bg-background shadow-2xl dark:border-white/[.15]"
+      panelClassName="absolute right-4 top-[4.25rem] max-h-[calc(100vh-5.5rem)] w-[calc(100vw-2rem)] max-w-sm overflow-y-auto rounded-2xl border border-black/[.1] bg-background shadow-2xl dark:border-white/[.15] sm:right-6 lg:right-8"
     >
       <div className="p-5 sm:p-6">
         <SupportPageContent />
