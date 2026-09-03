@@ -57,7 +57,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const detailsId = useId();
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLTextAreaElement>(null);
-  const [draft, writeDraft] = useSupportDraft();
+  const [draft, writeDraft] = useSupportDraft(email);
   const category = (draft.category === "" || isSupportCategory(draft.category) ? draft.category : "") as SupportCategoryChoice;
   const details = draft.details;
   const [attachment, setAttachment] = useState<File | null>(null);

@@ -11,17 +11,26 @@ function fakeStorage(initial: Record<string, string> = {}) {
   };
 }
 
+function throwingStorage(): Storage {
+  const boom = () => {
+    throw new DOMException("Storage is disabled", "SecurityError");
+  };
+  return { getItem: boom, setItem: boom, removeItem: boom } as unknown as Storage;
+}
+
+const KEY = "support-draft:learner@example.com";
+
 describe("support draft persistence", () => {
   it("returns null when nothing has been saved yet", () => {
-    expect(loadSupportDraft(fakeStorage())).toBeNull();
+    expect(loadSupportDraft(fakeStorage(), KEY)).toBeNull();
   });
 
   it("round-trips a saved draft, including the restored-attachment marker", () => {
     const storage = fakeStorage();
 
-    saveSupportDraft(storage, { category: "BUG", details: "The editor freezes.", attachmentName: "screenshot.png" });
+    saveSupportDraft(storage, KEY, { category: "BUG", details: "The editor freezes.", attachmentName: "screenshot.png" });
 
-    expect(loadSupportDraft(storage)).toEqual({
+    expect(loadSupportDraft(storage, KEY)).toEqual({
       category: "BUG",
       details: "The editor freezes.",
       attachmentName: "screenshot.png",
@@ -31,35 +40,65 @@ describe("support draft persistence", () => {
   it("overwrites the previous draft on every save rather than accumulating", () => {
     const storage = fakeStorage();
 
-    saveSupportDraft(storage, { category: "BUG", details: "First.", attachmentName: null });
-    saveSupportDraft(storage, { category: "QUESTION", details: "Second.", attachmentName: null });
+    saveSupportDraft(storage, KEY, { category: "BUG", details: "First.", attachmentName: null });
+    saveSupportDraft(storage, KEY, { category: "QUESTION", details: "Second.", attachmentName: null });
 
-    expect(loadSupportDraft(storage)).toEqual({ category: "QUESTION", details: "Second.", attachmentName: null });
+    expect(loadSupportDraft(storage, KEY)).toEqual({ category: "QUESTION", details: "Second.", attachmentName: null });
   });
 
   it("removes the draft entirely once cleared", () => {
     const storage = fakeStorage();
-    saveSupportDraft(storage, { category: "BUG", details: "Broken.", attachmentName: null });
+    saveSupportDraft(storage, KEY, { category: "BUG", details: "Broken.", attachmentName: null });
 
-    clearSupportDraft(storage);
+    clearSupportDraft(storage, KEY);
 
-    expect(loadSupportDraft(storage)).toBeNull();
+    expect(loadSupportDraft(storage, KEY)).toBeNull();
+  });
+
+  it("keeps two accounts' drafts under different keys from colliding", () => {
+    const storage = fakeStorage();
+    const otherKey = "support-draft:other@example.com";
+
+    saveSupportDraft(storage, KEY, { category: "BUG", details: "Learner A's issue.", attachmentName: null });
+    saveSupportDraft(storage, otherKey, { category: "QUESTION", details: "Learner B's question.", attachmentName: null });
+
+    expect(loadSupportDraft(storage, KEY)).toEqual({ category: "BUG", details: "Learner A's issue.", attachmentName: null });
+    expect(loadSupportDraft(storage, otherKey)).toEqual({
+      category: "QUESTION",
+      details: "Learner B's question.",
+      attachmentName: null,
+    });
+
+    clearSupportDraft(storage, KEY);
+
+    expect(loadSupportDraft(storage, KEY)).toBeNull();
+    expect(loadSupportDraft(storage, otherKey)).not.toBeNull();
   });
 
   it("defaults attachmentName to null for a draft saved before that field existed", () => {
-    const storage = fakeStorage({ "support-draft": JSON.stringify({ category: "BUG", details: "Broken." }) });
+    const storage = fakeStorage({ [KEY]: JSON.stringify({ category: "BUG", details: "Broken." }) });
 
-    expect(loadSupportDraft(storage)).toEqual({ category: "BUG", details: "Broken.", attachmentName: null });
+    expect(loadSupportDraft(storage, KEY)).toEqual({ category: "BUG", details: "Broken.", attachmentName: null });
   });
 
   it("treats a corrupted or incompatible stored value as no draft, instead of throwing", () => {
-    expect(loadSupportDraft(fakeStorage({ "support-draft": "not json" }))).toBeNull();
-    expect(loadSupportDraft(fakeStorage({ "support-draft": JSON.stringify({ category: "BUG" }) }))).toBeNull();
-    expect(loadSupportDraft(fakeStorage({ "support-draft": JSON.stringify(42) }))).toBeNull();
+    expect(loadSupportDraft(fakeStorage({ [KEY]: "not json" }), KEY)).toBeNull();
+    expect(loadSupportDraft(fakeStorage({ [KEY]: JSON.stringify({ category: "BUG" }) }), KEY)).toBeNull();
+    expect(loadSupportDraft(fakeStorage({ [KEY]: JSON.stringify(42) }), KEY)).toBeNull();
     expect(
-      loadSupportDraft(
-        fakeStorage({ "support-draft": JSON.stringify({ category: "BUG", details: "x", attachmentName: 7 }) }),
-      ),
+      loadSupportDraft(fakeStorage({ [KEY]: JSON.stringify({ category: "BUG", details: "x", attachmentName: 7 }) }), KEY),
     ).toBeNull();
+  });
+
+  it("treats storage that throws on read as no draft, instead of crashing", () => {
+    expect(loadSupportDraft(throwingStorage(), KEY)).toBeNull();
+  });
+
+  it("swallows a write failure instead of throwing (private browsing, disabled storage, full quota)", () => {
+    expect(() => saveSupportDraft(throwingStorage(), KEY, { category: "BUG", details: "x", attachmentName: null })).not.toThrow();
+  });
+
+  it("swallows a clear failure instead of throwing", () => {
+    expect(() => clearSupportDraft(throwingStorage(), KEY)).not.toThrow();
   });
 });
