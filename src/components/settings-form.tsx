@@ -147,19 +147,6 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
           listClassName={SELECT_LIST_CLASSNAME}
         />
       </section>
-
-      <section className="flex flex-col gap-2" aria-labelledby="help-heading">
-        <h2 id="help-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-          {copy.settings.helpHeading}
-        </h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">{copy.settings.helpDescription}</p>
-        <a
-          href="mailto:support@mytcflab.com"
-          className="self-start text-sm underline underline-offset-2 hover:text-foreground"
-        >
-          support@mytcflab.com
-        </a>
-      </section>
     </div>
   );
 }

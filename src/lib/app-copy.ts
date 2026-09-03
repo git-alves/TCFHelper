@@ -226,8 +226,6 @@ export interface AppCopy {
     themeSystem: string;
     languageHeading: string;
     languageDescription: string;
-    helpHeading: string;
-    helpDescription: string;
   };
   support: {
     title: string;
@@ -247,6 +245,7 @@ export interface AppCopy {
     attachmentHint: (values: { limit: string }) => string;
     removeAttachment: string;
     attachmentUnsupported: string;
+    attachmentNotRestored: (values: { name: string }) => string;
     submit: string;
     submitting: string;
     submitError: string;
@@ -724,8 +723,6 @@ export const APP_COPY = {
       themeSystem: "System",
       languageHeading: "Language",
       languageDescription: "Choose the language used across the interface, feedback, and translation panel.",
-      helpHeading: "Help & support",
-      helpDescription: "Have a question or found a problem? Reach out and we'll help.",
     },
     support: {
       title: "Support",
@@ -751,6 +748,8 @@ export const APP_COPY = {
       attachmentHint: ({ limit }) => `Images, text, PDF, JSON, or ZIP · up to ${limit} MB`,
       removeAttachment: "Remove attachment",
       attachmentUnsupported: "Choose an image, text, PDF, JSON, or ZIP file no larger than 4 MB.",
+      attachmentNotRestored: ({ name }) =>
+        `Your text was restored, but "${name}" couldn't be saved automatically — please attach it again if you still want to include it.`,
       submit: "Send",
       submitting: "Sending…",
       submitError: "We couldn’t send your message. Please try again.",
@@ -1372,8 +1371,6 @@ export const APP_COPY = {
       languageHeading: "Langue",
       languageDescription:
         "Choisissez la langue utilisée dans l’interface, les commentaires et le panneau de traduction.",
-      helpHeading: "Aide et assistance",
-      helpDescription: "Une question ou un problème ? Contactez-nous, nous sommes là pour vous aider.",
     },
     support: {
       title: "Assistance",
@@ -1399,6 +1396,8 @@ export const APP_COPY = {
       attachmentHint: ({ limit }) => `Images, texte, PDF, JSON ou ZIP · jusqu’à ${limit} Mo`,
       removeAttachment: "Supprimer la pièce jointe",
       attachmentUnsupported: "Choisissez une image, un fichier texte, PDF, JSON ou ZIP de 4 Mo maximum.",
+      attachmentNotRestored: ({ name }) =>
+        `Votre texte a été restauré, mais « ${name} » n'a pas pu être enregistré automatiquement — joignez-le à nouveau si vous souhaitez toujours l'inclure.`,
       submit: "Envoyer",
       submitting: "Envoi…",
       submitError: "Nous n’avons pas pu envoyer votre message. Réessayez.",
@@ -2025,8 +2024,6 @@ export const APP_COPY = {
       themeSystem: "Sistema",
       languageHeading: "Idioma",
       languageDescription: "Elige el idioma utilizado en la interfaz, los comentarios y el panel de traducción.",
-      helpHeading: "Ayuda y soporte",
-      helpDescription: "¿Tienes una pregunta o encontraste un problema? Contáctanos, con gusto te ayudamos.",
     },
     support: {
       title: "Soporte",
@@ -2052,6 +2049,8 @@ export const APP_COPY = {
       attachmentHint: ({ limit }) => `Imágenes, texto, PDF, JSON o ZIP · hasta ${limit} MB`,
       removeAttachment: "Quitar archivo adjunto",
       attachmentUnsupported: "Elige una imagen, archivo de texto, PDF, JSON o ZIP de hasta 4 MB.",
+      attachmentNotRestored: ({ name }) =>
+        `Se restauró tu texto, pero "${name}" no se pudo guardar automáticamente — adjúntalo de nuevo si aún quieres incluirlo.`,
       submit: "Enviar",
       submitting: "Enviando…",
       submitError: "No pudimos enviar tu mensaje. Inténtalo de nuevo.",
@@ -2678,8 +2677,6 @@ export const APP_COPY = {
       themeSystem: "Sistema",
       languageHeading: "Idioma",
       languageDescription: "Escolha o idioma usado na interface, nos comentários e no painel de tradução.",
-      helpHeading: "Ajuda e suporte",
-      helpDescription: "Tem uma dúvida ou encontrou um problema? Fale conosco, teremos prazer em ajudar.",
     },
     support: {
       title: "Suporte",
@@ -2705,6 +2702,8 @@ export const APP_COPY = {
       attachmentHint: ({ limit }) => `Imagens, texto, PDF, JSON ou ZIP · até ${limit} MB`,
       removeAttachment: "Remover anexo",
       attachmentUnsupported: "Escolha uma imagem, arquivo de texto, PDF, JSON ou ZIP de até 4 MB.",
+      attachmentNotRestored: ({ name }) =>
+        `Seu texto foi restaurado, mas "${name}" não pôde ser salvo automaticamente — anexe-o novamente se ainda quiser incluí-lo.`,
       submit: "Enviar",
       submitting: "Enviando…",
       submitError: "Não foi possível enviar sua mensagem. Tente novamente.",

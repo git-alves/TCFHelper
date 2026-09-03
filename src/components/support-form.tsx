@@ -5,10 +5,12 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { useModalCloseControl, useModalCloseGuard } from "@/components/modal";
 import { ThemedSelect } from "@/components/themed-select";
+import { EMPTY_SUPPORT_DRAFT, useSupportDraft } from "@/lib/support-draft";
 import {
   SUPPORT_ATTACHMENT_ACCEPT,
   SUPPORT_ATTACHMENT_MAX_BYTES,
   SUPPORT_CATEGORIES,
+  SUPPORT_CATEGORY_TRIGGER_ID,
   formatSupportAttachmentLimit,
   isAcceptedSupportAttachment,
   isSupportCategory,
@@ -22,11 +24,6 @@ interface SupportFormProps {
   email: string;
   name: string | null;
 }
-
-// Referenced by the intercepted-route page so Modal can send initial focus
-// here instead of its default (the first focusable element, which would
-// otherwise be the close button).
-export const SUPPORT_CATEGORY_TRIGGER_ID = "support-category-trigger";
 
 const SELECT_BUTTON_CLASSNAME =
   "flex w-full items-center justify-between gap-2 rounded-xl border border-black/[.15] bg-background px-4 py-2.5 text-left text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-white/[.2] dark:focus:border-violet-300 dark:focus:ring-violet-300/20 aria-invalid:border-red-500 dark:aria-invalid:border-red-400";
@@ -60,8 +57,9 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const detailsId = useId();
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const detailsRef = useRef<HTMLTextAreaElement>(null);
-  const [category, setCategory] = useState<SupportCategoryChoice>("");
-  const [details, setDetails] = useState("");
+  const [draft, writeDraft] = useSupportDraft(email);
+  const category = (draft.category === "" || isSupportCategory(draft.category) ? draft.category : "") as SupportCategoryChoice;
+  const details = draft.details;
   const [attachment, setAttachment] = useState<File | null>(null);
   const [error, setError] = useState("");
   const [invalidField, setInvalidField] = useState<InvalidField>(null);
@@ -69,7 +67,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const [isSent, setIsSent] = useState(false);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
-  const isDirty = category !== "" || details.trim() !== "" || attachment !== null;
+  const isDirty = category !== "" || details.trim() !== "" || attachment !== null || draft.attachmentName !== null;
   const { closeImmediately } = useModalCloseControl();
   useModalCloseGuard(() => {
     if (isSubmitting) return false;
@@ -90,6 +88,16 @@ export function SupportForm({ email, name }: SupportFormProps) {
     if (attachmentInputRef.current) attachmentInputRef.current.value = "";
   }
 
+  // Only for the explicit "Remove attachment" click: also drops the
+  // restored-but-unreattached marker below, since the learner just made an
+  // affirmative choice about it. An internal reset from a rejected file (see
+  // selectAttachment) must not touch that marker -- the original restored
+  // attachment is still pending reattachment either way.
+  function removeAttachment() {
+    clearAttachment();
+    if (draft.attachmentName !== null) writeDraft({ ...draft, attachmentName: null });
+  }
+
   function selectAttachment(file: File | null) {
     if (!file) return;
 
@@ -105,6 +113,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
 
     setAttachment(file);
     setError("");
+    writeDraft({ ...draft, attachmentName: file.name });
   }
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
@@ -147,9 +156,8 @@ export function SupportForm({ email, name }: SupportFormProps) {
       if (!response.ok) throw new Error("Support request failed");
 
       setIsSent(true);
-      setDetails("");
+      writeDraft(EMPTY_SUPPORT_DRAFT);
       clearAttachment();
-      setCategory("");
     } catch {
       setError(copy.support.submitError);
     } finally {
@@ -204,7 +212,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={SUPPORT_CATEGORY_TRIGGER_ID}
           value={category}
           onChange={(nextCategory) => {
-            setCategory(nextCategory);
+            writeDraft({ ...draft, category: nextCategory });
             setError("");
             setInvalidField(null);
           }}
@@ -226,7 +234,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
           id={detailsId}
           value={details}
           onChange={(event) => {
-            setDetails(event.target.value);
+            writeDraft({ ...draft, details: event.target.value });
             if (invalidField === "details") {
               setError("");
               setInvalidField(null);
@@ -254,7 +262,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
             </div>
             <button
               type="button"
-              onClick={clearAttachment}
+              onClick={removeAttachment}
               className="shrink-0 text-sm text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
             >
               {copy.support.removeAttachment}
@@ -273,6 +281,11 @@ export function SupportForm({ email, name }: SupportFormProps) {
             </span>
             <span className="mt-1 text-xs">{copy.support.attachmentHint({ limit: attachmentLimit })}</span>
           </label>
+        )}
+        {!attachment && draft.attachmentName && (
+          <p role="alert" className="text-xs text-amber-700 dark:text-amber-400">
+            {copy.support.attachmentNotRestored({ name: draft.attachmentName })}
+          </p>
         )}
         <input
           ref={attachmentInputRef}
@@ -303,6 +316,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
         onCancel={() => setShowDiscardConfirm(false)}
         onConfirm={() => {
           setShowDiscardConfirm(false);
+          writeDraft(EMPTY_SUPPORT_DRAFT);
           closeImmediately();
         }}
       />

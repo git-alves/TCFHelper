@@ -28,6 +28,47 @@ export type SyncableSupportRequest = {
   attachment: { data: Uint8Array; originalName: string; mimeType: string } | null;
 };
 
+// Shared by every caller that loads a row to sync (the retry cron's batch
+// query and the admin manual-retry route's single-row lookup), so the two
+// never drift into fetching different fields for the same operation.
+export const SYNCABLE_SUPPORT_REQUEST_SELECT = {
+  id: true,
+  senderEmail: true,
+  category: true,
+  details: true,
+  hubspotTicketId: true,
+  hubspotAttachmentFileId: true,
+  hubspotAttachmentSyncedAt: true,
+  user: { select: { name: true } },
+  attachment: { select: { data: true, originalName: true, mimeType: true } },
+} as const;
+
+type SyncableSupportRequestRow = {
+  id: string;
+  senderEmail: string;
+  category: SupportCategory;
+  details: string;
+  hubspotTicketId: string | null;
+  hubspotAttachmentFileId: string | null;
+  hubspotAttachmentSyncedAt: Date | null;
+  user: { name: string | null };
+  attachment: { data: Uint8Array; originalName: string; mimeType: string } | null;
+};
+
+export function toSyncableSupportRequest(row: SyncableSupportRequestRow): SyncableSupportRequest {
+  return {
+    id: row.id,
+    senderEmail: row.senderEmail,
+    senderName: row.user.name,
+    category: row.category,
+    details: row.details,
+    hubspotTicketId: row.hubspotTicketId,
+    hubspotAttachmentFileId: row.hubspotAttachmentFileId,
+    hubspotAttachmentSyncedAt: row.hubspotAttachmentSyncedAt,
+    attachment: row.attachment,
+  };
+}
+
 // Mirrors one support request into HubSpot, resuming from whatever a
 // previous attempt already got done. Duplicate-creation safety comes from
 // two layers: the locally persisted ids below let a normal retry skip
