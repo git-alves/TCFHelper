@@ -1,5 +1,17 @@
 # Support Request Flow
 
+> **Status: this document is the original design proposal, not a description of what shipped.** The merged implementation (PRs #128–#130) deliberately narrowed the scope below in several places:
+>
+> | This document specifies | What shipped |
+> | --- | --- |
+> | A visible, text-labelled "Help & support" nav button | A signed-in-only icon (circled question mark), no label |
+> | A 560–640px dialog | The same compact, top-right-anchored panel Settings uses (`max-w-sm`) |
+> | An editable "Send as" email, with an "invalid email" error state | A read-only display of the signed-in account's email; the server never accepts a browser-supplied address |
+> | Category-specific detail prompts (separate Bug/Question/Feedback/Account/Other copy) | One generic details prompt for every category |
+> | A public support path for the "Account & access" gap before sign-in | No signed-out entry point at all — Support is reachable only when signed in |
+>
+> The rest of this document (flow rationale, state specification, accessibility requirements) still reflects real product thinking and is a reasonable backlog for a v2, but treat every concrete UI value above (sizing, labels, editability) as superseded by the shipped code, not current behavior.
+
 **Problem** — A learner who is blocked, sees something broken, or has an idea needs a fast way to reach the team without leaving their current task, guessing where feedback belongs, or retyping information the app already knows. A generic email link asks the learner to supply routing context, loses useful attachments, and gives no clear confirmation that the message arrived.
 
 **Job to be done** — When I need help with my myTCFLab account or experience, let me describe it and send the right context in one short interaction, so I can get back to studying confident that the team received it.
