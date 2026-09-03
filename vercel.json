@@ -6,6 +6,10 @@
     {
       "path": "/api/cron/admin-events-retention",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/hubspot-support-sync-retry",
+      "schedule": "30 4 * * *"
     }
   ]
 }

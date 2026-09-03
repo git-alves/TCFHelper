@@ -5,7 +5,6 @@ const {
   getCurrentAppUserMock,
   AppUserProvisioningErrorMock,
   createMock,
-  updateMock,
   isHubspotConfiguredMock,
   syncSupportRequestToHubspotMock,
 } = vi.hoisted(() => {
@@ -15,7 +14,6 @@ const {
     getCurrentAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     createMock: vi.fn(),
-    updateMock: vi.fn(),
     isHubspotConfiguredMock: vi.fn(),
     syncSupportRequestToHubspotMock: vi.fn(),
   };
@@ -26,10 +24,12 @@ vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { supportRequest: { create: createMock, update: updateMock } },
+  prisma: { supportRequest: { create: createMock } },
 }));
 vi.mock("@/lib/hubspot", () => ({
   isHubspotConfigured: isHubspotConfiguredMock,
+}));
+vi.mock("@/lib/support-hubspot-sync", () => ({
   syncSupportRequestToHubspot: syncSupportRequestToHubspotMock,
 }));
 
@@ -58,7 +58,6 @@ function supportRequest(fields: Record<string, Array<string | SubmittedFile>>): 
 beforeEach(() => {
   getCurrentAppUserMock.mockReset();
   createMock.mockReset();
-  updateMock.mockReset();
   isHubspotConfiguredMock.mockReset();
   syncSupportRequestToHubspotMock.mockReset();
 
@@ -177,26 +176,24 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(201);
     expect(syncSupportRequestToHubspotMock).not.toHaveBeenCalled();
-    expect(updateMock).not.toHaveBeenCalled();
   });
 
-  it("mirrors a stored request to HubSpot and records the returned ticket id", async () => {
+  it("mirrors a newly created request to HubSpot with no prior progress", async () => {
     isHubspotConfiguredMock.mockReturnValue(true);
-    syncSupportRequestToHubspotMock.mockResolvedValue({ ticketId: "ticket_1" });
+    syncSupportRequestToHubspotMock.mockResolvedValue(undefined);
 
     const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
 
     expect(response.status).toBe(201);
     expect(syncSupportRequestToHubspotMock).toHaveBeenCalledWith({
+      id: "support_1",
       senderEmail: "learner@example.com",
       senderName: "Ada Lovelace",
       category: "BUG",
       details: "The editor freezes.",
+      hubspotTicketId: null,
+      hubspotAttachmentSyncedAt: null,
       attachment: null,
-    });
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: "support_1" },
-      data: { hubspotTicketId: "ticket_1", hubspotSyncedAt: expect.any(Date) },
     });
   });
 
@@ -209,7 +206,6 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual({ id: "support_1" });
-    expect(updateMock).not.toHaveBeenCalled();
     expect(consoleErrorSpy).toHaveBeenCalledWith("HubSpot support sync failed", "HubSpot is down");
 
     consoleErrorSpy.mockRestore();

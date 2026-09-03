@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
-import { isHubspotConfigured, syncSupportRequestToHubspot } from "@/lib/hubspot";
+import { isHubspotConfigured } from "@/lib/hubspot";
 import { prisma } from "@/lib/prisma";
+import { syncSupportRequestToHubspot } from "@/lib/support-hubspot-sync";
 import {
   SUPPORT_ATTACHMENT_MAX_BYTES,
   SUPPORT_DESCRIPTION_MAX_CHARS,
@@ -146,19 +147,20 @@ export async function POST(request: Request) {
 
     if (isHubspotConfigured()) {
       // The learner's request is already durably stored above, so a HubSpot
-      // outage or misconfiguration must never turn into a failed submission
-      // -- it only means this row's hubspotSyncedAt stays null for now.
+      // outage or misconfiguration must never turn into a failed submission.
+      // syncSupportRequestToHubspot itself records the attempt/error on the
+      // row; the retry cron (/api/cron/hubspot-support-sync-retry) picks up
+      // anything that doesn't succeed here.
       try {
-        const { ticketId } = await syncSupportRequestToHubspot({
+        await syncSupportRequestToHubspot({
+          id: created.id,
           senderEmail: user.email,
           senderName: user.name,
           category: parsed.data.category,
           details: parsed.data.details.trim(),
+          hubspotTicketId: null,
+          hubspotAttachmentSyncedAt: null,
           attachment: attachment ?? null,
-        });
-        await prisma.supportRequest.update({
-          where: { id: created.id },
-          data: { hubspotTicketId: ticketId, hubspotSyncedAt: new Date() },
         });
       } catch (error) {
         console.error("HubSpot support sync failed", error instanceof Error ? error.message : error);

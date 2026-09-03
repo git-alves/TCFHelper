@@ -574,7 +574,17 @@ a ticket with the category and details, associates the two, and — if the
 learner attached a file — uploads it to HubSpot's Files API and attaches it
 to the ticket via a note. A HubSpot outage or misconfiguration never fails
 the learner's submission; it only leaves that row's `hubspotSyncedAt` unset,
-and the failure is logged server-side without the request's sensitive text.
+and the failure (plus an attempt count) is recorded on the row and logged
+server-side without the request's sensitive text.
+
+A daily cron (`/api/cron/hubspot-support-sync-retry`, authenticated the same
+way as the admin-event retention cron with `CRON_SECRET`) re-attempts any
+request that hasn't fully synced yet. It resumes from whatever a previous
+attempt already got done — reusing an already-created ticket id, skipping an
+already-uploaded attachment — so a retry never creates a duplicate ticket or
+attachment. After 6 failed attempts a request stops retrying automatically
+and stays visible with its last error under `/admin/support` for manual
+follow-up.
 
 To turn it on:
 
@@ -625,7 +635,10 @@ Either way, set these environment variables on the Vercel project (with
 `GEMINI_CORRECTION_MODEL`, `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`,
 `CRON_SECRET` (Production scope only -- required for the admin-event
-retention cron to authenticate; see `.env.example`).
+retention and HubSpot support-sync retry crons to authenticate; see
+`.env.example`), `HUBSPOT_ACCESS_TOKEN` and, if needed,
+`HUBSPOT_TICKET_PIPELINE_ID` / `HUBSPOT_TICKET_PIPELINE_STAGE_ID` (see
+"HubSpot support sync" above).
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary

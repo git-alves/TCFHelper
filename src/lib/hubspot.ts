@@ -39,10 +39,14 @@ async function hubspotJson<T>(path: string, init: RequestInit = {}): Promise<T> 
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+type HubspotObjectRef = { type: string; id: string };
+
 // The v4 "default" association endpoint resolves the correct HubSpot-defined
 // association type for a given object pair on its own, so callers never need
-// to hardcode a numeric association type id.
-async function associateDefault(from: { type: string; id: string }, to: { type: string; id: string }) {
+// to hardcode a numeric association type id. It's also safe to call more
+// than once for the same pair -- HubSpot treats re-creating an existing
+// default association as a no-op, which is what makes every retry below safe.
+export async function associateHubspotDefault(from: HubspotObjectRef, to: HubspotObjectRef): Promise<void> {
   await hubspotJson(`/crm/v4/objects/${from.type}/${from.id}/associations/default/${to.type}/${to.id}`, {
     method: "PUT",
   });
@@ -55,7 +59,15 @@ function splitName(name: string | null): { firstname?: string; lastname?: string
   return rest.length > 0 ? { firstname, lastname: rest.join(" ") } : { firstname };
 }
 
-async function upsertHubspotContact({ email, name }: { email: string; name: string | null }): Promise<string> {
+// Keyed on email via idProperty, so calling this again for the same learner
+// (e.g. on a retry) updates the same contact rather than creating another.
+export async function upsertHubspotContact({
+  email,
+  name,
+}: {
+  email: string;
+  name: string | null;
+}): Promise<string> {
   const body = await hubspotJson<{ results: Array<{ id: string }> }>("/crm/v3/objects/contacts/batch/upsert", {
     method: "POST",
     body: JSON.stringify({
@@ -73,7 +85,10 @@ async function upsertHubspotContact({ email, name }: { email: string; name: stri
   return contactId;
 }
 
-async function createHubspotTicket({
+// Not idempotent -- each call creates a new ticket. Callers must persist the
+// returned id and pass it through on any retry instead of calling this again
+// for the same support request.
+export async function createHubspotTicket({
   category,
   details,
   senderEmail,
@@ -100,94 +115,45 @@ async function createHubspotTicket({
   return body.id;
 }
 
-async function uploadHubspotFile({
-  data,
-  fileName,
-  mimeType,
+// Not idempotent -- each call uploads another copy of the file and creates
+// another note. Callers must track completion (e.g.
+// SupportRequest.hubspotAttachmentSyncedAt) and skip calling this again once
+// it has succeeded for a given support request.
+export async function attachHubspotFile({
+  ticketId,
+  contactId,
+  attachment,
 }: {
-  data: Uint8Array;
-  fileName: string;
-  mimeType: string;
-}): Promise<string> {
+  ticketId: string;
+  contactId: string;
+  attachment: { data: Uint8Array; originalName: string; mimeType: string };
+}): Promise<void> {
   const token = requireHubspotAccessToken();
   const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(data)], { type: mimeType }), fileName);
+  form.append("file", new Blob([new Uint8Array(attachment.data)], { type: attachment.mimeType }), attachment.originalName);
   form.append("options", JSON.stringify({ access: "PRIVATE" }));
   form.append("folderPath", "/support-tickets");
 
-  const response = await fetch(`${HUBSPOT_API_BASE}/files/v3/files`, {
+  const uploadResponse = await fetch(`${HUBSPOT_API_BASE}/files/v3/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  if (!response.ok) {
-    throw new Error(`HubSpot file upload failed with ${response.status}`);
+  if (!uploadResponse.ok) {
+    throw new Error(`HubSpot file upload failed with ${uploadResponse.status}`);
   }
-  const uploaded = (await response.json()) as { id: string };
-  return uploaded.id;
-}
+  const uploaded = (await uploadResponse.json()) as { id: string };
 
-async function attachHubspotFileToTicket({
-  fileId,
-  fileName,
-  ticketId,
-  contactId,
-}: {
-  fileId: string;
-  fileName: string;
-  ticketId: string;
-  contactId: string;
-}): Promise<void> {
   const note = await hubspotJson<{ id: string }>("/crm/v3/objects/notes", {
     method: "POST",
     body: JSON.stringify({
       properties: {
         hs_timestamp: Date.now(),
-        hs_note_body: `Attachment from support request: ${fileName}`,
-        hs_attachment_ids: fileId,
+        hs_note_body: `Attachment from support request: ${attachment.originalName}`,
+        hs_attachment_ids: uploaded.id,
       },
     }),
   });
-  await associateDefault({ type: "notes", id: note.id }, { type: "tickets", id: ticketId });
-  await associateDefault({ type: "notes", id: note.id }, { type: "contacts", id: contactId });
-}
-
-export type HubspotSupportSyncInput = {
-  senderEmail: string;
-  senderName: string | null;
-  category: SupportCategory;
-  details: string;
-  attachment?: { data: Uint8Array; originalName: string; mimeType: string } | null;
-};
-
-// Best-effort mirror of a stored support request into HubSpot as a ticket
-// linked to a contact, with any attachment reachable from the ticket's
-// timeline. The local SupportRequest row is always the source of truth --
-// callers should not fail the learner's submission if this throws.
-export async function syncSupportRequestToHubspot(
-  input: HubspotSupportSyncInput,
-): Promise<{ ticketId: string }> {
-  const contactId = await upsertHubspotContact({ email: input.senderEmail, name: input.senderName });
-  const ticketId = await createHubspotTicket({
-    category: input.category,
-    details: input.details,
-    senderEmail: input.senderEmail,
-  });
-  await associateDefault({ type: "tickets", id: ticketId }, { type: "contacts", id: contactId });
-
-  if (input.attachment) {
-    const fileId = await uploadHubspotFile({
-      data: input.attachment.data,
-      fileName: input.attachment.originalName,
-      mimeType: input.attachment.mimeType,
-    });
-    await attachHubspotFileToTicket({
-      fileId,
-      fileName: input.attachment.originalName,
-      ticketId,
-      contactId,
-    });
-  }
-
-  return { ticketId };
+  await associateHubspotDefault({ type: "notes", id: note.id }, { type: "tickets", id: ticketId });
+  await associateHubspotDefault({ type: "notes", id: note.id }, { type: "contacts", id: contactId });
 }

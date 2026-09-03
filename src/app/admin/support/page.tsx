@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
+import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
 
 const CATEGORY_LABELS = {
   BUG: "Bug",
@@ -39,6 +40,9 @@ export default async function AdminSupportPage() {
       details: true,
       createdAt: true,
       hubspotTicketId: true,
+      hubspotSyncedAt: true,
+      hubspotSyncAttempts: true,
+      hubspotLastSyncError: true,
       attachment: {
         select: { originalName: true, byteSize: true },
       },
@@ -93,10 +97,21 @@ export default async function AdminSupportPage() {
                   </span>
                 </a>
               )}
-              {request.hubspotTicketId && (
+              {request.hubspotSyncedAt ? (
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
                   Synced to HubSpot (ticket {request.hubspotTicketId})
                 </p>
+              ) : (
+                request.hubspotSyncAttempts > 0 && (
+                  <p className="mt-3 text-xs text-amber-700 dark:text-amber-400">
+                    Not yet in HubSpot after {request.hubspotSyncAttempts}{" "}
+                    {request.hubspotSyncAttempts === 1 ? "attempt" : "attempts"}
+                    {request.hubspotSyncAttempts >= MAX_HUBSPOT_SYNC_ATTEMPTS
+                      ? " — retries stopped automatically."
+                      : " — will retry automatically."}
+                    {request.hubspotLastSyncError ? ` (${request.hubspotLastSyncError})` : ""}
+                  </p>
+                )
               )}
             </li>
           ))}
