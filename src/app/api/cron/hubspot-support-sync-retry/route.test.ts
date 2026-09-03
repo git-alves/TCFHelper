@@ -74,6 +74,7 @@ describe("GET /api/cron/hubspot-support-sync-retry", () => {
         category: "BUG",
         details: "Broken.",
         hubspotTicketId: "ticket_existing",
+        hubspotAttachmentFileId: null,
         hubspotAttachmentSyncedAt: null,
         user: { name: "Ada Lovelace" },
         attachment: null,
@@ -84,6 +85,7 @@ describe("GET /api/cron/hubspot-support-sync-retry", () => {
         category: "OTHER",
         details: "See attached.",
         hubspotTicketId: null,
+        hubspotAttachmentFileId: null,
         hubspotAttachmentSyncedAt: null,
         user: { name: null },
         attachment: { data: new Uint8Array([1]), originalName: "log.txt", mimeType: "text/plain" },
@@ -103,6 +105,7 @@ describe("GET /api/cron/hubspot-support-sync-retry", () => {
       category: "BUG",
       details: "Broken.",
       hubspotTicketId: "ticket_existing",
+      hubspotAttachmentFileId: null,
       hubspotAttachmentSyncedAt: null,
       attachment: null,
     });
@@ -113,6 +116,7 @@ describe("GET /api/cron/hubspot-support-sync-retry", () => {
       category: "OTHER",
       details: "See attached.",
       hubspotTicketId: null,
+      hubspotAttachmentFileId: null,
       hubspotAttachmentSyncedAt: null,
       attachment: { data: new Uint8Array([1]), originalName: "log.txt", mimeType: "text/plain" },
     });

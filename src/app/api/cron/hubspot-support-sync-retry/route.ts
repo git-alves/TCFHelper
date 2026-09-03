@@ -19,8 +19,10 @@ function isAuthorizedCron(request: NextRequest) {
  * Vercel invokes this daily in UTC and supplies CRON_SECRET as a bearer
  * token, the same credential used by the admin-event retention cron.
  * syncSupportRequestToHubspot resumes from whatever a prior attempt already
- * persisted (ticket id, attachment note), so re-running it here never
- * creates a duplicate ticket or attachment.
+ * persisted (ticket id, uploaded file id), and the HubSpot-side creates it
+ * still has to make are themselves deduped by a unique support_request_id
+ * property -- so re-running it here, even concurrently with the initial
+ * synchronous submit, never creates a duplicate ticket or attachment note.
  */
 export async function GET(request: NextRequest) {
   if (!isAuthorizedCron(request)) {
@@ -41,6 +43,7 @@ export async function GET(request: NextRequest) {
       category: true,
       details: true,
       hubspotTicketId: true,
+      hubspotAttachmentFileId: true,
       hubspotAttachmentSyncedAt: true,
       user: { select: { name: true } },
       attachment: { select: { data: true, originalName: true, mimeType: true } },
@@ -58,6 +61,7 @@ export async function GET(request: NextRequest) {
         category: item.category,
         details: item.details,
         hubspotTicketId: item.hubspotTicketId,
+        hubspotAttachmentFileId: item.hubspotAttachmentFileId,
         hubspotAttachmentSyncedAt: item.hubspotAttachmentSyncedAt,
         attachment: item.attachment
           ? {

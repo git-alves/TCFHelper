@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   associateHubspotDefault,
-  attachHubspotFile,
-  createHubspotTicket,
+  findOrCreateHubspotAttachmentNote,
+  findOrCreateHubspotTicket,
   isHubspotConfigured,
+  uploadHubspotFile,
   upsertHubspotContact,
 } from "./hubspot";
 
@@ -22,6 +23,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
   if (originalToken === undefined) delete process.env.HUBSPOT_ACCESS_TOKEN;
   else process.env.HUBSPOT_ACCESS_TOKEN = originalToken;
   if (originalPipeline === undefined) delete process.env.HUBSPOT_TICKET_PIPELINE_ID;
@@ -32,6 +34,14 @@ afterEach(() => {
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(body === undefined ? "" : JSON.stringify(body), { status });
+}
+
+function propertyExistsResponse() {
+  return jsonResponse({ name: "support_request_id" });
+}
+
+function propertyMissingResponse() {
+  return new Response("not found", { status: 404 });
 }
 
 describe("isHubspotConfigured", () => {
@@ -84,21 +94,33 @@ describe("upsertHubspotContact", () => {
   });
 });
 
-describe("createHubspotTicket", () => {
-  it("defaults to the default portal pipeline and stage", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "ticket_1" }));
+describe("findOrCreateHubspotTicket", () => {
+  const input = { supportRequestId: "support_1", category: "BUG" as const, details: "The editor freezes.", senderEmail: "learner@example.com" };
 
-    const ticketId = await createHubspotTicket({
-      category: "BUG",
-      details: "The editor freezes.",
-      senderEmail: "learner@example.com",
-    });
+  it("provisions the dedupe property when missing, then creates the ticket carrying it", async () => {
+    fetchMock
+      .mockResolvedValueOnce(propertyMissingResponse())
+      .mockResolvedValueOnce(jsonResponse({ results: [{ name: "ticketinformation" }] }))
+      .mockResolvedValueOnce(jsonResponse({}))
+      .mockResolvedValueOnce(jsonResponse({ id: "ticket_1" }));
+
+    const ticketId = await findOrCreateHubspotTicket(input);
 
     expect(ticketId).toBe("ticket_1");
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("https://api.hubapi.com/crm/v3/objects/tickets");
-    expect(JSON.parse(init.body as string)).toEqual({
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.hubapi.com/crm/v3/properties/tickets/support_request_id");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.hubapi.com/crm/v3/properties/tickets/groups");
+    const [propUrl, propInit] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(propUrl).toBe("https://api.hubapi.com/crm/v3/properties/tickets");
+    expect(JSON.parse(propInit.body as string)).toMatchObject({
+      name: "support_request_id",
+      groupName: "ticketinformation",
+      hasUniqueValue: true,
+    });
+    const [ticketUrl, ticketInit] = fetchMock.mock.calls[3] as [string, RequestInit];
+    expect(ticketUrl).toBe("https://api.hubapi.com/crm/v3/objects/tickets");
+    expect(JSON.parse(ticketInit.body as string)).toEqual({
       properties: {
+        support_request_id: "support_1",
         subject: "[Bug] Support request from learner@example.com",
         content: "The editor freezes.",
         hs_pipeline: "0",
@@ -107,20 +129,131 @@ describe("createHubspotTicket", () => {
     });
   });
 
-  it("respects pipeline/stage overrides and rejects a non-2xx response", async () => {
+  it("skips provisioning when the dedupe property already exists", async () => {
+    fetchMock.mockResolvedValueOnce(propertyExistsResponse()).mockResolvedValueOnce(jsonResponse({ id: "ticket_1" }));
+
+    await findOrCreateHubspotTicket(input);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("treats a 409 while provisioning the property as already-created by a concurrent worker", async () => {
+    fetchMock
+      .mockResolvedValueOnce(propertyMissingResponse())
+      .mockResolvedValueOnce(jsonResponse({ results: [{ name: "ticketinformation" }] }))
+      .mockResolvedValueOnce(new Response("conflict", { status: 409 }))
+      .mockResolvedValueOnce(jsonResponse({ id: "ticket_1" }));
+
+    const ticketId = await findOrCreateHubspotTicket(input);
+    expect(ticketId).toBe("ticket_1");
+  });
+
+  it("respects pipeline/stage overrides", async () => {
     process.env.HUBSPOT_TICKET_PIPELINE_ID = "42";
     process.env.HUBSPOT_TICKET_PIPELINE_STAGE_ID = "7";
+    fetchMock.mockResolvedValueOnce(propertyExistsResponse()).mockResolvedValueOnce(jsonResponse({ id: "ticket_1" }));
+
+    await findOrCreateHubspotTicket(input);
+
+    const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(JSON.parse(init.body as string).properties).toMatchObject({ hs_pipeline: "42", hs_pipeline_stage: "7" });
+  });
+
+  it("looks up the existing ticket on a 409 conflict instead of creating a duplicate", async () => {
+    fetchMock
+      .mockResolvedValueOnce(propertyExistsResponse())
+      .mockResolvedValueOnce(new Response("conflict", { status: 409 }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ id: "ticket_existing" }] }));
+
+    const ticketId = await findOrCreateHubspotTicket(input);
+
+    expect(ticketId).toBe("ticket_existing");
+    const [searchUrl, searchInit] = fetchMock.mock.calls[2] as [string, RequestInit];
+    expect(searchUrl).toBe("https://api.hubapi.com/crm/v3/objects/tickets/search");
+    expect(JSON.parse(searchInit.body as string)).toEqual({
+      filterGroups: [{ filters: [{ propertyName: "support_request_id", operator: "EQ", value: "support_1" }] }],
+      properties: ["hs_object_id"],
+      limit: 1,
+    });
+  });
+
+  it("retries the search briefly if HubSpot's index hasn't caught up yet", async () => {
+    vi.useFakeTimers();
+    fetchMock
+      .mockResolvedValueOnce(propertyExistsResponse())
+      .mockResolvedValueOnce(new Response("conflict", { status: 409 }))
+      .mockResolvedValueOnce(jsonResponse({ results: [] }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ id: "ticket_existing" }] }));
+
+    const promise = findOrCreateHubspotTicket(input);
+    await vi.runAllTimersAsync();
+
+    await expect(promise).resolves.toBe("ticket_existing");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("rethrows the 409 if the conflicting ticket can never be found", async () => {
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValueOnce(propertyExistsResponse()).mockResolvedValueOnce(new Response("conflict", { status: 409 }));
+    fetchMock.mockImplementation(() => Promise.resolve(jsonResponse({ results: [] })));
+
+    const promise = findOrCreateHubspotTicket(input);
+    const expectation = expect(promise).rejects.toThrow(/failed with 409/);
+    await vi.runAllTimersAsync();
+    await expectation;
+  });
+});
+
+describe("uploadHubspotFile", () => {
+  it("uploads the file as multipart form data", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "file_1" }));
+
+    const fileId = await uploadHubspotFile({
+      data: new Uint8Array([1, 2, 3]),
+      fileName: "log.txt",
+      mimeType: "text/plain",
+    });
+
+    expect(fileId).toBe("file_1");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://api.hubapi.com/files/v3/files");
+    expect(init.body).toBeInstanceOf(FormData);
+  });
+
+  it("rejects when the upload fails", async () => {
     fetchMock.mockResolvedValueOnce(new Response("nope", { status: 500 }));
 
     await expect(
-      createHubspotTicket({ category: "QUESTION", details: "Why?", senderEmail: "learner@example.com" }),
-    ).rejects.toThrow(/failed with 500/);
+      uploadHubspotFile({ data: new Uint8Array([1]), fileName: "log.txt", mimeType: "text/plain" }),
+    ).rejects.toThrow(/upload failed with 500/);
+  });
+});
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+describe("findOrCreateHubspotAttachmentNote", () => {
+  const input = { supportRequestId: "support_1", fileId: "file_1", fileName: "log.txt" };
+
+  it("creates a note carrying the dedupe property and referencing the file", async () => {
+    fetchMock.mockResolvedValueOnce(propertyExistsResponse()).mockResolvedValueOnce(jsonResponse({ id: "note_1" }));
+
+    const noteId = await findOrCreateHubspotAttachmentNote(input);
+
+    expect(noteId).toBe("note_1");
+    const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe("https://api.hubapi.com/crm/v3/objects/notes");
     expect(JSON.parse(init.body as string).properties).toMatchObject({
-      hs_pipeline: "42",
-      hs_pipeline_stage: "7",
+      support_request_id: "support_1",
+      hs_attachment_ids: "file_1",
     });
+  });
+
+  it("looks up the existing note on a 409 conflict instead of creating a duplicate", async () => {
+    fetchMock
+      .mockResolvedValueOnce(propertyExistsResponse())
+      .mockResolvedValueOnce(new Response("conflict", { status: 409 }))
+      .mockResolvedValueOnce(jsonResponse({ results: [{ id: "note_existing" }] }));
+
+    const noteId = await findOrCreateHubspotAttachmentNote(input);
+    expect(noteId).toBe("note_existing");
   });
 });
 
@@ -135,52 +268,5 @@ describe("associateHubspotDefault", () => {
       "https://api.hubapi.com/crm/v4/objects/tickets/ticket_1/associations/default/contacts/contact_1",
     );
     expect(init.method).toBe("PUT");
-  });
-});
-
-describe("attachHubspotFile", () => {
-  it("uploads the file, creates a note referencing it, and associates the note", async () => {
-    fetchMock
-      .mockResolvedValueOnce(jsonResponse({ id: "file_1" }))
-      .mockResolvedValueOnce(jsonResponse({ id: "note_1" }))
-      .mockResolvedValueOnce(jsonResponse(undefined))
-      .mockResolvedValueOnce(jsonResponse(undefined));
-
-    await attachHubspotFile({
-      ticketId: "ticket_1",
-      contactId: "contact_1",
-      attachment: { data: new Uint8Array([1, 2, 3]), originalName: "log.txt", mimeType: "text/plain" },
-    });
-
-    expect(fetchMock).toHaveBeenCalledTimes(4);
-
-    const [fileUrl, fileInit] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(fileUrl).toBe("https://api.hubapi.com/files/v3/files");
-    expect(fileInit.body).toBeInstanceOf(FormData);
-
-    const [noteUrl, noteInit] = fetchMock.mock.calls[1] as [string, RequestInit];
-    expect(noteUrl).toBe("https://api.hubapi.com/crm/v3/objects/notes");
-    expect(JSON.parse(noteInit.body as string).properties.hs_attachment_ids).toBe("file_1");
-
-    const [noteTicketAssocUrl] = fetchMock.mock.calls[2] as [string, RequestInit];
-    expect(noteTicketAssocUrl).toBe(
-      "https://api.hubapi.com/crm/v4/objects/notes/note_1/associations/default/tickets/ticket_1",
-    );
-    const [noteContactAssocUrl] = fetchMock.mock.calls[3] as [string, RequestInit];
-    expect(noteContactAssocUrl).toBe(
-      "https://api.hubapi.com/crm/v4/objects/notes/note_1/associations/default/contacts/contact_1",
-    );
-  });
-
-  it("rejects when the file upload itself fails", async () => {
-    fetchMock.mockResolvedValueOnce(new Response("nope", { status: 500 }));
-
-    await expect(
-      attachHubspotFile({
-        ticketId: "ticket_1",
-        contactId: "contact_1",
-        attachment: { data: new Uint8Array([1]), originalName: "log.txt", mimeType: "text/plain" },
-      }),
-    ).rejects.toThrow(/upload failed with 500/);
   });
 });

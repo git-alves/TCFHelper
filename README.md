@@ -581,8 +581,14 @@ A daily cron (`/api/cron/hubspot-support-sync-retry`, authenticated the same
 way as the admin-event retention cron with `CRON_SECRET`) re-attempts any
 request that hasn't fully synced yet. It resumes from whatever a previous
 attempt already got done — reusing an already-created ticket id, skipping an
-already-uploaded attachment — so a retry never creates a duplicate ticket or
-attachment. After 6 failed attempts a request stops retrying automatically
+already-uploaded attachment. Duplicate creation is prevented two ways: a
+locally persisted id lets a normal retry skip work it already finished, and
+every ticket/note this integration creates carries a `support_request_id`
+property that HubSpot enforces as unique — so even if a retry follows a crash
+between HubSpot accepting a create and that id being persisted locally, or
+the initial submit races the retry cron on the same row, the loser's create
+gets rejected and it looks up the winner's object instead of creating a
+second one. After 6 failed attempts a request stops retrying automatically
 and stays visible with its last error under `/admin/support` for manual
 follow-up.
 
@@ -591,7 +597,12 @@ To turn it on:
 1. In HubSpot, go to **Settings > Integrations > Private Apps** and create
    one (any name, e.g. "myTCFLab support sync").
 2. Grant it these scopes: `crm.objects.contacts.read`,
-   `crm.objects.contacts.write`, `tickets`, `files`.
+   `crm.objects.contacts.write`, `crm.objects.tickets.read`,
+   `crm.objects.tickets.write`, `crm.schemas.tickets.write`,
+   `crm.objects.notes.read`, `crm.objects.notes.write`,
+   `crm.schemas.notes.write`, `files`. The `crm.schemas.*.write` scopes are
+   needed once, the first time the app runs, to create the
+   `support_request_id` property used for dedupe.
 3. Copy the generated access token into `HUBSPOT_ACCESS_TOKEN`.
 4. Optional: if your portal's support pipeline isn't the default one, set
    `HUBSPOT_TICKET_PIPELINE_ID` and `HUBSPOT_TICKET_PIPELINE_STAGE_ID` to the

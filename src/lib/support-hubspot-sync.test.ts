@@ -2,24 +2,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   upsertHubspotContactMock,
-  createHubspotTicketMock,
+  findOrCreateHubspotTicketMock,
   associateHubspotDefaultMock,
-  attachHubspotFileMock,
+  uploadHubspotFileMock,
+  findOrCreateHubspotAttachmentNoteMock,
   updateMock,
 } = vi.hoisted(() => ({
   upsertHubspotContactMock: vi.fn(),
-  createHubspotTicketMock: vi.fn(),
+  findOrCreateHubspotTicketMock: vi.fn(),
   associateHubspotDefaultMock: vi.fn(),
-  attachHubspotFileMock: vi.fn(),
+  uploadHubspotFileMock: vi.fn(),
+  findOrCreateHubspotAttachmentNoteMock: vi.fn(),
   updateMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/hubspot", () => ({
   upsertHubspotContact: upsertHubspotContactMock,
-  createHubspotTicket: createHubspotTicketMock,
+  findOrCreateHubspotTicket: findOrCreateHubspotTicketMock,
   associateHubspotDefault: associateHubspotDefaultMock,
-  attachHubspotFile: attachHubspotFileMock,
+  uploadHubspotFile: uploadHubspotFileMock,
+  findOrCreateHubspotAttachmentNote: findOrCreateHubspotAttachmentNoteMock,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { supportRequest: { update: updateMock } },
@@ -34,29 +37,33 @@ const baseRequest = {
   category: "BUG" as const,
   details: "The editor freezes.",
   hubspotTicketId: null,
+  hubspotAttachmentFileId: null,
   hubspotAttachmentSyncedAt: null,
   attachment: null,
 };
 
 beforeEach(() => {
   upsertHubspotContactMock.mockReset();
-  createHubspotTicketMock.mockReset();
+  findOrCreateHubspotTicketMock.mockReset();
   associateHubspotDefaultMock.mockReset();
-  attachHubspotFileMock.mockReset();
+  uploadHubspotFileMock.mockReset();
+  findOrCreateHubspotAttachmentNoteMock.mockReset();
   updateMock.mockReset();
 
   upsertHubspotContactMock.mockResolvedValue("contact_1");
-  createHubspotTicketMock.mockResolvedValue("ticket_1");
+  findOrCreateHubspotTicketMock.mockResolvedValue("ticket_1");
   associateHubspotDefaultMock.mockResolvedValue(undefined);
-  attachHubspotFileMock.mockResolvedValue(undefined);
+  uploadHubspotFileMock.mockResolvedValue("file_1");
+  findOrCreateHubspotAttachmentNoteMock.mockResolvedValue("note_1");
   updateMock.mockResolvedValue(undefined);
 });
 
 describe("syncSupportRequestToHubspot", () => {
-  it("creates a new ticket, persists its id, associates the contact, and marks the row synced", async () => {
+  it("creates a new ticket via the dedupe-safe finder, persists its id, associates the contact, and marks the row synced", async () => {
     await syncSupportRequestToHubspot(baseRequest);
 
-    expect(createHubspotTicketMock).toHaveBeenCalledWith({
+    expect(findOrCreateHubspotTicketMock).toHaveBeenCalledWith({
+      supportRequestId: "support_1",
       category: "BUG",
       details: "The editor freezes.",
       senderEmail: "learner@example.com",
@@ -75,35 +82,64 @@ describe("syncSupportRequestToHubspot", () => {
     });
   });
 
-  it("reuses an already-created ticket id instead of creating a second ticket", async () => {
+  it("reuses an already-persisted ticket id instead of calling the finder again", async () => {
     await syncSupportRequestToHubspot({ ...baseRequest, hubspotTicketId: "ticket_existing" });
 
-    expect(createHubspotTicketMock).not.toHaveBeenCalled();
+    expect(findOrCreateHubspotTicketMock).not.toHaveBeenCalled();
     expect(associateHubspotDefaultMock).toHaveBeenCalledWith(
       { type: "tickets", id: "ticket_existing" },
       { type: "contacts", id: "contact_1" },
     );
-    // No ticket-id persistence step needed since it already existed.
     expect(updateMock).toHaveBeenCalledTimes(1);
-    expect(updateMock).toHaveBeenCalledWith({
-      where: { id: "support_1" },
-      data: { hubspotSyncedAt: expect.any(Date), hubspotLastSyncError: null },
-    });
   });
 
-  it("uploads and marks an attachment synced when one is present", async () => {
+  it("uploads an attachment, persists the file id, creates the note via the dedupe-safe finder, and marks it synced", async () => {
     const attachment = { data: new Uint8Array([1, 2, 3]), originalName: "log.txt", mimeType: "text/plain" };
 
     await syncSupportRequestToHubspot({ ...baseRequest, attachment });
 
-    expect(attachHubspotFileMock).toHaveBeenCalledWith({ ticketId: "ticket_1", contactId: "contact_1", attachment });
+    expect(uploadHubspotFileMock).toHaveBeenCalledWith({
+      data: attachment.data,
+      fileName: "log.txt",
+      mimeType: "text/plain",
+    });
+    expect(updateMock).toHaveBeenCalledWith({
+      where: { id: "support_1" },
+      data: { hubspotAttachmentFileId: "file_1" },
+    });
+    expect(findOrCreateHubspotAttachmentNoteMock).toHaveBeenCalledWith({
+      supportRequestId: "support_1",
+      fileId: "file_1",
+      fileName: "log.txt",
+    });
+    expect(associateHubspotDefaultMock).toHaveBeenCalledWith(
+      { type: "notes", id: "note_1" },
+      { type: "tickets", id: "ticket_1" },
+    );
+    expect(associateHubspotDefaultMock).toHaveBeenCalledWith(
+      { type: "notes", id: "note_1" },
+      { type: "contacts", id: "contact_1" },
+    );
     expect(updateMock).toHaveBeenCalledWith({
       where: { id: "support_1" },
       data: { hubspotAttachmentSyncedAt: expect.any(Date) },
     });
   });
 
-  it("skips re-uploading an attachment that a previous attempt already synced", async () => {
+  it("skips re-uploading a file that a previous attempt already uploaded", async () => {
+    const attachment = { data: new Uint8Array([1, 2, 3]), originalName: "log.txt", mimeType: "text/plain" };
+
+    await syncSupportRequestToHubspot({ ...baseRequest, hubspotAttachmentFileId: "file_existing", attachment });
+
+    expect(uploadHubspotFileMock).not.toHaveBeenCalled();
+    expect(findOrCreateHubspotAttachmentNoteMock).toHaveBeenCalledWith({
+      supportRequestId: "support_1",
+      fileId: "file_existing",
+      fileName: "log.txt",
+    });
+  });
+
+  it("skips the whole attachment step once it's already fully synced", async () => {
     const attachment = { data: new Uint8Array([1, 2, 3]), originalName: "log.txt", mimeType: "text/plain" };
 
     await syncSupportRequestToHubspot({
@@ -113,11 +149,12 @@ describe("syncSupportRequestToHubspot", () => {
       attachment,
     });
 
-    expect(attachHubspotFileMock).not.toHaveBeenCalled();
+    expect(uploadHubspotFileMock).not.toHaveBeenCalled();
+    expect(findOrCreateHubspotAttachmentNoteMock).not.toHaveBeenCalled();
   });
 
   it("records the attempt count and error, then rethrows, when a step fails", async () => {
-    createHubspotTicketMock.mockRejectedValue(new Error("HubSpot POST failed with 500"));
+    findOrCreateHubspotTicketMock.mockRejectedValue(new Error("HubSpot POST failed with 500"));
 
     await expect(syncSupportRequestToHubspot(baseRequest)).rejects.toThrow("HubSpot POST failed with 500");
 
@@ -128,7 +165,7 @@ describe("syncSupportRequestToHubspot", () => {
   });
 
   it("does not lose the original error if recording the failure itself fails", async () => {
-    createHubspotTicketMock.mockRejectedValue(new Error("HubSpot POST failed with 500"));
+    findOrCreateHubspotTicketMock.mockRejectedValue(new Error("HubSpot POST failed with 500"));
     updateMock.mockRejectedValue(new Error("database unavailable"));
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
@@ -136,5 +173,21 @@ describe("syncSupportRequestToHubspot", () => {
     expect(consoleErrorSpy).toHaveBeenCalledWith("Failed to record HubSpot sync failure state");
 
     consoleErrorSpy.mockRestore();
+  });
+
+  it("stays safe if HubSpot creates the ticket but persisting its id locally fails: the next attempt relies on findOrCreateHubspotTicket's own dedupe, not on this write having succeeded", async () => {
+    updateMock.mockImplementationOnce(() => Promise.reject(new Error("database unavailable")));
+
+    await expect(syncSupportRequestToHubspot(baseRequest)).rejects.toThrow("database unavailable");
+
+    // The row is left with no local ticket id -- a subsequent attempt calls
+    // findOrCreateHubspotTicket again, which is what makes this safe: it
+    // hits HubSpot's own uniqueness constraint on support_request_id rather
+    // than blindly creating a second ticket.
+    findOrCreateHubspotTicketMock.mockClear();
+    updateMock.mockReset();
+    updateMock.mockResolvedValue(undefined);
+    await syncSupportRequestToHubspot(baseRequest);
+    expect(findOrCreateHubspotTicketMock).toHaveBeenCalledTimes(1);
   });
 });

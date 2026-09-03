@@ -159,6 +159,7 @@ export async function POST(request: Request) {
           category: parsed.data.category,
           details: parsed.data.details.trim(),
           hubspotTicketId: null,
+          hubspotAttachmentFileId: null,
           hubspotAttachmentSyncedAt: null,
           attachment: attachment ?? null,
         });

@@ -192,6 +192,7 @@ describe("POST /api/support", () => {
       category: "BUG",
       details: "The editor freezes.",
       hubspotTicketId: null,
+      hubspotAttachmentFileId: null,
       hubspotAttachmentSyncedAt: null,
       attachment: null,
     });

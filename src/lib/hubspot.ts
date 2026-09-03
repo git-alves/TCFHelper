@@ -2,6 +2,15 @@ import type { SupportCategory } from "@/lib/support-request";
 
 const HUBSPOT_API_BASE = "https://api.hubapi.com";
 
+// Every ticket/note this integration creates carries this property, set to
+// the local SupportRequest id, and the property is provisioned with
+// hasUniqueValue: true. That turns "create a ticket/note for this support
+// request" into an operation HubSpot itself will reject as a 409 conflict if
+// it has already happened -- which is what makes createHubspotTicket and
+// createHubspotAttachmentNote safe to call more than once (by a retry, or by
+// two callers racing each other) for the same request.
+const SUPPORT_REQUEST_ID_PROPERTY = "support_request_id";
+
 const CATEGORY_LABELS: Record<SupportCategory, string> = {
   BUG: "Bug",
   QUESTION: "Question",
@@ -20,6 +29,16 @@ function requireHubspotAccessToken(): string {
   return token;
 }
 
+export class HubspotHttpError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "HubspotHttpError";
+  }
+}
+
 async function hubspotJson<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = requireHubspotAccessToken();
   const response = await fetch(`${HUBSPOT_API_BASE}${path}`, {
@@ -31,7 +50,7 @@ async function hubspotJson<T>(path: string, init: RequestInit = {}): Promise<T> 
     },
   });
   if (!response.ok) {
-    throw new Error(`HubSpot ${init.method ?? "GET"} ${path} failed with ${response.status}`);
+    throw new HubspotHttpError(`HubSpot ${init.method ?? "GET"} ${path} failed with ${response.status}`, response.status);
   }
   // Some endpoints (e.g. the v4 default-association PUT) can return an empty
   // body on success, so don't assume every 2xx response is parseable JSON.
@@ -85,75 +104,187 @@ export async function upsertHubspotContact({
   return contactId;
 }
 
-// Not idempotent -- each call creates a new ticket. Callers must persist the
-// returned id and pass it through on any retry instead of calling this again
-// for the same support request.
-export async function createHubspotTicket({
+async function hubspotPropertyExists(objectType: string, propertyName: string): Promise<boolean> {
+  const token = requireHubspotAccessToken();
+  const response = await fetch(`${HUBSPOT_API_BASE}/crm/v3/properties/${objectType}/${propertyName}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 404) return false;
+  if (!response.ok) {
+    throw new HubspotHttpError(
+      `HubSpot GET property ${objectType}/${propertyName} failed with ${response.status}`,
+      response.status,
+    );
+  }
+  return true;
+}
+
+async function firstHubspotPropertyGroup(objectType: string): Promise<string> {
+  const body = await hubspotJson<{ results: Array<{ name: string }> }>(`/crm/v3/properties/${objectType}/groups`);
+  const groupName = body.results[0]?.name;
+  if (!groupName) throw new Error(`HubSpot portal has no property groups for ${objectType}`);
+  return groupName;
+}
+
+// Provisions the dedupe-key property used by findOrCreate* below, on
+// whichever object type needs it, the first time it's needed. Safe to call
+// repeatedly (including concurrently): once the property exists this is a
+// single cheap GET, and the create-if-missing race resolves through the same
+// 409-means-already-there handling as the objects that use the property.
+async function ensureSupportRequestIdProperty(objectType: string): Promise<void> {
+  if (await hubspotPropertyExists(objectType, SUPPORT_REQUEST_ID_PROPERTY)) return;
+
+  const groupName = await firstHubspotPropertyGroup(objectType);
+  try {
+    await hubspotJson(`/crm/v3/properties/${objectType}`, {
+      method: "POST",
+      body: JSON.stringify({
+        name: SUPPORT_REQUEST_ID_PROPERTY,
+        label: "Support request ID",
+        type: "string",
+        fieldType: "text",
+        groupName,
+        hasUniqueValue: true,
+      }),
+    });
+  } catch (error) {
+    if (!(error instanceof HubspotHttpError) || error.status !== 409) throw error;
+  }
+}
+
+// HubSpot's CRM Search index is only eventually consistent, so the object a
+// 409 just told us exists may not be searchable yet. Retrying briefly covers
+// the normal case; if it still isn't found, the caller fails this attempt
+// (recorded for the retry cron) rather than risking a duplicate by creating
+// anyway.
+async function findHubspotObjectByProperty(
+  objectType: string,
+  value: string,
+  retries = 3,
+): Promise<string | null> {
+  for (let attempt = 0; ; attempt += 1) {
+    const body = await hubspotJson<{ results: Array<{ id: string }> }>(`/crm/v3/objects/${objectType}/search`, {
+      method: "POST",
+      body: JSON.stringify({
+        filterGroups: [{ filters: [{ propertyName: SUPPORT_REQUEST_ID_PROPERTY, operator: "EQ", value }] }],
+        properties: ["hs_object_id"],
+        limit: 1,
+      }),
+    });
+    const id = body.results[0]?.id;
+    if (id || attempt >= retries) return id ?? null;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+}
+
+// Idempotent per supportRequestId: HubSpot enforces uniqueness on
+// support_request_id server-side, so if two callers race (the initial
+// synchronous submit and a retry cron pass, say) or a retry follows a crash
+// right after HubSpot accepted the create, the loser's create gets a 409 and
+// this looks up the winner's ticket instead of creating a second one.
+export async function findOrCreateHubspotTicket({
+  supportRequestId,
   category,
   details,
   senderEmail,
 }: {
+  supportRequestId: string;
   category: SupportCategory;
   details: string;
   senderEmail: string;
 }): Promise<string> {
+  await ensureSupportRequestIdProperty("tickets");
+
   // A brand-new HubSpot portal's default ticket pipeline uses these ids;
   // both are overridable for portals with a customized support pipeline.
   const pipeline = process.env.HUBSPOT_TICKET_PIPELINE_ID?.trim() || "0";
   const stage = process.env.HUBSPOT_TICKET_PIPELINE_STAGE_ID?.trim() || "1";
-  const body = await hubspotJson<{ id: string }>("/crm/v3/objects/tickets", {
-    method: "POST",
-    body: JSON.stringify({
-      properties: {
-        subject: `[${CATEGORY_LABELS[category]}] Support request from ${senderEmail}`,
-        content: details,
-        hs_pipeline: pipeline,
-        hs_pipeline_stage: stage,
-      },
-    }),
-  });
-  return body.id;
+  try {
+    const body = await hubspotJson<{ id: string }>("/crm/v3/objects/tickets", {
+      method: "POST",
+      body: JSON.stringify({
+        properties: {
+          [SUPPORT_REQUEST_ID_PROPERTY]: supportRequestId,
+          subject: `[${CATEGORY_LABELS[category]}] Support request from ${senderEmail}`,
+          content: details,
+          hs_pipeline: pipeline,
+          hs_pipeline_stage: stage,
+        },
+      }),
+    });
+    return body.id;
+  } catch (error) {
+    if (error instanceof HubspotHttpError && error.status === 409) {
+      const existing = await findHubspotObjectByProperty("tickets", supportRequestId);
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }
 
-// Not idempotent -- each call uploads another copy of the file and creates
-// another note. Callers must track completion (e.g.
-// SupportRequest.hubspotAttachmentSyncedAt) and skip calling this again once
-// it has succeeded for a given support request.
-export async function attachHubspotFile({
-  ticketId,
-  contactId,
-  attachment,
+export async function uploadHubspotFile({
+  data,
+  fileName,
+  mimeType,
 }: {
-  ticketId: string;
-  contactId: string;
-  attachment: { data: Uint8Array; originalName: string; mimeType: string };
-}): Promise<void> {
+  data: Uint8Array;
+  fileName: string;
+  mimeType: string;
+}): Promise<string> {
   const token = requireHubspotAccessToken();
   const form = new FormData();
-  form.append("file", new Blob([new Uint8Array(attachment.data)], { type: attachment.mimeType }), attachment.originalName);
+  form.append("file", new Blob([new Uint8Array(data)], { type: mimeType }), fileName);
   form.append("options", JSON.stringify({ access: "PRIVATE" }));
   form.append("folderPath", "/support-tickets");
 
-  const uploadResponse = await fetch(`${HUBSPOT_API_BASE}/files/v3/files`, {
+  const response = await fetch(`${HUBSPOT_API_BASE}/files/v3/files`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,
   });
-  if (!uploadResponse.ok) {
-    throw new Error(`HubSpot file upload failed with ${uploadResponse.status}`);
+  if (!response.ok) {
+    throw new HubspotHttpError(`HubSpot file upload failed with ${response.status}`, response.status);
   }
-  const uploaded = (await uploadResponse.json()) as { id: string };
+  const uploaded = (await response.json()) as { id: string };
+  return uploaded.id;
+}
 
-  const note = await hubspotJson<{ id: string }>("/crm/v3/objects/notes", {
-    method: "POST",
-    body: JSON.stringify({
-      properties: {
-        hs_timestamp: Date.now(),
-        hs_note_body: `Attachment from support request: ${attachment.originalName}`,
-        hs_attachment_ids: uploaded.id,
-      },
-    }),
-  });
-  await associateHubspotDefault({ type: "notes", id: note.id }, { type: "tickets", id: ticketId });
-  await associateHubspotDefault({ type: "notes", id: note.id }, { type: "contacts", id: contactId });
+// Idempotent per supportRequestId, the same way findOrCreateHubspotTicket is.
+// The uploaded file itself can't carry a dedupe key (the Files API has no
+// custom properties), so callers should persist the id returned by
+// uploadHubspotFile before calling this, and skip re-uploading on a retry --
+// that leaves at most one harmless orphaned file in HubSpot if a retry
+// follows a crash between the upload and this call, never a duplicate note
+// or attachment visible on the ticket.
+export async function findOrCreateHubspotAttachmentNote({
+  supportRequestId,
+  fileId,
+  fileName,
+}: {
+  supportRequestId: string;
+  fileId: string;
+  fileName: string;
+}): Promise<string> {
+  await ensureSupportRequestIdProperty("notes");
+
+  try {
+    const note = await hubspotJson<{ id: string }>("/crm/v3/objects/notes", {
+      method: "POST",
+      body: JSON.stringify({
+        properties: {
+          [SUPPORT_REQUEST_ID_PROPERTY]: supportRequestId,
+          hs_timestamp: Date.now(),
+          hs_note_body: `Attachment from support request: ${fileName}`,
+          hs_attachment_ids: fileId,
+        },
+      }),
+    });
+    return note.id;
+  } catch (error) {
+    if (error instanceof HubspotHttpError && error.status === 409) {
+      const existing = await findHubspotObjectByProperty("notes", supportRequestId);
+      if (existing) return existing;
+    }
+    throw error;
+  }
 }

@@ -615,9 +615,14 @@ model SupportRequest {
   // (/api/cron/hubspot-support-sync-retry) re-attempts rows where this is
   // still null.
   hubspotTicketId String?
+  // Set once the attachment has been uploaded to HubSpot, independently of
+  // hubspotAttachmentSyncedAt below, so a retry after a failure creating the
+  // attachment note never re-uploads the file (HubSpot's Files API has no
+  // dedupe key of its own to prevent that).
+  hubspotAttachmentFileId String?
   // Set once the ticket's attachment note has been created, independently of
   // hubspotSyncedAt, so a retry after a failure elsewhere in the sync never
-  // re-uploads the file or creates a duplicate note.
+  // creates a duplicate note.
   hubspotAttachmentSyncedAt DateTime?
   hubspotSyncedAt           DateTime?
   hubspotSyncAttempts       Int        @default(0)
