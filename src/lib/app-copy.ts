@@ -348,6 +348,7 @@ export interface AppCopy {
     editor: {
       heading: string;
       wordCount: (values: WordCountValues) => string;
+      minimumWordCount: (values: { remainingWords: number; minWords: number }) => string;
       responseLabel: string;
       frenchResponsePlaceholder: string;
       correct: string;
@@ -866,6 +867,8 @@ export const APP_COPY = {
       editor: {
         heading: "3. Write",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
+        minimumWordCount: ({ remainingWords, minWords }) =>
+          `Write ${remainingWords} more word${remainingWords === 1 ? "" : "s"} to reach the ${minWords}-word minimum for correction.`,
         responseLabel: "Your response",
         frenchResponsePlaceholder: "Rédigez votre réponse ici, en français…",
         correct: "Correct",
@@ -1517,6 +1520,8 @@ export const APP_COPY = {
       editor: {
         heading: "3. Rédigez",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
+        minimumWordCount: ({ remainingWords, minWords }) =>
+          `Ajoutez encore ${remainingWords} mot${remainingWords === 1 ? "" : "s"} pour atteindre le minimum de ${minWords} mots avant la correction.`,
         responseLabel: "Votre réponse",
         frenchResponsePlaceholder: "Rédigez votre réponse ici, en français…",
         correct: "Corriger",
@@ -2170,6 +2175,8 @@ export const APP_COPY = {
       editor: {
         heading: "3. Escribe",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
+        minimumWordCount: ({ remainingWords, minWords }) =>
+          `Escribe ${remainingWords} palabra${remainingWords === 1 ? "" : "s"} más para alcanzar el mínimo de ${minWords} palabras antes de solicitar una corrección.`,
         responseLabel: "Tu respuesta",
         frenchResponsePlaceholder: "Rédigez votre réponse ici, en français…",
         correct: "Corregir",
@@ -2823,6 +2830,8 @@ export const APP_COPY = {
       editor: {
         heading: "3. Escreva",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
+        minimumWordCount: ({ remainingWords, minWords }) =>
+          `Escreva mais ${remainingWords} palavra${remainingWords === 1 ? "" : "s"} para atingir o mínimo de ${minWords} palavras antes de solicitar uma correção.`,
         responseLabel: "Sua resposta",
         frenchResponsePlaceholder: "Rédigez votre réponse ici, en français…",
         correct: "Corrigir",

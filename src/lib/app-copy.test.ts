@@ -261,6 +261,7 @@ describe("APP_COPY", () => {
         copy.workspace.topic.customTopicPlaceholder,
         copy.workspace.editor.heading,
         copy.workspace.editor.wordCount({ count: 80, minWords: 60, maxWords: 120 }),
+        copy.workspace.editor.minimumWordCount({ remainingWords: 1, minWords: 60 }),
         copy.workspace.editor.responseLabel,
         copy.workspace.editor.frenchResponsePlaceholder,
         copy.workspace.editor.correct,
