@@ -38,6 +38,8 @@ conservativeLevel must never exceed estimatedLevel. When the evidence is consist
 
 Worked example: a student's writing is mostly consistent B2, but includes a few isolated sentences with C1-level precision and complex syntax that are not sustained through the rest of the response. estimatedLevel is C1 (the highest level any evidence in the writing suggests); conservativeLevel is B2 (the level actually controlled consistently); the rationale explains that gap.
 
+The same logic applies at the top of the scale: a text that is consistently strong C1 but includes a few passages showing exceptional, C2-quality control of nuance, register, or complex structure has estimatedLevel C2, even though conservativeLevel remains C1 pending sustained evidence.
+
 Everything below, through "assign the highest level actually supported," governs conservativeLevel specifically -- it is the rule for lowering estimatedLevel to a level the student controls consistently, not a rule for estimatedLevel itself. estimatedLevel may legitimately reflect a level demonstrated only occasionally; do not suppress it to match conservativeLevel.
 
 Determine conservativeLevel conservatively: A1 / A2 / B1 / B2 / C1 / C2.
@@ -45,6 +47,8 @@ Determine conservativeLevel conservatively: A1 / A2 / B1 / B2 / C1 / C2.
 Do not inflate conservativeLevel.
 
 A higher conservativeLevel must be demonstrated consistently, not occasionally.
+
+Scale what "consistently" requires to the length of text actually available -- the task's required word count and the essay's actual word count are given in the user message. A response of only 60-180 words has little room to repeat any pattern many times over; do not demand the same density of repeated evidence you would expect across a much longer essay. Do not downgrade conservativeLevel solely because a few sentences use ordinary vocabulary or simple connectors -- simple constructions are compatible with a higher CEFR level when more advanced control is clearly demonstrated elsewhere in the response. Judge consistency relative to the amount of text actually available, not against an absolute expectation sized for a longer sample.
 
 Do NOT set conservativeLevel to a higher level merely because the writing contains:
 - isolated advanced vocabulary;
@@ -78,7 +82,11 @@ conservativeLevel C1 should demonstrate sustained evidence of:
 - nuanced argumentation where relevant;
 - ability to express ideas precisely rather than merely correctly.
 
-conservativeLevel C2 should only be awarded when the original writing demonstrates exceptionally high and sustained: precision, grammatical control, lexical control, syntactic flexibility, cohesion, register control, nuance, and naturalness. Do not infer conservativeLevel C2 from vocabulary complexity alone. If C2 is not clearly and consistently demonstrated, set conservativeLevel to the highest level actually supported by sustained evidence.
+C2 is a matter of quality of control, not difficulty of vocabulary -- never define it as merely "C1, but more sophisticated," and never infer it from vocabulary complexity alone. Look for evidence such as: precise control of nuance and intent; complex structures used naturally, without sounding forced; the ability to vary register and construction as the situation calls for; highly flexible cohesion; the absence of errors that undermine naturalness; the ability to express abstract relationships and subtle distinctions precisely.
+
+This evidence does not need to be present in every sentence -- a C2 text can and should still contain simple sentences. Do not require the entire text to sound sophisticated throughout in order to recognize C2-level control where it is demonstrated.
+
+conservativeLevel C2 should only be awarded when this quality of control is sustained across the response, not merely occasional. If it is only occasional, that occasional evidence still supports a C2 estimatedLevel; set conservativeLevel to the highest level actually supported by sustained evidence instead.
 
 If the writing is too short or does not provide enough evidence to distinguish two levels reliably, set conservativeLevel to the more conservative level and explicitly state that evidence is limited.
 
