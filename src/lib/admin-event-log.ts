@@ -576,6 +576,26 @@ export async function getAdminEventLogPage(
   };
 }
 
+const RECENT_ADMIN_EVENTS_LIMIT = 8;
+
+/**
+ * The newest events across every module and severity, unfiltered by the
+ * operational log's own range/search/pagination -- for a live "what just
+ * happened" feed, not the reviewed historical log.
+ */
+export async function getRecentAdminEvents(limit = RECENT_ADMIN_EVENTS_LIMIT): Promise<AdminEventLogItem[]> {
+  const records = await prisma.adminEvent.findMany({
+    select: ADMIN_EVENT_SELECT,
+    orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+    take: limit,
+  });
+  const emailByUserId = await emailsForUserIds(
+    records.map((record) => safeOpaqueId(record.userId)).filter((userId): userId is string => userId !== null),
+  );
+
+  return records.map((record) => serializeAdminEvent(record, emailByUserId));
+}
+
 /** Produces a canonical, complete link so pagination never drops a filter. */
 export function adminEventLogHref(filters: AdminEventLogFilterValues, page: number) {
   const params = new URLSearchParams({
