@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AdminSupportDeleteButton } from "@/components/admin-support-delete-button";
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
@@ -117,6 +118,7 @@ export default async function AdminSupportPage() {
                   </>
                 )
               )}
+              <AdminSupportDeleteButton requestId={request.id} isSyncedToHubspot={Boolean(request.hubspotSyncedAt)} />
             </li>
           ))}
         </ol>
