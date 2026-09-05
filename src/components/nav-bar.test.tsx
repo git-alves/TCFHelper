@@ -79,6 +79,8 @@ describe("NavBar", () => {
 
     expect(markup.match(/href="\/support"/g)).toHaveLength(1);
     expect(markup.match(/aria-label="Support"/g)).toHaveLength(1);
+    expect(markup.match(/title="Support"/g)).toHaveLength(1);
+    expect(markup).not.toContain(">Support<");
   });
 
   it("keeps the three learning links as plain text, not bordered pills", () => {
