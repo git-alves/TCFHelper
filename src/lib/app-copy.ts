@@ -554,7 +554,7 @@ export const APP_COPY = {
       title: "Write for the TCF exam. Get feedback that gets you to C2.",
       description:
         "Practice Task 1, 2, and 3 essays, then get grammar, vocabulary, and CEFR-level feedback in seconds.",
-      startATask: "Simulate a task",
+      startATask: "Simulate a Task",
       getStarted: "Get started",
     },
     practice: {
@@ -576,7 +576,7 @@ export const APP_COPY = {
       replayWithVariants: "Replay with new variants",
       startFresh: "Start fresh",
       chooseAnotherPart: "Choose another task part",
-      tryFullTask: "Simulate a task",
+      tryFullTask: "Simulate a Task",
       eyebrow: "Focused practice",
       title: "Work on one part of the task at a time.",
       description: "This is not an exam simulation. Choose a task, your target level and a task part; you will then follow a fixed, reviewed progression from recognition to independent writing.",
@@ -671,7 +671,7 @@ export const APP_COPY = {
       practiceStartTitle: "Train a skill first",
       practiceStartDescription: "Work on one part of a task step by step, from guided practice to independent writing.",
       practiceStartAction: "Go to Train",
-      tasksStartTitle: "Simulate a task",
+      tasksStartTitle: "Simulate a Task",
       tasksStartDescription: "Write a full TCF response, then receive feedback on your writing.",
       tasksStartAction: "Go to Simulate",
       practiceActivityTitle: "Practice activity",
