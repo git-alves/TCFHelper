@@ -11,6 +11,6 @@ describe("DashboardGettingStarted", () => {
     expect(markup).toContain('href="/practice"');
     expect(markup).toContain('href="/tasks"');
     expect(markup).toContain("Train a skill first");
-    expect(markup).toContain("Simulate a task");
+    expect(markup).toContain("Simulate a Task");
   });
 });
