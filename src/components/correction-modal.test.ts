@@ -38,7 +38,12 @@ const feedback = essayFeedbackSchema.parse({
   summary: "A clear response with one verb-form issue to correct.",
 });
 
-function renderResultModal(overrides: { cefrAssessment?: "current" | "legacy" } = {}) {
+function renderResultModal(
+  {
+    feedback: feedbackOverride = feedback,
+    ...overrides
+  }: { cefrAssessment?: "current" | "legacy"; feedback?: typeof feedback } = {},
+) {
   return renderToStaticMarkup(
     createElement(CorrectionModal, {
       open: true,
@@ -46,7 +51,7 @@ function renderResultModal(overrides: { cefrAssessment?: "current" | "legacy" } 
       task: TASK_INSTRUCTIONS.TASK_2,
       submissionId: "essay_123",
       originalText: "Je va au marché demain.",
-      feedback,
+      feedback: feedbackOverride,
       feedbackLocale: "en",
       locale: "en",
       isStale: false,
@@ -92,6 +97,25 @@ describe("CorrectionModal", () => {
     expect(markup).toContain("Secure level: B1");
     expect(markup).toContain("Demonstrated level: B1");
     expect(markup).not.toContain("Previously recorded level");
+  });
+
+  it("makes the demonstrated level primary when it differs from the secure level", () => {
+    const markup = renderResultModal({
+      feedback: {
+        ...feedback,
+        cefr: {
+          ...feedback.cefr,
+          estimatedLevel: "C1",
+          conservativeLevel: "B2",
+        },
+      },
+    });
+
+    expect(markup).toContain("<h3 class=\"font-semibold\">Demonstrated level: C1</h3>");
+    expect(markup).toContain("<p class=\"mt-0.5 text-sm text-zinc-500 dark:text-zinc-400\">Secure level: B2</p>");
+    expect(markup).toContain('aria-label="Demonstrated level: C1"');
+    expect(markup).toMatch(/aria-current="true"[^>]*>C1<\/span>/);
+    expect(markup).not.toMatch(/aria-current="true"[^>]*>B2<\/span>/);
   });
 
   it("never renders 'Secure level' or 'Demonstrated level' for a legacy-provenance record", () => {
