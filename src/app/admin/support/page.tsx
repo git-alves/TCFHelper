@@ -118,7 +118,7 @@ export default async function AdminSupportPage() {
                   </>
                 )
               )}
-              <AdminSupportDeleteButton requestId={request.id} />
+              <AdminSupportDeleteButton requestId={request.id} isSyncedToHubspot={Boolean(request.hubspotSyncedAt)} />
             </li>
           ))}
         </ol>

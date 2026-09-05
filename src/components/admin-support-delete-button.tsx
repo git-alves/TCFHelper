@@ -6,6 +6,10 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 
 interface AdminSupportDeleteButtonProps {
   requestId: string;
+  // Whether this request has already synced to HubSpot. Deleting only ever
+  // removes the local row and its attachment -- the confirm copy must not
+  // imply an already-synced external ticket disappears too.
+  isSyncedToHubspot: boolean;
 }
 
 // Bounds the request so a hung/slow response can never leave the confirm
@@ -77,7 +81,7 @@ export async function requestSupportRequestDeletion(
   }
 }
 
-export function AdminSupportDeleteButton({ requestId }: AdminSupportDeleteButtonProps) {
+export function AdminSupportDeleteButton({ requestId, isSyncedToHubspot }: AdminSupportDeleteButtonProps) {
   const router = useRouter();
   const [isConfirming, setIsConfirming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -122,7 +126,11 @@ export function AdminSupportDeleteButton({ requestId }: AdminSupportDeleteButton
       <ConfirmDialog
         open={isConfirming}
         title="Delete this support request?"
-        description="This request and its attachment (if any) will be permanently removed. This cannot be undone."
+        description={
+          isSyncedToHubspot
+            ? "The local request and attachment will be permanently removed; the ticket already synced to HubSpot will remain there. This cannot be undone."
+            : "This request and its attachment (if any) will be permanently removed. This cannot be undone."
+        }
         confirmLabel={isDeleting ? "Deleting…" : "Delete"}
         cancelLabel="Cancel"
         isConfirming={isDeleting}
