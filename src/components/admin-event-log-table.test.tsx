@@ -131,4 +131,68 @@ describe("AdminEventLogTable", () => {
     expect(markup).not.toContain("203.0.113.9");
     expect(markup).not.toContain("fingerprint");
   });
+
+  it("shows the learner's email instead of their raw id once it's resolved", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminEventLogTable, {
+        events: [
+          {
+            id: "event_5",
+            occurredAt: "2026-08-11T12:30:00.000Z",
+            firstOccurredAt: "2026-08-11T12:30:00.000Z",
+            severity: "INFO",
+            module: "QUOTA_ACCESS",
+            eventType: "TRANSLATION_QUOTA_DENIED",
+            userId: "user_1",
+            userEmail: "learner@example.com",
+            essayId: null,
+            accessCodeId: null,
+            provider: null,
+            reasonCode: null,
+            httpStatus: null,
+            quotaWindow: null,
+            usageValue: null,
+            quotaLimit: null,
+            occurrenceCount: 1,
+            message: "Translation quota denied.",
+          },
+        ],
+      }),
+    );
+
+    expect(markup).toContain("learner@example.com");
+    expect(markup).toContain('href="/admin/users/user_1"');
+    expect(markup).not.toContain(">user_1<");
+  });
+
+  it("falls back to the raw id when the email lookup did not resolve", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminEventLogTable, {
+        events: [
+          {
+            id: "event_6",
+            occurredAt: "2026-08-11T12:30:00.000Z",
+            firstOccurredAt: "2026-08-11T12:30:00.000Z",
+            severity: "INFO",
+            module: "QUOTA_ACCESS",
+            eventType: "TRANSLATION_QUOTA_DENIED",
+            userId: "user_deleted",
+            userEmail: null,
+            essayId: null,
+            accessCodeId: null,
+            provider: null,
+            reasonCode: null,
+            httpStatus: null,
+            quotaWindow: null,
+            usageValue: null,
+            quotaLimit: null,
+            occurrenceCount: 1,
+            message: "Translation quota denied.",
+          },
+        ],
+      }),
+    );
+
+    expect(markup).toContain(">user_deleted<");
+  });
 });
