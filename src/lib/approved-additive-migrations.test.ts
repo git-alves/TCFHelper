@@ -78,6 +78,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260903180000_add_support_request_hubspot_sync");
   });
 
+  it("allows the additive User.timezone migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260905160000_add_user_timezone");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
