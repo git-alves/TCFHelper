@@ -295,7 +295,7 @@ function createPrintDocument({
     )} &middot; ${escapeHtml(
       isLegacyCefrAssessment
         ? modalCopy.previouslyRecordedLevel({ level: feedback.cefr.conservativeLevel })
-        : modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel }),
+        : modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel }),
     )}${submissionReference}</p>
     ${generatedInOtherLanguageNotice ? `<p class="meta">${escapeHtml(generatedInOtherLanguageNotice)}</p>` : ""}
 
@@ -307,7 +307,7 @@ function createPrintDocument({
       <p>${escapeHtml(modalCopy.overallScoreDescription)}</p>
       <p>${printableText(feedback.wordCountNote)}</p>
       <p>${escapeHtml(modalCopy.cefrEstimateDisclosure)}</p>
-      ${isLegacyCefrAssessment ? "" : `<p>${escapeHtml(modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel }))}</p>`}
+      ${isLegacyCefrAssessment ? "" : `<p>${escapeHtml(modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel }))}</p>`}
       <h3>${escapeHtml(modalCopy.cefrRationaleHeading)}</h3>
       <p>${printableText(feedback.cefr.rationale)}</p>
       ${
@@ -637,7 +637,7 @@ export function CorrectionModal({
               <span className="rounded-full bg-violet-500/10 px-2.5 py-1 text-violet-800 dark:bg-violet-400/15 dark:text-violet-300">
                 {isLegacyCefrAssessment
                   ? modalCopy.previouslyRecordedLevel({ level: feedback.cefr.conservativeLevel })
-                  : modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}
+                  : modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel })}
               </span>
             )}
           </div>
@@ -721,9 +721,9 @@ export function CorrectionModal({
                         </h3>
                       ) : (
                         <div>
-                          <h3 className="font-semibold">{modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}</h3>
+                          <h3 className="font-semibold">{modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel })}</h3>
                           <p className="mt-0.5 text-sm text-zinc-500 dark:text-zinc-400">
-                            {modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel })}
+                            {modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}
                           </p>
                         </div>
                       )}
@@ -748,18 +748,18 @@ export function CorrectionModal({
                     {!isLegacyCefrAssessment && (
                       <div
                         role="list"
-                        aria-label={modalCopy.secureLevel({ level: feedback.cefr.conservativeLevel })}
+                        aria-label={modalCopy.demonstratedLevel({ level: feedback.cefr.estimatedLevel })}
                         className="mt-4 grid grid-cols-6 gap-1 text-center text-xs"
                       >
                         {CEFR_LEVELS.map((level) => (
                           <span
                             key={level}
                             role="listitem"
-                            aria-current={level === feedback.cefr.conservativeLevel ? "true" : undefined}
+                            aria-current={level === feedback.cefr.estimatedLevel ? "true" : undefined}
                             className={`rounded-md px-1.5 py-2 font-medium ${
-                              level === feedback.cefr.conservativeLevel
+                              level === feedback.cefr.estimatedLevel
                                 ? "bg-violet-600 text-white dark:bg-violet-400 dark:text-violet-950"
-                                : level === feedback.cefr.estimatedLevel
+                                : level === feedback.cefr.conservativeLevel
                                   ? "bg-violet-600/20 text-violet-800 ring-1 ring-inset ring-violet-600/50 dark:bg-violet-400/15 dark:text-violet-300 dark:ring-violet-400/40"
                                   : "bg-black/[.05] text-zinc-500 dark:bg-white/[.08] dark:text-zinc-400"
                             }`}

@@ -63,4 +63,17 @@ describe("buildCorrectionSystemPrompt", () => {
     expect(prompt).toContain("Do NOT set conservativeLevel to a higher level merely because");
     expect(prompt).toContain("these bullets constrain conservativeLevel only");
   });
+
+  it("calibrates short-response consistency and gives C2 observable control markers", () => {
+    const prompt = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.");
+
+    expect(prompt).toContain('Scale what "consistently" requires to the length of text actually available');
+    expect(prompt).toContain("60-180 words has little room to repeat any pattern many times over");
+    expect(prompt).toContain("Do not downgrade conservativeLevel solely because a few sentences use ordinary vocabulary or simple connectors");
+    expect(prompt).toContain("C2 is a matter of quality of control, not difficulty of vocabulary");
+    expect(prompt).toContain("precise control of nuance and intent");
+    expect(prompt).toContain("complex structures used naturally, without sounding forced");
+    expect(prompt).toContain("a C2 text can and should still contain simple sentences");
+    expect(prompt).toContain("occasional evidence still supports a C2 estimatedLevel");
+  });
 });
