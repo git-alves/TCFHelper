@@ -326,6 +326,9 @@ export function WritingWorkspace() {
   // correction is pending, so the visible message must always use the copy
   // from the current render.
   const [hasCorrectionError, setHasCorrectionError] = useState(false);
+  // Only surfaced after the learner actually tries to correct while short --
+  // not shown proactively while they're still typing.
+  const [showMinimumWordWarning, setShowMinimumWordWarning] = useState(false);
 
   // useSyncExternalStore serves the same defaults during SSR and hydration,
   // then reads the browser preference after hydration without a mismatched
@@ -707,6 +710,7 @@ export function WritingWorkspace() {
   function applyDraftContent(value: string) {
     setContent(value);
     setHasCorrectionError(false);
+    setShowMinimumWordWarning(false);
     // Keep a server-returned history ID while the learner experiments with a
     // revision. The link itself is rendered only when the current key matches
     // again, so edit-and-revert restores the useful route to the saved review.
@@ -746,6 +750,7 @@ export function WritingWorkspace() {
     setInProgressCorrection(null);
     setSubmittedCorrectionText("");
     setHasCorrectionError(false);
+    setShowMinimumWordWarning(false);
     setExampleError(null);
     setExampleNeedsTopic(false);
     cancelPendingTranslation();
@@ -1200,7 +1205,6 @@ export function WritingWorkspace() {
       !activeTopicPrompt ||
       !correctionRequestKey ||
       !task ||
-      wordCount < task.minWords ||
       isTopicLoading ||
       isCorrecting ||
       isCorrectionInProgressElsewhere ||
@@ -1208,6 +1212,12 @@ export function WritingWorkspace() {
     ) {
       return;
     }
+
+    if (wordCount < task.minWords) {
+      setShowMinimumWordWarning(true);
+      return;
+    }
+    setShowMinimumWordWarning(false);
 
     const correctionLocale = locale;
     // Keep the exact submitted draft for the comparison tab. A correction is
@@ -1837,7 +1847,6 @@ export function WritingWorkspace() {
                 onClick={handleCorrect}
                 disabled={
                   !activeTopicPrompt ||
-                  isBelowMinimumWordCount ||
                   isCorrecting ||
                   isTopicLoading ||
                   isGeneratingExample ||
@@ -1846,7 +1855,7 @@ export function WritingWorkspace() {
                 }
                 aria-describedby={
                   [
-                    isBelowMinimumWordCount ? "minimum-word-count-note" : null,
+                    showMinimumWordWarning && isBelowMinimumWordCount ? "minimum-word-count-note" : null,
                     isCurrentDraftAlreadyCorrected ? "already-corrected-note" : null,
                   ]
                     .filter(Boolean)
@@ -1947,10 +1956,10 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.genericCorrectionError}
               </p>
             )}
-            {isBelowMinimumWordCount && task && (
+            {showMinimumWordWarning && isBelowMinimumWordCount && task && (
               <p
                 id="minimum-word-count-note"
-                role="status"
+                role="alert"
                 className="text-sm text-amber-700 dark:text-amber-300"
               >
                 {copy.workspace.editor.minimumWordCount({
