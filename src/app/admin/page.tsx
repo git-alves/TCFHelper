@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminOnlineNowTile } from "@/components/admin-online-now-tile";
+import { AdminRecentActivityFeed } from "@/components/admin-recent-activity-feed";
 import { AdminRecentSignupsFeed } from "@/components/admin-recent-signups-feed";
 import { AdminStatTile } from "@/components/admin-stat-tile";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
@@ -97,7 +98,10 @@ export default async function AdminOverviewPage() {
           <AdminStatTile label="Activated" value={stats.users.activated} />
           <AdminStatTile label="Blocked" value={stats.users.blocked} />
         </div>
-        <AdminRecentSignupsFeed initialSignups={stats.recentSignups} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <AdminRecentSignupsFeed initialSignups={stats.recentSignups} />
+          <AdminRecentActivityFeed initialEvents={stats.recentActivity} />
+        </div>
       </section>
 
       <section aria-labelledby="access-codes-heading" className="flex flex-col gap-3">

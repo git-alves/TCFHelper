@@ -1,50 +1,37 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { AdminRecentSignup } from "@/lib/admin-overview";
+import type { AdminEventLogItem } from "@/lib/admin-event-log";
 import { formatRelativeTime } from "@/lib/relative-time";
 
-// There is no push channel or background job behind this list -- it is a
-// heartbeat, not literal real-time presence, same rationale as
-// AdminOnlineNowTile (which this polling shape mirrors). Kept as its own
-// independent poll rather than sharing state with that tile: two lightweight
-// requests to the same cheap endpoint is simpler than wiring shared state
-// for one page.
+// Same heartbeat-not-push rationale and polling shape as AdminOnlineNowTile
+// and AdminRecentSignupsFeed. Kept as its own independent poll of the same
+// endpoint rather than merged state -- see AdminRecentSignupsFeed for why.
 const POLL_INTERVAL_MS = 12_000;
 const POLL_TIMEOUT_MS = 8_000;
 
-interface AdminRecentSignupsFeedProps {
-  initialSignups: AdminRecentSignup[];
+const SEVERITY_SYMBOLS: Record<string, string> = { INFO: "🟢", WARN: "🟡", ERROR: "🔴" };
+
+interface AdminRecentActivityFeedProps {
+  initialEvents: AdminEventLogItem[];
 }
 
-type OverviewPollResponse = { stats?: { recentSignups?: unknown } };
+type OverviewPollResponse = { stats?: { recentActivity?: unknown } };
 
-function isRecentSignup(value: unknown): value is AdminRecentSignup {
+function isEventLogItem(value: unknown): value is AdminEventLogItem {
   if (!value || typeof value !== "object") return false;
   const record = value as Record<string, unknown>;
   return (
     typeof record.id === "string" &&
-    typeof record.email === "string" &&
-    (record.name === null || typeof record.name === "string") &&
-    typeof record.createdAt === "string" &&
-    (record.timezone === null || typeof record.timezone === "string")
+    typeof record.occurredAt === "string" &&
+    typeof record.severity === "string" &&
+    typeof record.message === "string"
   );
 }
 
-/** The learner's own local time, from their reported zone, defaulting to UTC when unknown. */
-function localJoinTime(createdAt: string, timezone: string | null): string {
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZoneName: "short",
-    timeZone: timezone ?? "UTC",
-  }).format(new Date(createdAt));
-}
-
-export function AdminRecentSignupsFeed({ initialSignups }: AdminRecentSignupsFeedProps) {
-  const [signups, setSignups] = useState(initialSignups);
+export function AdminRecentActivityFeed({ initialEvents }: AdminRecentActivityFeedProps) {
+  const [events, setEvents] = useState(initialEvents);
   const [isStale, setIsStale] = useState(false);
 
   useEffect(() => {
@@ -81,11 +68,11 @@ export function AdminRecentSignupsFeed({ initialSignups }: AdminRecentSignupsFee
         if (!response.ok) throw new Error(`Unexpected status ${response.status}`);
 
         const payload = (await response.json()) as OverviewPollResponse;
-        const nextSignups = payload.stats?.recentSignups;
+        const nextEvents = payload.stats?.recentActivity;
         if (stopped) return;
 
-        if (Array.isArray(nextSignups) && nextSignups.every(isRecentSignup)) {
-          setSignups(nextSignups);
+        if (Array.isArray(nextEvents) && nextEvents.every(isEventLogItem)) {
+          setEvents(nextEvents);
           setIsStale(false);
         } else {
           setIsStale(true);
@@ -132,20 +119,33 @@ export function AdminRecentSignupsFeed({ initialSignups }: AdminRecentSignupsFee
             }
             aria-hidden="true"
           />
-          <p className="text-sm font-medium">Recent signups</p>
+          <p className="text-sm font-medium">Recent activity</p>
         </div>
         {isStale && <span className="text-xs text-zinc-400 dark:text-zinc-500">May be outdated</span>}
       </div>
-      {signups.length === 0 ? (
-        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">No signups yet.</p>
+      {events.length === 0 ? (
+        <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">No activity yet.</p>
       ) : (
         <ul className="mt-3 flex flex-col gap-2 text-sm">
-          {signups.map((signup) => (
-            <li key={signup.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-              <span className="font-medium">{signup.name ?? signup.email}</span>
+          {events.map((event) => (
+            <li key={event.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+              <span>
+                <span aria-hidden="true">{SEVERITY_SYMBOLS[event.severity] ?? "•"}</span>{" "}
+                {event.message}
+              </span>
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {formatRelativeTime(signup.createdAt)} ·{" "}
-                {localJoinTime(signup.createdAt, signup.timezone)}
+                {formatRelativeTime(event.occurredAt)}
+                {event.userId && (
+                  <>
+                    {" · "}
+                    <Link
+                      href={`/admin/users/${encodeURIComponent(event.userId)}`}
+                      className="text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
+                    >
+                      {event.userEmail ?? event.userId}
+                    </Link>
+                  </>
+                )}
               </span>
             </li>
           ))}

@@ -2,6 +2,7 @@ import "server-only";
 
 import { prisma } from "@/lib/prisma";
 import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
+import { getRecentAdminEvents, type AdminEventLogItem } from "@/lib/admin-event-log";
 import { ONLINE_THRESHOLD_MS } from "@/lib/presence-limits";
 
 export type AdminRecentSignup = {
@@ -24,6 +25,11 @@ export type AdminOverviewStats = {
   // Newest first, regardless of where each learner is -- displayed with
   // each row's own reported timezone rather than one shared clock.
   recentSignups: AdminRecentSignup[];
+  // The newest recorded events across the whole app (corrections hitting a
+  // quota, access-code redemptions, provider failures, sign-ins, etc.) --
+  // "important activity" beyond just signing up, live rather than the
+  // paginated operational log.
+  recentActivity: AdminEventLogItem[];
   accessCodes: {
     total: number;
     redeemed: number;
@@ -102,6 +108,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     correctionDayAgg,
     correctionMonthAgg,
     recentSignupRecords,
+    recentActivity,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { isBlocked: true } }),
@@ -147,6 +154,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       take: RECENT_SIGNUPS_LIMIT,
       select: { id: true, email: true, name: true, createdAt: true, timezone: true },
     }),
+    getRecentAdminEvents(),
   ]);
 
   return {
@@ -163,6 +171,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       createdAt: record.createdAt.toISOString(),
       timezone: record.timezone,
     })),
+    recentActivity,
     accessCodes: {
       total: totalAccessCodes,
       redeemed: redeemedAccessCodes,

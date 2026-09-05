@@ -8,6 +8,7 @@ const {
   translationAggregateMock,
   exampleAggregateMock,
   correctionAggregateMock,
+  getRecentAdminEventsMock,
 } = vi.hoisted(() => ({
   userCountMock: vi.fn(),
   userFindManyMock: vi.fn(),
@@ -15,6 +16,7 @@ const {
   translationAggregateMock: vi.fn(),
   exampleAggregateMock: vi.fn(),
   correctionAggregateMock: vi.fn(),
+  getRecentAdminEventsMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -26,6 +28,9 @@ vi.mock("@/lib/prisma", () => ({
     exampleGenerationQuota: { aggregate: exampleAggregateMock },
     correctionUsage: { aggregate: correctionAggregateMock },
   },
+}));
+vi.mock("@/lib/admin-event-log", () => ({
+  getRecentAdminEvents: getRecentAdminEventsMock,
 }));
 
 const { getAdminOverviewStats, getGeminiRequestsToday } = await import("./admin-overview");
@@ -39,7 +44,9 @@ beforeEach(() => {
   translationAggregateMock.mockReset();
   exampleAggregateMock.mockReset();
   correctionAggregateMock.mockReset();
+  getRecentAdminEventsMock.mockReset();
   userFindManyMock.mockResolvedValue([]);
+  getRecentAdminEventsMock.mockResolvedValue([]);
 
   userCountMock.mockImplementation(
     async (args?: {
@@ -117,6 +124,18 @@ describe("getAdminOverviewStats", () => {
         timezone: null,
       },
     ]);
+  });
+
+  it("surfaces the newest recorded events as live recent activity", async () => {
+    const events = [
+      { id: "event_1", occurredAt: "2026-08-10T11:00:00.000Z", message: "Access code redeemed." },
+    ];
+    getRecentAdminEventsMock.mockResolvedValue(events);
+
+    const stats = await getAdminOverviewStats(NOW);
+
+    expect(getRecentAdminEventsMock).toHaveBeenCalledWith();
+    expect(stats.recentActivity).toBe(events);
   });
 
   it("filters each aggregate to the current UTC day/month boundary", async () => {
