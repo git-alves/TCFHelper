@@ -248,6 +248,12 @@ function promptWithoutLeadingTitle(title: string, prompt: string): string {
   return prompt.startsWith(prefix) ? prompt.slice(prefix.length) : prompt;
 }
 
+// A malformed or already-expired server timestamp should never create a
+// permanent client-side block.
+function resolveInProgressRetryAt(retryAt: number): number {
+  return Number.isFinite(retryAt) ? Math.max(retryAt, Date.now() + 1) : Date.now() + 5_000;
+}
+
 // Grows the custom-topic textarea to fit its content instead of capping it
 // at its `rows` and leaving the rest behind an internal scrollbar -- the
 // learner needs to keep the whole pasted topic visible while writing.
@@ -1284,9 +1290,7 @@ export function WritingWorkspace() {
             typeof retryAtValue === "string" ? Date.parse(retryAtValue) : Number.NaN;
           setInProgressCorrection({
             key: requestKey,
-            // A malformed or already-expired server timestamp should never
-            // create a permanent client-side block.
-            retryAt: Number.isFinite(retryAt) ? Math.max(retryAt, Date.now() + 1) : Date.now() + 5_000,
+            retryAt: resolveInProgressRetryAt(retryAt),
           });
           setCorrectionModalOpen(false);
           return;
