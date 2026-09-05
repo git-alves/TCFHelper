@@ -49,8 +49,8 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
     router.replace("/tasks", { scroll: false });
   }, [isFullTour, router]);
 
-  // Show this concise guide when the learner chooses Full task for the first
-  // time on this browser. It does not depend on, or redirect from, Practice.
+  // Show this concise guide when the learner chooses Simulate for the first
+  // time on this browser. It does not depend on, or redirect from, Train.
   useEffect(() => {
     if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
     // Let the workspace render its first state before opening a guide that
