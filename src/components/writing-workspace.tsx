@@ -1199,7 +1199,8 @@ export function WritingWorkspace() {
       !taskType ||
       !activeTopicPrompt ||
       !correctionRequestKey ||
-      wordCount === 0 ||
+      !task ||
+      wordCount < task.minWords ||
       isTopicLoading ||
       isCorrecting ||
       isCorrectionInProgressElsewhere ||
@@ -1404,6 +1405,8 @@ export function WritingWorkspace() {
   }
 
   const wordCountInRange = task ? wordCount >= task.minWords && wordCount <= task.maxWords : true;
+  const isBelowMinimumWordCount = Boolean(task && wordCount < task.minWords);
+  const remainingWords = task ? Math.max(0, task.minWords - wordCount) : 0;
   const trimmedContent = content.trim();
   const isDraftTooLongToTranslate =
     locale !== "fr" && trimmedContent.length > TRANSLATABLE_MAX_CHARS;
@@ -1834,14 +1837,21 @@ export function WritingWorkspace() {
                 onClick={handleCorrect}
                 disabled={
                   !activeTopicPrompt ||
-                  wordCount === 0 ||
+                  isBelowMinimumWordCount ||
                   isCorrecting ||
                   isTopicLoading ||
                   isGeneratingExample ||
                   isCorrectionInProgressElsewhere ||
                   isCurrentDraftAlreadyCorrected
                 }
-                aria-describedby={isCurrentDraftAlreadyCorrected ? "already-corrected-note" : undefined}
+                aria-describedby={
+                  [
+                    isBelowMinimumWordCount ? "minimum-word-count-note" : null,
+                    isCurrentDraftAlreadyCorrected ? "already-corrected-note" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
                 className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
               >
                 {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
@@ -1935,6 +1945,18 @@ export function WritingWorkspace() {
             {hasCorrectionError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
                 {copy.workspace.editor.genericCorrectionError}
+              </p>
+            )}
+            {isBelowMinimumWordCount && task && (
+              <p
+                id="minimum-word-count-note"
+                role="status"
+                className="text-sm text-amber-700 dark:text-amber-300"
+              >
+                {copy.workspace.editor.minimumWordCount({
+                  remainingWords,
+                  minWords: task.minWords,
+                })}
               </p>
             )}
             {isCorrectionInProgressElsewhere && (

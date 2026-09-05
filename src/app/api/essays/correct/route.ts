@@ -102,6 +102,20 @@ function correctionDailyLimitResponse(resetAt: Date) {
   );
 }
 
+function minimumWordCountResponse(wordCount: number, minWords: number) {
+  const remainingWords = minWords - wordCount;
+
+  return NextResponse.json(
+    {
+      error: `Your response needs ${remainingWords} more word${remainingWords === 1 ? "" : "s"} before it can be corrected.`,
+      code: "MINIMUM_WORD_COUNT_NOT_MET",
+      wordCount,
+      minWords,
+    },
+    { status: 422, headers: NO_STORE_HEADERS },
+  );
+}
+
 function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode {
   if (error instanceof GeminiNotConfiguredError) return "not_configured";
   if (error instanceof GeminiRateLimitedError) return "rate_limited";
@@ -150,6 +164,13 @@ export async function POST(request: Request) {
   const task = TASK_INSTRUCTIONS[taskType];
   const wordCount = countWords(content);
   const feedbackLanguage = APP_LOCALE_LANGUAGE_NAMES[locale];
+
+  // This is intentionally before any topic lookup, durable claim, or quota
+  // reservation. Short submissions cannot yield a useful assessment and
+  // must never consume a correction slot or send an avoidable Gemini request.
+  if (wordCount < task.minWords) {
+    return minimumWordCountResponse(wordCount, task.minWords);
+  }
 
   let resolvedTopicId: string | null = null;
   let resolvedTopicPrompt: string;
