@@ -7,8 +7,12 @@ interface AdminUsersTableProps {
   currentAdminId: string;
 }
 
-function formattedDate(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
+// Rendered server-side; an unqualified format would silently use the server
+// process's own timezone. Pin it to the learner's own reported zone when
+// known (see TimezoneReporter), UTC otherwise, so a join date near midnight
+// never reads as the wrong calendar day.
+function formattedDate(value: string, timeZone: string | null) {
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: timeZone ?? "UTC" }).format(new Date(value));
 }
 
 function count(value: number) {
@@ -54,7 +58,7 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                     )}
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-4 py-4 text-zinc-600 dark:text-zinc-400">{formattedDate(user.createdAt)}</td>
+                <td className="whitespace-nowrap px-4 py-4 text-zinc-600 dark:text-zinc-400">{formattedDate(user.createdAt, user.timezone)}</td>
                 <td className="px-4 py-4">
                   <AdminUserAccountStatus
                     userId={user.id}

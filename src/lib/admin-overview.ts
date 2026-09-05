@@ -4,6 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 import { ONLINE_THRESHOLD_MS } from "@/lib/presence-limits";
 
+export type AdminRecentSignup = {
+  id: string;
+  email: string;
+  name: string | null;
+  createdAt: string;
+  // IANA zone reported by the learner's own browser (see TimezoneReporter).
+  // Null until their first visit after this column shipped.
+  timezone: string | null;
+};
+
 export type AdminOverviewStats = {
   users: {
     total: number;
@@ -11,6 +21,9 @@ export type AdminOverviewStats = {
     activated: number;
     onlineNow: number;
   };
+  // Newest first, regardless of where each learner is -- displayed with
+  // each row's own reported timezone rather than one shared clock.
+  recentSignups: AdminRecentSignup[];
   accessCodes: {
     total: number;
     redeemed: number;
@@ -22,6 +35,8 @@ export type AdminOverviewStats = {
     corrections: { requestsToday: number; requestsThisMonth: number; activeUsersToday: number };
   };
 };
+
+const RECENT_SIGNUPS_LIMIT = 8;
 
 function startOfUtcDay(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
@@ -86,6 +101,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     exampleDayAgg,
     correctionDayAgg,
     correctionMonthAgg,
+    recentSignupRecords,
   ] = await Promise.all([
     prisma.user.count(),
     prisma.user.count({ where: { isBlocked: true } }),
@@ -126,6 +142,11 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       where: { monthStartedAt: currentMonthStart },
       _sum: { monthlyRequestCount: true },
     }),
+    prisma.user.findMany({
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: RECENT_SIGNUPS_LIMIT,
+      select: { id: true, email: true, name: true, createdAt: true, timezone: true },
+    }),
   ]);
 
   return {
@@ -135,6 +156,13 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       activated: activatedUsers,
       onlineNow: onlineNowUsers,
     },
+    recentSignups: recentSignupRecords.map((record) => ({
+      id: record.id,
+      email: record.email,
+      name: record.name,
+      createdAt: record.createdAt.toISOString(),
+      timezone: record.timezone,
+    })),
     accessCodes: {
       total: totalAccessCodes,
       redeemed: redeemedAccessCodes,

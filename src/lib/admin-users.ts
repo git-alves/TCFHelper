@@ -21,6 +21,7 @@ export const ADMIN_USER_SELECT = {
   email: true,
   name: true,
   createdAt: true,
+  timezone: true,
   isAdmin: true,
   isBlocked: true,
   translationQuota: {
@@ -157,6 +158,10 @@ export type AdminUserListItem = {
   email: string;
   name: string | null;
   createdAt: string;
+  // IANA zone reported by the learner's own browser (see TimezoneReporter).
+  // Null until their first visit after this column shipped -- admin displays
+  // must fall back to UTC rather than assume every row has one.
+  timezone: string | null;
   isAdmin: boolean;
   isBlocked: boolean;
   activatedAt: string | null;
@@ -191,6 +196,7 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
     email: record.email,
     name: record.name,
     createdAt: record.createdAt.toISOString(),
+    timezone: record.timezone,
     isAdmin: record.isAdmin,
     isBlocked: record.isBlocked,
     activatedAt: redemption?.redeemedAt?.toISOString() ?? null,

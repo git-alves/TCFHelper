@@ -31,6 +31,7 @@ function userRecord(overrides: {
   redeemedAt?: Date | null;
   validityDays?: number | null;
   expiresAt?: Date | null;
+  timezone?: string | null;
 }) {
   const hasRedemption =
     overrides.redeemedAt !== undefined || overrides.validityDays !== undefined || overrides.expiresAt !== undefined;
@@ -39,6 +40,7 @@ function userRecord(overrides: {
     email: "learner@example.com",
     name: null,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    timezone: overrides.timezone ?? null,
     isAdmin: false,
     isBlocked: false,
     translationQuota: null,

@@ -149,6 +149,11 @@ model User {
   // "active within the last couple of minutes" as online, so this is a
   // heartbeat, not literal real-time presence.
   lastActiveAt                DateTime?
+  // IANA zone name (e.g. "America/Sao_Paulo") reported by the learner's own
+  // browser -- see TimezoneReporter. Null until their first visit after this
+  // column shipped, so admin displays must fall back to UTC rather than
+  // assume every row has one.
+  timezone                    String?
 
   subscriptions           Subscription[]
   essays                  Essay[]

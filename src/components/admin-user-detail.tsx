@@ -14,8 +14,24 @@ function count(value: number) {
   return value.toLocaleString("en-US");
 }
 
-function dateTime(value: string) {
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+// Rendered server-side, so an unqualified format would silently use the
+// server process's own timezone -- never this admin's, and never the
+// learner's. Pin it to the learner's own reported zone when known (see
+// TimezoneReporter), UTC otherwise, and always show which one via
+// timeZoneName so the displayed time is never ambiguous.
+function dateTime(value: string, timeZone: string | null) {
+  // Intl rejects mixing dateStyle/timeStyle with timeZoneName in the same
+  // options object, so the "medium" look is spelled out as explicit
+  // components instead.
+  return new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+    timeZone: timeZone ?? "UTC",
+  }).format(new Date(value));
 }
 
 export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) {
@@ -40,16 +56,16 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
               <span className="rounded-full bg-violet-100 px-2.5 py-1 text-violet-900 dark:bg-violet-950 dark:text-violet-200">Owner access</span>
             ) : user.activatedAt ? (
               user.hasLiveAdmission ? (
-                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated {dateTime(user.activatedAt)}</span>
+                <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">Activated {dateTime(user.activatedAt, user.timezone)}</span>
               ) : (
-                <span className="rounded-full bg-zinc-200 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">Access expired {dateTime(user.activatedAt)}</span>
+                <span className="rounded-full bg-zinc-200 px-2.5 py-1 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">Access expired {dateTime(user.activatedAt, user.timezone)}</span>
               )
             ) : (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Awaiting access code</span>
             )}
           </div>
         </div>
-        <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Joined {dateTime(user.createdAt)}.</p>
+        <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Joined {dateTime(user.createdAt, user.timezone)}.</p>
       </div>
 
       <section aria-labelledby="usage-heading">

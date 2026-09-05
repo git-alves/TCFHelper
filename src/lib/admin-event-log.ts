@@ -400,9 +400,10 @@ export type AdminEventLogItem = {
   securityWindowMinutes?: number | null;
   occurrenceCount: number;
   message: string;
+  userEmail?: string | null;
 };
 
-function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
+function serializeAdminEvent(record: AdminEventRecord, emailByUserId: ReadonlyMap<string, string>): AdminEventLogItem {
   const eventType = isKnownValue(ADMIN_EVENT_TYPES, record.eventType)
     ? record.eventType
     : UNKNOWN_EVENT_TYPE;
@@ -433,6 +434,8 @@ function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
     occurrenceCount,
   };
 
+  const userId = safeOpaqueId(record.userId);
+
   return {
     id: safeOpaqueId(record.id) ?? "unknown-event",
     occurredAt: record.occurredAt.toISOString(),
@@ -440,7 +443,7 @@ function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
     severity,
     module: eventModule,
     eventType,
-    userId: safeOpaqueId(record.userId),
+    userId,
     essayId: safeOpaqueId(record.essayId),
     accessCodeId: safeOpaqueId(record.accessCodeId),
     provider,
@@ -456,6 +459,11 @@ function serializeAdminEvent(record: AdminEventRecord): AdminEventLogItem {
     securityWindowMinutes: security.securityWindowMinutes,
     occurrenceCount,
     message: formatAdminEventMessage(messageInput),
+    // userId is an immutable event-time snapshot; the account it names can
+    // be renamed, have its email changed, or be deleted since. A missing
+    // lookup here means exactly that -- not that the event lacks a user --
+    // so the table falls back to the raw id rather than hiding the row.
+    userEmail: userId ? (emailByUserId.get(userId) ?? null) : null,
   };
 }
 
@@ -471,6 +479,22 @@ async function matchingUserIds(query: string) {
     throw new AdminEventLogSearchTooBroadError();
   }
   return users.map((user) => user.id);
+}
+
+/**
+ * The one page of events being rendered names only a handful of distinct
+ * users at most, so this is a single small bounded lookup per page render --
+ * never a per-row query.
+ */
+async function emailsForUserIds(userIds: string[]): Promise<Map<string, string>> {
+  const distinctIds = [...new Set(userIds)];
+  if (distinctIds.length === 0) return new Map();
+
+  const users = await prisma.user.findMany({
+    where: { id: { in: distinctIds } },
+    select: { id: true, email: true },
+  });
+  return new Map(users.map((user) => [user.id, user.email]));
 }
 
 async function adminEventWhere(query: AdminEventLogQuery, now: Date): Promise<Prisma.AdminEventWhereInput> {
@@ -529,9 +553,12 @@ export async function getAdminEventLogPage(
     skip: (page - 1) * query.limit,
     take: query.limit,
   });
+  const emailByUserId = await emailsForUserIds(
+    records.map((record) => safeOpaqueId(record.userId)).filter((userId): userId is string => userId !== null),
+  );
 
   return {
-    events: records.map(serializeAdminEvent),
+    events: records.map((record) => serializeAdminEvent(record, emailByUserId)),
     total,
     page,
     pageCount,
