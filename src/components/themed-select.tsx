@@ -85,14 +85,21 @@ export function ThemedSelect<T extends string>({
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") setIsOpen(false);
+      if (event.key !== "Escape") return;
+      // Consume Escape in the capture phase so an ancestor modal's own
+      // Escape-to-close handler (bound in the bubble phase on document)
+      // never sees this keypress -- otherwise closing the picker and
+      // closing the whole modal race on the same keydown, and the modal
+      // wins regardless of which listener was registered first.
+      event.stopPropagation();
+      setIsOpen(false);
     }
 
     document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown, true);
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [isOpen]);
 
