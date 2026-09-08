@@ -120,11 +120,12 @@ describe("POST /api/support", () => {
   });
 
   it("stores one accepted attachment with its actual byte length", async () => {
+    const pdfBytes = new TextEncoder().encode("%PDF-1.4\n%mock pdf body used only to satisfy magic-byte sniffing");
     const file: SubmittedFile = {
       name: "steps.pdf",
       type: "application/pdf",
       size: 999,
-      arrayBuffer: async () => new Uint8Array([10, 20, 30]).buffer,
+      arrayBuffer: async () => pdfBytes.buffer,
     };
 
     const response = await POST(
@@ -136,9 +137,69 @@ describe("POST /api/support", () => {
     expect(createCall.data.attachment.create).toMatchObject({
       originalName: "steps.pdf",
       mimeType: "application/pdf",
-      byteSize: 3,
+      byteSize: pdfBytes.byteLength,
     });
-    expect(Array.from(createCall.data.attachment.create.data)).toEqual([10, 20, 30]);
+    expect(Array.from(createCall.data.attachment.create.data)).toEqual(Array.from(pdfBytes));
+  });
+
+  it("stores a genuine plain-text attachment", async () => {
+    const textBytes = new TextEncoder().encode("Steps to reproduce:\n1. Open the editor\n2. Freeze");
+    const file: SubmittedFile = {
+      name: "steps.txt",
+      type: "text/plain",
+      size: textBytes.byteLength,
+      arrayBuffer: async () => textBytes.buffer,
+    };
+
+    const response = await POST(
+      supportRequest({ category: ["BUG"], details: ["The editor freezes."], attachment: [file] }),
+    );
+
+    expect(response.status).toBe(201);
+    expect(createMock.mock.calls[0]?.[0].data.attachment.create).toMatchObject({
+      originalName: "steps.txt",
+      mimeType: "text/plain",
+    });
+  });
+
+  it("rejects an attachment whose content doesn't match its claimed type", async () => {
+    // MZ header: a Windows executable renamed to look like a PDF.
+    const exeBytes = new Uint8Array([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00]);
+    const file: SubmittedFile = {
+      name: "steps.pdf",
+      type: "application/pdf",
+      size: exeBytes.byteLength,
+      arrayBuffer: async () => exeBytes.buffer,
+    };
+
+    const response = await POST(
+      supportRequest({ category: ["BUG"], details: ["The editor freezes."], attachment: [file] }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid attachment." });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a binary file disguised with a .txt extension", async () => {
+    const pngBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64",
+    );
+    const file: SubmittedFile = {
+      name: "notes.txt",
+      type: "text/plain",
+      size: pngBytes.byteLength,
+      arrayBuffer: async () => pngBytes.buffer,
+    };
+
+    const response = await POST(
+      supportRequest({ category: ["BUG"], details: ["The editor freezes."], attachment: [file] }),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid attachment." });
+    expect(createMock).not.toHaveBeenCalled();
   });
 
   it("rejects an oversized attachment before reading it or writing a request", async () => {
