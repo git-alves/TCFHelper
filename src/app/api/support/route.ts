@@ -3,6 +3,7 @@ import { z } from "zod";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { isHubspotConfigured } from "@/lib/hubspot";
 import { prisma } from "@/lib/prisma";
+import { attachmentContentMatchesDeclaredType } from "@/lib/support-attachment-content";
 import { syncSupportRequestToHubspot } from "@/lib/support-hubspot-sync";
 import {
   SUPPORT_ATTACHMENT_MAX_BYTES,
@@ -120,6 +121,13 @@ export async function POST(request: Request) {
     // File.size is caller supplied metadata; use the actual stream length for
     // the durable bound and the saved value.
     if (data.byteLength === 0 || data.byteLength > SUPPORT_ATTACHMENT_MAX_BYTES) {
+      return response({ error: "Invalid attachment." }, 400);
+    }
+
+    // The extension and browser-supplied MIME type are both caller
+    // controlled; confirm the actual bytes match what was claimed so a
+    // renamed executable or polyglot file can't ride through the allowlist.
+    if (!(await attachmentContentMatchesDeclaredType({ name: originalName, mimeType, data }))) {
       return response({ error: "Invalid attachment." }, 400);
     }
 
