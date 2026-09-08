@@ -4,7 +4,11 @@ import { SUPPORT_ATTACHMENT_MAX_BYTES } from "@/lib/support-request";
 const {
   getCurrentAppUserMock,
   AppUserProvisioningErrorMock,
-  createMock,
+  countMock,
+  transactionMock,
+  executeRawMock,
+  txCountMock,
+  txCreateMock,
   isHubspotConfiguredMock,
   syncSupportRequestToHubspotMock,
 } = vi.hoisted(() => {
@@ -13,7 +17,11 @@ const {
   return {
     getCurrentAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
-    createMock: vi.fn(),
+    countMock: vi.fn(),
+    transactionMock: vi.fn(),
+    executeRawMock: vi.fn(),
+    txCountMock: vi.fn(),
+    txCreateMock: vi.fn(),
     isHubspotConfiguredMock: vi.fn(),
     syncSupportRequestToHubspotMock: vi.fn(),
   };
@@ -24,7 +32,7 @@ vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { supportRequest: { create: createMock } },
+  prisma: { supportRequest: { count: countMock }, $transaction: transactionMock },
 }));
 vi.mock("@/lib/hubspot", () => ({
   isHubspotConfigured: isHubspotConfiguredMock,
@@ -57,12 +65,28 @@ function supportRequest(fields: Record<string, Array<string | SubmittedFile>>): 
 
 beforeEach(() => {
   getCurrentAppUserMock.mockReset();
-  createMock.mockReset();
+  countMock.mockReset();
+  transactionMock.mockReset();
+  executeRawMock.mockReset();
+  txCountMock.mockReset();
+  txCreateMock.mockReset();
   isHubspotConfiguredMock.mockReset();
   syncSupportRequestToHubspotMock.mockReset();
 
   getCurrentAppUserMock.mockResolvedValue({ id: "learner_1", email: "learner@example.com", name: "Ada Lovelace" });
-  createMock.mockResolvedValue({ id: "support_1" });
+  countMock.mockResolvedValue(0);
+  txCountMock.mockResolvedValue(0);
+  txCreateMock.mockResolvedValue({ id: "support_1" });
+  executeRawMock.mockResolvedValue(undefined);
+  // Sequential by default: runs the callback against a tx stub immediately.
+  // The concurrency test below replaces this with a real serializing
+  // implementation to prove the advisory lock is what bounds the race.
+  transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      $executeRaw: executeRawMock,
+      supportRequest: { count: txCountMock, create: txCreateMock },
+    }),
+  );
   isHubspotConfiguredMock.mockReturnValue(false);
 });
 
@@ -74,7 +98,7 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: "Unauthorized" });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
   });
 
   it("fails closed while the signed-in account cannot be provisioned", async () => {
@@ -87,7 +111,144 @@ describe("POST /api/support", () => {
       error: "Your account is still being set up. Please try again.",
       code: "ACCOUNT_PROVISIONING_UNAVAILABLE",
     });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a request once the learner has hit the recent-request rate limit", async () => {
+    countMock.mockResolvedValue(5);
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "Too many support requests. Please try again later.",
+      code: "SUPPORT_RATE_LIMITED",
+    });
+    expect(response.headers.get("Retry-After")).toBe("900");
+    expect(countMock).toHaveBeenCalledWith({
+      where: { userId: "learner_1", createdAt: { gte: expect.any(Date) } },
+    });
+    expect(txCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("never reads the request body once the rate limit is reached, bounding attachment storage abuse", async () => {
+    countMock.mockResolvedValue(5);
+    const formData = vi.fn();
+    const request = { formData } as unknown as Request;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(429);
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it("allows a request while under the rate limit", async () => {
+    countMock.mockResolvedValue(4);
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(201);
+  });
+
+  it("acquires a per-user advisory lock before re-checking the limit inside the transaction", async () => {
+    const calls: string[] = [];
+    executeRawMock.mockImplementation(async () => {
+      calls.push("lock");
+    });
+    txCountMock.mockImplementation(async () => {
+      calls.push("count");
+      return 0;
+    });
+    txCreateMock.mockImplementation(async () => {
+      calls.push("create");
+      return { id: "support_1" };
+    });
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(201);
+    expect(calls).toEqual(["lock", "count", "create"]);
+    expect(executeRawMock.mock.calls[0]?.[0]?.[0]).toContain("pg_advisory_xact_lock");
+  });
+
+  it("treats the locked transaction's count as authoritative even when the pre-check optimistically passed", async () => {
+    // The unlocked fast-path read observed capacity (a stale snapshot from
+    // before other in-flight requests committed), but the serialized check
+    // inside the transaction sees the limit has since been reached.
+    countMock.mockResolvedValue(0);
+    txCountMock.mockResolvedValue(5);
+
+    const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toEqual({
+      error: "Too many support requests. Please try again later.",
+      code: "SUPPORT_RATE_LIMITED",
+    });
+    expect(txCreateMock).not.toHaveBeenCalled();
+  });
+
+  it("bounds concurrent submissions from the same account to the rate limit (regression for the TOCTOU race)", async () => {
+    // Models pg_advisory_xact_lock: calls to $executeRaw queue on a shared
+    // key, and a caller's slot only opens for the next one once its whole
+    // transaction (not just the lock call) has finished. transactionMock
+    // itself runs every callback immediately, with no serialization of its
+    // own -- and count() below deliberately yields a tick, so an unlocked
+    // count-then-create would actually interleave here. This test only
+    // passes because the route calls the lock before its count/create.
+    let queueTail: Promise<void> = Promise.resolve();
+    executeRawMock.mockImplementation(() => {
+      const myTurn = queueTail;
+      let releaseLock: () => void = () => {};
+      queueTail = new Promise<void>((resolve) => {
+        releaseLock = resolve;
+      });
+      return myTurn.then(() => releaseLock);
+    });
+
+    const store: Array<{ id: string }> = [];
+    transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => {
+      let releaseLock: (() => void) | undefined;
+      const tx = {
+        $executeRaw: (...args: unknown[]) =>
+          (executeRawMock(...args) as Promise<() => void>).then((release) => {
+            releaseLock = release;
+          }),
+        supportRequest: {
+          count: async () => {
+            await Promise.resolve();
+            return store.length;
+          },
+          create: async () => {
+            const row = { id: `support_${store.length + 1}` };
+            store.push(row);
+            return row;
+          },
+        },
+      };
+      try {
+        return await callback(tx);
+      } finally {
+        releaseLock?.();
+      }
+    });
+    // The unlocked pre-check always reports capacity: it's a stale read by
+    // design, so this isolates the assertion to what the transaction alone
+    // enforces.
+    countMock.mockResolvedValue(0);
+
+    const attempts = 8;
+    const responses = await Promise.all(
+      Array.from({ length: attempts }, () =>
+        POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] })),
+      ),
+    );
+
+    const accepted = responses.filter((r) => r.status === 201);
+    const limited = responses.filter((r) => r.status === 429);
+    expect(accepted).toHaveLength(5);
+    expect(limited).toHaveLength(attempts - 5);
+    expect(store).toHaveLength(5);
   });
 
   it("rejects malformed categories and duplicate form fields before writing", async () => {
@@ -97,7 +258,7 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid support request." });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
   });
 
   it("persists the authenticated sender rather than accepting a sender from the browser", async () => {
@@ -108,7 +269,7 @@ describe("POST /api/support", () => {
     expect(response.status).toBe(201);
     await expect(response.json()).resolves.toEqual({ id: "support_1" });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
-    expect(createMock).toHaveBeenCalledWith({
+    expect(txCreateMock).toHaveBeenCalledWith({
       data: {
         userId: "learner_1",
         senderEmail: "learner@example.com",
@@ -133,7 +294,7 @@ describe("POST /api/support", () => {
     );
 
     expect(response.status).toBe(201);
-    const createCall = createMock.mock.calls[0]?.[0];
+    const createCall = txCreateMock.mock.calls[0]?.[0];
     expect(createCall.data.attachment.create).toMatchObject({
       originalName: "steps.pdf",
       mimeType: "application/pdf",
@@ -156,7 +317,7 @@ describe("POST /api/support", () => {
     );
 
     expect(response.status).toBe(201);
-    expect(createMock.mock.calls[0]?.[0].data.attachment.create).toMatchObject({
+    expect(txCreateMock.mock.calls[0]?.[0].data.attachment.create).toMatchObject({
       originalName: "steps.txt",
       mimeType: "text/plain",
     });
@@ -178,7 +339,7 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid attachment." });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
   });
 
   it("rejects a binary file disguised with a .txt extension", async () => {
@@ -199,7 +360,7 @@ describe("POST /api/support", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid attachment." });
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
   });
 
   it("rejects an oversized attachment before reading it or writing a request", async () => {
@@ -218,11 +379,11 @@ describe("POST /api/support", () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: "Invalid attachment." });
     expect(arrayBuffer).not.toHaveBeenCalled();
-    expect(createMock).not.toHaveBeenCalled();
+    expect(txCreateMock).not.toHaveBeenCalled();
   });
 
   it("does not expose persistence errors containing a learner's support message", async () => {
-    createMock.mockRejectedValue(new Error("database rejected the sensitive details"));
+    txCreateMock.mockRejectedValue(new Error("database rejected the sensitive details"));
 
     const response = await POST(supportRequest({ category: ["OTHER"], details: ["private report"] }));
 
@@ -230,6 +391,21 @@ describe("POST /api/support", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Support is temporarily unavailable. Please try again.",
     });
+  });
+
+  it("fails closed with the sanitized 503 when the rate-limit pre-check itself errors", async () => {
+    countMock.mockRejectedValue(new Error("connection to database lost"));
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const response = await POST(supportRequest({ category: ["OTHER"], details: ["private report"] }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: "Support is temporarily unavailable. Please try again.",
+    });
+    expect(transactionMock).not.toHaveBeenCalled();
+
+    consoleErrorSpy.mockRestore();
   });
 
   it("skips HubSpot sync entirely when it isn't configured", async () => {

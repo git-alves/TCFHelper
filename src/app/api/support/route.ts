@@ -16,6 +16,27 @@ import {
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 const EXPECTED_FORM_FIELDS = new Set(["category", "details", "attachment"]);
 
+// Bounds both spam and, since every request may carry an attachment up to
+// SUPPORT_ATTACHMENT_MAX_BYTES, storage exhaustion from repeated max-size
+// uploads.
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 5;
+const RATE_LIMIT_TRANSACTION_TIMEOUT_MS = 3_000;
+
+function rateLimitedResponse() {
+  return NextResponse.json(
+    { error: "Too many support requests. Please try again later.", code: "SUPPORT_RATE_LIMITED" },
+    { status: 429, headers: { ...NO_STORE_HEADERS, "Retry-After": String(RATE_LIMIT_WINDOW_MS / 1000) } },
+  );
+}
+
+function unavailableResponse() {
+  // A support message can contain sensitive free-form text and files, so do
+  // not include the request body or storage error in logs or the response.
+  console.error("Support request persistence failed");
+  return response({ error: "Support is temporarily unavailable. Please try again." }, 503);
+}
+
 const supportRequestSchema = z
   .object({
     category: z.string().refine(isSupportCategory),
@@ -71,6 +92,21 @@ export async function POST(request: Request) {
   }
 
   if (!user) return response({ error: "Unauthorized" }, 401);
+
+  // Best-effort only: an unlocked read here can't be the authoritative check
+  // (concurrent requests could all pass it before any of them writes), but it
+  // cheaply rejects a learner who is already over the limit before this route
+  // reads and buffers a request body that may include a multi-megabyte
+  // attachment. The transaction below is what actually enforces the limit.
+  let recentRequestCount: number;
+  try {
+    recentRequestCount = await prisma.supportRequest.count({
+      where: { userId: user.id, createdAt: { gte: new Date(Date.now() - RATE_LIMIT_WINDOW_MS) } },
+    });
+  } catch {
+    return unavailableResponse();
+  }
+  if (recentRequestCount >= RATE_LIMIT_MAX_REQUESTS) return rateLimitedResponse();
 
   const formData = await request.formData().catch(() => null);
   if (!formData || Array.from(formData.keys()).some((key) => !EXPECTED_FORM_FIELDS.has(key))) {
@@ -140,18 +176,43 @@ export async function POST(request: Request) {
   }
 
   try {
-    const created = await prisma.supportRequest.create({
-      data: {
-        userId: user.id,
-        // Never accept a browser-provided sender address. The form’s read-only
-        // field is just the visible representation of this authenticated value.
-        senderEmail: user.email,
-        category: parsed.data.category,
-        details: parsed.data.details.trim(),
-        ...(attachment ? { attachment: { create: attachment } } : {}),
+    const submission = await prisma.$transaction(
+      async (tx) => {
+        // A per-user advisory lock, held for the rest of this transaction,
+        // serializes the count-and-create below across concurrent requests
+        // from the same account -- without it, several simultaneous
+        // submissions could each read a count under the limit and all write,
+        // defeating the limit entirely. Namespaced (not the bare userId) so
+        // this doesn't also serialize against unrelated per-user locks, e.g.
+        // reserveCorrectionUsage's.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`support:${user.id}`})::bigint)`;
+
+        const recentRequestCount = await tx.supportRequest.count({
+          where: { userId: user.id, createdAt: { gte: new Date(Date.now() - RATE_LIMIT_WINDOW_MS) } },
+        });
+        if (recentRequestCount >= RATE_LIMIT_MAX_REQUESTS) {
+          return { kind: "rateLimited" } as const;
+        }
+
+        const created = await tx.supportRequest.create({
+          data: {
+            userId: user.id,
+            // Never accept a browser-provided sender address. The form’s read-only
+            // field is just the visible representation of this authenticated value.
+            senderEmail: user.email,
+            category: parsed.data.category,
+            details: parsed.data.details.trim(),
+            ...(attachment ? { attachment: { create: attachment } } : {}),
+          },
+          select: { id: true },
+        });
+        return { kind: "created", id: created.id } as const;
       },
-      select: { id: true },
-    });
+      { timeout: RATE_LIMIT_TRANSACTION_TIMEOUT_MS },
+    );
+
+    if (submission.kind === "rateLimited") return rateLimitedResponse();
+    const created = submission;
 
     if (isHubspotConfigured()) {
       // The learner's request is already durably stored above, so a HubSpot
@@ -178,9 +239,6 @@ export async function POST(request: Request) {
 
     return response({ id: created.id }, 201);
   } catch {
-    // A support message can contain sensitive free-form text and files, so do
-    // not include the request body or storage error in logs or the response.
-    console.error("Support request persistence failed");
-    return response({ error: "Support is temporarily unavailable. Please try again." }, 503);
+    return unavailableResponse();
   }
 }
