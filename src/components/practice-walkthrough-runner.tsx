@@ -17,7 +17,7 @@ interface PracticeWalkthroughRunnerProps {
 }
 
 /**
- * The middle page in the app tour. Unlike the full-task walkthrough, this
+ * The middle Train page in the app tour. Unlike the Simulate walkthrough, this
  * never populates a learner response: it only introduces the fixed task-part
  * curriculum and the controlled-to-independent practice progression.
  */
@@ -36,13 +36,13 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
   }, [isFullTour, router]);
 
   // This guide appears only after the learner has deliberately opened
-  // Practice. It is separate from the account-level Dashboard orientation,
+  // Train. It is separate from the account-level Dashboard orientation,
   // so completing one never suppresses the other.
   useEffect(() => {
     if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
     // Defer the state change until after this synchronization effect so the
     // page's initial render stays stable (and the overlay measures its
-    // targets only after Practice has painted).
+    // targets only after Train has painted).
     const timer = window.setTimeout(() => setIsOpen(true), 0);
     return () => window.clearTimeout(timer);
   }, [isFullTour, shouldAutoStart]);
@@ -85,7 +85,7 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
 
   const continueToTasks = useCallback(() => {
     setIsOpen(false);
-    // The comprehensive tour already covered Practice, so returning here
+    // The comprehensive tour already covered Train, so returning here
     // later should not immediately launch the shorter contextual guide.
     markContextualWalkthroughSeen(getContextualWalkthroughStorage(), "practice");
     router.push(`/tasks?${FULL_WALKTHROUGH_PARAM}=${FULL_WALKTHROUGH_VALUE}`);

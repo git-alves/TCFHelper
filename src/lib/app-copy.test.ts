@@ -507,4 +507,43 @@ describe("APP_COPY", () => {
       }
     }
   });
+
+  it("uses the current Train and Simulate names throughout the walkthrough", () => {
+    const expectedByLocale = {
+      en: {
+        train: "Train",
+        simulate: "Simulate",
+        simulateTaskTitle: "Ready to Simulate a Task?",
+      },
+      fr: {
+        train: "Entraînement",
+        simulate: "Simulation",
+        simulateTaskTitle: "Prêt·e à simuler une tâche ?",
+      },
+      es: {
+        train: "Entrenar",
+        simulate: "Simular",
+        simulateTaskTitle: "¿Listo para simular una tarea?",
+      },
+      pt: {
+        train: "Treinar",
+        simulate: "Simular",
+        simulateTaskTitle: "Pronto para simular uma tarefa?",
+      },
+    } as const;
+
+    for (const locale of APP_LOCALES) {
+      const copy = getAppCopy(locale);
+      const expected = expectedByLocale[locale];
+
+      expect(copy.nav.practice).toBe(expected.train);
+      expect(copy.nav.tasks).toBe(expected.simulate);
+      expect(copy.walkthrough.continueToPractice).toContain(expected.train);
+      expect(copy.walkthrough.continueToFullTask).toContain(expected.simulate);
+      expect(copy.walkthrough.dashboardPracticeBody).toContain(expected.train);
+      expect(copy.walkthrough.dashboardStartWritingTitle).toBe(expected.simulateTaskTitle);
+      expect(copy.walkthrough.dashboardStartWritingBody).toContain(expected.simulate);
+      expect(copy.walkthrough.practiceStagesBody).toContain(expected.simulate);
+    }
+  });
 });

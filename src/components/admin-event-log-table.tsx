@@ -31,7 +31,11 @@ function formatUtc(iso: string) {
 function contextItems(event: AdminEventLogItem) {
   const items: { label: string; value: string; href?: string }[] = [];
   if (event.userId) {
-    items.push({ label: "User", value: event.userId, href: `/admin/users/${encodeURIComponent(event.userId)}` });
+    items.push({
+      label: "User",
+      value: event.userEmail ?? event.userId,
+      href: `/admin/users/${encodeURIComponent(event.userId)}`,
+    });
   }
   if (event.essayId) items.push({ label: "Essay", value: event.essayId });
   if (event.accessCodeId) items.push({ label: "Access-code record", value: event.accessCodeId });
@@ -107,7 +111,7 @@ export function AdminEventLogTable({ events }: { events: AdminEventLogItem[] }) 
                         <li key={`${item.label}-${item.value}`}>
                           <span className="font-medium text-zinc-700 dark:text-zinc-300">{item.label}: </span>
                           {item.href ? (
-                            <Link href={item.href} className="font-mono text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">
+                            <Link href={item.href} className="text-violet-700 underline underline-offset-2 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">
                               {item.value}
                             </Link>
                           ) : (

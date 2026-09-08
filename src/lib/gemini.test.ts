@@ -61,6 +61,41 @@ describe("generateModelAnswer", () => {
     await expect(generateModelAnswer(params)).resolves.toBe("Le télétravail présente des avantages.");
   });
 
+  it("skips a thinking model's reasoning part and returns only the real answer", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "L'utilisateur veut un texte sur le télétravail...", thought: true },
+                { text: "Le télétravail présente des avantages." },
+              ],
+            },
+          },
+        ],
+      }),
+    });
+
+    await expect(generateModelAnswer(params)).resolves.toBe("Le télétravail présente des avantages.");
+  });
+
+  it("disables thinking so the whole output budget goes to the answer", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((requestInit as RequestInit).body as string);
+    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+  });
+
   it("uses the default model unless GEMINI_MODEL overrides it", async () => {
     mockFetchOnce({
       ok: true,
@@ -325,6 +360,27 @@ describe("gradeEssayWithGemini", () => {
       status: 200,
       json: async () => ({
         candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
+  });
+
+  it("skips a thinking model's reasoning part and parses only the real JSON answer", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [
+          {
+            content: {
+              parts: [
+                { text: "Je vais évaluer cet essai selon les critères CEFR...", thought: true },
+                { text: JSON.stringify(feedback) },
+              ],
+            },
+          },
+        ],
       }),
     });
 

@@ -74,6 +74,7 @@ const {
   adminEventLogHref,
   adminEventLogSearchParamsFromUrl,
   getAdminEventLogPage,
+  getRecentAdminEvents,
   parseAdminEventLogQuery,
 } = await import("./admin-event-log");
 
@@ -375,5 +376,30 @@ describe("getAdminEventLogPage", () => {
     ).toBe(
       "/admin/logs?range=custom&severity=ERROR&module=ESSAY_SERVICE&page=3&limit=100&q=gemini&from=2026-08-10T10%3A00%3A00.000Z&to=2026-08-11T10%3A00%3A00.000Z",
     );
+  });
+});
+
+describe("getRecentAdminEvents", () => {
+  it("lists the newest events unfiltered by range, severity, module, or search", async () => {
+    eventFindManyMock.mockResolvedValue([record({ id: "event_1", userId: "c123456789012345678901234" })]);
+    userFindManyMock.mockResolvedValue([{ id: "c123456789012345678901234", email: "learner@example.com" }]);
+
+    const events = await getRecentAdminEvents();
+
+    expect(eventFindManyMock).toHaveBeenCalledWith({
+      select: expect.anything(),
+      orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+      take: 8,
+    });
+    expect(countMock).not.toHaveBeenCalled();
+    expect(events[0].userEmail).toBe("learner@example.com");
+  });
+
+  it("honors a custom limit", async () => {
+    eventFindManyMock.mockResolvedValue([]);
+
+    await getRecentAdminEvents(3);
+
+    expect(eventFindManyMock).toHaveBeenCalledWith(expect.objectContaining({ take: 3 }));
   });
 });

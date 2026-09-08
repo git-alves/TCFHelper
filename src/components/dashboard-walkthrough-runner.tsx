@@ -19,7 +19,7 @@ interface DashboardWalkthroughRunnerProps {
 
 /**
  * New learners and learners who choose "Take a tour" follow the same
- * comprehensive Dashboard → Practice → Full task walkthrough.
+ * comprehensive Dashboard → Train → Simulate walkthrough.
  */
 export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted }: DashboardWalkthroughRunnerProps) {
   const copy = useAppCopy();

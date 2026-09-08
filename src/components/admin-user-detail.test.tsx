@@ -12,6 +12,7 @@ const baseUser = {
   email: "learner@example.com",
   name: "Learner Example",
   createdAt: "2026-08-10T12:00:00.000Z",
+  timezone: null,
   isAdmin: false,
   isBlocked: false,
   activatedAt: "2026-08-10T12:05:00.000Z",

@@ -213,10 +213,20 @@ function extractText(payload: unknown): string {
   if (!isRecord(content) || !isRecord(content.content)) return "";
 
   const parts = content.content.parts;
-  if (!Array.isArray(parts) || parts.length === 0) return "";
+  if (!Array.isArray(parts)) return "";
 
-  const firstPart = parts[0];
-  return isRecord(firstPart) && typeof firstPart.text === "string" ? firstPart.text : "";
+  // A thinking-enabled model returns its internal reasoning as one or more
+  // separate parts (marked `thought: true`) ahead of the actual answer, not
+  // only ever as parts[0] -- taking parts[0] unconditionally silently
+  // extracted that reasoning instead of the answer whenever thinking was on
+  // (the example generator's word-count check then rejected it as too
+  // short/long, since it's not the real response at all). Skip thought
+  // parts and join whatever real text parts remain, in case the answer
+  // itself is split across more than one.
+  return parts
+    .filter((part): part is JsonRecord => isRecord(part) && part.thought !== true && typeof part.text === "string")
+    .map((part) => part.text as string)
+    .join("");
 }
 
 /**
@@ -245,7 +255,11 @@ export async function generateModelAnswer(
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 512 },
+        // Only the final French text is ever used -- reasoning would only
+        // eat into the 512-token budget meant for the answer itself, which
+        // is the likely cause of the "invalid response" (too-short) outputs
+        // seen once the underlying model started thinking by default.
+        generationConfig: { temperature: 0.7, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

@@ -167,7 +167,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   function startFullWalkthrough() {
     const destination = `/dashboard?${FULL_WALKTHROUGH_PARAM}=${FULL_WALKTHROUGH_VALUE}`;
     // Preserve the same draft/correction guard as the Dashboard button when
-    // the learner starts the comprehensive tour from Full task.
+    // the learner starts the comprehensive tour from Simulate.
     if (requestNavigation(destination)) return;
     router.push(destination);
   }
@@ -291,7 +291,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                       onClick={() => router.push("/settings")}
                     />
                     {isAdmin && !isOnAdminPage && !(onTasks && isDashboardBlocked) && (
-                      // Same unsaved-draft guard Dashboard/Practice apply via
+                      // Same unsaved-draft guard Dashboard/Train apply via
                       // guardedNavigationHandler above -- Admin previously
                       // carried it too, and moving into the account menu must
                       // not silently drop it.

@@ -21,6 +21,7 @@ import { TranslationProviderNotice } from "@/components/translation-provider-not
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
+import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
 import { computeTranslationDelta } from "@/lib/translation-delta";
 import {
   TIMED_TASK_PLANS,
@@ -245,6 +246,12 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
 function promptWithoutLeadingTitle(title: string, prompt: string): string {
   const prefix = `${title}\n\n`;
   return prompt.startsWith(prefix) ? prompt.slice(prefix.length) : prompt;
+}
+
+// A malformed or already-expired server timestamp should never create a
+// permanent client-side block.
+function resolveInProgressRetryAt(retryAt: number): number {
+  return Number.isFinite(retryAt) ? Math.max(retryAt, Date.now() + 1) : Date.now() + 5_000;
 }
 
 // Grows the custom-topic textarea to fit its content instead of capping it
@@ -1200,24 +1207,27 @@ export function WritingWorkspace() {
   }, [registerWalkthroughScript]);
 
   async function handleCorrect() {
-    if (
-      !taskType ||
-      !activeTopicPrompt ||
-      !correctionRequestKey ||
-      !task ||
-      isTopicLoading ||
-      isCorrecting ||
-      isCorrectionInProgressElsewhere ||
-      isCurrentDraftAlreadyCorrected
-    ) {
+    const attempt = getCorrectAttemptOutcome({
+      taskType,
+      activeTopicPrompt,
+      task,
+      isTopicLoading,
+      isCorrecting,
+      isCorrectionInProgressElsewhere,
+      isCurrentDraftAlreadyCorrected,
+      wordCount,
+      correctionRequestKey,
+    });
+
+    if (attempt.kind === "blocked") {
       return;
     }
-
-    if (wordCount < task.minWords) {
+    if (attempt.kind === "belowMinimum") {
       setShowMinimumWordWarning(true);
       return;
     }
     setShowMinimumWordWarning(false);
+    const requestKey = attempt.correctionRequestKey;
 
     const correctionLocale = locale;
     // Keep the exact submitted draft for the comparison tab. A correction is
@@ -1263,7 +1273,7 @@ export function WritingWorkspace() {
           typeof data === "object" &&
           (data as { code?: unknown }).code === "CORRECTION_ALREADY_EXISTS"
         ) {
-          setLastSuccessfulCorrectionKey(correctionRequestKey);
+          setLastSuccessfulCorrectionKey(requestKey);
           const essayId = (data as { essayId?: unknown }).essayId;
           setExistingCorrectionEssayId(typeof essayId === "string" ? essayId : null);
           setCorrectionModalOpen(false);
@@ -1279,10 +1289,8 @@ export function WritingWorkspace() {
           const retryAt =
             typeof retryAtValue === "string" ? Date.parse(retryAtValue) : Number.NaN;
           setInProgressCorrection({
-            key: correctionRequestKey,
-            // A malformed or already-expired server timestamp should never
-            // create a permanent client-side block.
-            retryAt: Number.isFinite(retryAt) ? Math.max(retryAt, Date.now() + 1) : Date.now() + 5_000,
+            key: requestKey,
+            retryAt: resolveInProgressRetryAt(retryAt),
           });
           setCorrectionModalOpen(false);
           return;
@@ -1298,7 +1306,7 @@ export function WritingWorkspace() {
       setFeedback(correction.feedback);
       setCorrectionEssayId(correction.essayId);
       setFeedbackLocale(correctionLocale);
-      setLastSuccessfulCorrectionKey(correctionRequestKey);
+      setLastSuccessfulCorrectionKey(requestKey);
       setCorrectionModalState("result");
     } catch {
       if (requestId === correctionRequestId.current) {

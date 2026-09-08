@@ -19,6 +19,7 @@ function user(overrides: Partial<AdminUserListItem>): AdminUserListItem {
     email: "learner@example.com",
     name: null,
     createdAt: "2026-08-01T00:00:00.000Z",
+    timezone: null,
     isAdmin: false,
     isBlocked: false,
     activatedAt: null,

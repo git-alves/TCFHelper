@@ -3,27 +3,34 @@ import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 const {
   userCountMock,
+  userFindManyMock,
   accessCodeCountMock,
   translationAggregateMock,
   exampleAggregateMock,
   correctionAggregateMock,
+  getRecentAdminEventsMock,
 } = vi.hoisted(() => ({
   userCountMock: vi.fn(),
+  userFindManyMock: vi.fn(),
   accessCodeCountMock: vi.fn(),
   translationAggregateMock: vi.fn(),
   exampleAggregateMock: vi.fn(),
   correctionAggregateMock: vi.fn(),
+  getRecentAdminEventsMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    user: { count: userCountMock },
+    user: { count: userCountMock, findMany: userFindManyMock },
     accessCode: { count: accessCodeCountMock },
     translationQuota: { aggregate: translationAggregateMock },
     exampleGenerationQuota: { aggregate: exampleAggregateMock },
     correctionUsage: { aggregate: correctionAggregateMock },
   },
+}));
+vi.mock("@/lib/admin-event-log", () => ({
+  getRecentAdminEvents: getRecentAdminEventsMock,
 }));
 
 const { getAdminOverviewStats, getGeminiRequestsToday } = await import("./admin-overview");
@@ -32,10 +39,14 @@ const NOW = new Date("2026-08-10T12:00:00.000Z");
 
 beforeEach(() => {
   userCountMock.mockReset();
+  userFindManyMock.mockReset();
   accessCodeCountMock.mockReset();
   translationAggregateMock.mockReset();
   exampleAggregateMock.mockReset();
   correctionAggregateMock.mockReset();
+  getRecentAdminEventsMock.mockReset();
+  userFindManyMock.mockResolvedValue([]);
+  getRecentAdminEventsMock.mockResolvedValue([]);
 
   userCountMock.mockImplementation(
     async (args?: {
@@ -70,6 +81,61 @@ describe("getAdminOverviewStats", () => {
       requestsThisMonth: 99,
       activeUsersToday: 3,
     });
+  });
+
+  it("lists the most recent signups newest-first, each with its own reported timezone", async () => {
+    userFindManyMock.mockResolvedValue([
+      {
+        id: "user_2",
+        email: "newest@example.com",
+        name: "Newest Learner",
+        createdAt: new Date("2026-08-10T11:00:00.000Z"),
+        timezone: "America/Sao_Paulo",
+      },
+      {
+        id: "user_1",
+        email: "earlier@example.com",
+        name: null,
+        createdAt: new Date("2026-08-10T09:00:00.000Z"),
+        timezone: null,
+      },
+    ]);
+
+    const stats = await getAdminOverviewStats(NOW);
+
+    expect(userFindManyMock).toHaveBeenCalledWith({
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      take: 8,
+      select: { id: true, email: true, name: true, createdAt: true, timezone: true },
+    });
+    expect(stats.recentSignups).toEqual([
+      {
+        id: "user_2",
+        email: "newest@example.com",
+        name: "Newest Learner",
+        createdAt: "2026-08-10T11:00:00.000Z",
+        timezone: "America/Sao_Paulo",
+      },
+      {
+        id: "user_1",
+        email: "earlier@example.com",
+        name: null,
+        createdAt: "2026-08-10T09:00:00.000Z",
+        timezone: null,
+      },
+    ]);
+  });
+
+  it("surfaces the newest recorded events as live recent activity", async () => {
+    const events = [
+      { id: "event_1", occurredAt: "2026-08-10T11:00:00.000Z", message: "Access code redeemed." },
+    ];
+    getRecentAdminEventsMock.mockResolvedValue(events);
+
+    const stats = await getAdminOverviewStats(NOW);
+
+    expect(getRecentAdminEventsMock).toHaveBeenCalledWith();
+    expect(stats.recentActivity).toBe(events);
   });
 
   it("filters each aggregate to the current UTC day/month boundary", async () => {

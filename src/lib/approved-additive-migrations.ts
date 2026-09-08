@@ -46,4 +46,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // SupportRequest table. No existing row's meaning changes; a null
   // hubspotSyncedAt just means the mirror hasn't (yet) succeeded.
   "20260903180000_add_support_request_hubspot_sync",
+  // A single nullable column on the existing User table. No existing row's
+  // meaning changes; a null timezone just means that learner hasn't loaded
+  // a page with TimezoneReporter yet.
+  "20260905160000_add_user_timezone",
 ]);

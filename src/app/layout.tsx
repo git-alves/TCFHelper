@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Show } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
@@ -6,6 +7,7 @@ import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
 import { DashboardNavGuardProvider } from "@/components/dashboard-nav-guard";
 import { NavBar } from "@/components/nav-bar";
+import { TimezoneReporter } from "@/components/timezone-reporter";
 import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
 import { getCurrentAdminUser } from "@/lib/app-user";
@@ -69,6 +71,9 @@ export default async function RootLayout({
             <ClerkLocaleProvider>
               <DashboardNavGuardProvider>
                 <WalkthroughTriggerProvider>
+                  <Show when="signed-in">
+                    <TimezoneReporter />
+                  </Show>
                   <NavBar isAdmin={isAdmin} />
                   <div className="flex flex-1 flex-col">{children}</div>
                   {settings}
