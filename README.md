@@ -207,7 +207,9 @@ Then set `LANGUAGETOOL_URL="http://localhost:8010"` in `.env` (see
 `.env.example`). See [French grammar and spelling
 check](docs/french-grammar-check.md) for the full architecture, the
 `/api/language-check` contract, and how to deploy LanguageTool alongside the
-app instead of on the host.
+app instead of on the host -- including the authenticating reverse proxy a
+serverless deployment (e.g. Vercel) needs instead of a bare public
+LanguageTool URL, since it has no authentication of its own.
 
 ## Database
 

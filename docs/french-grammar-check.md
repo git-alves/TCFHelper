@@ -94,6 +94,51 @@ The LanguageTool container should stay on the internal network only —
 there's no reason to publish its port publicly when every request already
 goes through the backend API.
 
+### Exposing LanguageTool to a serverless deployment
+
+This app can also run on a platform like Vercel, which has no way to join
+a private Docker network -- `http://languagetool:8010` is only reachable
+from another container on the same compose network, never from a
+serverless function. If you deploy this way, do **not** publish
+LanguageTool's own port to a public address instead: it has no
+authentication of its own, so anyone who finds that URL could send it
+requests directly, bypassing this app's own auth and rate limiting
+entirely and running up the compute bill on whatever host runs it.
+
+Use the `languagetool-proxy` service in `docker-compose.yml` instead. It's
+a small [Caddy](https://caddyserver.com/) reverse proxy (see the
+`Caddyfile` at the repo root) that requires a
+`Authorization: Bearer <secret>` header matching `LANGUAGETOOL_SHARED_SECRET`
+on every request, and returns a bare 401 -- never forwarding to
+LanguageTool -- for anything else. It isn't started by a plain
+`docker compose up`; it needs the `public` profile:
+
+```sh
+LANGUAGETOOL_SHARED_SECRET="$(openssl rand -hex 32)" \
+  docker compose --profile public up -d languagetool languagetool-proxy
+```
+
+Publish only `languagetool-proxy`'s port (`8080` by default) on whatever
+host runs this -- never `languagetool`'s own port. Then, in the app's
+deployment (e.g. Vercel's project environment variables):
+
+```
+LANGUAGETOOL_URL="https://<your-host>:8080"
+LANGUAGETOOL_SHARED_SECRET="<the exact same value>"
+```
+
+`checkFrenchText` (`src/lib/language-tool.ts`) sends that secret as a
+bearer token automatically whenever it's set; it's a no-op for the plain
+local-dev or internal-network setups above, where it should stay unset.
+
+Review the `Caddyfile` (or substitute an equivalent nginx/other proxy
+config) before relying on it in production -- it's a minimal, deliberately
+simple reference, not a hardened default; verified in this repo only with
+Caddy's own `caddy validate` and a live functional check (missing header
+and a wrong secret both get a 401 with no request ever reaching
+LanguageTool; the correct header proxies through), not against every
+possible attack.
+
 ## `POST /api/language-check`
 
 Request:

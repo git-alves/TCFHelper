@@ -213,6 +213,18 @@ describe("checkFrenchText", () => {
     const body = init?.body as URLSearchParams;
     expect(body.get("language")).toBe("fr");
     expect(body.get("text")).toBe("Je suis tres content.");
+    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+  });
+
+  it("sends the shared secret as a bearer token when LANGUAGETOOL_SHARED_SECRET is set", async () => {
+    vi.stubEnv("LANGUAGETOOL_URL", "http://languagetool-proxy:8080");
+    vi.stubEnv("LANGUAGETOOL_SHARED_SECRET", "sekret-value");
+    vi.mocked(global.fetch).mockResolvedValue(new Response(JSON.stringify({ matches: [] }), { status: 200 }));
+
+    await checkFrenchText("Bonjour", new AbortController().signal);
+
+    const [, init] = vi.mocked(global.fetch).mock.calls[0];
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer sekret-value");
   });
 
   it("throws a LanguageToolRequestError carrying the status when LanguageTool responds with a non-2xx status", async () => {

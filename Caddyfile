@@ -1,0 +1,20 @@
+# Reverse proxy for the `languagetool-proxy` service in docker-compose.yml.
+# Requires a `Bearer <LANGUAGETOOL_SHARED_SECRET>` Authorization header on
+# every request; anything else gets a bare 401 rather than ever reaching
+# LanguageTool. This is the ONLY authentication LanguageTool itself has --
+# review and adapt this file (or replace it with an equivalent nginx/other
+# proxy config) before relying on it, rather than treating it as a fully
+# tested, hardened default.
+{
+	admin off
+}
+
+:8080 {
+	@authorized header Authorization "Bearer {$LANGUAGETOOL_SHARED_SECRET}"
+	handle @authorized {
+		reverse_proxy languagetool:8010
+	}
+	handle {
+		respond 401
+	}
+}

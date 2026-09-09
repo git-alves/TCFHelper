@@ -104,6 +104,16 @@ export function mapLanguageToolMatches(payload: unknown): LanguageCheckMatch[] {
  * the public LanguageTool API -- if `LANGUAGETOOL_URL` is unset, the feature
  * is disabled rather than silently using a third-party service in
  * production.
+ *
+ * `LANGUAGETOOL_SHARED_SECRET` is optional and only needed when
+ * `LANGUAGETOOL_URL` points at the authenticating `languagetool-proxy`
+ * service in docker-compose.yml, rather than at LanguageTool directly over
+ * a private network -- see "Exposing LanguageTool to a serverless
+ * deployment" in docs/french-grammar-check.md. LanguageTool itself has no
+ * authentication, so a deployment that cannot reach it over a private
+ * network (e.g. this app running on Vercel) must never be given a bare
+ * public LanguageTool URL; this secret is what the proxy in front of it
+ * checks instead.
  */
 export async function checkFrenchText(text: string, signal: AbortSignal): Promise<LanguageCheckMatch[]> {
   const languageToolUrl = process.env.LANGUAGETOOL_URL?.trim();
@@ -111,9 +121,14 @@ export async function checkFrenchText(text: string, signal: AbortSignal): Promis
     throw new LanguageToolNotConfiguredError("LANGUAGETOOL_URL is not configured.");
   }
 
+  const sharedSecret = process.env.LANGUAGETOOL_SHARED_SECRET?.trim();
+
   const response = await fetch(`${languageToolUrl.replace(/\/+$/, "")}/v2/check`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(sharedSecret ? { Authorization: `Bearer ${sharedSecret}` } : {}),
+    },
     body: new URLSearchParams({ text, language: "fr" }),
     signal,
     cache: "no-store",
