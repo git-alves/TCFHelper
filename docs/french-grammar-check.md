@@ -50,7 +50,8 @@ Self-hosted LanguageTool server (Docker)
   open-source [erikvl87/languagetool](https://github.com/Erikvl87/docker-languagetool)
   image (itself a build of the official
   [languagetool-org/languagetool](https://github.com/languagetool-org/languagetool)
-  server). Language is always `fr`.
+  server), pinned to a specific reviewed release and digest rather than the
+  floating `latest` tag. Language is always `fr`.
 
 ## Running it locally
 

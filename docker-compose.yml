@@ -23,7 +23,13 @@ services:
     # updated build of the official open-source LanguageTool server
     # (https://github.com/languagetool-org/languagetool). Free and
     # self-hosted; never the public api.languagetool.org.
-    image: erikvl87/languagetool:latest
+    #
+    # Pinned to a specific reviewed release (not the floating `latest` tag,
+    # which can change what gets deployed without review) by both version
+    # and digest. Bump deliberately: check the release notes at
+    # https://github.com/Erikvl87/docker-languagetool/releases, then update
+    # both the tag and the digest together.
+    image: erikvl87/languagetool:6.8@sha256:ef8fa12cbd485166c9ceeb7139d76d56d07707a624da6bb1fc1fbb5411750527
     restart: unless-stopped
     # Bound to loopback only -- this is for the app on the same host to
     # reach during local development, never for a public interface.
