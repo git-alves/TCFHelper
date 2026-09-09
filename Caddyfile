@@ -1,15 +1,23 @@
 # Reverse proxy for the `languagetool-proxy` service in docker-compose.yml.
+#
 # Requires a `Bearer <LANGUAGETOOL_SHARED_SECRET>` Authorization header on
 # every request; anything else gets a bare 401 rather than ever reaching
 # LanguageTool. This is the ONLY authentication LanguageTool itself has --
 # review and adapt this file (or replace it with an equivalent nginx/other
 # proxy config) before relying on it, rather than treating it as a fully
 # tested, hardened default.
+#
+# LANGUAGETOOL_PROXY_HOSTNAME must be a real DNS name that already resolves
+# to this host (e.g. languagetool.example.com), and ports 80/443 must be
+# reachable from the internet. Caddy uses that to obtain and renew a
+# Let's Encrypt certificate automatically and serves the proxy over HTTPS
+# only -- there is no plain-HTTP fallback here, because the bearer secret
+# must never be sent in clear text.
 {
 	admin off
 }
 
-:8080 {
+{$LANGUAGETOOL_PROXY_HOSTNAME} {
 	@authorized header Authorization "Bearer {$LANGUAGETOOL_SHARED_SECRET}"
 	handle @authorized {
 		reverse_proxy languagetool:8010

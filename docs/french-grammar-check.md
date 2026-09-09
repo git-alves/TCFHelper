@@ -110,20 +110,28 @@ a small [Caddy](https://caddyserver.com/) reverse proxy (see the
 `Caddyfile` at the repo root) that requires a
 `Authorization: Bearer <secret>` header matching `LANGUAGETOOL_SHARED_SECRET`
 on every request, and returns a bare 401 -- never forwarding to
-LanguageTool -- for anything else. It isn't started by a plain
+LanguageTool -- for anything else. It terminates real TLS via automatic
+Let's Encrypt certificates, because the bearer secret must never travel in
+clear text -- there is no plain-HTTP mode. It isn't started by a plain
 `docker compose up`; it needs the `public` profile:
 
-```sh
-LANGUAGETOOL_SHARED_SECRET="$(openssl rand -hex 32)" \
-  docker compose --profile public up -d languagetool languagetool-proxy
-```
+1. Point a DNS name you control at this host, e.g.
+   `languagetool.example.com` -- Caddy needs that to request a certificate.
+2. Start it with both required variables set:
 
-Publish only `languagetool-proxy`'s port (`8080` by default) on whatever
-host runs this -- never `languagetool`'s own port. Then, in the app's
-deployment (e.g. Vercel's project environment variables):
+   ```sh
+   LANGUAGETOOL_PROXY_HOSTNAME="languagetool.example.com" \
+   LANGUAGETOOL_SHARED_SECRET="$(openssl rand -hex 32)" \
+     docker compose --profile public up -d languagetool languagetool-proxy
+   ```
+
+Publish only `languagetool-proxy`'s ports (`80` and `443`) on whatever
+host runs this -- `80` is required for the ACME HTTP challenge and
+redirects to HTTPS; never publish `languagetool`'s own port. Then, in the
+app's deployment (e.g. Vercel's project environment variables):
 
 ```
-LANGUAGETOOL_URL="https://<your-host>:8080"
+LANGUAGETOOL_URL="https://languagetool.example.com"
 LANGUAGETOOL_SHARED_SECRET="<the exact same value>"
 ```
 

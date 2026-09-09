@@ -53,9 +53,17 @@ services:
     profiles: ["public"]
     depends_on:
       - languagetool
+    # 80 is required for Caddy's ACME HTTP challenge (and it redirects to
+    # HTTPS); 443 serves the actual proxied traffic. There is no HTTP-only
+    # mode -- see Caddyfile for why.
     ports:
-      - "8080:8080"
+      - "80:80"
+      - "443:443"
     environment:
+      # Required -- a real DNS name already pointing at this host, e.g.
+      # languagetool.example.com. Caddy substitutes it into the Caddyfile
+      # below and requests a Let's Encrypt certificate for it automatically.
+      LANGUAGETOOL_PROXY_HOSTNAME: ${LANGUAGETOOL_PROXY_HOSTNAME:?Set LANGUAGETOOL_PROXY_HOSTNAME to a DNS name pointing at this host before starting languagetool-proxy}
       # Required -- Caddy substitutes this into the Caddyfile below. Generate
       # a long random value (e.g. `openssl rand -hex 32`) and set the exact
       # same value as LANGUAGETOOL_SHARED_SECRET in the app's own
@@ -63,3 +71,9 @@ services:
       LANGUAGETOOL_SHARED_SECRET: ${LANGUAGETOOL_SHARED_SECRET:?Set LANGUAGETOOL_SHARED_SECRET before starting languagetool-proxy}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persists the ACME account key and issued certificate so restarts
+      # don't re-request one and risk Let's Encrypt's rate limits.
+      - languagetool-proxy-data:/data
+
+volumes:
+  languagetool-proxy-data:
