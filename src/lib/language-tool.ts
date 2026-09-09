@@ -26,6 +26,13 @@ export interface LanguageCheckMatch {
 /** LanguageTool has no French server configured, or none at all. */
 export class LanguageToolNotConfiguredError extends Error {}
 
+/** The LanguageTool server itself responded with a non-2xx status. */
+export class LanguageToolRequestError extends Error {
+  constructor(public readonly status: number) {
+    super(`LanguageTool request failed (${status})`);
+  }
+}
+
 // LanguageTool can attach dozens of dictionary-adjacent spelling guesses to
 // a single match (see the real "tres" -> "très" response, which lists 40+
 // replacements). The editor only ever needs a handful to offer as
@@ -113,7 +120,7 @@ export async function checkFrenchText(text: string, signal: AbortSignal): Promis
   });
 
   if (!response.ok) {
-    throw new Error(`LanguageTool request failed (${response.status})`);
+    throw new LanguageToolRequestError(response.status);
   }
 
   const payload: unknown = await response.json().catch(() => null);

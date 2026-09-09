@@ -139,6 +139,19 @@ Other behavior:
 - LanguageTool being unreachable or misconfigured returns 502/503 rather
   than ever falling back to a public API.
 
+### Admin observability
+
+Every failure to reach LanguageTool (misconfigured, unreachable, timed out,
+or responding with a non-2xx status) is recorded as a `GRAMMAR_CHECK_PROVIDER_FAILED`
+event in the admin event log (`/admin/logs`, see
+[admin audit log](admin-audit-log.md)), the same mechanism already used for
+Gemini and DeepL/translation failures. A client-cancelled (aborted) request
+is not an error and is never recorded. The event never contains the
+learner's draft text -- only the local user ID, `languagetool` as the
+provider, a fixed failure class (`not_configured`, `transport_error`,
+`upstream_http_error`, or `provider_unavailable`), and the HTTP status
+returned to the client.
+
 ## Testing
 
 - `src/lib/language-tool.test.ts` — mapping LanguageTool's raw response
@@ -156,6 +169,7 @@ Other behavior:
 - `src/lib/language-check-rate-limit.test.ts` — the sliding-window limiter.
 - `src/app/api/language-check/route.test.ts` — the route's auth, validation,
   rate limiting, and error-mapping behavior end to end (with LanguageTool
-  itself mocked).
+  itself mocked), including that failures record a `GRAMMAR_CHECK_PROVIDER_FAILED`
+  admin event and a cancelled request does not.
 
 Run everything with `npm test`.

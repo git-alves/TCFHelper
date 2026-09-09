@@ -105,6 +105,47 @@ describe("recordAdminEvent", () => {
     });
   });
 
+  it("persists a grammar-check provider failure with the languagetool provider", async () => {
+    await recordAdminEvent(
+      {
+        eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+        userId: USER_ID,
+        provider: "languagetool",
+        reasonCode: "not_configured",
+        httpStatus: 503,
+      },
+      new Date("2020-08-11T12:00:00.000Z"),
+    );
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      create: expect.objectContaining({
+        severity: "ERROR",
+        module: "ESSAY_SERVICE",
+        eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+        provider: "languagetool",
+        reasonCode: "not_configured",
+        httpStatus: 503,
+        searchText: "grammar check spelling languagetool provider failed not configured",
+      }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    });
+  });
+
+  it("rejects a grammar-check provider failure using a provider other than languagetool", async () => {
+    await expect(
+      recordAdminEvent({
+        eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+        userId: USER_ID,
+        provider: "gemini",
+        reasonCode: "not_configured",
+        httpStatus: 503,
+      }),
+    ).resolves.toBeUndefined();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it("does not change a learner response when event persistence fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     createMock.mockRejectedValue(new Error("upstream error with secret"));
@@ -385,6 +426,20 @@ describe("formatAdminEventMessage", () => {
         occurrenceCount: 2,
       }),
     ).toBe("Correction generation failed (gemini): transport error. (2 occurrences)");
+  });
+
+  it("renders a grammar-check provider failure message", () => {
+    expect(
+      formatAdminEventMessage({
+        eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+        provider: "languagetool",
+        reasonCode: "provider_unavailable",
+        quotaWindow: null,
+        usageValue: null,
+        quotaLimit: null,
+        occurrenceCount: 1,
+      }),
+    ).toBe("Grammar check failed (languagetool): provider unavailable.");
   });
 
   it("never interpolates malformed persisted values into display copy", () => {

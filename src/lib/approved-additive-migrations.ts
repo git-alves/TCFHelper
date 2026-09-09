@@ -50,4 +50,9 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // meaning changes; a null timezone just means that learner hasn't loaded
   // a page with TimezoneReporter yet.
   "20260905160000_add_user_timezone",
+  // Widens the existing AdminEvent closed-vocabulary check constraints to
+  // allow one new event type/provider for the grammar checker. Every
+  // existing row still satisfies every constraint unchanged -- only new
+  // allowed values are added, none removed or narrowed.
+  "20260909180000_add_grammar_check_provider_failed_event",
 ]);

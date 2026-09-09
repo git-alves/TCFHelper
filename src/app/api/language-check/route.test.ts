@@ -1,16 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, checkFrenchTextMock, isLanguageCheckRateLimitedMock } =
-  vi.hoisted(() => {
-    class AppUserProvisioningErrorMock extends Error {}
+const {
+  getCurrentActivatedAppUserMock,
+  AppUserProvisioningErrorMock,
+  checkFrenchTextMock,
+  isLanguageCheckRateLimitedMock,
+  recordAdminEventMock,
+} = vi.hoisted(() => {
+  class AppUserProvisioningErrorMock extends Error {}
 
-    return {
-      getCurrentActivatedAppUserMock: vi.fn(),
-      AppUserProvisioningErrorMock,
-      checkFrenchTextMock: vi.fn(),
-      isLanguageCheckRateLimitedMock: vi.fn(),
-    };
-  });
+  return {
+    getCurrentActivatedAppUserMock: vi.fn(),
+    AppUserProvisioningErrorMock,
+    checkFrenchTextMock: vi.fn(),
+    isLanguageCheckRateLimitedMock: vi.fn(),
+    recordAdminEventMock: vi.fn(),
+  };
+});
 
 vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
@@ -25,9 +31,12 @@ vi.mock("@/lib/language-tool", async (importOriginal) => {
 vi.mock("@/lib/language-check-rate-limit", () => ({
   isLanguageCheckRateLimited: isLanguageCheckRateLimitedMock,
 }));
+vi.mock("@/lib/admin-events", () => ({
+  recordAdminEvent: recordAdminEventMock,
+}));
 
 const { POST } = await import("./route");
-const { LanguageToolNotConfiguredError } = await import("@/lib/language-tool");
+const { LanguageToolNotConfiguredError, LanguageToolRequestError } = await import("@/lib/language-tool");
 
 const LOCAL_USER_ID = "cuid_local_user_1";
 
@@ -46,10 +55,12 @@ beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   checkFrenchTextMock.mockReset();
   isLanguageCheckRateLimitedMock.mockReset();
+  recordAdminEventMock.mockReset();
 
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   checkFrenchTextMock.mockResolvedValue([]);
   isLanguageCheckRateLimitedMock.mockReturnValue(false);
+  recordAdminEventMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -125,25 +136,53 @@ describe("POST /api/language-check", () => {
     expect(checkFrenchTextMock).not.toHaveBeenCalled();
   });
 
-  it("returns 503 when LanguageTool is not configured", async () => {
+  it("returns 503 when LanguageTool is not configured, and records it for the admin log", async () => {
     checkFrenchTextMock.mockRejectedValue(new LanguageToolNotConfiguredError());
 
     const response = await post({ text: "Bonjour" });
 
     expect(response.status).toBe(503);
     expect((await response.json()).code).toBe("LANGUAGE_CHECK_UNAVAILABLE");
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "languagetool",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
   });
 
-  it("returns 502 when the LanguageTool request fails", async () => {
+  it("returns 502 when the LanguageTool request fails, and records it for the admin log", async () => {
     checkFrenchTextMock.mockRejectedValue(new Error("network down"));
 
     const response = await post({ text: "Bonjour" });
 
     expect(response.status).toBe(502);
     expect((await response.json()).code).toBe("LANGUAGE_CHECK_UNAVAILABLE");
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "languagetool",
+      reasonCode: "provider_unavailable",
+      httpStatus: 502,
+    });
   });
 
-  it("returns 499 when the client has already cancelled the request", async () => {
+  it("records the LanguageTool server's own HTTP status when it responds with one", async () => {
+    checkFrenchTextMock.mockRejectedValue(new LanguageToolRequestError(500));
+
+    await post({ text: "Bonjour" });
+
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "languagetool",
+      reasonCode: "upstream_http_error",
+      httpStatus: 500,
+    });
+  });
+
+  it("returns 499 when the client has already cancelled the request, without recording an admin event", async () => {
     const controller = new AbortController();
     controller.abort();
 
@@ -151,6 +190,7 @@ describe("POST /api/language-check", () => {
 
     expect(response.status).toBe(499);
     expect(checkFrenchTextMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).not.toHaveBeenCalled();
   });
 
   it("handles a long (near max-length) text without special-casing", async () => {

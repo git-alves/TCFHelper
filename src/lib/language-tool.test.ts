@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LanguageToolNotConfiguredError, checkFrenchText, mapLanguageToolMatches } from "@/lib/language-tool";
+import {
+  LanguageToolNotConfiguredError,
+  LanguageToolRequestError,
+  checkFrenchText,
+  mapLanguageToolMatches,
+} from "@/lib/language-tool";
 
 describe("mapLanguageToolMatches", () => {
   it("maps a spelling match", () => {
@@ -210,13 +215,20 @@ describe("checkFrenchText", () => {
     expect(body.get("text")).toBe("Je suis tres content.");
   });
 
-  it("throws when LanguageTool responds with a non-2xx status", async () => {
+  it("throws a LanguageToolRequestError carrying the status when LanguageTool responds with a non-2xx status", async () => {
     vi.stubEnv("LANGUAGETOOL_URL", "http://languagetool:8010");
     vi.mocked(global.fetch).mockResolvedValue(new Response("boom", { status: 500 }));
 
-    await expect(checkFrenchText("Bonjour", new AbortController().signal)).rejects.toThrow(
-      /LanguageTool request failed \(500\)/,
-    );
+    let caught: unknown;
+    try {
+      await checkFrenchText("Bonjour", new AbortController().signal);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(LanguageToolRequestError);
+    expect((caught as LanguageToolRequestError).status).toBe(500);
+    expect((caught as Error).message).toMatch(/LanguageTool request failed \(500\)/);
   });
 
   it("resolves with the mapped matches on success", async () => {
