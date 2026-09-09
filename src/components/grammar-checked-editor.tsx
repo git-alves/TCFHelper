@@ -173,6 +173,21 @@ export function GrammarCheckedEditor({
     textarea.setSelectionRange(offset, offset);
   }, [value]);
 
+  // The overlay must track the textarea's scroll position, not just its
+  // content. `onScroll` below covers a learner dragging the scrollbar or
+  // using the wheel, but typing past the visible rows scrolls the textarea
+  // by the browser following the caret -- a content change, not a user
+  // scroll gesture. Re-syncing here, after every commit that could have
+  // moved the caret (a new `value`, or the selection restored above), means
+  // the underline overlay never has to depend on that also happening to
+  // dispatch its own native `scroll` event.
+  useLayoutEffect(() => {
+    if (overlayRef.current && textareaRef.current) {
+      overlayRef.current.scrollTop = textareaRef.current.scrollTop;
+      overlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
+    }
+  }, [value]);
+
   // Any edit invalidates whatever the popup was anchored to -- adjusted
   // during render (see the note on useLanguageCheck above), not in an
   // effect, so the popup never repaints even once at a stale position.

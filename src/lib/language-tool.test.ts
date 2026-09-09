@@ -124,6 +124,46 @@ describe("mapLanguageToolMatches", () => {
     expect(errors[0].message).toBe("kept");
   });
 
+  it("drops a zero-length match (impossible from a real server, but defended anyway)", () => {
+    // org.languagetool.rules.RuleMatch's own constructor throws
+    // IllegalArgumentException whenever toPos <= fromPos, so a real
+    // LanguageTool response can never contain length <= 0 -- including for
+    // missing-word rules, which flag an adjacent word and replace it with a
+    // longer phrase (e.g. French's ABSENCE_QUE turning "possible il" into
+    // "possible qu'il", length 11) rather than a zero-width insertion point.
+    expect(mapLanguageToolMatches({ matches: [{ offset: 5, length: 0, message: "x" }] })).toEqual([]);
+  });
+
+  it("maps a real self-hosted-shaped missing-word match (ABSENCE_QUE)", () => {
+    // Verified against the live LanguageTool API for
+    // "Il est possible il pleuve demain." -> "Il est possible qu'il pleuve
+    // demain." -- offset/length cover "possible il", the existing text
+    // ABSENCE_QUE replaces with a longer phrase that inserts "qu'".
+    const errors = mapLanguageToolMatches({
+      matches: [
+        {
+          message: "Une conjonction est probablement manquante.",
+          offset: 7,
+          length: 11,
+          replacements: [{ value: "possible qu'il" }, { value: "possible, il" }],
+          rule: { id: "ABSENCE_QUE", issueType: "grammar", category: { id: "GRAMMAR" } },
+        },
+      ],
+    });
+
+    expect(errors).toEqual([
+      {
+        offset: 7,
+        length: 11,
+        message: "Une conjonction est probablement manquante.",
+        replacements: ["possible qu'il", "possible, il"],
+        category: "GRAMMAR",
+        ruleId: "ABSENCE_QUE",
+        severity: "grammar",
+      },
+    ]);
+  });
+
   it("returns an empty list for an empty or malformed payload", () => {
     expect(mapLanguageToolMatches({ matches: [] })).toEqual([]);
     expect(mapLanguageToolMatches({})).toEqual([]);

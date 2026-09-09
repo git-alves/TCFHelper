@@ -40,6 +40,14 @@ function toLanguageCheckMatch(rawMatch: unknown): LanguageCheckMatch | null {
   if (!isRecord(rawMatch)) return null;
 
   const { offset, length } = rawMatch;
+  // `length <= 0` can't happen from a real LanguageTool response --
+  // org.languagetool.rules.RuleMatch's constructor throws
+  // IllegalArgumentException whenever toPos <= fromPos, so every match it
+  // produces spans at least one character (missing-word rules flag an
+  // adjacent word and replace it with a longer phrase, e.g. ABSENCE_QUE
+  // turning "possible il" into "possible qu'il", rather than ever pointing
+  // at a zero-width insertion point). This is defense-in-depth against a
+  // malformed payload, not a real case this endpoint needs to render.
   if (typeof offset !== "number" || typeof length !== "number" || offset < 0 || length <= 0) {
     return null;
   }
