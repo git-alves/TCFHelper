@@ -15,8 +15,16 @@ services:
     # self-hosted; never the public api.languagetool.org.
     image: erikvl87/languagetool:latest
     restart: unless-stopped
+    # Bound to loopback only -- this is for the app on the same host to
+    # reach during local development, never for a public interface.
+    # LanguageTool has no auth of its own, so it must stay unreachable from
+    # outside this machine; the backend API is the only intended caller. A
+    # production deployment should typically drop this `ports` block
+    # entirely and rely on the internal Docker network (see the note above
+    # about LANGUAGETOOL_URL=http://languagetool:8010) instead of publishing
+    # any port at all.
     ports:
-      - "8010:8010"
+      - "127.0.0.1:8010:8010"
     environment:
       # JVM heap bounds. LanguageTool's own image defaults to the same
       # values; kept explicit here so they're easy to raise if you see

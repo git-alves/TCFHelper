@@ -60,8 +60,11 @@ Self-hosted LanguageTool server (Docker)
    docker compose up -d languagetool
    ```
 
-   This publishes it on `http://localhost:8010`. The first request after
-   startup can take a few seconds while the French language model loads.
+   This publishes it on `http://localhost:8010`, bound to loopback only
+   (`127.0.0.1:8010:8010` in `docker-compose.yml`) -- LanguageTool has no
+   authentication of its own, so it must never be reachable from outside
+   this machine. The first request after startup can take a few seconds
+   while the French language model loads.
 
 2. Set `LANGUAGETOOL_URL` in `.env` (see `.env.example`):
 

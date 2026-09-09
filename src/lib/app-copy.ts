@@ -384,6 +384,7 @@ export interface AppCopy {
       applyButton: string;
       closeButtonAriaLabel: string;
       noReplacementHint: string;
+      issuesHeading: (values: { count: number }) => string;
     };
     // Fixed, reviewed coaching content selected by task + writing-context
     // profile + target level -- see docs/guided-writing.md and
@@ -919,6 +920,7 @@ export const APP_COPY = {
         applyButton: "Apply",
         closeButtonAriaLabel: "Close suggestion",
         noReplacementHint: "No automatic suggestion for this issue.",
+        issuesHeading: ({ count }) => (count === 1 ? "1 issue found" : `${count} issues found`),
       },
       guidedWriting: {
         show: "Writing guide",
@@ -1586,6 +1588,7 @@ export const APP_COPY = {
         applyButton: "Appliquer",
         closeButtonAriaLabel: "Fermer la suggestion",
         noReplacementHint: "Aucune suggestion automatique pour ce problème.",
+        issuesHeading: ({ count }) => (count === 1 ? "1 problème trouvé" : `${count} problèmes trouvés`),
       },
       guidedWriting: {
         show: "Guide de rédaction",
@@ -2255,6 +2258,7 @@ export const APP_COPY = {
         applyButton: "Aplicar",
         closeButtonAriaLabel: "Cerrar la sugerencia",
         noReplacementHint: "No hay una sugerencia automática para este problema.",
+        issuesHeading: ({ count }) => (count === 1 ? "1 problema encontrado" : `${count} problemas encontrados`),
       },
       guidedWriting: {
         show: "Guía de redacción",
@@ -2924,6 +2928,7 @@ export const APP_COPY = {
         applyButton: "Aplicar",
         closeButtonAriaLabel: "Fechar a sugestão",
         noReplacementHint: "Não há sugestão automática para este problema.",
+        issuesHeading: ({ count }) => (count === 1 ? "1 problema encontrado" : `${count} problemas encontrados`),
       },
       guidedWriting: {
         show: "Guia de escrita",

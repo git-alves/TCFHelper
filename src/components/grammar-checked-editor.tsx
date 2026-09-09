@@ -27,6 +27,7 @@ export interface GrammarCheckCopy {
   applyButton: string;
   closeButtonAriaLabel: string;
   noReplacementHint: string;
+  issuesHeading: (values: { count: number }) => string;
 }
 
 interface GrammarCheckedEditorProps {
@@ -131,6 +132,16 @@ function useLanguageCheck(text: string, enabled: boolean) {
  * textarea underneath; only the flagged `<mark>` spans opt back into
  * pointer events, so they alone are clickable/hoverable, and only their
  * red underline decoration is visible, exactly aligned over the real text.
+ *
+ * Both the textarea and the overlay use `scrollbar-gutter: stable`. A
+ * native scrollbar takes width away from the textarea's content box only
+ * once it's actually showing one; the overlay (`overflow-hidden`, no
+ * scrollbar of its own) would otherwise stay full-width the whole time.
+ * Once an essay grows past the visible rows, that width difference would
+ * make the two wrap their (identical) text differently, so an underline
+ * could land on the wrong line even with scrollTop perfectly synced.
+ * Reserving the gutter unconditionally on both keeps their usable width
+ * identical whether or not the content currently overflows.
  */
 export function GrammarCheckedEditor({
   id,
@@ -187,6 +198,36 @@ export function GrammarCheckedEditor({
       overlayRef.current.scrollLeft = textareaRef.current.scrollLeft;
     }
   }, [value]);
+
+  // The overlay's height cannot be left to `inset-0` inside its `relative`
+  // container: that container has no explicit height of its own (it sizes
+  // to fit the textarea, its only in-flow child), and a block-level
+  // "auto" height is a shrink-to-fit content height, not a stretch target.
+  // An absolutely-positioned child can't resolve `top: 0; bottom: 0`
+  // against that -- there's a circular dependency, since the container's
+  // height would have to come from a child that's out of flow -- so
+  // browsers fall back to sizing the overlay from its own content instead
+  // of stretching it to match, drifting a few pixels taller than the real
+  // textarea. Measuring the textarea directly and applying that height to
+  // the overlay imperatively sidesteps the ambiguity entirely, and a
+  // ResizeObserver keeps it correct if the learner drags the textarea's own
+  // resize handle. (Width has no equivalent problem: an ordinary block's
+  // "auto" width already fills its container, so `w-full` on the overlay
+  // matches without any of this.)
+  useLayoutEffect(() => {
+    const textarea = textareaRef.current;
+    const overlay = overlayRef.current;
+    if (!textarea || !overlay) return;
+
+    const syncHeight = () => {
+      overlay.style.height = `${textarea.offsetHeight}px`;
+    };
+
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(textarea);
+    return () => observer.disconnect();
+  }, []);
 
   // Any edit invalidates whatever the popup was anchored to -- adjusted
   // during render (see the note on useLanguageCheck above), not in an
@@ -289,6 +330,35 @@ export function GrammarCheckedEditor({
 
   const activeMatch = activeMatchIndex !== null ? matches[activeMatchIndex] : null;
 
+  // Shared between the mouse-oriented popup and the always-in-the-tab-order
+  // issues list below, so the two accessible/inaccessible surfaces never
+  // drift out of sync with each other.
+  function renderReplacementActions(match: LanguageCheckMatch, matchIndex: number) {
+    if (match.replacements.length === 0) {
+      return <p className="mt-2 text-zinc-500 dark:text-zinc-400">{copy.noReplacementHint}</p>;
+    }
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-1.5">
+        {match.replacements.map((replacement, index) => (
+          <button
+            key={`${replacement}-${index}`}
+            type="button"
+            onClick={() => handleApply(matchIndex, replacement)}
+            className={
+              index === 0
+                ? "rounded-full bg-foreground px-3 py-1 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+                : "rounded-full border border-black/[.15] px-3 py-1 transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            }
+          >
+            {index === 0 ? `${copy.applyButton}: ` : ""}
+            {replacement || "∅"}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
@@ -329,26 +399,25 @@ export function GrammarCheckedEditor({
         <div
           ref={overlayRef}
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 z-10 min-h-72 w-full overflow-hidden rounded-xl border border-transparent px-4 py-3 whitespace-pre-wrap break-words text-transparent"
+          className="pointer-events-none absolute top-0 left-0 z-10 w-full overflow-hidden rounded-xl border border-transparent px-4 py-3 whitespace-pre-wrap break-words text-transparent [scrollbar-gutter:stable]"
         >
           {segments.map((segment, segmentIndex) => {
             if (segment.matchIndex === null) {
               return <span key={segmentIndex}>{segment.text}</span>;
             }
 
-            const match = matches[segment.matchIndex];
             return (
+              // Decorative only -- a mouse-hover/click shortcut to the same
+              // popup the accessible issues list below always exposes.
+              // Never a tab stop or in the accessibility tree: it lives
+              // inside the `aria-hidden` overlay (see above), so it must not
+              // be focusable itself, and it has no keyboard handling.
               <mark
                 key={segmentIndex}
-                tabIndex={0}
-                role="button"
-                aria-label={match?.message}
                 className="pointer-events-auto cursor-pointer rounded-[1px] bg-transparent text-transparent underline decoration-red-500 decoration-2 decoration-wavy underline-offset-2 dark:decoration-red-400"
                 onClick={(event) => openPopupForMatch(segment.matchIndex as number, event.currentTarget)}
                 onMouseEnter={(event) => scheduleOpen(segment.matchIndex as number, event.currentTarget)}
                 onMouseLeave={scheduleClose}
-                onFocus={(event) => openPopupForMatch(segment.matchIndex as number, event.currentTarget)}
-                onBlur={scheduleClose}
               >
                 {segment.text}
               </mark>
@@ -370,7 +439,7 @@ export function GrammarCheckedEditor({
           aria-describedby={ariaDescribedBy}
           lang="fr"
           spellCheck={false}
-          className={`${className} relative z-0`}
+          className={`${className} relative z-0 [scrollbar-gutter:stable]`}
         />
 
         {activeMatch && popupPosition && (
@@ -392,30 +461,33 @@ export function GrammarCheckedEditor({
               <span aria-hidden="true">×</span>
             </button>
             <p className="pr-5 font-medium">{activeMatch.message}</p>
-            {activeMatch.replacements.length > 0 ? (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {activeMatch.replacements.map((replacement, index) => (
-                  <button
-                    key={`${replacement}-${index}`}
-                    type="button"
-                    onClick={() => handleApply(activeMatchIndex as number, replacement)}
-                    className={
-                      index === 0
-                        ? "rounded-full bg-foreground px-3 py-1 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-                        : "rounded-full border border-black/[.15] px-3 py-1 transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                    }
-                  >
-                    {index === 0 ? `${copy.applyButton}: ` : ""}
-                    {replacement || "∅"}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-zinc-500 dark:text-zinc-400">{copy.noReplacementHint}</p>
-            )}
+            {renderReplacementActions(activeMatch, activeMatchIndex as number)}
           </div>
         )}
       </div>
+
+      {/* The overlay's `<mark>`s are mouse-only decoration living inside an
+          `aria-hidden` ancestor (see above) -- they are never a tab stop and
+          have no keyboard handling, so a focusable "button" there would be
+          invisible to assistive tech while still eating a Tab press. This
+          list is the real, always-reachable equivalent: ordinary buttons,
+          in normal document order, right after the editor. */}
+      {enabled && matches.length > 0 && (
+        <div className="flex flex-col gap-2 rounded-xl border border-black/[.12] p-3 text-sm dark:border-white/[.15]">
+          <p className="font-medium text-zinc-700 dark:text-zinc-300">{copy.issuesHeading({ count: matches.length })}</p>
+          <ul className="flex flex-col gap-2">
+            {matches.map((match, matchIndex) => (
+              <li
+                key={matchIndex}
+                className="rounded-lg border border-black/[.1] p-2 dark:border-white/[.15]"
+              >
+                <p>{match.message}</p>
+                {renderReplacementActions(match, matchIndex)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
