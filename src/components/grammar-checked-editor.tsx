@@ -95,6 +95,12 @@ function useLanguageCheck(text: string, enabled: boolean) {
           return response.json() as Promise<{ errors?: LanguageCheckMatch[] }>;
         })
         .then((payload) => {
+          // `abort()` can't un-resolve a fetch promise that had already
+          // settled before it was called -- a real race for a fast typist
+          // if a response lands just as they type again. Without this
+          // check, a superseded response could still overwrite `matches`
+          // with offsets into text that no longer exists.
+          if (controller.signal.aborted) return;
           setMatches(Array.isArray(payload.errors) ? payload.errors : []);
           setStatus("idle");
         })
@@ -160,6 +166,21 @@ export function GrammarCheckedEditor({
 }: GrammarCheckedEditorProps) {
   const { matches, status } = useLanguageCheck(value, enabled && !disabled);
   const segments = useMemo(() => buildLanguageCheckSegments(value, matches), [value, matches]);
+  // The only matches actually safe to show or apply: `buildLanguageCheckSegments`
+  // already dropped whatever was out-of-range for the current `value` (a
+  // debounced response can legitimately resolve just after `AbortController.abort()`
+  // is called, if the fetch promise had already settled before the abort took
+  // effect -- the abort can't un-resolve an already-resolved promise) or
+  // overlapping another match. Deriving from `segments` instead of iterating
+  // `matches` directly means the issues list below can never expose an Apply
+  // button for a match `applyLanguageCheckReplacement` would slice incorrectly.
+  const acceptedMatchIndexes = useMemo(
+    () =>
+      segments
+        .map((segment) => segment.matchIndex)
+        .filter((matchIndex): matchIndex is number => matchIndex !== null),
+    [segments],
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -472,19 +493,24 @@ export function GrammarCheckedEditor({
           invisible to assistive tech while still eating a Tab press. This
           list is the real, always-reachable equivalent: ordinary buttons,
           in normal document order, right after the editor. */}
-      {enabled && matches.length > 0 && (
+      {enabled && acceptedMatchIndexes.length > 0 && (
         <div className="flex flex-col gap-2 rounded-xl border border-black/[.12] p-3 text-sm dark:border-white/[.15]">
-          <p className="font-medium text-zinc-700 dark:text-zinc-300">{copy.issuesHeading({ count: matches.length })}</p>
+          <p className="font-medium text-zinc-700 dark:text-zinc-300">
+            {copy.issuesHeading({ count: acceptedMatchIndexes.length })}
+          </p>
           <ul className="flex flex-col gap-2">
-            {matches.map((match, matchIndex) => (
-              <li
-                key={matchIndex}
-                className="rounded-lg border border-black/[.1] p-2 dark:border-white/[.15]"
-              >
-                <p>{match.message}</p>
-                {renderReplacementActions(match, matchIndex)}
-              </li>
-            ))}
+            {acceptedMatchIndexes.map((matchIndex) => {
+              const match = matches[matchIndex];
+              return (
+                <li
+                  key={matchIndex}
+                  className="rounded-lg border border-black/[.1] p-2 dark:border-white/[.15]"
+                >
+                  <p>{match.message}</p>
+                  {renderReplacementActions(match, matchIndex)}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
