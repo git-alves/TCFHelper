@@ -371,6 +371,20 @@ export interface AppCopy {
       copyFailed: string;
       clear: string;
     };
+    // Copy for the self-hosted LanguageTool integration (inline spelling and
+    // grammar underlines in the essay editor). See
+    // src/components/grammar-checked-editor.tsx and docs/french-grammar-check.md.
+    grammarCheck: {
+      toggleLabel: string;
+      toggleAriaLabel: (values: { enabled: boolean }) => string;
+      statusOn: string;
+      statusOff: string;
+      checking: string;
+      unavailable: string;
+      applyButton: string;
+      closeButtonAriaLabel: string;
+      noReplacementHint: string;
+    };
     // Fixed, reviewed coaching content selected by task + writing-context
     // profile + target level -- see docs/guided-writing.md and
     // src/lib/guided-writing.ts, which holds the actual tips (localized
@@ -893,6 +907,18 @@ export const APP_COPY = {
         copied: "Copied!",
         copyFailed: "Couldn't copy",
         clear: "Clear text",
+      },
+      grammarCheck: {
+        toggleLabel: "Grammar check",
+        toggleAriaLabel: ({ enabled }) =>
+          enabled ? "Grammar check is on. Turn it off." : "Grammar check is off. Turn it on.",
+        statusOn: "On",
+        statusOff: "Off",
+        checking: "Checking…",
+        unavailable: "Grammar check is temporarily unavailable.",
+        applyButton: "Apply",
+        closeButtonAriaLabel: "Close suggestion",
+        noReplacementHint: "No automatic suggestion for this issue.",
       },
       guidedWriting: {
         show: "Writing guide",
@@ -1546,6 +1572,20 @@ export const APP_COPY = {
         copied: "Copié !",
         copyFailed: "Impossible de copier",
         clear: "Effacer le texte",
+      },
+      grammarCheck: {
+        toggleLabel: "Correction grammaticale",
+        toggleAriaLabel: ({ enabled }) =>
+          enabled
+            ? "La correction grammaticale est activée. La désactiver."
+            : "La correction grammaticale est désactivée. L’activer.",
+        statusOn: "Activée",
+        statusOff: "Désactivée",
+        checking: "Vérification…",
+        unavailable: "La correction grammaticale est temporairement indisponible.",
+        applyButton: "Appliquer",
+        closeButtonAriaLabel: "Fermer la suggestion",
+        noReplacementHint: "Aucune suggestion automatique pour ce problème.",
       },
       guidedWriting: {
         show: "Guide de rédaction",
@@ -2202,6 +2242,20 @@ export const APP_COPY = {
         copyFailed: "No se pudo copiar",
         clear: "Borrar texto",
       },
+      grammarCheck: {
+        toggleLabel: "Corrección gramatical",
+        toggleAriaLabel: ({ enabled }) =>
+          enabled
+            ? "La corrección gramatical está activada. Desactivarla."
+            : "La corrección gramatical está desactivada. Activarla.",
+        statusOn: "Activada",
+        statusOff: "Desactivada",
+        checking: "Comprobando…",
+        unavailable: "La corrección gramatical no está disponible en este momento.",
+        applyButton: "Aplicar",
+        closeButtonAriaLabel: "Cerrar la sugerencia",
+        noReplacementHint: "No hay una sugerencia automática para este problema.",
+      },
       guidedWriting: {
         show: "Guía de redacción",
         hide: "Ocultar guía de redacción",
@@ -2856,6 +2910,20 @@ export const APP_COPY = {
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",
         clear: "Limpar texto",
+      },
+      grammarCheck: {
+        toggleLabel: "Correção gramatical",
+        toggleAriaLabel: ({ enabled }) =>
+          enabled
+            ? "A correção gramatical está ativada. Desativá-la."
+            : "A correção gramatical está desativada. Ativá-la.",
+        statusOn: "Ativada",
+        statusOff: "Desativada",
+        checking: "Verificando…",
+        unavailable: "A correção gramatical está temporariamente indisponível.",
+        applyButton: "Aplicar",
+        closeButtonAriaLabel: "Fechar a sugestão",
+        noReplacementHint: "Não há sugestão automática para este problema.",
       },
       guidedWriting: {
         show: "Guia de escrita",

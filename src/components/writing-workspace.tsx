@@ -16,6 +16,7 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+import { GrammarCheckedEditor } from "@/components/grammar-checked-editor";
 import { ThemedSelect } from "@/components/themed-select";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
@@ -77,6 +78,7 @@ type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic"
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
+const SPELL_CHECK_ENABLED_STORAGE_KEY = "mytcflab:spell-check-enabled";
 const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
 const WALKTHROUGH_GUIDED_WRITING_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
 const writingPreferenceListeners = new Set<() => void>();
@@ -95,6 +97,13 @@ function getStoredTargetLevel(): ExampleLevel {
 
 function getStoredGuidedWritingOpen(): boolean {
   return readWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY) === "1";
+}
+
+// Defaults to enabled: the grammar checker is the feature, not an opt-in
+// extra, so a learner who has never touched the toggle should still see it
+// working. Only an explicit "0" (they turned it off themselves) disables it.
+function getStoredSpellCheckEnabled(): boolean {
+  return readWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY) !== "0";
 }
 
 function isTimedTaskSession(value: unknown): value is TimedTaskSession {
@@ -350,6 +359,11 @@ export function WritingWorkspace() {
     subscribeToWritingPreferences,
     getStoredGuidedWritingOpen,
     () => false,
+  );
+  const isSpellCheckEnabled = useSyncExternalStore(
+    subscribeToWritingPreferences,
+    getStoredSpellCheckEnabled,
+    () => true,
   );
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
@@ -1833,20 +1847,25 @@ export function WritingWorkspace() {
             <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
             </label>
-            <textarea
+            <GrammarCheckedEditor
               id="essay-content"
-              data-walkthrough="editor"
+              dataWalkthrough="editor"
               value={content}
-              onChange={(e) => {
+              onChange={(next) => {
                 cancelPendingTopicRequests();
-                applyDraftContent(e.target.value);
+                applyDraftContent(next);
               }}
               placeholder={copy.workspace.editor.frenchResponsePlaceholder}
               rows={14}
               maxLength={20000}
               disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-              aria-describedby="word-count"
+              ariaDescribedBy="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
+              copy={copy.workspace.grammarCheck}
+              enabled={isSpellCheckEnabled}
+              onToggleEnabled={() =>
+                storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
+              }
             />
             <div className="flex flex-wrap items-center gap-3">
               <button
