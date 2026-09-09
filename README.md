@@ -190,6 +190,25 @@ the durable reservation, that learner's allowance remains spent; this avoids a
 release racing a newer request for the same learner. The aborted request never
 reaches DeepL or the fallback, and it cannot spend anyone else's allowance.
 
+## French grammar and spelling check
+
+The essay editor underlines spelling, grammar, and missing-word issues as the
+learner types, using a self-hosted, free/open-source
+[LanguageTool](https://languagetool.org/) server — never the public
+`api.languagetool.org` and never a paid grammar/AI API. A toggle above the
+editor lets the learner turn it on or off; the choice is remembered per
+browser and defaults to on.
+
+```sh
+docker compose up -d languagetool   # publishes it on http://localhost:8010
+```
+
+Then set `LANGUAGETOOL_URL="http://localhost:8010"` in `.env` (see
+`.env.example`). See [French grammar and spelling
+check](docs/french-grammar-check.md) for the full architecture, the
+`/api/language-check` contract, and how to deploy LanguageTool alongside the
+app instead of on the host.
+
 ## Database
 
 Schema lives in `prisma/schema.prisma`. The initial migration is committed

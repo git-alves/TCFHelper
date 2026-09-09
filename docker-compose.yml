@@ -1,0 +1,35 @@
+# Self-hosted LanguageTool for the French grammar/spelling checker (see
+# docs/french-grammar-check.md). This is the only service defined here --
+# the Next.js app itself runs on the host via `npm run dev` and talks to
+# this container over the published port (LANGUAGETOOL_URL=http://localhost:8010
+# in .env, matching .env.example).
+#
+# If you instead run the app itself inside this same Docker network (e.g. a
+# self-hosted production deployment), point LANGUAGETOOL_URL at the internal
+# service name and port instead: http://languagetool:8010.
+services:
+  languagetool:
+    # Erikvl87/docker-languagetool -- a community-maintained, actively
+    # updated build of the official open-source LanguageTool server
+    # (https://github.com/languagetool-org/languagetool). Free and
+    # self-hosted; never the public api.languagetool.org.
+    image: erikvl87/languagetool:latest
+    restart: unless-stopped
+    # Bound to loopback only -- this is for the app on the same host to
+    # reach during local development, never for a public interface.
+    # LanguageTool has no auth of its own, so it must stay unreachable from
+    # outside this machine; the backend API is the only intended caller. A
+    # production deployment should typically drop this `ports` block
+    # entirely and rely on the internal Docker network (see the note above
+    # about LANGUAGETOOL_URL=http://languagetool:8010) instead of publishing
+    # any port at all.
+    ports:
+      - "127.0.0.1:8010:8010"
+    environment:
+      # JVM heap bounds. LanguageTool's own image defaults to the same
+      # values; kept explicit here so they're easy to raise if you see
+      # OutOfMemory errors from the standard French model on long essays.
+      Java_Xms: "256m"
+      Java_Xmx: "512m"
+    # The image ships its own HEALTHCHECK (a real /v2/check request), so
+    # none is redeclared here.
