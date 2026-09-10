@@ -814,8 +814,8 @@ export const APP_COPY = {
         "Recent exam prompts are pulled directly from real, recently published TCF exams on this site, so you always practise with an authentic prompt. You can also paste in your own prompt instead.",
       timedTaskTourTitle: "Practise under exam conditions",
       timedTaskTourBody: "Start a timed task when you want to rehearse the real time pressure of the exam. It tracks the suggested time for this task and keeps running in the background while you write.",
-      spellCheckTourTitle: "Catch spelling and grammar issues as you type",
-      spellCheckTourBody: "Turn on spell check to underline spelling and grammar issues in your response, with a suggested correction on click. It runs locally and never sends your writing to a third-party AI service.",
+      spellCheckTourTitle: "Catch spelling mistakes as you type",
+      spellCheckTourBody: "Turn on spell check to underline misspelled French words in your response, with a suggested correction on click. It runs locally and never sends your writing to a third-party AI service.",
       guidedWritingTitle: "Plan before you write",
       guidedWritingBody:
         "Open the Writing guide when you need ideas. Choose the writing situation, then use its planning questions, French phrases, and suggested verb tenses for your target level.",
@@ -1479,8 +1479,8 @@ export const APP_COPY = {
         "Les consignes d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des consignes authentiques. Vous pouvez aussi coller la vôtre.",
       timedTaskTourTitle: "Entraînez-vous dans les conditions de l'examen",
       timedTaskTourBody: "Démarrez une tâche chronométrée pour vous entraîner avec la vraie pression de temps de l'examen. Elle suit la durée suggérée pour cette tâche et continue en arrière-plan pendant que vous écrivez.",
-      spellCheckTourTitle: "Repérez les fautes d’orthographe et de grammaire en écrivant",
-      spellCheckTourBody: "Activez la vérification orthographique pour souligner les fautes d’orthographe et de grammaire dans votre réponse, avec une correction suggérée au clic. Elle s’exécute localement et n’envoie jamais votre texte à un service d’IA tiers.",
+      spellCheckTourTitle: "Repérez les fautes d’orthographe en écrivant",
+      spellCheckTourBody: "Activez la vérification orthographique pour souligner les mots mal orthographiés dans votre réponse, avec une correction suggérée au clic. Elle s’exécute localement et n’envoie jamais votre texte à un service d’IA tiers.",
       guidedWritingTitle: "Planifiez avant d’écrire",
       guidedWritingBody:
         "Ouvrez le guide de rédaction lorsque vous manquez d’idées. Choisissez la situation d’écriture, puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour votre niveau visé.",
@@ -2151,8 +2151,8 @@ export const APP_COPY = {
         "Las consignas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con una consigna auténtica. También puedes pegar la tuya.",
       timedTaskTourTitle: "Practica en condiciones de examen",
       timedTaskTourBody: "Inicia una tarea cronometrada cuando quieras practicar con la presión de tiempo real del examen. Sigue el tiempo sugerido para esta tarea y continúa en segundo plano mientras escribes.",
-      spellCheckTourTitle: "Detecta errores de ortografía y gramática mientras escribes",
-      spellCheckTourBody: "Activa la revisión ortográfica para subrayar errores de ortografía y gramática en tu respuesta, con una corrección sugerida al hacer clic. Se ejecuta localmente y nunca envía tu texto a un servicio de IA externo.",
+      spellCheckTourTitle: "Detecta errores de ortografía mientras escribes",
+      spellCheckTourBody: "Activa la revisión ortográfica para subrayar las palabras mal escritas en tu respuesta, con una corrección sugerida al hacer clic. Se ejecuta localmente y nunca envía tu texto a un servicio de IA externo.",
       guidedWritingTitle: "Planifica antes de escribir",
       guidedWritingBody:
         "Abre la Guía de redacción cuando necesites ideas. Elige la situación de escritura y usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para tu nivel objetivo.",
@@ -2823,8 +2823,8 @@ export const APP_COPY = {
         "Os enunciados de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio enunciado.",
       timedTaskTourTitle: "Pratique nas condições da prova",
       timedTaskTourBody: "Inicie uma tarefa cronometrada quando quiser praticar com a pressão de tempo real da prova. Ela acompanha o tempo sugerido para esta tarefa e continua em segundo plano enquanto você escreve.",
-      spellCheckTourTitle: "Identifique erros de ortografia e gramática enquanto escreve",
-      spellCheckTourBody: "Ative a verificação ortográfica para sublinhar erros de ortografia e gramática na sua resposta, com uma correção sugerida ao clicar. Ela roda localmente e nunca envia seu texto para um serviço de IA de terceiros.",
+      spellCheckTourTitle: "Identifique erros de ortografia enquanto escreve",
+      spellCheckTourBody: "Ative a verificação ortográfica para sublinhar palavras escritas incorretamente na sua resposta, com uma correção sugerida ao clicar. Ela roda localmente e nunca envia seu texto para um serviço de IA de terceiros.",
       guidedWritingTitle: "Planeje antes de escrever",
       guidedWritingBody:
         "Abra o Guia de escrita quando precisar de ideias. Escolha a situação de escrita e use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para o nível desejado.",
