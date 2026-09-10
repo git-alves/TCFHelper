@@ -463,9 +463,15 @@ export function GrammarCheckedEditor({
           have no keyboard handling, so a focusable "button" there would be
           invisible to assistive tech while still eating a Tab press. This
           list is the real, always-reachable equivalent: ordinary buttons,
-          in normal document order, right after the editor. */}
+          in normal document order, right after the editor. The red
+          underline is enough for sighted mouse/touch users, so this stays
+          visually hidden (`sr-only`) for them -- but it must never be
+          `display:none`/`aria-hidden`, since it's the only way a
+          keyboard-only or screen-reader user can reach a correction at all.
+          `focus-within:not-sr-only` reveals it in place once Tab reaches one
+          of its buttons, so a sighted keyboard user isn't operating blind. */}
       {enabled && acceptedMatchIndexes.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-xl border border-black/[.12] p-3 text-sm dark:border-white/[.15]">
+        <div className="sr-only flex flex-col gap-2 rounded-xl border border-black/[.12] p-3 text-sm focus-within:not-sr-only dark:border-white/[.15]">
           <p className="font-medium text-zinc-700 dark:text-zinc-300">
             {copy.issuesHeading({ count: acceptedMatchIndexes.length })}
           </p>
