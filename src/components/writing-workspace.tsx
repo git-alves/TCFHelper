@@ -78,7 +78,6 @@ type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic"
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
-const SPELL_CHECK_ENABLED_STORAGE_KEY = "mytcflab:spell-check-enabled";
 const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
 const WALKTHROUGH_GUIDED_WRITING_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
 const writingPreferenceListeners = new Set<() => void>();
@@ -97,12 +96,6 @@ function getStoredTargetLevel(): ExampleLevel {
 
 function getStoredGuidedWritingOpen(): boolean {
   return readWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY) === "1";
-}
-
-// Spelling assistance is opt-in. A learner who has never made a choice starts
-// with it off; only an explicit "1" enables it for this browser.
-function getStoredSpellCheckEnabled(): boolean {
-  return readWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY) === "1";
 }
 
 function isTimedTaskSession(value: unknown): value is TimedTaskSession {
@@ -359,11 +352,18 @@ export function WritingWorkspace() {
     getStoredGuidedWritingOpen,
     () => false,
   );
-  const isSpellCheckEnabled = useSyncExternalStore(
-    subscribeToWritingPreferences,
-    getStoredSpellCheckEnabled,
-    () => false,
-  );
+  // Deliberately not a persisted preference (unlike the other toggles on this
+  // panel): sending a learner's draft to the spell-check endpoint must be an
+  // explicit decision for *this* topic, not something a stale "on" value from
+  // a previous browser session or a previously written topic silently
+  // resumes. `armedFor` records which topic identity the "on" value below
+  // belongs to; it's reset to off the moment that identity no longer matches
+  // the current topic (see spellCheckTopicIdentity), without a separate
+  // effect and its extra render pass.
+  const [spellCheckState, setSpellCheckState] = useState<{ armedFor: string | null; enabled: boolean }>({
+    armedFor: null,
+    enabled: false,
+  });
   const [spellCheckStatus, setSpellCheckStatus] = useState<LanguageCheckStatus>("idle");
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
@@ -439,10 +439,22 @@ export function WritingWorkspace() {
       : topicMode === "custom"
         ? customTopic.trim()
         : "";
-  // The toggle is a persisted preference (it can be "on" from a previous
-  // session before any topic is picked), but checking only makes sense once
-  // there is a topic to write about -- mirrors the guided-writing panel's
-  // own `... && activeTopicPrompt` gate just below.
+  // Identifies "a genuinely new topic", not every keystroke while editing a
+  // custom prompt: switching recent topics changes the id, switching between
+  // recent/custom/no-topic changes the mode, but retyping the same custom
+  // topic keeps the same identity so it doesn't fight typing.
+  const spellCheckTopicIdentity =
+    topicMode === "recent" && recentTopic ? `recent:${recentTopic.id}` : topicMode;
+  // React's recommended way to reset state when a prop-like value changes:
+  // adjust it during render instead of in an effect, avoiding an extra
+  // render pass. See https://react.dev/learn/you-might-not-need-an-effect.
+  const isSpellCheckEnabled =
+    spellCheckState.armedFor === spellCheckTopicIdentity && spellCheckState.enabled;
+  if (spellCheckState.armedFor !== spellCheckTopicIdentity) {
+    setSpellCheckState({ armedFor: spellCheckTopicIdentity, enabled: false });
+  }
+  // Checking only makes sense once there is a topic to write about -- mirrors
+  // the guided-writing panel's own `... && activeTopicPrompt` gate just below.
   const isSpellCheckActive = isSpellCheckEnabled && Boolean(activeTopicPrompt);
   // Topic changes should end a timed practice run instead of quietly timing
   // a different prompt. Custom prompts are fingerprinted so their text is
@@ -1674,7 +1686,10 @@ export function WritingWorkspace() {
                   type="button"
                   data-walkthrough="spell-check"
                   onClick={() =>
-                    storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
+                    setSpellCheckState((state) => ({
+                      armedFor: spellCheckTopicIdentity,
+                      enabled: state.armedFor === spellCheckTopicIdentity ? !state.enabled : true,
+                    }))
                   }
                   disabled={!activeTopicPrompt}
                   aria-pressed={isSpellCheckActive}
