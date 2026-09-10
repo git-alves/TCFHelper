@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { buildLanguageCheckSegments } from "@/lib/language-check-segments";
-import type { LanguageCheckMatch } from "@/lib/language-tool";
+import type { SpellCheckMatch } from "@/lib/spell-check";
 
-function match(offset: number, length: number, overrides: Partial<LanguageCheckMatch> = {}): LanguageCheckMatch {
+function match(offset: number, length: number, overrides: Partial<SpellCheckMatch> = {}): SpellCheckMatch {
   return {
     offset,
     length,
     message: "issue",
     replacements: [],
     category: "TYPOS",
-    ruleId: "TEST_RULE",
+    ruleId: "HUNSPELL_FR",
+    severity: "misspelling",
     ...overrides,
   };
 }
@@ -46,7 +47,7 @@ describe("buildLanguageCheckSegments", () => {
 
   it("handles multiple, non-adjacent errors in the same sentence", () => {
     const text = "Je suit tres content de la situation actuel.";
-    const matches = [match(3, 4, { ruleId: "AGREEMENT" }), match(8, 4, { ruleId: "TYPOS" })];
+    const matches = [match(3, 4), match(8, 4)];
     const segments = buildLanguageCheckSegments(text, matches);
     expect(segments.filter((s) => s.matchIndex !== null)).toEqual([
       { text: "suit", matchIndex: 0 },

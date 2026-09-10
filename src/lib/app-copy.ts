@@ -371,10 +371,9 @@ export interface AppCopy {
       copyFailed: string;
       clear: string;
     };
-    // Copy for the self-hosted LanguageTool integration (inline spelling and
-    // grammar underlines in the essay editor). See
-    // src/components/grammar-checked-editor.tsx and docs/french-grammar-check.md.
-    grammarCheck: {
+    // Copy for the bundled French Hunspell spelling checker in the essay
+    // editor. It deliberately does not make grammar or missing-word claims.
+    spellCheck: {
       toggleLabel: string;
       toggleAriaLabel: (values: { enabled: boolean }) => string;
       statusOn: string;
@@ -909,14 +908,14 @@ export const APP_COPY = {
         copyFailed: "Couldn't copy",
         clear: "Clear text",
       },
-      grammarCheck: {
-        toggleLabel: "Grammar check",
+      spellCheck: {
+        toggleLabel: "Spell check",
         toggleAriaLabel: ({ enabled }) =>
-          enabled ? "Grammar check is on. Turn it off." : "Grammar check is off. Turn it on.",
+          enabled ? "Spell check is on. Turn it off." : "Spell check is off. Turn it on.",
         statusOn: "On",
         statusOff: "Off",
         checking: "Checking…",
-        unavailable: "Grammar check is temporarily unavailable.",
+        unavailable: "Spell check is temporarily unavailable.",
         applyButton: "Apply",
         closeButtonAriaLabel: "Close suggestion",
         noReplacementHint: "No automatic suggestion for this issue.",
@@ -1575,16 +1574,16 @@ export const APP_COPY = {
         copyFailed: "Impossible de copier",
         clear: "Effacer le texte",
       },
-      grammarCheck: {
-        toggleLabel: "Correction grammaticale",
+      spellCheck: {
+        toggleLabel: "Vérification orthographique",
         toggleAriaLabel: ({ enabled }) =>
           enabled
-            ? "La correction grammaticale est activée. La désactiver."
-            : "La correction grammaticale est désactivée. L’activer.",
+            ? "La vérification orthographique est activée. La désactiver."
+            : "La vérification orthographique est désactivée. L’activer.",
         statusOn: "Activée",
         statusOff: "Désactivée",
         checking: "Vérification…",
-        unavailable: "La correction grammaticale est temporairement indisponible.",
+        unavailable: "La vérification orthographique est temporairement indisponible.",
         applyButton: "Appliquer",
         closeButtonAriaLabel: "Fermer la suggestion",
         noReplacementHint: "Aucune suggestion automatique pour ce problème.",
@@ -2245,16 +2244,16 @@ export const APP_COPY = {
         copyFailed: "No se pudo copiar",
         clear: "Borrar texto",
       },
-      grammarCheck: {
-        toggleLabel: "Corrección gramatical",
+      spellCheck: {
+        toggleLabel: "Revisión ortográfica",
         toggleAriaLabel: ({ enabled }) =>
           enabled
-            ? "La corrección gramatical está activada. Desactivarla."
-            : "La corrección gramatical está desactivada. Activarla.",
+            ? "La revisión ortográfica está activada. Desactivarla."
+            : "La revisión ortográfica está desactivada. Activarla.",
         statusOn: "Activada",
         statusOff: "Desactivada",
         checking: "Comprobando…",
-        unavailable: "La corrección gramatical no está disponible en este momento.",
+        unavailable: "La revisión ortográfica no está disponible en este momento.",
         applyButton: "Aplicar",
         closeButtonAriaLabel: "Cerrar la sugerencia",
         noReplacementHint: "No hay una sugerencia automática para este problema.",
@@ -2915,16 +2914,16 @@ export const APP_COPY = {
         copyFailed: "Não foi possível copiar",
         clear: "Limpar texto",
       },
-      grammarCheck: {
-        toggleLabel: "Correção gramatical",
+      spellCheck: {
+        toggleLabel: "Verificação ortográfica",
         toggleAriaLabel: ({ enabled }) =>
           enabled
-            ? "A correção gramatical está ativada. Desativá-la."
-            : "A correção gramatical está desativada. Ativá-la.",
+            ? "A verificação ortográfica está ativada. Desativá-la."
+            : "A verificação ortográfica está desativada. Ativá-la.",
         statusOn: "Ativada",
         statusOff: "Desativada",
         checking: "Verificando…",
-        unavailable: "A correção gramatical está temporariamente indisponível.",
+        unavailable: "A verificação ortográfica está temporariamente indisponível.",
         applyButton: "Aplicar",
         closeButtonAriaLabel: "Fechar a sugestão",
         noReplacementHint: "Não há sugestão automática para este problema.",

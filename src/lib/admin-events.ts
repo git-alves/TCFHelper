@@ -28,6 +28,7 @@ export const ADMIN_EVENT_TYPES = [
   "EXAMPLE_PROVIDER_FAILED",
   "TRANSLATION_PROVIDER_FAILED",
   "GRAMMAR_CHECK_PROVIDER_FAILED",
+  "SPELL_CHECK_FAILED",
   "AUTH_SESSION_CREATED",
   "AUTH_NETWORK_REVIEW_REQUIRED",
 ] as const;
@@ -46,7 +47,7 @@ export const ADMIN_EVENT_REASON_CODES = [
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
-export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "languagetool"] as const;
+export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "languagetool", "hunspell"] as const;
 export const ADMIN_EVENT_QUOTA_WINDOWS = ["minute", "day", "month"] as const;
 export const ADMIN_EVENT_BROWSER_FAMILIES = [
   "Chrome",
@@ -135,6 +136,12 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
     severity: "ERROR",
     module: "ESSAY_SERVICE",
     searchText: "grammar check spelling languagetool provider failed",
+    coalesceForMs: 15 * 60_000,
+  },
+  SPELL_CHECK_FAILED: {
+    severity: "ERROR",
+    module: "ESSAY_SERVICE",
+    searchText: "spell check hunspell dictionary failed",
     coalesceForMs: 15 * 60_000,
   },
   AUTH_SESSION_CREATED: {
@@ -348,6 +355,14 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
           ["not_configured", "transport_error", "upstream_http_error", "provider_unavailable"] as const,
           input.reasonCode,
         ) &&
+        hasNoAuthenticationContext(input)
+      );
+    case "SPELL_CHECK_FAILED":
+      return (
+        input.provider === "hunspell" &&
+        input.httpStatus !== undefined &&
+        hasNoQuotaSnapshot(input) &&
+        input.reasonCode === "provider_unavailable" &&
         hasNoAuthenticationContext(input)
       );
     case "AUTH_SESSION_CREATED":
@@ -736,6 +751,8 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
       return `Translation generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "GRAMMAR_CHECK_PROVIDER_FAILED":
       return `Grammar check failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
+    case "SPELL_CHECK_FAILED":
+      return `Spell check failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "AUTH_SESSION_CREATED":
       return `Authenticated session started.${repeat}`;
     case "AUTH_NETWORK_REVIEW_REQUIRED":

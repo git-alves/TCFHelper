@@ -190,26 +190,15 @@ the durable reservation, that learner's allowance remains spent; this avoids a
 release racing a newer request for the same learner. The aborted request never
 reaches DeepL or the fallback, and it cannot spend anyone else's allowance.
 
-## French grammar and spelling check
+## French spelling check
 
-The essay editor underlines spelling, grammar, and missing-word issues as the
-learner types, using a self-hosted, free/open-source
-[LanguageTool](https://languagetool.org/) server — never the public
-`api.languagetool.org` and never a paid grammar/AI API. A toggle above the
-editor lets the learner turn it on or off; the choice is remembered per
-browser and defaults to on.
-
-```sh
-docker compose up -d languagetool   # publishes it on http://localhost:8010
-```
-
-Then set `LANGUAGETOOL_URL="http://localhost:8010"` in `.env` (see
-`.env.example`). See [French grammar and spelling
-check](docs/french-grammar-check.md) for the full architecture, the
-`/api/language-check` contract, and how to deploy LanguageTool alongside the
-app instead of on the host -- including the authenticating reverse proxy a
-serverless deployment (e.g. Vercel) needs instead of a bare public
-LanguageTool URL, since it has no authentication of its own.
+The essay editor has an opt-in French spelling checker powered by a bundled
+Hunspell dictionary. It runs directly in the application backend, requires no
+Docker service or environment variables, and never sends draft text to a
+third-party API. It intentionally checks spelling only — not grammar, missing
+words, punctuation, style, or TCF scoring. See [French spelling
+check](docs/french-spell-check.md) for the architecture, API contract, limits,
+and test coverage.
 
 ## Database
 

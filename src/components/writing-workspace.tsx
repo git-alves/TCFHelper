@@ -99,11 +99,10 @@ function getStoredGuidedWritingOpen(): boolean {
   return readWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY) === "1";
 }
 
-// Defaults to enabled: the grammar checker is the feature, not an opt-in
-// extra, so a learner who has never touched the toggle should still see it
-// working. Only an explicit "0" (they turned it off themselves) disables it.
+// Spelling assistance is opt-in. A learner who has never made a choice starts
+// with it off; only an explicit "1" enables it for this browser.
 function getStoredSpellCheckEnabled(): boolean {
-  return readWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY) !== "0";
+  return readWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY) === "1";
 }
 
 function isTimedTaskSession(value: unknown): value is TimedTaskSession {
@@ -363,9 +362,9 @@ export function WritingWorkspace() {
   const isSpellCheckEnabled = useSyncExternalStore(
     subscribeToWritingPreferences,
     getStoredSpellCheckEnabled,
-    () => true,
+    () => false,
   );
-  const [grammarCheckStatus, setGrammarCheckStatus] = useState<LanguageCheckStatus>("idle");
+  const [spellCheckStatus, setSpellCheckStatus] = useState<LanguageCheckStatus>("idle");
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
   const [exampleNeedsTopic, setExampleNeedsTopic] = useState(false);
@@ -1672,20 +1671,19 @@ export function WritingWorkspace() {
                     storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
                   }
                   aria-pressed={isSpellCheckEnabled}
-                  aria-label={copy.workspace.grammarCheck.toggleAriaLabel({ enabled: isSpellCheckEnabled })}
+                  aria-label={copy.workspace.spellCheck.toggleAriaLabel({ enabled: isSpellCheckEnabled })}
                   className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
-                  {copy.workspace.grammarCheck.toggleLabel}:{" "}
-                  {isSpellCheckEnabled ? copy.workspace.grammarCheck.statusOn : copy.workspace.grammarCheck.statusOff}
+                  {copy.workspace.spellCheck.toggleLabel}: {isSpellCheckEnabled ? copy.workspace.spellCheck.statusOn : copy.workspace.spellCheck.statusOff}
                 </button>
-                {isSpellCheckEnabled && grammarCheckStatus === "checking" && (
+                {isSpellCheckEnabled && spellCheckStatus === "checking" && (
                   <span aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {copy.workspace.grammarCheck.checking}
+                    {copy.workspace.spellCheck.checking}
                   </span>
                 )}
-                {isSpellCheckEnabled && grammarCheckStatus === "error" && (
+                {isSpellCheckEnabled && spellCheckStatus === "error" && (
                   <span role="alert" className="text-sm text-red-600 dark:text-red-400">
-                    {copy.workspace.grammarCheck.unavailable}
+                    {copy.workspace.spellCheck.unavailable}
                   </span>
                 )}
               </div>
@@ -1884,9 +1882,9 @@ export function WritingWorkspace() {
               disabled={isCorrecting || isTopicLoading || isGeneratingExample}
               ariaDescribedBy="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
-              copy={copy.workspace.grammarCheck}
+              copy={copy.workspace.spellCheck}
               enabled={isSpellCheckEnabled}
-              onStatusChange={setGrammarCheckStatus}
+              onStatusChange={setSpellCheckStatus}
             />
             <div className="flex flex-wrap items-center gap-3">
               <button

@@ -1,4 +1,4 @@
-import type { LanguageCheckMatch } from "@/lib/language-tool";
+import type { SpellCheckMatch } from "@/lib/spell-check";
 
 /** One piece of the editor's text, for rendering in the highlight overlay. */
 export interface TextSegment {
@@ -8,7 +8,7 @@ export interface TextSegment {
 }
 
 /**
- * Turns a list of LanguageTool matches (unsorted, and potentially
+ * Turns a list of spelling matches (unsorted, and potentially
  * overlapping or stale) into a flat, ordered list of text segments that
  * together reconstruct `text` exactly once.
  *
@@ -21,7 +21,7 @@ export interface TextSegment {
  *   that starts before that range ends is dropped, so a single character
  *   is never covered by two `<mark>`s at once.
  */
-export function buildLanguageCheckSegments(text: string, matches: readonly LanguageCheckMatch[]): TextSegment[] {
+export function buildLanguageCheckSegments(text: string, matches: readonly SpellCheckMatch[]): TextSegment[] {
   const candidates = matches
     .map((match, index) => ({ match, index }))
     .filter(({ match }) => match.offset >= 0 && match.length > 0 && match.offset + match.length <= text.length)

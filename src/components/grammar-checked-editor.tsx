@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { applyLanguageCheckReplacement } from "@/lib/apply-correction";
 import { buildLanguageCheckSegments } from "@/lib/language-check-segments";
-import type { LanguageCheckMatch } from "@/lib/language-tool";
+import type { SpellCheckMatch } from "@/lib/spell-check";
 
 // Debounce sits in the middle of the requested 500-800ms window: long
 // enough that a fast typist doesn't fire a request per keystroke, short
@@ -19,7 +19,7 @@ const POPUP_WIDTH_PX = 288;
 
 export type LanguageCheckStatus = "idle" | "checking" | "error";
 
-/** The subset of `copy.workspace.grammarCheck` this component renders
+/** The subset of `copy.workspace.spellCheck` this component renders
  * itself -- the toggle button and its "Checking…"/"unavailable" status text
  * live in the caller instead (see WritingWorkspace), so they stay visually
  * grouped with its other action buttons rather than in a separate row with
@@ -52,7 +52,7 @@ interface GrammarCheckedEditorProps {
 type CheckStatus = LanguageCheckStatus;
 
 /**
- * Debounces calls to `/api/language-check` while `text` changes, cancelling
+ * Debounces calls to `/api/spell-check` while `text` changes, cancelling
  * any in-flight request that a newer keystroke has made obsolete.
  *
  * Matches are cleared the instant `text` changes -- before the debounce
@@ -62,7 +62,7 @@ type CheckStatus = LanguageCheckStatus;
  * the learner types anything before it.
  */
 function useLanguageCheck(text: string, enabled: boolean) {
-  const [matches, setMatches] = useState<LanguageCheckMatch[]>([]);
+  const [matches, setMatches] = useState<SpellCheckMatch[]>([]);
   const [status, setStatus] = useState<CheckStatus>("idle");
 
   // Reacting to a prop/state change by adjusting state is meant to happen
@@ -87,7 +87,7 @@ function useLanguageCheck(text: string, enabled: boolean) {
 
     const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetch("/api/language-check", {
+      fetch("/api/spell-check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text }),
@@ -95,7 +95,7 @@ function useLanguageCheck(text: string, enabled: boolean) {
       })
         .then((response) => {
           if (!response.ok) throw new Error(`Language check failed (${response.status})`);
-          return response.json() as Promise<{ errors?: LanguageCheckMatch[] }>;
+          return response.json() as Promise<{ errors?: SpellCheckMatch[] }>;
         })
         .then((payload) => {
           // `abort()` can't un-resolve a fetch promise that had already
@@ -126,10 +126,9 @@ function useLanguageCheck(text: string, enabled: boolean) {
 }
 
 /**
- * A drop-in replacement for a plain `<textarea>` that underlines spelling,
- * grammar, and (where LanguageTool finds one) missing-word issues while the
- * learner types, with a click/hover popup offering LanguageTool's own
- * suggested fix.
+ * A drop-in replacement for a plain `<textarea>` that underlines potential
+ * spelling mistakes while the learner types, with a click/hover popup
+ * offering Hunspell's dictionary suggestions.
  *
  * Implementation note (the "mirror" technique): a `<textarea>` cannot
  * contain `<mark>` children, so real inline underlines aren't possible
@@ -360,7 +359,7 @@ export function GrammarCheckedEditor({
   // Shared between the mouse-oriented popup and the always-in-the-tab-order
   // issues list below, so the two accessible/inaccessible surfaces never
   // drift out of sync with each other.
-  function renderReplacementActions(match: LanguageCheckMatch, matchIndex: number) {
+  function renderReplacementActions(match: SpellCheckMatch, matchIndex: number) {
     if (match.replacements.length === 0) {
       return <p className="mt-2 text-zinc-500 dark:text-zinc-400">{copy.noReplacementHint}</p>;
     }

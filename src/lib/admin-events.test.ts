@@ -132,6 +132,30 @@ describe("recordAdminEvent", () => {
     });
   });
 
+  it("persists a spell-check failure with the bundled Hunspell provider", async () => {
+    await recordAdminEvent(
+      {
+        eventType: "SPELL_CHECK_FAILED",
+        userId: USER_ID,
+        provider: "hunspell",
+        reasonCode: "provider_unavailable",
+        httpStatus: 500,
+      },
+      new Date("2020-08-11T12:00:00.000Z"),
+    );
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      create: expect.objectContaining({
+        eventType: "SPELL_CHECK_FAILED",
+        provider: "hunspell",
+        reasonCode: "provider_unavailable",
+        searchText: "spell check hunspell dictionary failed provider unavailable",
+      }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    });
+  });
+
   it("rejects a grammar-check provider failure using a provider other than languagetool", async () => {
     await expect(
       recordAdminEvent({
@@ -440,6 +464,20 @@ describe("formatAdminEventMessage", () => {
         occurrenceCount: 1,
       }),
     ).toBe("Grammar check failed (languagetool): provider unavailable.");
+  });
+
+  it("renders a Hunspell spell-check failure message", () => {
+    expect(
+      formatAdminEventMessage({
+        eventType: "SPELL_CHECK_FAILED",
+        provider: "hunspell",
+        reasonCode: "provider_unavailable",
+        quotaWindow: null,
+        usageValue: null,
+        quotaLimit: null,
+        occurrenceCount: 1,
+      }),
+    ).toBe("Spell check failed (hunspell): provider unavailable.");
   });
 
   it("never interpolates malformed persisted values into display copy", () => {
