@@ -1677,11 +1677,11 @@ export function WritingWorkspace() {
                     storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
                   }
                   disabled={!activeTopicPrompt}
-                  aria-pressed={isSpellCheckEnabled}
-                  aria-label={copy.workspace.spellCheck.toggleAriaLabel({ enabled: isSpellCheckEnabled })}
+                  aria-pressed={isSpellCheckActive}
+                  aria-label={copy.workspace.spellCheck.toggleAriaLabel({ enabled: isSpellCheckActive })}
                   className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
-                  {copy.workspace.spellCheck.toggleLabel}: {isSpellCheckEnabled ? copy.workspace.spellCheck.statusOn : copy.workspace.spellCheck.statusOff}
+                  {copy.workspace.spellCheck.toggleLabel}: {isSpellCheckActive ? copy.workspace.spellCheck.statusOn : copy.workspace.spellCheck.statusOff}
                 </button>
                 {isSpellCheckActive && spellCheckStatus === "checking" && (
                   <span aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
