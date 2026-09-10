@@ -7,6 +7,10 @@ interface ModalProps {
   children: ReactNode;
   closeLabel: string;
   ariaLabel: string;
+  // Intercepted-route modals usually return to the route beneath them. A
+  // direct URL has no such preserved route, so it can name a safe in-app
+  // destination for close instead of relying on browser history.
+  fallbackCloseHref?: string;
   title?: string;
   panelClassName?: string;
   // CSS selector (evaluated within the dialog) for where initial focus
@@ -63,7 +67,7 @@ const FOCUSABLE_SELECTOR =
 // always goes through router.back() so the URL and browser history stay in
 // sync with what's actually on screen, per Next's parallel + intercepting
 // routes convention for modals.
-export function Modal({ children, closeLabel, ariaLabel, title, panelClassName, initialFocusSelector }: ModalProps) {
+export function Modal({ children, closeLabel, ariaLabel, fallbackCloseHref, title, panelClassName, initialFocusSelector }: ModalProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeGuardRef = useRef<CloseGuard | null>(null);
@@ -71,7 +75,13 @@ export function Modal({ children, closeLabel, ariaLabel, title, panelClassName, 
   const registerCloseGuard = useCallback((guard: CloseGuard | null) => {
     closeGuardRef.current = guard;
   }, []);
-  const closeImmediately = useCallback(() => router.back(), [router]);
+  const closeImmediately = useCallback(() => {
+    if (fallbackCloseHref) {
+      router.replace(fallbackCloseHref);
+      return;
+    }
+    router.back();
+  }, [fallbackCloseHref, router]);
 
   function requestClose() {
     if (closeGuardRef.current && !closeGuardRef.current()) return;

@@ -1,9 +1,10 @@
-import { SettingsPageContent } from "@/components/settings-page-content";
+import { SettingsModal } from "@/components/settings-modal";
 
-export default function SettingsPage() {
-  return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <SettingsPageContent />
-    </main>
-  );
+// A refresh/direct navigation cannot be intercepted by Next, but it must
+// retain the Settings dialog's compact form rather than unexpectedly taking
+// over the page. There is no underlying route to reveal in that case, so
+// close returns learners to their dashboard instead of potentially leaving
+// the app through browser history.
+export default async function SettingsPage() {
+  return <SettingsModal fallbackCloseHref="/dashboard" />;
 }
