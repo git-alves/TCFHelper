@@ -27,10 +27,18 @@ export const ADMIN_EVENT_TYPES = [
   "CORRECTION_PROVIDER_FAILED",
   "EXAMPLE_PROVIDER_FAILED",
   "TRANSLATION_PROVIDER_FAILED",
-  "GRAMMAR_CHECK_PROVIDER_FAILED",
   "SPELL_CHECK_FAILED",
   "AUTH_SESSION_CREATED",
   "AUTH_NETWORK_REVIEW_REQUIRED",
+  // GRAMMAR_CHECK_PROVIDER_FAILED (self-hosted LanguageTool, replaced by
+  // Hunspell within a day) is deliberately gone from here. The database
+  // CHECK constraints still allow it until an operator confirms no
+  // production row uses it and promotes
+  // 20260910150000_retire_grammar_check_provider_failed_event -- see that
+  // migration. A row with that legacy eventType still reads back fine: it
+  // just renders as a generic message (see formatAdminEventMessage) instead
+  // of a type-specific one, since isMember() against this narrowed list
+  // treats it as unrecognized rather than throwing.
 ] as const;
 export const ADMIN_EVENT_REASON_CODES = [
   "invalid_or_spent",
@@ -47,7 +55,7 @@ export const ADMIN_EVENT_REASON_CODES = [
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
-export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "languagetool", "hunspell"] as const;
+export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "hunspell"] as const;
 export const ADMIN_EVENT_QUOTA_WINDOWS = ["minute", "day", "month"] as const;
 export const ADMIN_EVENT_BROWSER_FAMILIES = [
   "Chrome",
@@ -130,12 +138,6 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
     severity: "ERROR",
     module: "ESSAY_SERVICE",
     searchText: "translation generation provider failed",
-    coalesceForMs: 15 * 60_000,
-  },
-  GRAMMAR_CHECK_PROVIDER_FAILED: {
-    severity: "ERROR",
-    module: "ESSAY_SERVICE",
-    searchText: "grammar check spelling languagetool provider failed",
     coalesceForMs: 15 * 60_000,
   },
   SPELL_CHECK_FAILED: {
@@ -343,18 +345,6 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
         isMember(["fallback_circuit_open", "transport_error", "provider_unavailable"] as const, input.reasonCode) &&
-        hasNoAuthenticationContext(input)
-      );
-    case "GRAMMAR_CHECK_PROVIDER_FAILED":
-      return (
-        input.provider === "languagetool" &&
-        input.httpStatus !== undefined &&
-        hasNoQuotaSnapshot(input) &&
-        input.reasonCode !== undefined &&
-        isMember(
-          ["not_configured", "transport_error", "upstream_http_error", "provider_unavailable"] as const,
-          input.reasonCode,
-        ) &&
         hasNoAuthenticationContext(input)
       );
     case "SPELL_CHECK_FAILED":
@@ -749,8 +739,6 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
       return `Sample text generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "TRANSLATION_PROVIDER_FAILED":
       return `Translation generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
-    case "GRAMMAR_CHECK_PROVIDER_FAILED":
-      return `Grammar check failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "SPELL_CHECK_FAILED":
       return `Spell check failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "AUTH_SESSION_CREATED":
