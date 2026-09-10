@@ -8,12 +8,16 @@ import { getRequestLocale } from "@/lib/request-locale";
 // navigation, while a refresh or a document navigation has no route context
 // to preserve. Both paths still present the same compact dialog, so a brief
 // reload/routing fallback can never turn Settings into a full-page view.
-export async function SettingsModal() {
+interface SettingsModalProps {
+  fallbackCloseHref?: string;
+}
+
+export async function SettingsModal({ fallbackCloseHref }: SettingsModalProps = {}) {
   const locale = await getRequestLocale();
   const copy = getAppCopy(locale);
 
   return (
-    <Modal closeLabel={copy.common.close} ariaLabel={copy.settings.title}>
+    <Modal closeLabel={copy.common.close} ariaLabel={copy.settings.title} fallbackCloseHref={fallbackCloseHref}>
       <SettingsPageContent />
     </Modal>
   );

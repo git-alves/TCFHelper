@@ -5,7 +5,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 // shell so this regression test stays focused on the direct-navigation
 // fallback rather than duplicating the Modal component's own tests.
 vi.mock("@/components/settings-modal", () => ({
-  SettingsModal: () => <div role="dialog" data-testid="settings-modal" />,
+  SettingsModal: ({ fallbackCloseHref }: { fallbackCloseHref?: string }) => (
+    <div role="dialog" data-testid="settings-modal" data-fallback-close-href={fallbackCloseHref} />
+  ),
 }));
 
 // Keep the direct-page assertion valid against the pre-fix implementation
@@ -24,11 +26,13 @@ describe("Settings route presentation", () => {
 
     expect(markup).toContain('role="dialog"');
     expect(markup).not.toContain("<main");
+    expect(markup).toContain('data-fallback-close-href="/dashboard"');
   });
 
   it("uses the same shell for intercepted navigation", async () => {
     const markup = renderToStaticMarkup(await InterceptedSettingsModal());
 
     expect(markup).toContain('role="dialog"');
+    expect(markup).not.toContain("data-fallback-close-href");
   });
 });
