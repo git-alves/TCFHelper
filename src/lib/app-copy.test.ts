@@ -185,6 +185,8 @@ describe("APP_COPY", () => {
         copy.walkthrough.guidedWritingBody,
         copy.walkthrough.timedTaskTourTitle,
         copy.walkthrough.timedTaskTourBody,
+        copy.walkthrough.spellCheckTourTitle,
+        copy.walkthrough.spellCheckTourBody,
         copy.walkthrough.editorTitle,
         copy.walkthrough.editorBody,
         copy.walkthrough.correctButtonTitle,
