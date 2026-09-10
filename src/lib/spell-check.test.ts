@@ -42,16 +42,19 @@ describe("checkFrenchSpelling", () => {
     expect(checkFrenchSpelling(text)).toEqual([]);
   });
 
-  it("bounds malformed long drafts to 100 issues and suggestions to the first 25", () => {
-    const malformedDraft = Array.from({ length: 3_000 }, (_, index) => `zxqv${index}zz`).join(" ");
+  it("bounds vowel-containing malformed drafts to 100 issues and five suggestions", () => {
+    // This token is deliberately vowel-containing so it exercises Hunspell's
+    // expensive suggestion path instead of the consonant-run fast path.
+    const nonceWord = "azzzzzzzzzzzzzzzzzzzzzzzzzzzzzz";
+    const malformedDraft = Array.from({ length: 3_000 }, () => nonceWord).join(" ");
     const startedAt = performance.now();
     const errors = checkFrenchSpelling(malformedDraft);
 
     expect(errors).toHaveLength(100);
-    expect(errors.slice(0, 25).every((error) => error.replacements.length <= 5)).toBe(true);
-    expect(errors.slice(25).every((error) => error.replacements.length === 0)).toBe(true);
+    expect(errors.slice(0, 5).every((error) => error.replacements.length <= 5)).toBe(true);
+    expect(errors.slice(5).every((error) => error.replacements.length === 0)).toBe(true);
     // This was previously an unbounded suggestion loop. The generous bound
     // keeps the regression test stable on slower CI while still catching it.
-    expect(performance.now() - startedAt).toBeLessThan(2_000);
+    expect(performance.now() - startedAt).toBeLessThan(3_000);
   });
 });

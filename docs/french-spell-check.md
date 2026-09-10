@@ -44,7 +44,7 @@ the learner’s draft stays within this application.
 
 The 20,000-character request limit matches the editor. A response is capped at
 100 potential misspellings and Hunspell generates suggestions for only the
-first 25 plausible words (not arbitrary consonant runs), so malformed long
+first five plausible words (not arbitrary consonant runs), so malformed long
 drafts cannot exhaust a server worker. The endpoint requires an activated
 account, has an in-memory per-user rate limit, validates a strict payload, and
 marks responses `private, no-store`.

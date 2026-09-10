@@ -24,7 +24,7 @@ const MAX_REPLACEMENTS_PER_MATCH = 5;
 // draft full of random text cannot monopolize a server worker. Later matches
 // are omitted; the learner can fix the visible batch and check again.
 const MAX_ISSUES_PER_CHECK = 100;
-const MAX_SUGGESTED_ISSUES_PER_CHECK = 25;
+const MAX_SUGGESTED_ISSUES_PER_CHECK = 5;
 const MAX_SUGGESTION_WORD_LENGTH = 32;
 const WORD_PATTERN = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu;
 const FRENCH_VOWEL_PATTERN = /[aeiouyàâäéèêëîïôöùûüÿæœ]/iu;
