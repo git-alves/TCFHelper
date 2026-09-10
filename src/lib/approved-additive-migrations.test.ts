@@ -82,6 +82,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260905160000_add_user_timezone");
   });
 
+  it("allows the additive Hunspell spell-check failure event", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260910100000_add_hunspell_spell_check_failed_event");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

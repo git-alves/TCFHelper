@@ -1,15 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { buildLanguageCheckSegments } from "@/lib/language-check-segments";
-import type { LanguageCheckMatch } from "@/lib/language-tool";
+import type { SpellCheckMatch } from "@/lib/spell-check";
 
-function match(offset: number, length: number, overrides: Partial<LanguageCheckMatch> = {}): LanguageCheckMatch {
+function match(offset: number, length: number, overrides: Partial<SpellCheckMatch> = {}): SpellCheckMatch {
   return {
     offset,
     length,
     message: "issue",
     replacements: [],
     category: "TYPOS",
-    ruleId: "TEST_RULE",
+    ruleId: "HUNSPELL_FR",
+    severity: "misspelling",
     ...overrides,
   };
 }

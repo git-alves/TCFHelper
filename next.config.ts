@@ -12,6 +12,10 @@ const CSP = buildContentSecurityPolicy({
 // engine next to each server bundle and records it in the corresponding
 // trace, which Vercel then packages into the function output.
 const nextConfig: NextConfig = {
+  // dictionary-fr reads its Hunspell .aff/.dic assets relative to its own
+  // module URL. Keeping these server-only packages external preserves that
+  // supported Node loading path and lets output tracing ship those assets.
+  serverExternalPackages: ["dictionary-fr", "nspell"],
   // @prisma/client is externalized by default. Bundle it so PrismaPlugin can
   // see the generated client configuration and copy its runtime files.
   transpilePackages: ["@prisma/client"],

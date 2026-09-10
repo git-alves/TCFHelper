@@ -55,4 +55,7 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // existing row still satisfies every constraint unchanged -- only new
   // allowed values are added, none removed or narrowed.
   "20260909180000_add_grammar_check_provider_failed_event",
+  // Widens the same closed vocabulary for the bundled Hunspell checker.
+  // Existing events retain their exact shapes and meanings.
+  "20260910100000_add_hunspell_spell_check_failed_event",
 ]);
