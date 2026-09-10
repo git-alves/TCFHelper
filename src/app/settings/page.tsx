@@ -1,9 +1,9 @@
-import { SettingsPageContent } from "@/components/settings-page-content";
+import { SettingsModal } from "@/components/settings-modal";
 
-export default function SettingsPage() {
-  return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <SettingsPageContent />
-    </main>
-  );
+// A refresh/direct navigation cannot be intercepted by Next, but it must
+// retain the Settings dialog's compact form rather than unexpectedly taking
+// over the page. The modal's close action still returns through browser
+// history, the same as a soft-navigation modal.
+export default async function SettingsPage() {
+  return <SettingsModal />;
 }
