@@ -82,6 +82,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
         ...shortSteps.slice(0, 2),
         { id: "guided-writing", title: copy.walkthrough.guidedWritingTitle, body: copy.walkthrough.guidedWritingBody },
         { id: "timed-task", title: copy.walkthrough.timedTaskTourTitle, body: copy.walkthrough.timedTaskTourBody },
+        { id: "spell-check", title: copy.walkthrough.spellCheckTourTitle, body: copy.walkthrough.spellCheckTourBody },
         ...shortSteps.slice(2),
         {
           id: "correction-modal",
@@ -146,7 +147,7 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={dismiss}
-      progress={isFullTour ? { step: stepIndex + 9, total: 20 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 9, total: 21 } : undefined}
     />
   );
 }

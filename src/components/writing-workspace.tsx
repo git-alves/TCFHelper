@@ -439,6 +439,11 @@ export function WritingWorkspace() {
       : topicMode === "custom"
         ? customTopic.trim()
         : "";
+  // The toggle is a persisted preference (it can be "on" from a previous
+  // session before any topic is picked), but checking only makes sense once
+  // there is a topic to write about -- mirrors the guided-writing panel's
+  // own `... && activeTopicPrompt` gate just below.
+  const isSpellCheckActive = isSpellCheckEnabled && Boolean(activeTopicPrompt);
   // Topic changes should end a timed practice run instead of quietly timing
   // a different prompt. Custom prompts are fingerprinted so their text is
   // never kept in the persisted session.
@@ -1667,21 +1672,23 @@ export function WritingWorkspace() {
                 </button>
                 <button
                   type="button"
+                  data-walkthrough="spell-check"
                   onClick={() =>
                     storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
                   }
+                  disabled={!activeTopicPrompt}
                   aria-pressed={isSpellCheckEnabled}
                   aria-label={copy.workspace.spellCheck.toggleAriaLabel({ enabled: isSpellCheckEnabled })}
                   className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
                   {copy.workspace.spellCheck.toggleLabel}: {isSpellCheckEnabled ? copy.workspace.spellCheck.statusOn : copy.workspace.spellCheck.statusOff}
                 </button>
-                {isSpellCheckEnabled && spellCheckStatus === "checking" && (
+                {isSpellCheckActive && spellCheckStatus === "checking" && (
                   <span aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
                     {copy.workspace.spellCheck.checking}
                   </span>
                 )}
-                {isSpellCheckEnabled && spellCheckStatus === "error" && (
+                {isSpellCheckActive && spellCheckStatus === "error" && (
                   <span role="alert" className="text-sm text-red-600 dark:text-red-400">
                     {copy.workspace.spellCheck.unavailable}
                   </span>
@@ -1883,7 +1890,7 @@ export function WritingWorkspace() {
               ariaDescribedBy="word-count"
               className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
               copy={copy.workspace.spellCheck}
-              enabled={isSpellCheckEnabled}
+              enabled={isSpellCheckActive}
               onStatusChange={setSpellCheckStatus}
             />
             <div className="flex flex-wrap items-center gap-3">
