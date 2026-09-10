@@ -19,7 +19,15 @@ export interface SpellCheckMatch {
 // not an overwhelming menu. Keep the closest distinct choices, including
 // accent restorations such as `tres` -> `très`.
 const MAX_REPLACEMENTS_PER_MATCH = 5;
+// Generating Hunspell suggestions is much more expensive than recognizing a
+// word. Bound both result volume and suggestion work so a 20,000-character
+// draft full of random text cannot monopolize a server worker. Later matches
+// are omitted; the learner can fix the visible batch and check again.
+const MAX_ISSUES_PER_CHECK = 100;
+const MAX_SUGGESTED_ISSUES_PER_CHECK = 25;
+const MAX_SUGGESTION_WORD_LENGTH = 32;
 const WORD_PATTERN = /[\p{L}\p{M}]+(?:['’][\p{L}\p{M}]+)*/gu;
+const FRENCH_VOWEL_PATTERN = /[aeiouyàâäéèêëîïôöùûüÿæœ]/iu;
 
 // nspell is a pure-JS implementation of Hunspell. The dictionary ships as a
 // package asset and is loaded in this process: no third-party service, Docker
@@ -42,6 +50,13 @@ function suggestionsFor(word: string): string[] {
   return [...accentOnly, ...remaining].slice(0, MAX_REPLACEMENTS_PER_MATCH);
 }
 
+// Pure consonant runs such as `qzxv` are almost certainly keyboard noise,
+// not a misspelled French word. Hunspell's edit-distance search over those
+// runs has no useful suggestion and can be disproportionately expensive.
+function isSuggestionCandidate(word: string): boolean {
+  return word.length <= MAX_SUGGESTION_WORD_LENGTH && FRENCH_VOWEL_PATTERN.test(word);
+}
+
 /**
  * Finds only misspelled French words. It deliberately does not infer grammar,
  * punctuation, style, or missing words: those require a language-analysis
@@ -51,6 +66,8 @@ export function checkFrenchSpelling(text: string): SpellCheckMatch[] {
   const errors: SpellCheckMatch[] = [];
 
   for (const token of text.matchAll(WORD_PATTERN)) {
+    if (errors.length >= MAX_ISSUES_PER_CHECK) break;
+
     const word = token[0];
     const offset = token.index;
     if (offset === undefined || isAllCapsAbbreviation(word) || frenchSpellChecker.correct(word)) continue;
@@ -59,7 +76,10 @@ export function checkFrenchSpelling(text: string): SpellCheckMatch[] {
       offset,
       length: word.length,
       message: "Possible spelling mistake.",
-      replacements: suggestionsFor(word),
+      // Keep enough one-click help for a useful correction pass, then avoid
+      // expensive suggestion generation for the remaining visible issues.
+      replacements:
+        errors.length < MAX_SUGGESTED_ISSUES_PER_CHECK && isSuggestionCandidate(word) ? suggestionsFor(word) : [],
       category: "TYPOS",
       ruleId: "HUNSPELL_FR",
       severity: "misspelling",
