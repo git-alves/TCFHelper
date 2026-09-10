@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
@@ -127,21 +127,6 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   // The workspace can stay mounted while Settings is open, so it remains
   // the source of truth for whether leaving this page needs a draft guard.
   const onTasks = isWorkspaceMounted;
-
-  // Settings has no <Link> of its own to prefetch from (it opens via
-  // UserButton.Action's onClick, see below), so warm its intercepted-route
-  // payload as soon as the nav bar mounts. app/settings/page.tsx and its
-  // (.) interceptor now share the same compact SettingsModal shell either
-  // way (see that component), so this is no longer load-bearing for
-  // correctness -- just for speed: a cold `router.push` still has to fetch
-  // the RSC payload over the network, and prefetching removes that as a
-  // reason for a slow/flaky connection to fall back to a full navigation
-  // (a real, if harmless, URL/history detour) instead of the intercepted
-  // one. Harmless to call for a signed-out visitor too: the Settings menu
-  // item they'd trigger it from is not rendered for them at all.
-  useEffect(() => {
-    router.prefetch("/settings");
-  }, [router]);
 
   // Settings changes the URL while leaving the underlying page mounted.
   // Preserve that page identity so the active navigation item does not
