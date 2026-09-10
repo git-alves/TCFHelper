@@ -17,13 +17,14 @@ const POPUP_CLOSE_DELAY_MS = 200;
 const POPUP_OPEN_DELAY_MS = 120;
 const POPUP_WIDTH_PX = 288;
 
+export type LanguageCheckStatus = "idle" | "checking" | "error";
+
+/** The subset of `copy.workspace.grammarCheck` this component renders
+ * itself -- the toggle button and its "Checking…"/"unavailable" status text
+ * live in the caller instead (see WritingWorkspace), so they stay visually
+ * grouped with its other action buttons rather than in a separate row with
+ * their own color scheme. */
 export interface GrammarCheckCopy {
-  toggleLabel: string;
-  toggleAriaLabel: (values: { enabled: boolean }) => string;
-  statusOn: string;
-  statusOff: string;
-  checking: string;
-  unavailable: string;
   applyButton: string;
   closeButtonAriaLabel: string;
   noReplacementHint: string;
@@ -43,10 +44,12 @@ interface GrammarCheckedEditorProps {
   className: string;
   copy: GrammarCheckCopy;
   enabled: boolean;
-  onToggleEnabled: () => void;
+  /** Mirrors the internal check status out to the caller, which owns the
+   * toggle button and renders "Checking…"/error text next to it. */
+  onStatusChange?: (status: LanguageCheckStatus) => void;
 }
 
-type CheckStatus = "idle" | "checking" | "error";
+type CheckStatus = LanguageCheckStatus;
 
 /**
  * Debounces calls to `/api/language-check` while `text` changes, cancelling
@@ -162,9 +165,12 @@ export function GrammarCheckedEditor({
   className,
   copy,
   enabled,
-  onToggleEnabled,
+  onStatusChange,
 }: GrammarCheckedEditorProps) {
   const { matches, status } = useLanguageCheck(value, enabled && !disabled);
+  useEffect(() => {
+    onStatusChange?.(status);
+  }, [status, onStatusChange]);
   const segments = useMemo(() => buildLanguageCheckSegments(value, matches), [value, matches]);
   // The only matches actually safe to show or apply: `buildLanguageCheckSegments`
   // already dropped whatever was out-of-range for the current `value` (a
@@ -382,40 +388,6 @@ export function GrammarCheckedEditor({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-end gap-3 text-sm">
-        {enabled && status === "checking" && (
-          <span aria-live="polite" className="text-zinc-500 dark:text-zinc-400">
-            {copy.checking}
-          </span>
-        )}
-        {enabled && status === "error" && (
-          <span role="alert" className="text-red-600 dark:text-red-400">
-            {copy.unavailable}
-          </span>
-        )}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={enabled}
-          aria-label={copy.toggleAriaLabel({ enabled })}
-          onClick={onToggleEnabled}
-          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 transition-colors ${
-            enabled
-              ? "border-violet-600 bg-violet-600/10 text-violet-700 dark:border-violet-400 dark:text-violet-300"
-              : "border-black/[.15] text-zinc-600 hover:bg-black/[.04] dark:border-white/[.2] dark:text-zinc-300 dark:hover:bg-white/[.06]"
-          }`}
-        >
-          <span
-            aria-hidden="true"
-            className={`h-2 w-2 rounded-full ${enabled ? "bg-violet-600 dark:bg-violet-400" : "bg-zinc-400 dark:bg-zinc-500"}`}
-          />
-          {copy.toggleLabel}
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">
-            {enabled ? copy.statusOn : copy.statusOff}
-          </span>
-        </button>
-      </div>
-
       <div ref={containerRef} className="relative">
         <div
           ref={overlayRef}

@@ -50,7 +50,8 @@ Self-hosted LanguageTool server (Docker)
   open-source [erikvl87/languagetool](https://github.com/Erikvl87/docker-languagetool)
   image (itself a build of the official
   [languagetool-org/languagetool](https://github.com/languagetool-org/languagetool)
-  server). Language is always `fr`.
+  server), pinned to a specific reviewed release and digest rather than the
+  floating `latest` tag. Language is always `fr`.
 
 ## Running it locally
 
@@ -93,6 +94,59 @@ LANGUAGETOOL_URL="http://languagetool:8010"
 The LanguageTool container should stay on the internal network only —
 there's no reason to publish its port publicly when every request already
 goes through the backend API.
+
+### Exposing LanguageTool to a serverless deployment
+
+This app can also run on a platform like Vercel, which has no way to join
+a private Docker network -- `http://languagetool:8010` is only reachable
+from another container on the same compose network, never from a
+serverless function. If you deploy this way, do **not** publish
+LanguageTool's own port to a public address instead: it has no
+authentication of its own, so anyone who finds that URL could send it
+requests directly, bypassing this app's own auth and rate limiting
+entirely and running up the compute bill on whatever host runs it.
+
+Use the `languagetool-proxy` service in `docker-compose.yml` instead. It's
+a small [Caddy](https://caddyserver.com/) reverse proxy (see the
+`Caddyfile` at the repo root) that requires a
+`Authorization: Bearer <secret>` header matching `LANGUAGETOOL_SHARED_SECRET`
+on every request, and returns a bare 401 -- never forwarding to
+LanguageTool -- for anything else. It terminates real TLS via automatic
+Let's Encrypt certificates, because the bearer secret must never travel in
+clear text -- there is no plain-HTTP mode. It isn't started by a plain
+`docker compose up`; it needs the `public` profile:
+
+1. Point a DNS name you control at this host, e.g.
+   `languagetool.example.com` -- Caddy needs that to request a certificate.
+2. Start it with both required variables set:
+
+   ```sh
+   LANGUAGETOOL_PROXY_HOSTNAME="languagetool.example.com" \
+   LANGUAGETOOL_SHARED_SECRET="$(openssl rand -hex 32)" \
+     docker compose --profile public up -d languagetool languagetool-proxy
+   ```
+
+Publish only `languagetool-proxy`'s ports (`80` and `443`) on whatever
+host runs this -- `80` is required for the ACME HTTP challenge and
+redirects to HTTPS; never publish `languagetool`'s own port. Then, in the
+app's deployment (e.g. Vercel's project environment variables):
+
+```
+LANGUAGETOOL_URL="https://languagetool.example.com"
+LANGUAGETOOL_SHARED_SECRET="<the exact same value>"
+```
+
+`checkFrenchText` (`src/lib/language-tool.ts`) sends that secret as a
+bearer token automatically whenever it's set; it's a no-op for the plain
+local-dev or internal-network setups above, where it should stay unset.
+
+Review the `Caddyfile` (or substitute an equivalent nginx/other proxy
+config) before relying on it in production -- it's a minimal, deliberately
+simple reference, not a hardened default; verified in this repo only with
+Caddy's own `caddy validate` and a live functional check (missing header
+and a wrong secret both get a 401 with no request ever reaching
+LanguageTool; the correct header proxies through), not against every
+possible attack.
 
 ## `POST /api/language-check`
 
@@ -139,6 +193,19 @@ Other behavior:
 - LanguageTool being unreachable or misconfigured returns 502/503 rather
   than ever falling back to a public API.
 
+### Admin observability
+
+Every failure to reach LanguageTool (misconfigured, unreachable, timed out,
+or responding with a non-2xx status) is recorded as a `GRAMMAR_CHECK_PROVIDER_FAILED`
+event in the admin event log (`/admin/logs`, see
+[admin audit log](admin-audit-log.md)), the same mechanism already used for
+Gemini and DeepL/translation failures. A client-cancelled (aborted) request
+is not an error and is never recorded. The event never contains the
+learner's draft text -- only the local user ID, `languagetool` as the
+provider, a fixed failure class (`not_configured`, `transport_error`,
+`upstream_http_error`, or `provider_unavailable`), and the HTTP status
+returned to the client.
+
 ## Testing
 
 - `src/lib/language-tool.test.ts` — mapping LanguageTool's raw response
@@ -156,6 +223,7 @@ Other behavior:
 - `src/lib/language-check-rate-limit.test.ts` — the sliding-window limiter.
 - `src/app/api/language-check/route.test.ts` — the route's auth, validation,
   rate limiting, and error-mapping behavior end to end (with LanguageTool
-  itself mocked).
+  itself mocked), including that failures record a `GRAMMAR_CHECK_PROVIDER_FAILED`
+  admin event and a cancelled request does not.
 
 Run everything with `npm test`.

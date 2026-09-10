@@ -27,6 +27,7 @@ export const ADMIN_EVENT_TYPES = [
   "CORRECTION_PROVIDER_FAILED",
   "EXAMPLE_PROVIDER_FAILED",
   "TRANSLATION_PROVIDER_FAILED",
+  "GRAMMAR_CHECK_PROVIDER_FAILED",
   "AUTH_SESSION_CREATED",
   "AUTH_NETWORK_REVIEW_REQUIRED",
 ] as const;
@@ -45,7 +46,7 @@ export const ADMIN_EVENT_REASON_CODES = [
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
-export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial"] as const;
+export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "languagetool"] as const;
 export const ADMIN_EVENT_QUOTA_WINDOWS = ["minute", "day", "month"] as const;
 export const ADMIN_EVENT_BROWSER_FAMILIES = [
   "Chrome",
@@ -128,6 +129,12 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
     severity: "ERROR",
     module: "ESSAY_SERVICE",
     searchText: "translation generation provider failed",
+    coalesceForMs: 15 * 60_000,
+  },
+  GRAMMAR_CHECK_PROVIDER_FAILED: {
+    severity: "ERROR",
+    module: "ESSAY_SERVICE",
+    searchText: "grammar check spelling languagetool provider failed",
     coalesceForMs: 15 * 60_000,
   },
   AUTH_SESSION_CREATED: {
@@ -329,6 +336,18 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
         isMember(["fallback_circuit_open", "transport_error", "provider_unavailable"] as const, input.reasonCode) &&
+        hasNoAuthenticationContext(input)
+      );
+    case "GRAMMAR_CHECK_PROVIDER_FAILED":
+      return (
+        input.provider === "languagetool" &&
+        input.httpStatus !== undefined &&
+        hasNoQuotaSnapshot(input) &&
+        input.reasonCode !== undefined &&
+        isMember(
+          ["not_configured", "transport_error", "upstream_http_error", "provider_unavailable"] as const,
+          input.reasonCode,
+        ) &&
         hasNoAuthenticationContext(input)
       );
     case "AUTH_SESSION_CREATED":
@@ -715,6 +734,8 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
       return `Sample text generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "TRANSLATION_PROVIDER_FAILED":
       return `Translation generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
+    case "GRAMMAR_CHECK_PROVIDER_FAILED":
+      return `Grammar check failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "AUTH_SESSION_CREATED":
       return `Authenticated session started.${repeat}`;
     case "AUTH_NETWORK_REVIEW_REQUIRED":

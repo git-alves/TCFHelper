@@ -5,24 +5,34 @@
 # in .env, matching .env.example).
 #
 # If you instead run the app itself inside this same Docker network (e.g. a
-# self-hosted production deployment), point LANGUAGETOOL_URL at the internal
-# service name and port instead: http://languagetool:8010.
+# self-hosted deployment), point LANGUAGETOOL_URL at the internal service
+# name and port instead: http://languagetool:8010. That is the ONLY safe way
+# to reach LanguageTool over a network you don't otherwise control -- it has
+# no authentication of its own, so it must never be given a public,
+# unauthenticated address.
+#
+# A serverless deployment (e.g. the app runs on Vercel) *cannot* join this
+# Docker network, so it cannot use that internal-hostname approach. If you
+# need LanguageTool reachable from a deployment like that, use the
+# `languagetool-proxy` service below instead of publishing `languagetool`'s
+# own port -- see the "Exposing LanguageTool to a serverless deployment"
+# section in docs/french-grammar-check.md before using it.
 services:
   languagetool:
     # Erikvl87/docker-languagetool -- a community-maintained, actively
     # updated build of the official open-source LanguageTool server
     # (https://github.com/languagetool-org/languagetool). Free and
     # self-hosted; never the public api.languagetool.org.
-    image: erikvl87/languagetool:latest
+    #
+    # Pinned to a specific reviewed release (not the floating `latest` tag,
+    # which can change what gets deployed without review) by both version
+    # and digest. Bump deliberately: check the release notes at
+    # https://github.com/Erikvl87/docker-languagetool/releases, then update
+    # both the tag and the digest together.
+    image: erikvl87/languagetool:6.8@sha256:ef8fa12cbd485166c9ceeb7139d76d56d07707a624da6bb1fc1fbb5411750527
     restart: unless-stopped
     # Bound to loopback only -- this is for the app on the same host to
     # reach during local development, never for a public interface.
-    # LanguageTool has no auth of its own, so it must stay unreachable from
-    # outside this machine; the backend API is the only intended caller. A
-    # production deployment should typically drop this `ports` block
-    # entirely and rely on the internal Docker network (see the note above
-    # about LANGUAGETOOL_URL=http://languagetool:8010) instead of publishing
-    # any port at all.
     ports:
       - "127.0.0.1:8010:8010"
     environment:
@@ -33,3 +43,43 @@ services:
       Java_Xmx: "512m"
     # The image ships its own HEALTHCHECK (a real /v2/check request), so
     # none is redeclared here.
+
+  # Optional: an authenticating reverse proxy in front of LanguageTool, for
+  # deployments (e.g. Vercel) that cannot reach the `languagetool` service
+  # above over a private Docker network and would otherwise need to publish
+  # its port directly to the public internet -- which LanguageTool cannot
+  # protect itself, since it has no authentication of its own. This is the
+  # only piece of the stack a serverless deployment's backend ever talks to;
+  # `languagetool` itself is still never published outside this compose
+  # network. Not started by a plain `docker compose up`; requires the
+  # `public` profile: `docker compose --profile public up -d`.
+  languagetool-proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles: ["public"]
+    depends_on:
+      - languagetool
+    # 80 is required for Caddy's ACME HTTP challenge (and it redirects to
+    # HTTPS); 443 serves the actual proxied traffic. There is no HTTP-only
+    # mode -- see Caddyfile for why.
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Required -- a real DNS name already pointing at this host, e.g.
+      # languagetool.example.com. Caddy substitutes it into the Caddyfile
+      # below and requests a Let's Encrypt certificate for it automatically.
+      LANGUAGETOOL_PROXY_HOSTNAME: ${LANGUAGETOOL_PROXY_HOSTNAME:?Set LANGUAGETOOL_PROXY_HOSTNAME to a DNS name pointing at this host before starting languagetool-proxy}
+      # Required -- Caddy substitutes this into the Caddyfile below. Generate
+      # a long random value (e.g. `openssl rand -hex 32`) and set the exact
+      # same value as LANGUAGETOOL_SHARED_SECRET in the app's own
+      # environment (see .env.example), never committed anywhere.
+      LANGUAGETOOL_SHARED_SECRET: ${LANGUAGETOOL_SHARED_SECRET:?Set LANGUAGETOOL_SHARED_SECRET before starting languagetool-proxy}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Persists the ACME account key and issued certificate so restarts
+      # don't re-request one and risk Let's Encrypt's rate limits.
+      - languagetool-proxy-data:/data
+
+volumes:
+  languagetool-proxy-data:

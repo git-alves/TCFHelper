@@ -26,6 +26,13 @@ export interface LanguageCheckMatch {
 /** LanguageTool has no French server configured, or none at all. */
 export class LanguageToolNotConfiguredError extends Error {}
 
+/** The LanguageTool server itself responded with a non-2xx status. */
+export class LanguageToolRequestError extends Error {
+  constructor(public readonly status: number) {
+    super(`LanguageTool request failed (${status})`);
+  }
+}
+
 // LanguageTool can attach dozens of dictionary-adjacent spelling guesses to
 // a single match (see the real "tres" -> "très" response, which lists 40+
 // replacements). The editor only ever needs a handful to offer as
@@ -97,6 +104,16 @@ export function mapLanguageToolMatches(payload: unknown): LanguageCheckMatch[] {
  * the public LanguageTool API -- if `LANGUAGETOOL_URL` is unset, the feature
  * is disabled rather than silently using a third-party service in
  * production.
+ *
+ * `LANGUAGETOOL_SHARED_SECRET` is optional and only needed when
+ * `LANGUAGETOOL_URL` points at the authenticating `languagetool-proxy`
+ * service in docker-compose.yml, rather than at LanguageTool directly over
+ * a private network -- see "Exposing LanguageTool to a serverless
+ * deployment" in docs/french-grammar-check.md. LanguageTool itself has no
+ * authentication, so a deployment that cannot reach it over a private
+ * network (e.g. this app running on Vercel) must never be given a bare
+ * public LanguageTool URL; this secret is what the proxy in front of it
+ * checks instead.
  */
 export async function checkFrenchText(text: string, signal: AbortSignal): Promise<LanguageCheckMatch[]> {
   const languageToolUrl = process.env.LANGUAGETOOL_URL?.trim();
@@ -104,16 +121,21 @@ export async function checkFrenchText(text: string, signal: AbortSignal): Promis
     throw new LanguageToolNotConfiguredError("LANGUAGETOOL_URL is not configured.");
   }
 
+  const sharedSecret = process.env.LANGUAGETOOL_SHARED_SECRET?.trim();
+
   const response = await fetch(`${languageToolUrl.replace(/\/+$/, "")}/v2/check`, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(sharedSecret ? { Authorization: `Bearer ${sharedSecret}` } : {}),
+    },
     body: new URLSearchParams({ text, language: "fr" }),
     signal,
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`LanguageTool request failed (${response.status})`);
+    throw new LanguageToolRequestError(response.status);
   }
 
   const payload: unknown = await response.json().catch(() => null);

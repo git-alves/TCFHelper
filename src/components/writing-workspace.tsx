@@ -16,7 +16,7 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
-import { GrammarCheckedEditor } from "@/components/grammar-checked-editor";
+import { GrammarCheckedEditor, type LanguageCheckStatus } from "@/components/grammar-checked-editor";
 import { ThemedSelect } from "@/components/themed-select";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
@@ -365,6 +365,7 @@ export function WritingWorkspace() {
     getStoredSpellCheckEnabled,
     () => true,
   );
+  const [grammarCheckStatus, setGrammarCheckStatus] = useState<LanguageCheckStatus>("idle");
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
   const [exampleNeedsTopic, setExampleNeedsTopic] = useState(false);
@@ -1665,6 +1666,28 @@ export function WritingWorkspace() {
                   <span aria-hidden="true">⏱ </span>
                   {copy.workspace.timedTask.show}
                 </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
+                  }
+                  aria-pressed={isSpellCheckEnabled}
+                  aria-label={copy.workspace.grammarCheck.toggleAriaLabel({ enabled: isSpellCheckEnabled })}
+                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  {copy.workspace.grammarCheck.toggleLabel}:{" "}
+                  {isSpellCheckEnabled ? copy.workspace.grammarCheck.statusOn : copy.workspace.grammarCheck.statusOff}
+                </button>
+                {isSpellCheckEnabled && grammarCheckStatus === "checking" && (
+                  <span aria-live="polite" className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {copy.workspace.grammarCheck.checking}
+                  </span>
+                )}
+                {isSpellCheckEnabled && grammarCheckStatus === "error" && (
+                  <span role="alert" className="text-sm text-red-600 dark:text-red-400">
+                    {copy.workspace.grammarCheck.unavailable}
+                  </span>
+                )}
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <span
@@ -1863,9 +1886,7 @@ export function WritingWorkspace() {
               className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
               copy={copy.workspace.grammarCheck}
               enabled={isSpellCheckEnabled}
-              onToggleEnabled={() =>
-                storeWritingPreference(SPELL_CHECK_ENABLED_STORAGE_KEY, isSpellCheckEnabled ? "0" : "1")
-              }
+              onStatusChange={setGrammarCheckStatus}
             />
             <div className="flex flex-wrap items-center gap-3">
               <button

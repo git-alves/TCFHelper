@@ -2,8 +2,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
-import { checkFrenchText, LanguageToolNotConfiguredError, type LanguageCheckMatch } from "@/lib/language-tool";
+import {
+  checkFrenchText,
+  LanguageToolNotConfiguredError,
+  LanguageToolRequestError,
+  type LanguageCheckMatch,
+} from "@/lib/language-tool";
 import { isLanguageCheckRateLimited } from "@/lib/language-check-rate-limit";
+import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 const LANGUAGE_CHECK_TIMEOUT_MS = 8_000;
@@ -17,6 +23,18 @@ const requestSchema = z.object({ text: z.string().max(MAX_TEXT_LENGTH) }).strict
 
 function jsonResponse(body: Record<string, unknown>, status = 200, headers: Record<string, string> = {}) {
   return NextResponse.json(body, { status, headers: { ...NO_STORE_HEADERS, ...headers } });
+}
+
+function classifyLanguageCheckFailure(error: unknown): AdminEventReasonCode {
+  if (error instanceof LanguageToolNotConfiguredError) return "not_configured";
+  if (error instanceof LanguageToolRequestError) return "upstream_http_error";
+  if (error instanceof DOMException && error.name === "TimeoutError") return "transport_error";
+  return "provider_unavailable";
+}
+
+function boundedLanguageToolHttpStatus(error: unknown): number | undefined {
+  if (!(error instanceof LanguageToolRequestError)) return undefined;
+  return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599 ? error.status : undefined;
 }
 
 /** Combines the browser's own cancellation with a server-side timeout, the
@@ -105,8 +123,17 @@ export async function POST(request: Request) {
       return jsonResponse({ error: "Language check request was cancelled." }, 499);
     }
 
+    const reasonCode = classifyLanguageCheckFailure(error);
+
     if (error instanceof LanguageToolNotConfiguredError) {
       console.error("LANGUAGETOOL_URL is not configured; language check is disabled.");
+      await recordAdminEvent({
+        eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+        userId: user.id,
+        provider: "languagetool",
+        reasonCode,
+        httpStatus: 503,
+      });
       return jsonResponse(
         { error: "Grammar check is not configured on this server.", code: "LANGUAGE_CHECK_UNAVAILABLE" },
         503,
@@ -114,6 +141,13 @@ export async function POST(request: Request) {
     }
 
     console.error("LanguageTool request failed before a response was received", error);
+    await recordAdminEvent({
+      eventType: "GRAMMAR_CHECK_PROVIDER_FAILED",
+      userId: user.id,
+      provider: "languagetool",
+      reasonCode,
+      httpStatus: boundedLanguageToolHttpStatus(error) ?? 502,
+    });
     return jsonResponse(
       { error: "Grammar check is temporarily unavailable.", code: "LANGUAGE_CHECK_UNAVAILABLE" },
       502,
