@@ -54,8 +54,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     beforeAnalysisLabel: "What you're missing",
     beforeAnalysis: [
       { label: "Vocabulary", value: "basic" },
-      { label: "Structure", value: "repetitive" },
-      { label: "Linking", value: "limited" },
+      { label: "Coherence", value: "weak, repetitive" },
       { label: "Register", value: "acceptable" },
     ],
     afterAnalysisLabel: "Why it's better",
@@ -103,8 +102,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     beforeAnalysisLabel: "Ce qui manque",
     beforeAnalysis: [
       { label: "Vocabulaire", value: "basique" },
-      { label: "Structure", value: "répétitive" },
-      { label: "Connecteurs", value: "limités" },
+      { label: "Cohérence", value: "faible, répétitive" },
       { label: "Registre", value: "acceptable" },
     ],
     afterAnalysisLabel: "Pourquoi c’est mieux",
@@ -148,8 +146,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     beforeAnalysisLabel: "Lo que falta",
     beforeAnalysis: [
       { label: "Vocabulario", value: "básico" },
-      { label: "Estructura", value: "repetitiva" },
-      { label: "Conectores", value: "limitados" },
+      { label: "Coherencia", value: "débil, repetitiva" },
       { label: "Registro", value: "aceptable" },
     ],
     afterAnalysisLabel: "Por qué es mejor",
@@ -193,8 +190,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     beforeAnalysisLabel: "O que está faltando",
     beforeAnalysis: [
       { label: "Vocabulário", value: "básico" },
-      { label: "Estrutura", value: "repetitiva" },
-      { label: "Conectores", value: "limitados" },
+      { label: "Coerência", value: "fraca, repetitiva" },
       { label: "Registro", value: "aceitável" },
     ],
     afterAnalysisLabel: "Por que é melhor",
