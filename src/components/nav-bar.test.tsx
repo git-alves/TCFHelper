@@ -1,8 +1,12 @@
+// @vitest-environment happy-dom
+import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const { pushMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hoisted(() => ({
+const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
+  prefetchMock: vi.fn(),
   requestNavigationMock: vi.fn(() => false),
   pathnameMock: vi.fn(() => "/practice"),
   setLocaleMock: vi.fn(),
@@ -10,7 +14,7 @@ const { pushMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hois
 
 vi.mock("next/navigation", () => ({
   usePathname: pathnameMock,
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, prefetch: prefetchMock }),
 }));
 
 vi.mock("@clerk/nextjs", () => {
@@ -96,17 +100,40 @@ describe("NavBar", () => {
     expect(markup).not.toContain("rounded-full border");
   });
 
-  it("offers the persisted language picker on the public landing page", () => {
+  it("offers the persisted language picker on the public landing page, with a flag per language", () => {
     pathnameMock.mockReturnValue("/");
 
-    const markup = renderToStaticMarkup(<NavBar />);
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<NavBar />);
+    });
 
-    expect(markup).toContain('id="landing-language"');
-    expect(markup).toContain('value="en"');
-    expect(markup).toContain(">English<");
-    expect(markup).toContain(">Français<");
-    expect(markup).toContain(">Español<");
-    expect(markup).toContain(">Português<");
+    const trigger = container.querySelector<HTMLButtonElement>("#landing-language");
+    expect(trigger).not.toBeNull();
+    expect(trigger!.getAttribute("aria-label")).toBe("Language");
+    // Defaults to English until the learner picks something else.
+    expect(trigger!.textContent).toContain("English");
+
+    act(() => {
+      trigger!.click();
+    });
+
+    const optionButtons = Array.from(container.querySelectorAll('[role="option"]'));
+    expect(optionButtons.map((button) => button.textContent)).toEqual([
+      "English",
+      "Français",
+      "Español",
+      "Português",
+    ]);
+    // Each language option carries its own flag icon, not shared text-only labels.
+    expect(container.querySelectorAll('[role="option"] svg')).toHaveLength(4);
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
   });
 
   it("moves Settings into the account menu instead of a standalone icon", () => {

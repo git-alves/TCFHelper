@@ -6,6 +6,8 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
+import { LocaleFlag } from "@/components/locale-flag";
+import { ThemedSelect } from "@/components/themed-select";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { APP_LOCALES, APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
@@ -108,6 +110,13 @@ function AccountIcon() {
   );
 }
 
+const LANDING_LANGUAGE_BUTTON_CLASS =
+  "flex w-full items-center justify-between gap-2 rounded-lg border border-white/[.18] bg-transparent px-2 py-1.5 text-left text-sm text-zinc-200 outline-none transition-colors hover:border-white/[.35] focus:border-white focus:ring-2 focus:ring-white/30";
+const LANDING_LANGUAGE_LIST_CLASS =
+  "absolute right-0 z-20 mt-1 flex w-36 flex-col gap-0.5 overflow-auto rounded-lg border border-white/[.18] bg-[#080808] p-1 shadow-lg";
+const LANDING_LANGUAGE_OPTION_CLASS =
+  "w-full rounded-lg px-2 py-1.5 text-left text-sm text-zinc-200 hover:bg-white/[.08]";
+
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
@@ -204,23 +213,20 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           {isHome && (
-            <label className="sr-only" htmlFor="landing-language">
-              Language
-            </label>
-          )}
-          {isHome && (
-            <select
+            <ThemedSelect<AppLocale>
               id="landing-language"
+              ariaLabel={copy.settings.languageHeading}
               value={locale}
-              onChange={(event) => setLocale(event.target.value as AppLocale)}
-              className="rounded-lg border border-white/[.18] bg-transparent px-2 py-1.5 text-sm text-zinc-200 outline-none transition-colors hover:border-white/[.35] focus:border-white focus:ring-2 focus:ring-white/30"
-            >
-              {APP_LOCALES.map((code) => (
-                <option key={code} value={code} className="bg-[#080808] text-white">
-                  {APP_LOCALE_LABELS[code]}
-                </option>
-              ))}
-            </select>
+              onChange={setLocale}
+              options={APP_LOCALES.map((code) => ({
+                value: code,
+                label: APP_LOCALE_LABELS[code],
+                icon: <LocaleFlag locale={code} />,
+              }))}
+              buttonClassName={LANDING_LANGUAGE_BUTTON_CLASS}
+              listClassName={LANDING_LANGUAGE_LIST_CLASS}
+              optionClassName={LANDING_LANGUAGE_OPTION_CLASS}
+            />
           )}
           <Show when="signed-in">
             <>
