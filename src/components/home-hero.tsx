@@ -13,17 +13,21 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const copy = useAppCopy();
 
   return (
-    <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-24 text-center">
-      <h1 className="max-w-xl text-4xl font-semibold tracking-tight">{copy.home.title}</h1>
-      <p className="max-w-md text-lg text-zinc-600 dark:text-zinc-400">
-        {copy.home.description}
-      </p>
-      <Link
-        href={isAuthenticated ? "/tasks" : "/signup"}
-        className="rounded-full bg-foreground px-6 py-3 text-base font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-      >
-        {isAuthenticated ? copy.home.startATask : copy.home.getStarted}
-      </Link>
+    <main className="flex flex-1 items-center justify-center bg-[#080808] px-6 py-20 text-center text-[#f5f5f5] sm:px-10">
+      <section className="flex w-full max-w-2xl flex-col items-center">
+        <h1 className="max-w-xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-5xl">
+          {copy.home.title}
+        </h1>
+        <p className="mt-6 max-w-md text-base leading-7 text-zinc-400 sm:text-lg">
+          {copy.home.description}
+        </p>
+        <Link
+          href={isAuthenticated ? "/tasks" : "/signup"}
+          className="mt-7 rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white"
+        >
+          {isAuthenticated ? copy.home.startATask : copy.home.getStarted}
+        </Link>
+      </section>
     </main>
   );
 }

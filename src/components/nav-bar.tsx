@@ -154,6 +154,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   }
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
+  const isHome = realPathname === "/";
 
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
@@ -188,7 +189,13 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   return (
-    <header className="border-b border-black/[.08] dark:border-white/[.145]">
+    <header
+      className={
+        isHome
+          ? "border-b border-white/[.14] bg-[#080808] text-[#f5f5f5]"
+          : "border-b border-black/[.08] dark:border-white/[.145]"
+      }
+    >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="font-semibold tracking-tight">
           MyTCFLab
@@ -229,7 +236,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-dashboard"
                     onClick={guardedNavigationHandler("/dashboard")}
                     aria-current={realPathname === "/dashboard" ? "page" : undefined}
-                    className={realPathname === "/dashboard" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                    className={`${realPathname === "/dashboard" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
                   >
                     {copy.nav.dashboard}
                   </Link>
@@ -238,7 +245,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-practice"
                     onClick={guardedNavigationHandler("/practice")}
                     aria-current={realPathname === "/practice" ? "page" : undefined}
-                    className={realPathname === "/practice" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                    className={`${realPathname === "/practice" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
                   >
                     {copy.nav.practice}
                   </Link>
@@ -248,7 +255,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                 href="/tasks"
                 data-walkthrough="nav-tasks"
                 aria-current={onTasks ? "page" : undefined}
-                className={onTasks ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                className={`${onTasks ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
               >
                 {copy.nav.tasks}
               </Link>
@@ -326,7 +333,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           </Show>
           <Show when="signed-out">
             <SignInButton mode="modal">
-              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
+              <button
+                type="button"
+                title={copy.nav.logIn}
+                aria-label={copy.nav.logIn}
+                className={`${ICON_BUTTON_CLASS}${isHome ? " !text-zinc-200 hover:!bg-white/[.08] hover:!text-white" : ""}`}
+              >
                 <AccountIcon />
               </button>
             </SignInButton>
