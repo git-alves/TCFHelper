@@ -6,6 +6,32 @@ import { EditorDemo } from "@/components/editor-demo";
 import { LANDING_PAGE_COPY } from "@/lib/landing-page-copy";
 import { useReveal } from "@/lib/use-reveal";
 
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="15" height="15" rx="3.5" />
+      <path strokeLinecap="round" strokeLinejoin="round" d="M11.5 17v-5.5h1.8l.3-2.3h-2.1V7.8c0-.7.2-1.1 1.2-1.1h1V4.6c-.2 0-.9-.1-1.7-.1-1.7 0-2.9 1-2.9 2.9v1.8H7.5v2.3h1.6V17" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-5 w-5" aria-hidden="true">
+      <rect x="2.5" y="2.5" width="15" height="15" rx="4.5" />
+      <circle cx="10" cy="10" r="3.5" />
+      <circle cx="14.2" cy="5.8" r="0.9" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// Placeholder hrefs ("#") -- the real Facebook/Instagram URLs will be filled
+// in once the accounts exist.
+const SOCIAL_LINKS = [
+  { label: "Facebook", href: "#", Icon: FacebookIcon },
+  { label: "Instagram", href: "#", Icon: InstagramIcon },
+];
+
 interface HomeHeroProps {
   isAuthenticated: boolean;
 }
@@ -28,7 +54,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const destination = isAuthenticated ? "/tasks" : "/signup";
 
   const { ref: proofRef, visible: proofVisible } = useReveal<HTMLElement>();
-  const { ref: problemRef, visible: problemVisible } = useReveal<HTMLElement>();
   const { ref: whyRef, visible: whyVisible } = useReveal<HTMLElement>();
   const { ref: stepsRef, visible: stepsVisible } = useReveal<HTMLElement>();
   const { ref: methodRef, visible: methodVisible } = useReveal<HTMLElement>();
@@ -48,10 +73,14 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
       <section
         ref={proofRef}
         className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(proofVisible)}`}
-        aria-labelledby="proof-heading"
+        aria-labelledby="problem-heading"
       >
-        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h2 id="proof-heading" className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.proofTitle}</h2>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-sm font-medium text-violet-300">{copy.problemEyebrow}</p>
+          <h2 id="problem-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.problemTitle}</h2>
+          <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
+          <p className="mt-10 text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h3 id="proof-heading" className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">{copy.proofTitle}</h3>
+          <div className="mt-8 grid gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6">
               <p className="text-sm font-medium text-zinc-400">{copy.before}</p>
               <p className="mt-5 text-lg leading-8 text-zinc-300">{copy.beforeText}</p>
@@ -80,14 +109,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
             </article>
           </div>
         </div>
-      </section>
-
-      <section
-        ref={problemRef}
-        className={`mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(problemVisible)}`}
-        aria-labelledby="problem-heading"
-      >
-        <p className="text-sm font-medium text-violet-300">{copy.problemEyebrow}</p><h2 id="problem-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.problemTitle}</h2><p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
       </section>
 
       <section
@@ -132,7 +153,16 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <Link href={destination} className="mt-8 inline-block rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
       </section>
 
-      <footer className="border-t border-white/[.12] px-6 py-8 text-center text-sm text-zinc-500">{copy.footer}</footer>
+      <footer className="border-t border-white/[.12] px-6 py-8 text-center text-sm text-zinc-500">
+        <div className="flex items-center justify-center gap-4">
+          {SOCIAL_LINKS.map(({ label, href, Icon }) => (
+            <a key={label} href={href} aria-label={label} className="text-zinc-500 transition-colors hover:text-zinc-300">
+              <Icon />
+            </a>
+          ))}
+        </div>
+        <p className="mt-4">{copy.footer}</p>
+      </footer>
     </main>
   );
 }
