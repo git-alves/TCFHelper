@@ -11,6 +11,7 @@ import {
 import type { AppCopy, MethodologyBlock } from "@/lib/app-copy";
 import { APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { CEFR_LEVELS, type EssayFeedback } from "@/lib/essay-feedback";
+import { RADAR_AXIS_COLORS, RADAR_ANGLES, RADAR_CENTER, getRadarPoint, getRadarPolygon } from "@/lib/radar-chart";
 import type { TaskDefinition } from "@/lib/tcf-tasks";
 
 export type CorrectionModalState = "loading" | "result" | "error";
@@ -47,11 +48,6 @@ type TabId = "overview" | "comparison" | "comments" | "methodology";
 
 const FOCUSABLE_SELECTOR =
   'a[href], button:not([disabled]), summary, textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-const RADAR_CENTER = 100;
-const RADAR_RADIUS = 70;
-const RADAR_ANGLES = [-90, 30, 150];
-const RADAR_AXIS_COLORS = ["#7c3aed", "#0284c7", "#c026d3"];
 
 type CorrectionModalCopy = AppCopy["workspace"]["correctionModal"];
 
@@ -199,24 +195,6 @@ function MethodologyPanel({ blocks }: { blocks: MethodologyBlock[] }) {
       })}
     </div>
   );
-}
-
-function getRadarPoint(score: number, index: number) {
-  const angle = (RADAR_ANGLES[index] * Math.PI) / 180;
-  const radius = (Math.max(0, Math.min(100, score)) / 100) * RADAR_RADIUS;
-  return {
-    x: RADAR_CENTER + Math.cos(angle) * radius,
-    y: RADAR_CENTER + Math.sin(angle) * radius,
-  };
-}
-
-function getRadarPolygon(scores: number[]) {
-  return scores
-    .map((score, index) => {
-      const point = getRadarPoint(score, index);
-      return `${point.x},${point.y}`;
-    })
-    .join(" ");
 }
 
 function createPrintDocument({
