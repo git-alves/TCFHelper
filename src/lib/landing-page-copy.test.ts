@@ -12,8 +12,11 @@ describe("landing page copy", () => {
       expect(copy.demoTaskPrompt).not.toHaveLength(0);
       expect(copy.beforeText).not.toHaveLength(0);
       expect(copy.afterText).not.toHaveLength(0);
-      expect(copy.beforeAnalysis).toHaveLength(4);
+      // Before/after must pair up 1:1 so each row reads as a direct
+      // comparison rather than two independent, differently-sized lists.
+      expect(copy.beforeAnalysis).toHaveLength(3);
       expect(copy.afterAnalysis).toHaveLength(3);
+      expect(copy.beforeAnalysis.map((item) => item.label)).toEqual(copy.afterAnalysis.map((item) => item.label));
       expect(copy.whyItems).toHaveLength(4);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
