@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
-import { useAppCopy } from "@/components/app-locale-provider";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
+import { APP_LOCALES, APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
 
 // Sized for Clerk's UserButton menu rows (16px), not the larger standalone
@@ -120,6 +121,7 @@ const ACTIVE_NAV_LINK_CLASS =
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
+  const { locale, setLocale } = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
@@ -201,6 +203,25 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           MyTCFLab
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
+          {isHome && (
+            <label className="sr-only" htmlFor="landing-language">
+              Language
+            </label>
+          )}
+          {isHome && (
+            <select
+              id="landing-language"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as AppLocale)}
+              className="rounded-lg border border-white/[.18] bg-transparent px-2 py-1.5 text-sm text-zinc-200 outline-none transition-colors hover:border-white/[.35] focus:border-white focus:ring-2 focus:ring-white/30"
+            >
+              {APP_LOCALES.map((code) => (
+                <option key={code} value={code} className="bg-[#080808] text-white">
+                  {APP_LOCALE_LABELS[code]}
+                </option>
+              ))}
+            </select>
+          )}
           <Show when="signed-in">
             <>
               {/* Keep the three main destinations in one stable order. The
