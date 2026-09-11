@@ -33,6 +33,11 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{copy.skills.map((skill) => <article key={skill.title} className="rounded-2xl border border-white/[.12] p-5"><h3 className="font-semibold">{skill.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{skill.description}</p></article>)}</div>
       </section>
 
+      <section className="mx-auto max-w-5xl px-6 py-20 sm:px-10" aria-labelledby="why-heading">
+        <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
+        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
+      </section>
+
       <section className="bg-white/[.035] px-6 py-20 sm:px-10" aria-labelledby="steps-heading">
         <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol></div>
       </section>

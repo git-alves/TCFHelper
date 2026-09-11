@@ -15,6 +15,9 @@ type LandingCopy = {
   problemTitle: string;
   problemDescription: string;
   skills: { title: string; description: string }[];
+  whyEyebrow: string;
+  whyTitle: string;
+  whyItems: string[];
   stepsEyebrow: string;
   stepsTitle: string;
   steps: { title: string; description: string }[];
@@ -51,6 +54,17 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { title: "Grammar", description: "Identify errors that hinder your expression." },
       { title: "Vocabulary", description: "Find more precise, natural ways to say what you mean." },
       { title: "Coherence", description: "Connect ideas more effectively." },
+    ],
+    whyEyebrow: "Built specifically for TCF Writing",
+    whyTitle: "Not just French correction. TCF-focused practice.",
+    whyItems: [
+      "TCF Tasks 1, 2 & 3",
+      "Task-specific requirements",
+      "Timed practice",
+      "Detailed correction",
+      "Original vs corrected response",
+      "Grammar & vocabulary feedback",
+      "Progressive improvement",
     ],
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
@@ -94,6 +108,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
     problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
     skills: [{ title: "Structure", description: "Organisez vos idées clairement et de façon cohérente." }, { title: "Grammaire", description: "Repérez les erreurs qui gênent votre expression." }, { title: "Vocabulaire", description: "Trouvez des formulations plus précises et naturelles." }, { title: "Cohérence", description: "Reliez vos idées plus efficacement." }],
+    whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
+    whyTitle: "Pas seulement de la correction de français. Un entraînement axé sur le TCF.",
+    whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Correction détaillée", "Réponse initiale et réponse corrigée", "Retours sur la grammaire et le vocabulaire", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
     steps: [{ title: "Choisissez une tâche", description: "Travaillez sur un sujet de type TCF ou ajoutez le vôtre." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Relisez et améliorez", description: "Utilisez des retours ciblés pour savoir quoi réviser ensuite." }],
@@ -124,6 +141,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
     problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
     skills: [{ title: "Estructura", description: "Organiza tus ideas de forma clara y coherente." }, { title: "Gramática", description: "Identifica los errores que dificultan tu expresión." }, { title: "Vocabulario", description: "Encuentra formas más precisas y naturales de expresarte." }, { title: "Coherencia", description: "Conecta tus ideas con más eficacia." }],
+    whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
+    whyTitle: "No es solo corrección de francés. Es práctica enfocada en el TCF.",
+    whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Corrección detallada", "Respuesta original y respuesta corregida", "Comentarios de gramática y vocabulario", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
     steps: [{ title: "Elige una tarea", description: "Trabaja con una consigna tipo TCF o añade la tuya." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Revisa y mejora", description: "Usa comentarios específicos para entender qué revisar después." }],
@@ -154,6 +174,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
     problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",
     skills: [{ title: "Estrutura", description: "Organize suas ideias com clareza e coerência." }, { title: "Gramática", description: "Identifique erros que prejudicam sua expressão." }, { title: "Vocabulário", description: "Encontre formas mais precisas e naturais de se expressar." }, { title: "Coerência", description: "Conecte suas ideias de forma mais eficaz." }],
+    whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
+    whyTitle: "Não é apenas correção de francês. É prática focada no TCF.",
+    whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Correção detalhada", "Resposta original e resposta corrigida", "Feedback de gramática e vocabulário", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",
     steps: [{ title: "Escolha uma tarefa", description: "Trabalhe com um tema no formato TCF ou escreva o seu." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Revise e melhore", description: "Use comentários específicos para entender o que revisar a seguir." }],

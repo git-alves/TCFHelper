@@ -11,6 +11,7 @@ describe("landing page copy", () => {
       expect(copy.beforeText).not.toHaveLength(0);
       expect(copy.afterText).not.toHaveLength(0);
       expect(copy.skills).toHaveLength(4);
+      expect(copy.whyItems).toHaveLength(7);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
       expect(copy.faqs).toHaveLength(7);
