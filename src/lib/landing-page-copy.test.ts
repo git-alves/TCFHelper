@@ -8,9 +8,16 @@ describe("landing page copy", () => {
       const copy = LANDING_PAGE_COPY[locale];
 
       expect(copy.title).not.toHaveLength(0);
+      expect(copy.demoBadge).not.toHaveLength(0);
+      expect(copy.demoWritingStatus).not.toHaveLength(0);
+      expect(copy.demoCorrectingStatus).not.toHaveLength(0);
+      expect(copy.demoCorrectedStatus).not.toHaveLength(0);
       expect(copy.beforeText).not.toHaveLength(0);
       expect(copy.afterText).not.toHaveLength(0);
+      expect(copy.beforeAnalysis).toHaveLength(4);
+      expect(copy.afterAnalysis).toHaveLength(3);
       expect(copy.skills).toHaveLength(4);
+      expect(copy.whyItems).toHaveLength(7);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
       expect(copy.faqs).toHaveLength(7);

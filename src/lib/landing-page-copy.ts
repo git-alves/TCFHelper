@@ -5,16 +5,27 @@ type LandingCopy = {
   title: string;
   description: string;
   primaryAction: string;
+  demoBadge: string;
+  demoWritingStatus: string;
+  demoCorrectingStatus: string;
+  demoCorrectedStatus: string;
   proofEyebrow: string;
   proofTitle: string;
   before: string;
   after: string;
   beforeText: string;
   afterText: string;
+  beforeAnalysisLabel: string;
+  beforeAnalysis: { label: string; value: string }[];
+  afterAnalysisLabel: string;
+  afterAnalysis: { label: string; value: string }[];
   problemEyebrow: string;
   problemTitle: string;
   problemDescription: string;
   skills: { title: string; description: string }[];
+  whyEyebrow: string;
+  whyTitle: string;
+  whyItems: string[];
   stepsEyebrow: string;
   stepsTitle: string;
   steps: { title: string; description: string }[];
@@ -34,15 +45,32 @@ type LandingCopy = {
 export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   en: {
     eyebrow: "TCF written expression practice",
-    title: "Write with more clarity for the TCF.",
-    description: "Practise Tasks 1, 2, and 3, then turn detailed feedback into your next, better response.",
+    title: "Build the writing skills you need for B2 on the TCF.",
+    description: "Practice TCF Writing Tasks 1, 2 and 3, get detailed feedback, and learn exactly what to improve in your next response.",
     primaryAction: "Access the tool",
+    demoBadge: "Live preview",
+    demoWritingStatus: "Writing…",
+    demoCorrectingStatus: "Correcting…",
+    demoCorrectedStatus: "Corrected",
     proofEyebrow: "From draft to clearer expression",
     proofTitle: "See what a more precise response can sound like.",
     before: "Before",
     after: "After",
-    beforeText: "I think social media is important because people can easily communicate with their friends and also discover information.",
-    afterText: "In my opinion, social media plays an important role in our daily lives, as it allows us to stay in touch with loved ones while facilitating access to information.",
+    beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
+    afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "What you're missing",
+    beforeAnalysis: [
+      { label: "Vocabulary", value: "basic" },
+      { label: "Structure", value: "repetitive" },
+      { label: "Linking", value: "limited" },
+      { label: "Register", value: "acceptable" },
+    ],
+    afterAnalysisLabel: "Why it's better",
+    afterAnalysis: [
+      { label: "Vocabulary", value: "more precise" },
+      { label: "Coherence", value: "stronger connection" },
+      { label: "Register", value: "more appropriate" },
+    ],
     problemEyebrow: "More than spell check",
     problemTitle: "Writing in French is difficult. Writing for the TCF is even harder.",
     problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task.",
@@ -52,12 +80,23 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { title: "Vocabulary", description: "Find more precise, natural ways to say what you mean." },
       { title: "Coherence", description: "Connect ideas more effectively." },
     ],
+    whyEyebrow: "Built specifically for TCF Writing",
+    whyTitle: "Not just French correction. TCF-focused practice.",
+    whyItems: [
+      "TCF Tasks 1, 2 & 3",
+      "Task-specific requirements",
+      "Timed practice",
+      "Detailed correction",
+      "Original vs corrected response",
+      "Grammar & vocabulary feedback",
+      "Progressive improvement",
+    ],
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
     steps: [
-      { title: "Choose a task", description: "Work on a TCF-style prompt or bring your own." },
+      { title: "Train or simulate a task", description: "Practise one skill in Train, or write a full response in Simulate." },
       { title: "Write your response", description: "Draft at your pace with the task requirements in view." },
-      { title: "Review and improve", description: "Use focused feedback to understand what to revise next." },
+      { title: "Track your progress", description: "Review corrected responses and watch your estimated CEFR level on your Dashboard." },
     ],
     methodEyebrow: "Feedback methodology",
     methodTitle: "Every correction should tell you what to work on next.",
@@ -81,22 +120,42 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   fr: {
     eyebrow: "Préparation à l’expression écrite du TCF",
-    title: "Écrivez avec plus de clarté pour le TCF.",
-    description: "Entraînez-vous aux tâches 1, 2 et 3, puis transformez chaque retour en une meilleure réponse.",
+    title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
+    description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
+    demoBadge: "Aperçu en direct",
+    demoWritingStatus: "Rédaction…",
+    demoCorrectingStatus: "Correction en cours…",
+    demoCorrectedStatus: "Corrigé",
     proofEyebrow: "Du brouillon à une expression plus claire",
     proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
     before: "Avant",
     after: "Après",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
     afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "Ce qui manque",
+    beforeAnalysis: [
+      { label: "Vocabulaire", value: "basique" },
+      { label: "Structure", value: "répétitive" },
+      { label: "Connecteurs", value: "limités" },
+      { label: "Registre", value: "acceptable" },
+    ],
+    afterAnalysisLabel: "Pourquoi c’est mieux",
+    afterAnalysis: [
+      { label: "Vocabulaire", value: "plus précis" },
+      { label: "Cohérence", value: "lien plus solide" },
+      { label: "Registre", value: "plus approprié" },
+    ],
     problemEyebrow: "Bien plus qu’un correcteur",
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
     problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
     skills: [{ title: "Structure", description: "Organisez vos idées clairement et de façon cohérente." }, { title: "Grammaire", description: "Repérez les erreurs qui gênent votre expression." }, { title: "Vocabulaire", description: "Trouvez des formulations plus précises et naturelles." }, { title: "Cohérence", description: "Reliez vos idées plus efficacement." }],
+    whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
+    whyTitle: "Pas seulement de la correction de français. Un entraînement axé sur le TCF.",
+    whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Correction détaillée", "Réponse initiale et réponse corrigée", "Retours sur la grammaire et le vocabulaire", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
-    steps: [{ title: "Choisissez une tâche", description: "Travaillez sur un sujet de type TCF ou ajoutez le vôtre." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Relisez et améliorez", description: "Utilisez des retours ciblés pour savoir quoi réviser ensuite." }],
+    steps: [{ title: "Entraînez-vous ou simulez une tâche", description: "Travaillez une compétence dans Entraînement, ou rédigez une réponse complète dans Simulation." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Suivez votre progression", description: "Consultez vos réponses corrigées et votre niveau CECRL estimé sur votre tableau de bord." }],
     methodEyebrow: "Méthode de retour",
     methodTitle: "Chaque correction doit vous indiquer quoi travailler ensuite.",
     methodDescription: "Les retours sont organisés pour vous aider à comprendre votre texte, et non simplement à signaler ce qui ne va pas.",
@@ -111,22 +170,42 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   es: {
     eyebrow: "Práctica de expresión escrita del TCF",
-    title: "Escribe con más claridad para el TCF.",
-    description: "Practica las tareas 1, 2 y 3 y convierte cada comentario en una respuesta mejor.",
+    title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
+    description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
+    demoBadge: "Vista previa en vivo",
+    demoWritingStatus: "Escribiendo…",
+    demoCorrectingStatus: "Corrigiendo…",
+    demoCorrectedStatus: "Corregido",
     proofEyebrow: "Del borrador a una expresión más clara",
     proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
     before: "Antes",
     after: "Después",
-    beforeText: "Creo que las redes sociales son importantes porque las personas pueden comunicarse fácilmente con sus amigos y descubrir información.",
-    afterText: "En mi opinión, las redes sociales desempeñan un papel importante en nuestra vida diaria, ya que nos permiten mantenernos en contacto con nuestros seres queridos y facilitan el acceso a la información.",
+    beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
+    afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "Lo que falta",
+    beforeAnalysis: [
+      { label: "Vocabulario", value: "básico" },
+      { label: "Estructura", value: "repetitiva" },
+      { label: "Conectores", value: "limitados" },
+      { label: "Registro", value: "aceptable" },
+    ],
+    afterAnalysisLabel: "Por qué es mejor",
+    afterAnalysis: [
+      { label: "Vocabulario", value: "más preciso" },
+      { label: "Coherencia", value: "conexión más sólida" },
+      { label: "Registro", value: "más adecuado" },
+    ],
     problemEyebrow: "Mucho más que un corrector",
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
     problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
     skills: [{ title: "Estructura", description: "Organiza tus ideas de forma clara y coherente." }, { title: "Gramática", description: "Identifica los errores que dificultan tu expresión." }, { title: "Vocabulario", description: "Encuentra formas más precisas y naturales de expresarte." }, { title: "Coherencia", description: "Conecta tus ideas con más eficacia." }],
+    whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
+    whyTitle: "No es solo corrección de francés. Es práctica enfocada en el TCF.",
+    whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Corrección detallada", "Respuesta original y respuesta corregida", "Comentarios de gramática y vocabulario", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
-    steps: [{ title: "Elige una tarea", description: "Trabaja con una consigna tipo TCF o añade la tuya." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Revisa y mejora", description: "Usa comentarios específicos para entender qué revisar después." }],
+    steps: [{ title: "Entrena o simula una tarea", description: "Practica una habilidad en Entrenar, o escribe una respuesta completa en Simular." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Sigue tu progreso", description: "Revisa tus respuestas corregidas y tu nivel MCER estimado en tu panel." }],
     methodEyebrow: "Metodología de comentarios",
     methodTitle: "Cada corrección debe decirte qué trabajar después.",
     methodDescription: "Los comentarios se organizan para que entiendas tu respuesta, no solo para señalar lo que está mal.",
@@ -141,22 +220,42 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   pt: {
     eyebrow: "Prática de expressão escrita para o TCF",
-    title: "Escreva com mais clareza para o TCF.",
-    description: "Pratique as tarefas 1, 2 e 3 e transforme cada comentário em uma resposta melhor.",
+    title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
+    description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
+    demoBadge: "Prévia ao vivo",
+    demoWritingStatus: "Escrevendo…",
+    demoCorrectingStatus: "Corrigindo…",
+    demoCorrectedStatus: "Corrigido",
     proofEyebrow: "Do rascunho a uma expressão mais clara",
     proofTitle: "Veja como uma resposta mais precisa pode soar.",
     before: "Antes",
     after: "Depois",
-    beforeText: "Acho que as redes sociais são importantes porque as pessoas podem se comunicar facilmente com seus amigos e descobrir informações.",
-    afterText: "Na minha opinião, as redes sociais desempenham um papel importante em nossa vida diária, pois nos permitem manter contato com pessoas queridas e facilitam o acesso à informação.",
+    beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
+    afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "O que está faltando",
+    beforeAnalysis: [
+      { label: "Vocabulário", value: "básico" },
+      { label: "Estrutura", value: "repetitiva" },
+      { label: "Conectores", value: "limitados" },
+      { label: "Registro", value: "aceitável" },
+    ],
+    afterAnalysisLabel: "Por que é melhor",
+    afterAnalysis: [
+      { label: "Vocabulário", value: "mais preciso" },
+      { label: "Coerência", value: "conexão mais forte" },
+      { label: "Registro", value: "mais adequado" },
+    ],
     problemEyebrow: "Mais do que um corretor ortográfico",
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
     problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",
     skills: [{ title: "Estrutura", description: "Organize suas ideias com clareza e coerência." }, { title: "Gramática", description: "Identifique erros que prejudicam sua expressão." }, { title: "Vocabulário", description: "Encontre formas mais precisas e naturais de se expressar." }, { title: "Coerência", description: "Conecte suas ideias de forma mais eficaz." }],
+    whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
+    whyTitle: "Não é apenas correção de francês. É prática focada no TCF.",
+    whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Correção detalhada", "Resposta original e resposta corrigida", "Feedback de gramática e vocabulário", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",
-    steps: [{ title: "Escolha uma tarefa", description: "Trabalhe com um tema no formato TCF ou escreva o seu." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Revise e melhore", description: "Use comentários específicos para entender o que revisar a seguir." }],
+    steps: [{ title: "Treine ou simule uma tarefa", description: "Pratique uma habilidade em Treinar, ou escreva uma resposta completa em Simular." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Acompanhe seu progresso", description: "Revise suas respostas corrigidas e seu nível QECR estimado no seu Dashboard." }],
     methodEyebrow: "Metodologia de feedback",
     methodTitle: "Cada correção deve mostrar no que trabalhar em seguida.",
     methodDescription: "O feedback é organizado para ajudar você a compreender sua resposta, não apenas apontar o que está errado.",

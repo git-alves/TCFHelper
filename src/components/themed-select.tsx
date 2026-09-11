@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 // A native <select>'s open popup is rendered by the OS/browser chrome, not
 // the page -- Chromium in particular ignores author CSS (background-color,
@@ -10,6 +10,7 @@ import { useEffect, useId, useRef, useState } from "react";
 export interface ThemedSelectOption<T extends string> {
   value: T;
   label: string;
+  icon?: ReactNode;
 }
 
 type MenuPlacement = "auto" | "above" | "below";
@@ -163,7 +164,10 @@ export function ThemedSelect<T extends string>({
         onClick={toggleMenu}
         className={buttonClassName}
       >
-        <span className="truncate">{selected?.label ?? value}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          {selected?.icon}
+          <span className="truncate">{selected?.label ?? value}</span>
+        </span>
         <span aria-hidden="true" className="shrink-0 text-xs opacity-60">
           ▾
         </span>
@@ -186,8 +190,9 @@ export function ThemedSelect<T extends string>({
                   onChange(option.value);
                   setIsOpen(false);
                 }}
-                className={optionClassName}
+                className={`flex items-center gap-2 ${optionClassName}`}
               >
+                {option.icon}
                 {option.label}
               </button>
             </li>

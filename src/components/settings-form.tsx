@@ -2,6 +2,7 @@
 
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useAppTheme } from "@/components/app-theme-provider";
+import { LocaleFlag } from "@/components/locale-flag";
 import { ThemedSelect } from "@/components/themed-select";
 import { APP_LOCALES, APP_LOCALE_LABELS } from "@/lib/app-locale";
 import type { AppTheme } from "@/lib/app-theme";
@@ -142,7 +143,11 @@ export function SettingsForm({ name, email, avatarUrl }: SettingsFormProps) {
           ariaLabelledBy="language-heading"
           value={locale}
           onChange={setLocale}
-          options={APP_LOCALES.map((code) => ({ value: code, label: APP_LOCALE_LABELS[code] }))}
+          options={APP_LOCALES.map((code) => ({
+            value: code,
+            label: APP_LOCALE_LABELS[code],
+            icon: <LocaleFlag locale={code} />,
+          }))}
           buttonClassName={SELECT_BUTTON_CLASSNAME}
           listClassName={SELECT_LIST_CLASSNAME}
         />
