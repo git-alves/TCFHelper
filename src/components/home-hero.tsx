@@ -30,7 +30,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const { ref: stepsRef, visible: stepsVisible } = useReveal<HTMLElement>();
   const { ref: methodRef, visible: methodVisible } = useReveal<HTMLElement>();
   const { ref: assessedRef, visible: assessedVisible } = useReveal<HTMLElement>();
-  const { ref: faqRef, visible: faqVisible } = useReveal<HTMLElement>();
 
   return (
     <main className="bg-[#080808] text-[#f5f5f5]">
@@ -39,15 +38,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <h1 className="mt-4 max-w-2xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-6xl">{copy.title}</h1>
         <p className="mt-6 max-w-xl text-base leading-7 text-zinc-400 sm:text-lg">{copy.description}</p>
         <Link href={destination} className="mt-8 rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
-        <EditorDemo
-          badge={copy.demoBadge}
-          writingStatus={copy.demoWritingStatus}
-          correctingStatus={copy.demoCorrectingStatus}
-          correctedStatus={copy.demoCorrectedStatus}
-          draftText={copy.beforeText}
-          correctedText={copy.afterText}
-          analysis={copy.afterAnalysis}
-        />
+        <EditorDemo taskLabel={copy.demoTaskLabel} taskPrompt={copy.demoTaskPrompt} />
       </section>
 
       <section
@@ -127,14 +118,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         aria-labelledby="assessed-heading"
       >
         <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul></div>
-      </section>
-
-      <section
-        ref={faqRef}
-        className={`mx-auto max-w-3xl px-6 py-20 sm:px-10 ${revealClassName(faqVisible)}`}
-        aria-labelledby="faq-heading"
-      >
-        <p className="text-sm font-medium text-violet-300">{copy.faqEyebrow}</p><h2 id="faq-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.faqTitle}</h2><div className="mt-10 divide-y divide-white/[.12]">{copy.faqs.map((faq) => <details key={faq.question} className="group py-5"><summary className="cursor-pointer list-none font-medium text-white marker:hidden">{faq.question}<span className="float-right text-violet-200 transition-transform group-open:rotate-45" aria-hidden="true">+</span></summary><p className="mt-3 max-w-2xl leading-7 text-zinc-400">{faq.answer}</p></details>)}</div>
       </section>
 
       <footer className="border-t border-white/[.12] px-6 py-8 text-center text-sm text-zinc-500">{copy.footer}</footer>

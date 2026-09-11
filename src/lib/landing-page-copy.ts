@@ -5,10 +5,8 @@ type LandingCopy = {
   title: string;
   description: string;
   primaryAction: string;
-  demoBadge: string;
-  demoWritingStatus: string;
-  demoCorrectingStatus: string;
-  demoCorrectedStatus: string;
+  demoTaskLabel: string;
+  demoTaskPrompt: string;
   proofEyebrow: string;
   proofTitle: string;
   before: string;
@@ -36,9 +34,6 @@ type LandingCopy = {
   assessedEyebrow: string;
   assessedTitle: string;
   assessed: string[];
-  faqEyebrow: string;
-  faqTitle: string;
-  faqs: { question: string; answer: string }[];
   footer: string;
 };
 
@@ -48,10 +43,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Build the writing skills you need for B2 on the TCF.",
     description: "Practice TCF Writing Tasks 1, 2 and 3, get detailed feedback, and learn exactly what to improve in your next response.",
     primaryAction: "Access the tool",
-    demoBadge: "Live preview",
-    demoWritingStatus: "Writing…",
-    demoCorrectingStatus: "Correcting…",
-    demoCorrectedStatus: "Corrected",
+    demoTaskLabel: "Task 2 · Recount and comment",
+    demoTaskPrompt: "Do social media strengthen or weaken real relationships? Give your opinion.",
     proofEyebrow: "From draft to clearer expression",
     proofTitle: "See what a more precise response can sound like.",
     before: "Before",
@@ -105,17 +98,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "What you will work on",
     assessedTitle: "The parts of written expression that make a response easier to follow.",
     assessed: ["Task response and relevance", "Organisation and coherence", "Grammar and sentence control", "Vocabulary, register, and precision"],
-    faqEyebrow: "Questions",
-    faqTitle: "Frequently asked questions",
-    faqs: [
-      { question: "What is the TCF?", answer: "The Test de connaissance du français is a French-language proficiency test. Requirements vary by the version of the test and your objective." },
-      { question: "Which level is the app for?", answer: "It is designed for learners preparing written expression, from building confidence through advanced practice." },
-      { question: "Which skills can I practise?", answer: "You can practise the three written-expression tasks and work on organisation, grammar, vocabulary, and coherence." },
-      { question: "Is the app free?", answer: "Access and availability are shown during sign-up. We do not make a pricing promise on this page." },
-      { question: "When will I get access?", answer: "After you create an account, access depends on the current invitation or waitlist process." },
-      { question: "Do I need an account to join the list?", answer: "Yes. An account lets us keep your invitation and practice history connected to you." },
-      { question: "Does the app replace a French course?", answer: "No. It is a practice and supplementary preparation tool, designed to help you identify difficulties and practise more deliberately." },
-    ],
     footer: "MyTCFLab · Practice deliberately. Improve one response at a time.",
   },
   fr: {
@@ -123,10 +105,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
     description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
-    demoBadge: "Aperçu en direct",
-    demoWritingStatus: "Rédaction…",
-    demoCorrectingStatus: "Correction en cours…",
-    demoCorrectedStatus: "Corrigé",
+    demoTaskLabel: "Tâche 2 · Raconter et commenter",
+    demoTaskPrompt: "Les réseaux sociaux renforcent-ils ou affaiblissent-ils les relations réelles ? Donnez votre avis.",
     proofEyebrow: "Du brouillon à une expression plus claire",
     proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
     before: "Avant",
@@ -163,9 +143,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "Ce que vous travaillerez",
     assessedTitle: "Les éléments qui rendent une réponse écrite plus facile à suivre.",
     assessed: ["Réponse à la tâche et pertinence", "Organisation et cohérence", "Grammaire et maîtrise des phrases", "Vocabulaire, registre et précision"],
-    faqEyebrow: "Questions",
-    faqTitle: "Questions fréquentes",
-    faqs: [{ question: "Qu’est-ce que le TCF ?", answer: "Le Test de connaissance du français est un test de niveau de français. Les exigences varient selon la version du test et votre objectif." }, { question: "À quel niveau l’application s’adresse-t-elle ?", answer: "Elle est conçue pour les personnes qui préparent l’expression écrite, de la consolidation des bases à la pratique avancée." }, { question: "Quelles compétences puis-je travailler ?", answer: "Vous pouvez vous entraîner aux trois tâches d’expression écrite et travailler l’organisation, la grammaire, le vocabulaire et la cohérence." }, { question: "L’application est-elle gratuite ?", answer: "Les conditions d’accès et de disponibilité sont indiquées lors de l’inscription. Cette page ne fait aucune promesse de prix." }, { question: "Quand aurai-je accès ?", answer: "Après la création d’un compte, l’accès dépend du processus d’invitation ou de liste d’attente en cours." }, { question: "Ai-je besoin d’un compte pour rejoindre la liste ?", answer: "Oui. Un compte permet de relier votre invitation et votre historique d’entraînement." }, { question: "L’application remplace-t-elle un cours de français ?", answer: "Non. C’est un outil de pratique et de préparation complémentaire, conçu pour vous aider à identifier vos difficultés et à vous entraîner de manière plus ciblée." }],
     footer: "MyTCFLab · Entraînez-vous avec intention. Améliorez une réponse à la fois.",
   },
   es: {
@@ -173,10 +150,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
     description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
-    demoBadge: "Vista previa en vivo",
-    demoWritingStatus: "Escribiendo…",
-    demoCorrectingStatus: "Corrigiendo…",
-    demoCorrectedStatus: "Corregido",
+    demoTaskLabel: "Tarea 2 · Narrar y comentar",
+    demoTaskPrompt: "¿Las redes sociales fortalecen o debilitan las relaciones reales? Da tu opinión.",
     proofEyebrow: "Del borrador a una expresión más clara",
     proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
     before: "Antes",
@@ -213,9 +188,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "En qué trabajarás",
     assessedTitle: "Los elementos que hacen que una respuesta sea más fácil de seguir.",
     assessed: ["Respuesta a la tarea y pertinencia", "Organización y coherencia", "Gramática y control de las oraciones", "Vocabulario, registro y precisión"],
-    faqEyebrow: "Preguntas",
-    faqTitle: "Preguntas frecuentes",
-    faqs: [{ question: "¿Qué es el TCF?", answer: "El Test de connaissance du français es una prueba de competencia en francés. Los requisitos varían según la versión y tu objetivo." }, { question: "¿Para qué nivel es la aplicación?", answer: "Está diseñada para quienes preparan la expresión escrita, desde ganar confianza hasta la práctica avanzada." }, { question: "¿Qué habilidades puedo practicar?", answer: "Puedes practicar las tres tareas de expresión escrita y trabajar organización, gramática, vocabulario y coherencia." }, { question: "¿La aplicación es gratuita?", answer: "El acceso y la disponibilidad se indican durante el registro. Esta página no promete un precio." }, { question: "¿Cuándo tendré acceso?", answer: "Después de crear una cuenta, el acceso depende del proceso actual de invitación o lista de espera." }, { question: "¿Necesito crear una cuenta para unirme a la lista?", answer: "Sí. Una cuenta permite mantener conectadas tu invitación y tu historial de práctica." }, { question: "¿La aplicación sustituye un curso de francés?", answer: "No. Es una herramienta de práctica y preparación complementaria para identificar dificultades y practicar de forma más intencional." }],
     footer: "MyTCFLab · Practica con intención. Mejora una respuesta cada vez.",
   },
   pt: {
@@ -223,10 +195,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
     description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
-    demoBadge: "Prévia ao vivo",
-    demoWritingStatus: "Escrevendo…",
-    demoCorrectingStatus: "Corrigindo…",
-    demoCorrectedStatus: "Corrigido",
+    demoTaskLabel: "Tarefa 2 · Narrar e comentar",
+    demoTaskPrompt: "As redes sociais fortalecem ou enfraquecem os relacionamentos reais? Dê sua opinião.",
     proofEyebrow: "Do rascunho a uma expressão mais clara",
     proofTitle: "Veja como uma resposta mais precisa pode soar.",
     before: "Antes",
@@ -263,9 +233,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "No que você vai trabalhar",
     assessedTitle: "Os elementos que tornam uma resposta escrita mais fácil de acompanhar.",
     assessed: ["Resposta à tarefa e relevância", "Organização e coerência", "Gramática e domínio das frases", "Vocabulário, registro e precisão"],
-    faqEyebrow: "Dúvidas",
-    faqTitle: "Perguntas frequentes",
-    faqs: [{ question: "O que é o TCF?", answer: "O Test de connaissance du français é um teste de proficiência em francês. Os requisitos variam conforme a versão do exame e seu objetivo." }, { question: "Para qual nível o app é indicado?", answer: "Ele foi pensado para quem prepara a expressão escrita, da construção de confiança à prática avançada." }, { question: "Quais habilidades posso praticar?", answer: "Você pode praticar as três tarefas de expressão escrita e trabalhar organização, gramática, vocabulário e coerência." }, { question: "O app é gratuito?", answer: "O acesso e a disponibilidade são informados durante o cadastro. Esta página não promete um preço." }, { question: "Quando terei acesso?", answer: "Depois de criar uma conta, o acesso depende do processo atual de convite ou lista de espera." }, { question: "Preciso criar uma conta para entrar na lista?", answer: "Sim. Uma conta mantém seu convite e histórico de prática vinculados a você." }, { question: "O app substitui um curso de francês?", answer: "Não. É uma ferramenta de prática e preparação complementar, criada para ajudar você a identificar dificuldades e praticar de maneira mais direcionada." }],
     footer: "MyTCFLab · Pratique com intenção. Melhore uma resposta por vez.",
   },
 };
