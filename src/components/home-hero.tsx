@@ -33,20 +33,20 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
   return (
     <main className="bg-[#080808] text-[#f5f5f5]">
-      <section className="mx-auto flex min-h-[calc(100svh-65px)] max-w-3xl flex-col items-center justify-center px-6 py-20 text-center sm:px-10">
+      <section className="mx-auto flex min-h-[calc(100svh-65px)] max-w-4xl flex-col items-center justify-center px-6 py-20 text-center sm:px-10 lg:px-12 xl:px-16">
         <p className="text-sm font-medium text-violet-300">{copy.eyebrow}</p>
-        <h1 className="mt-4 max-w-2xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-6xl">{copy.title}</h1>
-        <p className="mt-6 max-w-xl text-base leading-7 text-zinc-400 sm:text-lg">{copy.description}</p>
+        <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-6xl">{copy.title}</h1>
+        <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">{copy.description}</p>
         <Link href={destination} className="mt-8 rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
         <EditorDemo taskLabel={copy.demoTaskLabel} taskPrompt={copy.demoTaskPrompt} />
       </section>
 
       <section
         ref={proofRef}
-        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 ${revealClassName(proofVisible)}`}
+        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(proofVisible)}`}
         aria-labelledby="proof-heading"
       >
-        <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h2 id="proof-heading" className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.proofTitle}</h2>
+        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h2 id="proof-heading" className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.proofTitle}</h2>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6">
               <p className="text-sm font-medium text-zinc-400">{copy.before}</p>
@@ -80,7 +80,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={problemRef}
-        className={`mx-auto max-w-5xl px-6 py-20 sm:px-10 ${revealClassName(problemVisible)}`}
+        className={`mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(problemVisible)}`}
         aria-labelledby="problem-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.problemEyebrow}</p><h2 id="problem-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.problemTitle}</h2><p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
@@ -89,7 +89,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={whyRef}
-        className={`mx-auto max-w-5xl px-6 py-20 sm:px-10 ${revealClassName(whyVisible)}`}
+        className={`mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(whyVisible)}`}
         aria-labelledby="why-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
@@ -98,15 +98,15 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={stepsRef}
-        className={`bg-white/[.035] px-6 py-20 sm:px-10 ${revealClassName(stepsVisible)}`}
+        className={`bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(stepsVisible)}`}
         aria-labelledby="steps-heading"
       >
-        <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol></div>
+        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol></div>
       </section>
 
       <section
         ref={methodRef}
-        className={`mx-auto grid max-w-5xl gap-10 px-6 py-20 sm:px-10 md:grid-cols-2 ${revealClassName(methodVisible)}`}
+        className={`mx-auto grid max-w-7xl gap-10 px-6 py-20 sm:px-10 lg:px-12 xl:px-16 md:grid-cols-2 ${revealClassName(methodVisible)}`}
         aria-labelledby="method-heading"
       >
         <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><ul className="space-y-3 self-center">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul>
@@ -114,10 +114,10 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={assessedRef}
-        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 ${revealClassName(assessedVisible)}`}
+        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(assessedVisible)}`}
         aria-labelledby="assessed-heading"
       >
-        <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul></div>
+        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul></div>
       </section>
 
       <footer className="border-t border-white/[.12] px-6 py-8 text-center text-sm text-zinc-500">{copy.footer}</footer>
