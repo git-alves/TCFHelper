@@ -24,10 +24,13 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
   const copy = getAppCopy(locale);
   return {
+    metadataBase: new URL(APP_URL),
     title: "MyTCFLab",
     description: copy.home.description,
   };
