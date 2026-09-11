@@ -129,3 +129,28 @@ body {
     animation: none;
   }
 }
+
+/* The landing page's editor demo: each phase (typing/correcting/corrected)
+ * swaps the response text for a fresh DOM node (keyed by phase), so this
+ * runs again on every swap and reads as the new line settling into place
+ * rather than a static snap. */
+@keyframes demo-line-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.demo-line-in {
+  animation: demo-line-in 350ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-line-in {
+    animation: none;
+  }
+}

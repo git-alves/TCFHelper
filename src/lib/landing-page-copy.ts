@@ -5,6 +5,10 @@ type LandingCopy = {
   title: string;
   description: string;
   primaryAction: string;
+  demoBadge: string;
+  demoWritingStatus: string;
+  demoCorrectingStatus: string;
+  demoCorrectedStatus: string;
   proofEyebrow: string;
   proofTitle: string;
   before: string;
@@ -44,6 +48,10 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Build the writing skills you need for B2 on the TCF.",
     description: "Practice TCF Writing Tasks 1, 2 and 3, get detailed feedback, and learn exactly what to improve in your next response.",
     primaryAction: "Access the tool",
+    demoBadge: "Live preview",
+    demoWritingStatus: "Writing…",
+    demoCorrectingStatus: "Correcting…",
+    demoCorrectedStatus: "Corrected",
     proofEyebrow: "From draft to clearer expression",
     proofTitle: "See what a more precise response can sound like.",
     before: "Before",
@@ -86,9 +94,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
     steps: [
-      { title: "Choose a task", description: "Work on a TCF-style prompt or bring your own." },
+      { title: "Train or simulate a task", description: "Practise one skill in Train, or write a full response in Simulate." },
       { title: "Write your response", description: "Draft at your pace with the task requirements in view." },
-      { title: "Review and improve", description: "Use focused feedback to understand what to revise next." },
+      { title: "Track your progress", description: "Review corrected responses and watch your estimated CEFR level on your Dashboard." },
     ],
     methodEyebrow: "Feedback methodology",
     methodTitle: "Every correction should tell you what to work on next.",
@@ -115,6 +123,10 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
     description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
+    demoBadge: "Aperçu en direct",
+    demoWritingStatus: "Rédaction…",
+    demoCorrectingStatus: "Correction en cours…",
+    demoCorrectedStatus: "Corrigé",
     proofEyebrow: "Du brouillon à une expression plus claire",
     proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
     before: "Avant",
@@ -143,7 +155,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Correction détaillée", "Réponse initiale et réponse corrigée", "Retours sur la grammaire et le vocabulaire", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
-    steps: [{ title: "Choisissez une tâche", description: "Travaillez sur un sujet de type TCF ou ajoutez le vôtre." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Relisez et améliorez", description: "Utilisez des retours ciblés pour savoir quoi réviser ensuite." }],
+    steps: [{ title: "Entraînez-vous ou simulez une tâche", description: "Travaillez une compétence dans Entraînement, ou rédigez une réponse complète dans Simulation." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Suivez votre progression", description: "Consultez vos réponses corrigées et votre niveau CECRL estimé sur votre tableau de bord." }],
     methodEyebrow: "Méthode de retour",
     methodTitle: "Chaque correction doit vous indiquer quoi travailler ensuite.",
     methodDescription: "Les retours sont organisés pour vous aider à comprendre votre texte, et non simplement à signaler ce qui ne va pas.",
@@ -161,6 +173,10 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
     description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
+    demoBadge: "Vista previa en vivo",
+    demoWritingStatus: "Escribiendo…",
+    demoCorrectingStatus: "Corrigiendo…",
+    demoCorrectedStatus: "Corregido",
     proofEyebrow: "Del borrador a una expresión más clara",
     proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
     before: "Antes",
@@ -189,7 +205,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Corrección detallada", "Respuesta original y respuesta corregida", "Comentarios de gramática y vocabulario", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
-    steps: [{ title: "Elige una tarea", description: "Trabaja con una consigna tipo TCF o añade la tuya." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Revisa y mejora", description: "Usa comentarios específicos para entender qué revisar después." }],
+    steps: [{ title: "Entrena o simula una tarea", description: "Practica una habilidad en Entrenar, o escribe una respuesta completa en Simular." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Sigue tu progreso", description: "Revisa tus respuestas corregidas y tu nivel MCER estimado en tu panel." }],
     methodEyebrow: "Metodología de comentarios",
     methodTitle: "Cada corrección debe decirte qué trabajar después.",
     methodDescription: "Los comentarios se organizan para que entiendas tu respuesta, no solo para señalar lo que está mal.",
@@ -207,6 +223,10 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
     description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
+    demoBadge: "Prévia ao vivo",
+    demoWritingStatus: "Escrevendo…",
+    demoCorrectingStatus: "Corrigindo…",
+    demoCorrectedStatus: "Corrigido",
     proofEyebrow: "Do rascunho a uma expressão mais clara",
     proofTitle: "Veja como uma resposta mais precisa pode soar.",
     before: "Antes",
@@ -235,7 +255,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Correção detalhada", "Resposta original e resposta corrigida", "Feedback de gramática e vocabulário", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",
-    steps: [{ title: "Escolha uma tarefa", description: "Trabalhe com um tema no formato TCF ou escreva o seu." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Revise e melhore", description: "Use comentários específicos para entender o que revisar a seguir." }],
+    steps: [{ title: "Treine ou simule uma tarefa", description: "Pratique uma habilidade em Treinar, ou escreva uma resposta completa em Simular." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Acompanhe seu progresso", description: "Revise suas respostas corrigidas e seu nível QECR estimado no seu Dashboard." }],
     methodEyebrow: "Metodologia de feedback",
     methodTitle: "Cada correção deve mostrar no que trabalhar em seguida.",
     methodDescription: "O feedback é organizado para ajudar você a compreender sua resposta, não apenas apontar o que está errado.",
