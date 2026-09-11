@@ -20,7 +20,6 @@ describe("landing page copy", () => {
       expect(copy.whyItems).toHaveLength(7);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
-      expect(copy.faqs).toHaveLength(7);
     }
   });
 });

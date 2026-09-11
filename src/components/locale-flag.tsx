@@ -4,12 +4,14 @@ import type { AppLocale } from "@/lib/app-locale";
 // Simplified flag glyphs, not full heraldic detail: at picker size (20x14)
 // the coat of arms on the Spanish and Brazilian flags is illegible anyway,
 // so each keeps only the field/bands that make it recognizable.
-function EnglandFlag() {
+function UnitedKingdomFlag() {
   return (
     <svg viewBox="0 0 20 14" className="h-full w-full" aria-hidden="true">
-      <rect width="20" height="14" fill="#fff" />
-      <rect x="8" width="4" height="14" fill="#CF142B" />
-      <rect y="5" width="20" height="4" fill="#CF142B" />
+      <rect width="20" height="14" fill="#00247D" />
+      <path d="M0 0 20 14M20 0 0 14" stroke="#fff" strokeWidth="3" />
+      <path d="M0 0 20 14M20 0 0 14" stroke="#CF142B" strokeWidth="1.2" />
+      <path d="M10 0V14M0 7H20" stroke="#fff" strokeWidth="4.6" />
+      <path d="M10 0V14M0 7H20" stroke="#CF142B" strokeWidth="2.4" />
     </svg>
   );
 }
@@ -44,7 +46,7 @@ function BrazilFlag() {
 }
 
 const LOCALE_FLAGS: Record<AppLocale, () => ReactElement> = {
-  en: EnglandFlag,
+  en: UnitedKingdomFlag,
   fr: FranceFlag,
   es: SpainFlag,
   pt: BrazilFlag,
