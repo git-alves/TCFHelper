@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const { pushMock, requestNavigationMock } = vi.hoisted(() => ({
+const { pushMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   requestNavigationMock: vi.fn(() => false),
+  pathnameMock: vi.fn(() => "/practice"),
+  setLocaleMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/practice",
+  usePathname: pathnameMock,
   useRouter: () => ({ push: pushMock }),
 }));
 
@@ -36,7 +38,10 @@ vi.mock("@clerk/nextjs", () => {
 
 vi.mock("@/components/app-locale-provider", async () => {
   const { getAppCopy } = await import("@/lib/app-copy");
-  return { useAppCopy: () => getAppCopy("en") };
+  return {
+    useAppCopy: () => getAppCopy("en"),
+    useAppLocale: () => ({ locale: "en", setLocale: setLocaleMock }),
+  };
 });
 
 vi.mock("@/components/dashboard-nav-guard", () => ({
@@ -58,6 +63,8 @@ describe("NavBar", () => {
     pushMock.mockClear();
     requestNavigationMock.mockClear();
     requestNavigationMock.mockReturnValue(false);
+    pathnameMock.mockReturnValue("/practice");
+    setLocaleMock.mockClear();
   });
 
   it("keeps the three learning destinations visible in a stable order", () => {
@@ -87,6 +94,19 @@ describe("NavBar", () => {
     const markup = renderToStaticMarkup(<NavBar />);
 
     expect(markup).not.toContain("rounded-full border");
+  });
+
+  it("offers the persisted language picker on the public landing page", () => {
+    pathnameMock.mockReturnValue("/");
+
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toContain('id="landing-language"');
+    expect(markup).toContain('value="en"');
+    expect(markup).toContain(">English<");
+    expect(markup).toContain(">Français<");
+    expect(markup).toContain(">Español<");
+    expect(markup).toContain(">Português<");
   });
 
   it("moves Settings into the account menu instead of a standalone icon", () => {

@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
-import { useAppCopy } from "@/components/app-locale-provider";
+import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
+import { APP_LOCALES, APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
 
 // Sized for Clerk's UserButton menu rows (16px), not the larger standalone
@@ -120,6 +121,7 @@ const ACTIVE_NAV_LINK_CLASS =
 
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
+  const { locale, setLocale } = useAppLocale();
   const pathname = usePathname();
   const router = useRouter();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
@@ -154,6 +156,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   }
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
+  const isHome = realPathname === "/";
 
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
@@ -188,12 +191,37 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   }
 
   return (
-    <header className="border-b border-black/[.08] dark:border-white/[.145]">
+    <header
+      className={
+        isHome
+          ? "border-b border-white/[.14] bg-[#080808] text-[#f5f5f5]"
+          : "border-b border-black/[.08] dark:border-white/[.145]"
+      }
+    >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="font-semibold tracking-tight">
           MyTCFLab
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
+          {isHome && (
+            <label className="sr-only" htmlFor="landing-language">
+              Language
+            </label>
+          )}
+          {isHome && (
+            <select
+              id="landing-language"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value as AppLocale)}
+              className="rounded-lg border border-white/[.18] bg-transparent px-2 py-1.5 text-sm text-zinc-200 outline-none transition-colors hover:border-white/[.35] focus:border-white focus:ring-2 focus:ring-white/30"
+            >
+              {APP_LOCALES.map((code) => (
+                <option key={code} value={code} className="bg-[#080808] text-white">
+                  {APP_LOCALE_LABELS[code]}
+                </option>
+              ))}
+            </select>
+          )}
           <Show when="signed-in">
             <>
               {/* Keep the three main destinations in one stable order. The
@@ -229,7 +257,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-dashboard"
                     onClick={guardedNavigationHandler("/dashboard")}
                     aria-current={realPathname === "/dashboard" ? "page" : undefined}
-                    className={realPathname === "/dashboard" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                    className={`${realPathname === "/dashboard" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
                   >
                     {copy.nav.dashboard}
                   </Link>
@@ -238,7 +266,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                     data-walkthrough="nav-practice"
                     onClick={guardedNavigationHandler("/practice")}
                     aria-current={realPathname === "/practice" ? "page" : undefined}
-                    className={realPathname === "/practice" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                    className={`${realPathname === "/practice" ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
                   >
                     {copy.nav.practice}
                   </Link>
@@ -248,7 +276,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                 href="/tasks"
                 data-walkthrough="nav-tasks"
                 aria-current={onTasks ? "page" : undefined}
-                className={onTasks ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}
+                className={`${onTasks ? ACTIVE_NAV_LINK_CLASS : NAV_LINK_CLASS}${isHome ? " !text-zinc-200 hover:!text-white" : ""}`}
               >
                 {copy.nav.tasks}
               </Link>
@@ -326,7 +354,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
           </Show>
           <Show when="signed-out">
             <SignInButton mode="modal">
-              <button type="button" title={copy.nav.logIn} aria-label={copy.nav.logIn} className={ICON_BUTTON_CLASS}>
+              <button
+                type="button"
+                title={copy.nav.logIn}
+                aria-label={copy.nav.logIn}
+                className={`${ICON_BUTTON_CLASS}${isHome ? " !text-zinc-200 hover:!bg-white/[.08] hover:!text-white" : ""}`}
+              >
                 <AccountIcon />
               </button>
             </SignInButton>
