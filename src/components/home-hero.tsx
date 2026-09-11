@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useAppLocale } from "@/components/app-locale-provider";
+import { DashboardPreview } from "@/components/dashboard-preview";
 import { EditorDemo } from "@/components/editor-demo";
 import { LANDING_PAGE_COPY } from "@/lib/landing-page-copy";
 import { useReveal } from "@/lib/use-reveal";
@@ -125,7 +126,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         className={`bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(stepsVisible)}`}
         aria-labelledby="steps-heading"
       >
-        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol></div>
+        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol><DashboardPreview /></div>
       </section>
 
       <section
