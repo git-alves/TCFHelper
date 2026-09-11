@@ -59,30 +59,36 @@ function ProgressDataTable({ series }: { series: EssayProgressSeries[] }) {
 
   // The visual chart is decorative (aria-hidden below); this is the actual
   // data assistive technology reads, since color/position alone can't
-  // convey a line chart's values.
+  // convey a line chart's values. sr-only is on this wrapping div rather
+  // than the table itself -- a table's auto layout never shrinks below its
+  // content's min-content width regardless of an explicit `width: 1px`, so
+  // enough rows (or long enough localized dates) can push the table wider
+  // than the viewport and force real horizontal scroll on the page.
   return (
-    <table className="sr-only">
-      <caption>{copy.dashboard.chartTitle}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{copy.dashboard.attemptAxisLabel}</th>
-          <th scope="col">{copy.dashboard.levelAxisLabel}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {series.map((task) =>
-          task.attempts.map((point, i) => (
-            <tr key={point.id}>
-              <td>
-                {copy.dashboard.taskLegend({ number: task.number })} — {dateFormatter.format(new Date(point.assessedAt))}{" "}
-                (#{i + 1})
-              </td>
-              <td>{point.cefrLevel}</td>
-            </tr>
-          )),
-        )}
-      </tbody>
-    </table>
+    <div className="sr-only">
+      <table>
+        <caption>{copy.dashboard.chartTitle}</caption>
+        <thead>
+          <tr>
+            <th scope="col">{copy.dashboard.attemptAxisLabel}</th>
+            <th scope="col">{copy.dashboard.levelAxisLabel}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {series.map((task) =>
+            task.attempts.map((point, i) => (
+              <tr key={point.id}>
+                <td>
+                  {copy.dashboard.taskLegend({ number: task.number })} — {dateFormatter.format(new Date(point.assessedAt))}{" "}
+                  (#{i + 1})
+                </td>
+                <td>{point.cefrLevel}</td>
+              </tr>
+            )),
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

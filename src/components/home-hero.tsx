@@ -140,7 +140,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         className={`mx-auto grid max-w-7xl gap-10 px-6 py-20 sm:px-10 lg:px-12 xl:px-16 md:grid-cols-2 ${revealClassName(methodVisible)}`}
         aria-labelledby="method-heading"
       >
-        <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><div><ul className="space-y-3">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul><MethodPreview /></div>
+        <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><ul className="space-y-3 self-center">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul><div className="md:col-span-2"><MethodPreview /></div>
       </section>
 
       <section
