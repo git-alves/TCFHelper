@@ -2,9 +2,12 @@
 
 import Link from "next/link";
 import { useAppLocale } from "@/components/app-locale-provider";
+import { AssessedPreview } from "@/components/assessed-preview";
 import { DashboardPreview } from "@/components/dashboard-preview";
 import { EditorDemo } from "@/components/editor-demo";
+import { MethodPreview } from "@/components/method-preview";
 import { LANDING_PAGE_COPY } from "@/lib/landing-page-copy";
+import { useScrollParallax } from "@/lib/use-parallax";
 import { useReveal } from "@/lib/use-reveal";
 
 function FacebookIcon() {
@@ -60,6 +63,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const { ref: methodRef, visible: methodVisible } = useReveal<HTMLElement>();
   const { ref: assessedRef, visible: assessedVisible } = useReveal<HTMLElement>();
   const { ref: closingRef, visible: closingVisible } = useReveal<HTMLElement>();
+  const { ref: demoParallaxRef, offset: demoParallaxOffset } = useScrollParallax<HTMLDivElement>();
 
   return (
     <main className="bg-[#080808] text-[#f5f5f5]">
@@ -68,7 +72,9 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-6xl">{copy.title}</h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">{copy.description}</p>
         <Link href={destination} className="mt-8 rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
-        <EditorDemo taskLabel={copy.demoTaskLabel} taskPrompt={copy.demoTaskPrompt} />
+        <div ref={demoParallaxRef} style={{ transform: `translateY(${demoParallaxOffset}px)` }}>
+          <EditorDemo taskLabel={copy.demoTaskLabel} taskPrompt={copy.demoTaskPrompt} />
+        </div>
       </section>
 
       <section
@@ -82,7 +88,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
           <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
           <p className="mt-10 text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h3 id="proof-heading" className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">{copy.proofTitle}</h3>
           <div className="mt-8 grid gap-4 md:grid-cols-2">
-            <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6">
+            <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:shadow-xl hover:shadow-black/30 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
               <p className="text-sm font-medium text-zinc-400">{copy.before}</p>
               <p className="mt-5 text-lg leading-8 text-zinc-300">{copy.beforeText}</p>
               <dl className="mt-6 space-y-2 border-t border-white/[.1] pt-5">
@@ -95,7 +101,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
                 ))}
               </dl>
             </article>
-            <article className="rounded-2xl border border-violet-300/35 bg-violet-400/[.08] p-6">
+            <article className="rounded-2xl border border-violet-300/35 bg-violet-400/[.08] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-violet-300/60 hover:shadow-xl hover:shadow-violet-900/40 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
               <p className="text-sm font-medium text-violet-200">{copy.after}</p>
               <p className="mt-5 text-lg leading-8 text-white">{copy.afterText}</p>
               <dl className="mt-6 space-y-2 border-t border-violet-300/25 pt-5">
@@ -134,7 +140,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         className={`mx-auto grid max-w-7xl gap-10 px-6 py-20 sm:px-10 lg:px-12 xl:px-16 md:grid-cols-2 ${revealClassName(methodVisible)}`}
         aria-labelledby="method-heading"
       >
-        <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><ul className="space-y-3 self-center">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul>
+        <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><div><ul className="space-y-3">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul><MethodPreview /></div>
       </section>
 
       <section
@@ -142,7 +148,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(assessedVisible)}`}
         aria-labelledby="assessed-heading"
       >
-        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul></div>
+        <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul><AssessedPreview /></div>
       </section>
 
       <section
