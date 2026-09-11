@@ -34,8 +34,8 @@ type LandingCopy = {
 export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   en: {
     eyebrow: "TCF written expression practice",
-    title: "Write with more clarity for the TCF.",
-    description: "Practise Tasks 1, 2, and 3, then turn detailed feedback into your next, better response.",
+    title: "Build the writing skills you need for B2 on the TCF.",
+    description: "Practice TCF Writing Tasks 1, 2 and 3, get detailed feedback, and learn exactly what to improve in your next response.",
     primaryAction: "Access the tool",
     proofEyebrow: "From draft to clearer expression",
     proofTitle: "See what a more precise response can sound like.",
@@ -81,8 +81,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   fr: {
     eyebrow: "Préparation à l’expression écrite du TCF",
-    title: "Écrivez avec plus de clarté pour le TCF.",
-    description: "Entraînez-vous aux tâches 1, 2 et 3, puis transformez chaque retour en une meilleure réponse.",
+    title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
+    description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
     proofEyebrow: "Du brouillon à une expression plus claire",
     proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
@@ -111,8 +111,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   es: {
     eyebrow: "Práctica de expresión escrita del TCF",
-    title: "Escribe con más claridad para el TCF.",
-    description: "Practica las tareas 1, 2 y 3 y convierte cada comentario en una respuesta mejor.",
+    title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
+    description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
     proofEyebrow: "Del borrador a una expresión más clara",
     proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
@@ -141,8 +141,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   pt: {
     eyebrow: "Prática de expressão escrita para o TCF",
-    title: "Escreva com mais clareza para o TCF.",
-    description: "Pratique as tarefas 1, 2 e 3 e transforme cada comentário em uma resposta melhor.",
+    title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
+    description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
     proofEyebrow: "Do rascunho a uma expressão mais clara",
     proofTitle: "Veja como uma resposta mais precisa pode soar.",
