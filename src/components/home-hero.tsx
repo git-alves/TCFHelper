@@ -14,9 +14,12 @@ interface HomeHeroProps {
 // page reads as a living product tour rather than a static document. Skips
 // straight to visible for anyone who never gets a qualifying
 // IntersectionObserver entry (reduced motion, SSR, older browsers) -- see
-// useReveal.
+// useReveal. print: always wins regardless of `visible`: a browser's
+// print/"Save as PDF" layout renders the whole page at once rather than
+// scrolling it, so nothing here would ever intersect and every section
+// below the hero would print blank without this override.
 function revealClassName(visible: boolean) {
-  return `transition-all duration-700 ease-out ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`;
+  return `transition-all duration-700 ease-out print:opacity-100 print:translate-y-0 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`;
 }
 
 export function HomeHero({ isAuthenticated }: HomeHeroProps) {
@@ -30,6 +33,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const { ref: stepsRef, visible: stepsVisible } = useReveal<HTMLElement>();
   const { ref: methodRef, visible: methodVisible } = useReveal<HTMLElement>();
   const { ref: assessedRef, visible: assessedVisible } = useReveal<HTMLElement>();
+  const { ref: closingRef, visible: closingVisible } = useReveal<HTMLElement>();
 
   return (
     <main className="bg-[#080808] text-[#f5f5f5]">
@@ -84,7 +88,6 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         aria-labelledby="problem-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.problemEyebrow}</p><h2 id="problem-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.problemTitle}</h2><p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{copy.skills.map((skill) => <article key={skill.title} className="rounded-2xl border border-white/[.12] p-5"><h3 className="font-semibold">{skill.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{skill.description}</p></article>)}</div>
       </section>
 
       <section
@@ -93,7 +96,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         aria-labelledby="why-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
-        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
+        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
       </section>
 
       <section
@@ -118,6 +121,15 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         aria-labelledby="assessed-heading"
       >
         <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul></div>
+      </section>
+
+      <section
+        ref={closingRef}
+        className={`mx-auto max-w-3xl px-6 py-20 text-center sm:px-10 lg:px-12 xl:px-16 ${revealClassName(closingVisible)}`}
+        aria-labelledby="closing-heading"
+      >
+        <h2 id="closing-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">{copy.closingTitle}</h2>
+        <Link href={destination} className="mt-8 inline-block rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
       </section>
 
       <footer className="border-t border-white/[.12] px-6 py-8 text-center text-sm text-zinc-500">{copy.footer}</footer>

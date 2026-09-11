@@ -20,7 +20,6 @@ type LandingCopy = {
   problemEyebrow: string;
   problemTitle: string;
   problemDescription: string;
-  skills: { title: string; description: string }[];
   whyEyebrow: string;
   whyTitle: string;
   whyItems: string[];
@@ -34,6 +33,7 @@ type LandingCopy = {
   assessedEyebrow: string;
   assessedTitle: string;
   assessed: string[];
+  closingTitle: string;
   footer: string;
 };
 
@@ -67,23 +67,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemEyebrow: "More than spell check",
     problemTitle: "Writing in French is difficult. Writing for the TCF is even harder.",
     problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task.",
-    skills: [
-      { title: "Structure", description: "Organise ideas clearly and coherently." },
-      { title: "Grammar", description: "Identify errors that hinder your expression." },
-      { title: "Vocabulary", description: "Find more precise, natural ways to say what you mean." },
-      { title: "Coherence", description: "Connect ideas more effectively." },
-    ],
     whyEyebrow: "Built specifically for TCF Writing",
     whyTitle: "Not just French correction. TCF-focused practice.",
-    whyItems: [
-      "TCF Tasks 1, 2 & 3",
-      "Task-specific requirements",
-      "Timed practice",
-      "Detailed correction",
-      "Original vs corrected response",
-      "Grammar & vocabulary feedback",
-      "Progressive improvement",
-    ],
+    whyItems: ["TCF Tasks 1, 2 & 3", "Task-specific requirements", "Timed practice", "Progressive improvement"],
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
     steps: [
@@ -98,6 +84,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "What you will work on",
     assessedTitle: "The parts of written expression that make a response easier to follow.",
     assessed: ["Task response and relevance", "Organisation and coherence", "Grammar and sentence control", "Vocabulary, register, and precision"],
+    closingTitle: "Ready to write with more precision?",
     footer: "MyTCFLab · Practice deliberately. Improve one response at a time.",
   },
   fr: {
@@ -129,10 +116,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemEyebrow: "Bien plus qu’un correcteur",
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
     problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
-    skills: [{ title: "Structure", description: "Organisez vos idées clairement et de façon cohérente." }, { title: "Grammaire", description: "Repérez les erreurs qui gênent votre expression." }, { title: "Vocabulaire", description: "Trouvez des formulations plus précises et naturelles." }, { title: "Cohérence", description: "Reliez vos idées plus efficacement." }],
     whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
     whyTitle: "Pas seulement de la correction de français. Un entraînement axé sur le TCF.",
-    whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Correction détaillée", "Réponse initiale et réponse corrigée", "Retours sur la grammaire et le vocabulaire", "Progression continue"],
+    whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
     steps: [{ title: "Entraînez-vous ou simulez une tâche", description: "Travaillez une compétence dans Entraînement, ou rédigez une réponse complète dans Simulation." }, { title: "Rédigez votre réponse", description: "Écrivez à votre rythme en gardant les consignes en vue." }, { title: "Suivez votre progression", description: "Consultez vos réponses corrigées et votre niveau CECRL estimé sur votre tableau de bord." }],
@@ -143,6 +129,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "Ce que vous travaillerez",
     assessedTitle: "Les éléments qui rendent une réponse écrite plus facile à suivre.",
     assessed: ["Réponse à la tâche et pertinence", "Organisation et cohérence", "Grammaire et maîtrise des phrases", "Vocabulaire, registre et précision"],
+    closingTitle: "Prêt à écrire avec plus de précision ?",
     footer: "MyTCFLab · Entraînez-vous avec intention. Améliorez une réponse à la fois.",
   },
   es: {
@@ -174,10 +161,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemEyebrow: "Mucho más que un corrector",
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
     problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
-    skills: [{ title: "Estructura", description: "Organiza tus ideas de forma clara y coherente." }, { title: "Gramática", description: "Identifica los errores que dificultan tu expresión." }, { title: "Vocabulario", description: "Encuentra formas más precisas y naturales de expresarte." }, { title: "Coherencia", description: "Conecta tus ideas con más eficacia." }],
     whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
     whyTitle: "No es solo corrección de francés. Es práctica enfocada en el TCF.",
-    whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Corrección detallada", "Respuesta original y respuesta corregida", "Comentarios de gramática y vocabulario", "Mejora progresiva"],
+    whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
     steps: [{ title: "Entrena o simula una tarea", description: "Practica una habilidad en Entrenar, o escribe una respuesta completa en Simular." }, { title: "Escribe tu respuesta", description: "Redacta a tu ritmo con los requisitos de la tarea a la vista." }, { title: "Sigue tu progreso", description: "Revisa tus respuestas corregidas y tu nivel MCER estimado en tu panel." }],
@@ -188,6 +174,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "En qué trabajarás",
     assessedTitle: "Los elementos que hacen que una respuesta sea más fácil de seguir.",
     assessed: ["Respuesta a la tarea y pertinencia", "Organización y coherencia", "Gramática y control de las oraciones", "Vocabulario, registro y precisión"],
+    closingTitle: "¿Listo para escribir con más precisión?",
     footer: "MyTCFLab · Practica con intención. Mejora una respuesta cada vez.",
   },
   pt: {
@@ -219,10 +206,9 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemEyebrow: "Mais do que um corretor ortográfico",
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
     problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",
-    skills: [{ title: "Estrutura", description: "Organize suas ideias com clareza e coerência." }, { title: "Gramática", description: "Identifique erros que prejudicam sua expressão." }, { title: "Vocabulário", description: "Encontre formas mais precisas e naturais de se expressar." }, { title: "Coerência", description: "Conecte suas ideias de forma mais eficaz." }],
     whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
     whyTitle: "Não é apenas correção de francês. É prática focada no TCF.",
-    whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Correção detalhada", "Resposta original e resposta corrigida", "Feedback de gramática e vocabulário", "Melhoria progressiva"],
+    whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",
     steps: [{ title: "Treine ou simule uma tarefa", description: "Pratique uma habilidade em Treinar, ou escreva uma resposta completa em Simular." }, { title: "Escreva sua resposta", description: "Redija no seu ritmo mantendo os requisitos da tarefa em vista." }, { title: "Acompanhe seu progresso", description: "Revise suas respostas corrigidas e seu nível QECR estimado no seu Dashboard." }],
@@ -233,6 +219,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     assessedEyebrow: "No que você vai trabalhar",
     assessedTitle: "Os elementos que tornam uma resposta escrita mais fácil de acompanhar.",
     assessed: ["Resposta à tarefa e relevância", "Organização e coerência", "Gramática e domínio das frases", "Vocabulário, registro e precisão"],
+    closingTitle: "Pronto para escrever com mais precisão?",
     footer: "MyTCFLab · Pratique com intenção. Melhore uma resposta por vez.",
   },
 };

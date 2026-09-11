@@ -14,10 +14,10 @@ describe("landing page copy", () => {
       expect(copy.afterText).not.toHaveLength(0);
       expect(copy.beforeAnalysis).toHaveLength(4);
       expect(copy.afterAnalysis).toHaveLength(3);
-      expect(copy.skills).toHaveLength(4);
-      expect(copy.whyItems).toHaveLength(7);
+      expect(copy.whyItems).toHaveLength(4);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
+      expect(copy.closingTitle).not.toHaveLength(0);
     }
   });
 });
