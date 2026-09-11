@@ -11,6 +11,10 @@ type LandingCopy = {
   after: string;
   beforeText: string;
   afterText: string;
+  beforeAnalysisLabel: string;
+  beforeAnalysis: { label: string; value: string }[];
+  afterAnalysisLabel: string;
+  afterAnalysis: { label: string; value: string }[];
   problemEyebrow: string;
   problemTitle: string;
   problemDescription: string;
@@ -46,6 +50,19 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     after: "After",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
     afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "What you're missing",
+    beforeAnalysis: [
+      { label: "Vocabulary", value: "basic" },
+      { label: "Structure", value: "repetitive" },
+      { label: "Linking", value: "limited" },
+      { label: "Register", value: "acceptable" },
+    ],
+    afterAnalysisLabel: "Why it's better",
+    afterAnalysis: [
+      { label: "Vocabulary", value: "more precise" },
+      { label: "Coherence", value: "stronger connection" },
+      { label: "Register", value: "more appropriate" },
+    ],
     problemEyebrow: "More than spell check",
     problemTitle: "Writing in French is difficult. Writing for the TCF is even harder.",
     problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task.",
@@ -104,6 +121,19 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     after: "Après",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
     afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "Ce qui manque",
+    beforeAnalysis: [
+      { label: "Vocabulaire", value: "basique" },
+      { label: "Structure", value: "répétitive" },
+      { label: "Connecteurs", value: "limités" },
+      { label: "Registre", value: "acceptable" },
+    ],
+    afterAnalysisLabel: "Pourquoi c’est mieux",
+    afterAnalysis: [
+      { label: "Vocabulaire", value: "plus précis" },
+      { label: "Cohérence", value: "lien plus solide" },
+      { label: "Registre", value: "plus approprié" },
+    ],
     problemEyebrow: "Bien plus qu’un correcteur",
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
     problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
@@ -137,6 +167,19 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     after: "Después",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
     afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "Lo que falta",
+    beforeAnalysis: [
+      { label: "Vocabulario", value: "básico" },
+      { label: "Estructura", value: "repetitiva" },
+      { label: "Conectores", value: "limitados" },
+      { label: "Registro", value: "aceptable" },
+    ],
+    afterAnalysisLabel: "Por qué es mejor",
+    afterAnalysis: [
+      { label: "Vocabulario", value: "más preciso" },
+      { label: "Coherencia", value: "conexión más sólida" },
+      { label: "Registro", value: "más adecuado" },
+    ],
     problemEyebrow: "Mucho más que un corrector",
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
     problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
@@ -170,6 +213,19 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     after: "Depois",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
     afterText: "À mon avis, les réseaux sociaux jouent un rôle important dans notre quotidien, car ils permettent de rester en contact avec nos proches tout en facilitant l’accès à l’information.",
+    beforeAnalysisLabel: "O que está faltando",
+    beforeAnalysis: [
+      { label: "Vocabulário", value: "básico" },
+      { label: "Estrutura", value: "repetitiva" },
+      { label: "Conectores", value: "limitados" },
+      { label: "Registro", value: "aceitável" },
+    ],
+    afterAnalysisLabel: "Por que é melhor",
+    afterAnalysis: [
+      { label: "Vocabulário", value: "mais preciso" },
+      { label: "Coerência", value: "conexão mais forte" },
+      { label: "Registro", value: "mais adequado" },
+    ],
     problemEyebrow: "Mais do que um corretor ortográfico",
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
     problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",

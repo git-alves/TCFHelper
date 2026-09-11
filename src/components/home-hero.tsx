@@ -24,7 +24,34 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section className="border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10" aria-labelledby="proof-heading">
         <div className="mx-auto max-w-5xl"><p className="text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h2 id="proof-heading" className="mt-3 max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.proofTitle}</h2>
-          <div className="mt-10 grid gap-4 md:grid-cols-2"><article className="rounded-2xl border border-white/[.12] bg-black/20 p-6"><p className="text-sm font-medium text-zinc-400">{copy.before}</p><p className="mt-5 text-lg leading-8 text-zinc-300">{copy.beforeText}</p></article><article className="rounded-2xl border border-violet-300/35 bg-violet-400/[.08] p-6"><p className="text-sm font-medium text-violet-200">{copy.after}</p><p className="mt-5 text-lg leading-8 text-white">{copy.afterText}</p></article></div>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6">
+              <p className="text-sm font-medium text-zinc-400">{copy.before}</p>
+              <p className="mt-5 text-lg leading-8 text-zinc-300">{copy.beforeText}</p>
+              <dl className="mt-6 space-y-2 border-t border-white/[.1] pt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">{copy.beforeAnalysisLabel}</p>
+                {copy.beforeAnalysis.map((item) => (
+                  <div key={item.label} className="flex items-baseline justify-between gap-3 text-sm">
+                    <dt className="text-zinc-500">{item.label}</dt>
+                    <dd className="font-medium text-zinc-300">{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+            <article className="rounded-2xl border border-violet-300/35 bg-violet-400/[.08] p-6">
+              <p className="text-sm font-medium text-violet-200">{copy.after}</p>
+              <p className="mt-5 text-lg leading-8 text-white">{copy.afterText}</p>
+              <dl className="mt-6 space-y-2 border-t border-violet-300/25 pt-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-violet-300">{copy.afterAnalysisLabel}</p>
+                {copy.afterAnalysis.map((item) => (
+                  <div key={item.label} className="flex items-baseline justify-between gap-3 text-sm">
+                    <dt className="text-violet-200/80">{item.label}</dt>
+                    <dd className="font-medium text-white">{item.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </article>
+          </div>
         </div>
       </section>
 
