@@ -5,10 +5,8 @@ type LandingCopy = {
   title: string;
   description: string;
   primaryAction: string;
-  demoBadge: string;
-  demoWritingStatus: string;
-  demoCorrectingStatus: string;
-  demoCorrectedStatus: string;
+  demoTaskLabel: string;
+  demoTaskPrompt: string;
   proofEyebrow: string;
   proofTitle: string;
   before: string;
@@ -45,10 +43,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Build the writing skills you need for B2 on the TCF.",
     description: "Practice TCF Writing Tasks 1, 2 and 3, get detailed feedback, and learn exactly what to improve in your next response.",
     primaryAction: "Access the tool",
-    demoBadge: "Live preview",
-    demoWritingStatus: "Writing…",
-    demoCorrectingStatus: "Correcting…",
-    demoCorrectedStatus: "Corrected",
+    demoTaskLabel: "Task 2 · Recount and comment",
+    demoTaskPrompt: "Do social media strengthen or weaken real relationships? Give your opinion.",
     proofEyebrow: "From draft to clearer expression",
     proofTitle: "See what a more precise response can sound like.",
     before: "Before",
@@ -109,10 +105,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
     description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
-    demoBadge: "Aperçu en direct",
-    demoWritingStatus: "Rédaction…",
-    demoCorrectingStatus: "Correction en cours…",
-    demoCorrectedStatus: "Corrigé",
+    demoTaskLabel: "Tâche 2 · Raconter et commenter",
+    demoTaskPrompt: "Les réseaux sociaux renforcent-ils ou affaiblissent-ils les relations réelles ? Donnez votre avis.",
     proofEyebrow: "Du brouillon à une expression plus claire",
     proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
     before: "Avant",
@@ -156,10 +150,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
     description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
-    demoBadge: "Vista previa en vivo",
-    demoWritingStatus: "Escribiendo…",
-    demoCorrectingStatus: "Corrigiendo…",
-    demoCorrectedStatus: "Corregido",
+    demoTaskLabel: "Tarea 2 · Narrar y comentar",
+    demoTaskPrompt: "¿Las redes sociales fortalecen o debilitan las relaciones reales? Da tu opinión.",
     proofEyebrow: "Del borrador a una expresión más clara",
     proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
     before: "Antes",
@@ -203,10 +195,8 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
     description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
-    demoBadge: "Prévia ao vivo",
-    demoWritingStatus: "Escrevendo…",
-    demoCorrectingStatus: "Corrigindo…",
-    demoCorrectedStatus: "Corrigido",
+    demoTaskLabel: "Tarefa 2 · Narrar e comentar",
+    demoTaskPrompt: "As redes sociais fortalecem ou enfraquecem os relacionamentos reais? Dê sua opinião.",
     proofEyebrow: "Do rascunho a uma expressão mais clara",
     proofTitle: "Veja como uma resposta mais precisa pode soar.",
     before: "Antes",
