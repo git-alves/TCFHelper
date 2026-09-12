@@ -1,15 +1,16 @@
 // The MyTCFLab mark: a speech bubble (writing/feedback) with a checkmark
-// (correction). Outline and writing lines use `currentColor` so the icon
-// always matches the surrounding text color (the home page's fixed light
-// text on its dark header, or the tool's `dark:`-aware foreground).
+// (correction). Only the outline uses `currentColor`, so it always matches
+// the surrounding text color (the home page's fixed light text on its dark
+// header, or the tool's `dark:`-aware foreground); the writing lines and
+// checkmark are both the violet accent, echoing the wordmark's violet "TCF".
 //
-// The checkmark's violet accent can't just key off the `dark:` variant: the
-// home page's header is unconditionally dark regardless of the app's
-// light/dark theme setting, so `dark:text-violet-300` would fall back to
-// the light-mode violet-700 (too low-contrast on the near-black header)
-// whenever a visitor's resolved theme happens to be light. Callers on a
-// fixed-dark surface should pass `accentClassName="text-violet-300"`
-// explicitly; everywhere else the theme-aware pair is the right default.
+// The violet accent can't just key off the `dark:` variant: the home page's
+// header is unconditionally dark regardless of the app's light/dark theme
+// setting, so `dark:text-violet-300` would fall back to the light-mode
+// violet-700 (too low-contrast on the near-black header) whenever a
+// visitor's resolved theme happens to be light. Callers on a fixed-dark
+// surface should pass `accentClassName="text-violet-300"` explicitly;
+// everywhere else the theme-aware pair is the right default.
 export function BrandMark({ className, accentClassName = "text-violet-700 dark:text-violet-300" }: { className?: string; accentClassName?: string }) {
   return (
     <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
@@ -20,7 +21,7 @@ export function BrandMark({ className, accentClassName = "text-violet-700 dark:t
         strokeWidth="1.8"
         strokeLinejoin="round"
       />
-      <path d="M7.5 11h10M7.5 14.3h7.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M7.5 11h10M7.5 14.3h7.7" fill="none" className={accentClassName} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       <path
         d="M14.5 18.3l2 2 4.5-5.3"
         fill="none"
