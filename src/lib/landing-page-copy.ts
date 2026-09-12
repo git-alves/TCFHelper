@@ -98,7 +98,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   fr: {
     eyebrow: "Préparation à l’expression écrite du TCF",
-    title: "Développez les compétences rédactionnelles nécessaires pour le niveau B2 au TCF.",
+    title: "Développez la rédaction pour le B2 au TCF.",
     description: "Entraînez-vous aux tâches d’expression écrite 1, 2 et 3 du TCF, recevez un retour détaillé et découvrez exactement quoi améliorer dans votre prochaine réponse.",
     primaryAction: "Accéder à l’outil",
     demoTaskLabel: "Tâche 2 · Raconter et commenter",
@@ -150,7 +150,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   es: {
     eyebrow: "Práctica de expresión escrita del TCF",
-    title: "Desarrolla las habilidades de escritura que necesitas para el nivel B2 del TCF.",
+    title: "Desarrolla la redacción para el B2 del TCF.",
     description: "Practica las tareas de expresión escrita 1, 2 y 3 del TCF, recibe comentarios detallados y aprende exactamente qué mejorar en tu próxima respuesta.",
     primaryAction: "Acceder a la herramienta",
     demoTaskLabel: "Tarea 2 · Narrar y comentar",
@@ -202,7 +202,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
   },
   pt: {
     eyebrow: "Prática de expressão escrita para o TCF",
-    title: "Desenvolva as habilidades de escrita que você precisa para o nível B2 do TCF.",
+    title: "Desenvolva a redação para o B2 do TCF.",
     description: "Pratique as tarefas de expressão escrita 1, 2 e 3 do TCF, receba feedback detalhado e aprenda exatamente o que melhorar na sua próxima resposta.",
     primaryAction: "Acessar a ferramenta",
     demoTaskLabel: "Tarefa 2 · Narrar e comentar",
