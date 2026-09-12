@@ -167,6 +167,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
   const isHome = realPathname === "/";
+  // The landing header is unconditionally dark (see the header className
+  // below), independent of the app's light/dark theme setting, so the
+  // wordmark's violet needs an explicit override there instead of relying
+  // on the `dark:` variant -- see BrandMark's accentClassName doc comment
+  // for the same reasoning.
+  const wordmarkAccentClassName = isHome ? "text-violet-300" : "text-violet-700 dark:text-violet-300";
 
   // Settings sets the URL to exactly /settings while its own modal is open
   // (and only then), so — unlike the workspace-mounted check above — the
@@ -210,12 +216,12 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
     >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
-          <BrandMark className="h-8 w-8" accentClassName={isHome ? "text-violet-300" : undefined} />
-          {/* One flex child, not two: MyTCF and the Lab span must sit directly
-           * next to each other with no gap between them, unlike the gap-1.5
-           * between the icon and this whole wordmark. */}
+          <BrandMark className="h-8 w-8" accentClassName={wordmarkAccentClassName} />
+          {/* One flex child, not two: My/TCF/Lab must sit directly next to
+           * each other with no gap between them, unlike the gap-1.5 between
+           * the icon and this whole wordmark. */}
           <span>
-            MyTCF<span className={isHome ? "text-violet-300" : "text-violet-700 dark:text-violet-300"}>Lab</span>
+            <span className={wordmarkAccentClassName}>My</span>TCF<span className={wordmarkAccentClassName}>Lab</span>
           </span>
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
