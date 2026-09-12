@@ -22,6 +22,10 @@ type LandingCopy = {
   problemDescription: string;
   whyEyebrow: string;
   whyTitle: string;
+  whyDescription: string;
+  comparisonGenericHeading: string;
+  comparisonMyTcfLabHeading: string;
+  comparisonRows: { generic: string; mytcflab: string }[];
   whyItems: string[];
   stepsEyebrow: string;
   stepsTitle: string;
@@ -67,7 +71,17 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Writing in French is difficult. Writing for the TCF is even harder.",
     problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task.",
     whyEyebrow: "Built specifically for TCF Writing",
-    whyTitle: "Not just French correction. TCF-focused practice.",
+    whyTitle: "Why MyTCFLab?",
+    whyDescription: "MyTCFLab is not a generic French corrector. It is designed specifically around TCF written expression.",
+    comparisonGenericHeading: "Generic AI tools",
+    comparisonMyTcfLabHeading: "MyTCFLab",
+    comparisonRows: [
+      { generic: "General French correction", mytcflab: "TCF-focused practice" },
+      { generic: "Open-ended feedback", mytcflab: "Structured feedback" },
+      { generic: "No TCF task context", mytcflab: "Tasks 1, 2 & 3" },
+      { generic: "Corrects your text", mytcflab: "Helps you improve your next response" },
+      { generic: "Generic suggestions", mytcflab: "Focus on TCF-relevant criteria" },
+    ],
     whyItems: ["TCF Tasks 1, 2 & 3", "Task-specific requirements", "Timed practice", "Progressive improvement"],
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
@@ -115,7 +129,17 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
     problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
     whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
-    whyTitle: "Pas seulement de la correction de français. Un entraînement axé sur le TCF.",
+    whyTitle: "Pourquoi MyTCFLab ?",
+    whyDescription: "MyTCFLab n’est pas un correcteur de français générique. Il est conçu spécifiquement autour de l’expression écrite du TCF.",
+    comparisonGenericHeading: "Outils d’IA génériques",
+    comparisonMyTcfLabHeading: "MyTCFLab",
+    comparisonRows: [
+      { generic: "Correction générale du français", mytcflab: "Entraînement axé sur le TCF" },
+      { generic: "Retour ouvert et vague", mytcflab: "Retour structuré" },
+      { generic: "Aucun contexte lié aux tâches du TCF", mytcflab: "Tâches 1, 2 et 3" },
+      { generic: "Corrige votre texte", mytcflab: "Vous aide à améliorer votre prochaine réponse" },
+      { generic: "Suggestions génériques", mytcflab: "Axé sur les critères pertinents du TCF" },
+    ],
     whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
@@ -159,7 +183,17 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
     problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
     whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
-    whyTitle: "No es solo corrección de francés. Es práctica enfocada en el TCF.",
+    whyTitle: "¿Por qué MyTCFLab?",
+    whyDescription: "MyTCFLab no es un corrector de francés genérico. Está diseñado específicamente en torno a la expresión escrita del TCF.",
+    comparisonGenericHeading: "Herramientas de IA genéricas",
+    comparisonMyTcfLabHeading: "MyTCFLab",
+    comparisonRows: [
+      { generic: "Corrección general de francés", mytcflab: "Práctica enfocada en el TCF" },
+      { generic: "Comentarios abiertos", mytcflab: "Comentarios estructurados" },
+      { generic: "Sin contexto de las tareas del TCF", mytcflab: "Tareas 1, 2 y 3" },
+      { generic: "Corrige tu texto", mytcflab: "Te ayuda a mejorar tu próxima respuesta" },
+      { generic: "Sugerencias genéricas", mytcflab: "Enfocado en los criterios relevantes del TCF" },
+    ],
     whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
@@ -203,7 +237,17 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
     problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",
     whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
-    whyTitle: "Não é apenas correção de francês. É prática focada no TCF.",
+    whyTitle: "Por que MyTCFLab?",
+    whyDescription: "MyTCFLab não é um corretor de francês genérico. Ele foi projetado especificamente para a expressão escrita do TCF.",
+    comparisonGenericHeading: "Ferramentas de IA genéricas",
+    comparisonMyTcfLabHeading: "MyTCFLab",
+    comparisonRows: [
+      { generic: "Correção geral de francês", mytcflab: "Prática focada no TCF" },
+      { generic: "Feedback aberto e vago", mytcflab: "Feedback estruturado" },
+      { generic: "Sem contexto das tarefas do TCF", mytcflab: "Tarefas 1, 2 e 3" },
+      { generic: "Corrige seu texto", mytcflab: "Ajuda você a melhorar sua próxima resposta" },
+      { generic: "Sugestões genéricas", mytcflab: "Foco nos critérios relevantes do TCF" },
+    ],
     whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",

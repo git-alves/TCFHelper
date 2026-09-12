@@ -124,7 +124,26 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         aria-labelledby="why-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
-        <ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
+        <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.whyDescription}</p>
+        <div className="mt-10 overflow-hidden rounded-2xl border border-white/[.12]">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-white/[.12]">
+                <th scope="col" className="px-5 py-4 text-sm font-semibold text-zinc-400">{copy.comparisonGenericHeading}</th>
+                <th scope="col" className="px-5 py-4 text-sm font-semibold text-violet-200">{copy.comparisonMyTcfLabHeading}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {copy.comparisonRows.map((row) => (
+                <tr key={row.generic} className="border-b border-white/[.08] last:border-b-0">
+                  <td className="px-5 py-4 text-sm text-zinc-400">{row.generic}</td>
+                  <td className="px-5 py-4 text-sm font-medium text-violet-200">{row.mytcflab}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
       </section>
 
       <section
