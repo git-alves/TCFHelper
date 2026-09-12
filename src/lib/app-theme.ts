@@ -19,8 +19,18 @@ export const APP_THEME_STORAGE_KEY = "mytcflab:app-theme";
 // `dark` class variant and Clerk's `appearance.baseTheme` care about.
 export type ResolvedTheme = "light" | "dark";
 
+// The <link rel="icon"> element both the blocking script below and
+// FaviconSync (see favicon-sync.tsx) update in place, rather than each
+// picking their own id and risking a mismatch.
+export const APP_FAVICON_LINK_ID = "app-favicon";
+
 // Kept in one place so the pre-hydration blocking script (a literal string
 // injected into <head>) and the client provider resolve "system" identically.
+//
+// Also sets the favicon here, before first paint: the landing page ("/") is
+// unconditionally dark regardless of the resolved theme, while every other
+// route follows it. Without this the favicon would flash the wrong variant
+// on load, then jump once FaviconSync's effect runs after hydration.
 export const THEME_INIT_SCRIPT = `
 (function () {
   try {
@@ -30,6 +40,9 @@ export const THEME_INIT_SCRIPT = `
       ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
       : theme;
     document.documentElement.classList.toggle("dark", resolved === "dark");
+    var faviconTheme = window.location.pathname === "/" ? "dark" : resolved;
+    var favicon = document.getElementById(${JSON.stringify(APP_FAVICON_LINK_ID)});
+    if (favicon) favicon.setAttribute("href", "/favicon-" + faviconTheme + ".svg");
   } catch (e) {}
 })();
 `;
