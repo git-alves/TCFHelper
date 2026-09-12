@@ -209,9 +209,14 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
       }
     >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <BrandMark className="h-6 w-6" accentClassName={isHome ? "text-violet-300" : undefined} />
-          MyTCF<span className={isHome ? "text-violet-300" : "text-violet-700 dark:text-violet-300"}>Lab</span>
+        <Link href="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
+          <BrandMark className="h-8 w-8" accentClassName={isHome ? "text-violet-300" : undefined} />
+          {/* One flex child, not two: MyTCF and the Lab span must sit directly
+           * next to each other with no gap between them, unlike the gap-1.5
+           * between the icon and this whole wordmark. */}
+          <span>
+            MyTCF<span className={isHome ? "text-violet-300" : "text-violet-700 dark:text-violet-300"}>Lab</span>
+          </span>
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           {isHome && (
