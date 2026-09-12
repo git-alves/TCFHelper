@@ -63,7 +63,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
   const { ref: methodRef, visible: methodVisible } = useReveal<HTMLElement>();
   const { ref: assessedRef, visible: assessedVisible } = useReveal<HTMLElement>();
   const { ref: closingRef, visible: closingVisible } = useReveal<HTMLElement>();
-  const { ref: demoParallaxRef, offset: demoParallaxOffset } = useScrollParallax<HTMLDivElement>();
+  const demoParallaxRef = useScrollParallax<HTMLDivElement>();
 
   return (
     <main className="bg-[#080808] text-[#f5f5f5]">
@@ -72,7 +72,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.08] tracking-[-0.035em] sm:text-6xl">{copy.title}</h1>
         <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-400 sm:text-lg">{copy.description}</p>
         <Link href={destination} className="mt-8 rounded-full bg-[#f5f5f5] px-7 py-3 text-base font-medium text-[#111] transition-transform transition-colors hover:scale-[1.02] hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">{copy.primaryAction}</Link>
-        <div ref={demoParallaxRef} style={{ transform: `translateY(${demoParallaxOffset}px)` }}>
+        <div ref={demoParallaxRef}>
           <EditorDemo taskLabel={copy.demoTaskLabel} taskPrompt={copy.demoTaskPrompt} />
         </div>
       </section>
