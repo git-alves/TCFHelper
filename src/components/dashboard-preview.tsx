@@ -32,7 +32,7 @@ export function DashboardPreview() {
   const copy = useAppCopy();
 
   return (
-    <div className="dark mx-auto mt-12 max-w-2xl rounded-2xl border border-white/[.12] bg-black/30 p-6 shadow-2xl shadow-black/40 sm:p-8">
+    <div className="dark mt-12 rounded-2xl border border-white/[.12] bg-black/30 p-6 shadow-2xl shadow-black/40 sm:p-8">
       <p className="text-sm font-medium text-zinc-400">{copy.dashboard.chartTitle}</p>
       <div className="mt-4">
         <ProgressChart points={SAMPLE_PROGRESS_POINTS} />
