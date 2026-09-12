@@ -6,6 +6,14 @@ import { groupEssayProgressByTask, type EssayProgressPoint, type EssayProgressSe
 
 interface ProgressChartProps {
   points: EssayProgressPoint[];
+  // Lets a much wider container (the landing page preview) use a flatter
+  // aspect ratio instead of inheriting the real Dashboard's height, which
+  // would otherwise scale up proportionally with the extra width and leave
+  // the mostly-unused C1/C2 rows towering over the actual data. Recomputing
+  // the vertical scale for a shorter viewBox keeps marker/text sizes at
+  // their normal absolute size -- unlike CSS-stretching the same SVG, nothing
+  // here gets visually squished.
+  height?: number;
 }
 
 // Enough attempts to show a real trend without the line becoming unreadable;
@@ -25,10 +33,9 @@ const TASK_STYLES: Record<string, { color: string; dashArray?: string; marker: "
 };
 
 const CHART_WIDTH = 640;
-const CHART_HEIGHT = 260;
+const DEFAULT_CHART_HEIGHT = 260;
 const PADDING = { top: 16, right: 16, bottom: 28, left: 32 };
 const PLOT_WIDTH = CHART_WIDTH - PADDING.left - PADDING.right;
-const PLOT_HEIGHT = CHART_HEIGHT - PADDING.top - PADDING.bottom;
 const MARKER_SIZE = 4;
 
 function xFor(index: number, maxAttempts: number) {
@@ -37,8 +44,8 @@ function xFor(index: number, maxAttempts: number) {
 }
 
 // Rank 1 (A1) plots at the bottom, rank 6 (C2) at the top.
-function yFor(rank: number) {
-  return PADDING.top + (1 - (rank - 1) / (CEFR_LEVELS.length - 1)) * PLOT_HEIGHT;
+function yFor(rank: number, plotHeight: number) {
+  return PADDING.top + (1 - (rank - 1) / (CEFR_LEVELS.length - 1)) * plotHeight;
 }
 
 function Marker({ shape, x, y, color }: { shape: "circle" | "square" | "diamond"; x: number; y: number; color: string }) {
@@ -92,7 +99,7 @@ function ProgressDataTable({ series }: { series: EssayProgressSeries[] }) {
   );
 }
 
-export function ProgressChart({ points }: ProgressChartProps) {
+export function ProgressChart({ points, height = DEFAULT_CHART_HEIGHT }: ProgressChartProps) {
   const copy = useAppCopy();
   const series = groupEssayProgressByTask(points, MAX_ATTEMPTS_PER_TASK);
 
@@ -106,6 +113,7 @@ export function ProgressChart({ points }: ProgressChartProps) {
   }
 
   const maxAttempts = Math.max(...series.map((task) => task.attempts.length));
+  const plotHeight = height - PADDING.top - PADDING.bottom;
 
   return (
     <div>
@@ -118,13 +126,13 @@ export function ProgressChart({ points }: ProgressChartProps) {
        * scaled below 1:1 -- an 11-unit label stays at least 11 CSS px. */}
       <div className="-mx-1 overflow-x-auto px-1">
         <svg
-          viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+          viewBox={`0 0 ${CHART_WIDTH} ${height}`}
           aria-hidden="true"
           className="w-full"
           style={{ minWidth: CHART_WIDTH }}
         >
           {CEFR_LEVELS.map((level, i) => {
-            const y = yFor(i + 1);
+            const y = yFor(i + 1, plotHeight);
             return (
               <g key={level}>
                 <line
@@ -146,7 +154,7 @@ export function ProgressChart({ points }: ProgressChartProps) {
             <text
               key={i}
               x={xFor(i, maxAttempts)}
-              y={CHART_HEIGHT - PADDING.bottom + 16}
+              y={height - PADDING.bottom + 16}
               textAnchor="middle"
               fontSize={11}
               fill="currentColor"
@@ -165,10 +173,10 @@ export function ProgressChart({ points }: ProgressChartProps) {
                   stroke={style.color}
                   strokeWidth={2}
                   strokeDasharray={style.dashArray}
-                  points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank)}`).join(" ")}
+                  points={task.attempts.map((point, i) => `${xFor(i, maxAttempts)},${yFor(point.cefrRank, plotHeight)}`).join(" ")}
                 />
                 {task.attempts.map((point, i) => (
-                  <Marker key={point.id} shape={style.marker} x={xFor(i, maxAttempts)} y={yFor(point.cefrRank)} color={style.color} />
+                  <Marker key={point.id} shape={style.marker} x={xFor(i, maxAttempts)} y={yFor(point.cefrRank, plotHeight)} color={style.color} />
                 ))}
               </g>
             );

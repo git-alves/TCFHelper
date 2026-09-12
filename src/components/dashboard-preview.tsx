@@ -35,7 +35,13 @@ export function DashboardPreview() {
     <div className="dark mt-12 rounded-2xl border border-white/[.12] bg-black/30 p-6 shadow-2xl shadow-black/40 sm:p-8">
       <p className="text-sm font-medium text-zinc-400">{copy.dashboard.chartTitle}</p>
       <div className="mt-4">
-        <ProgressChart points={SAMPLE_PROGRESS_POINTS} />
+        {/* This card spans the full section width, far wider than the real
+         * Dashboard's max-w-3xl -- at the chart's normal aspect ratio that
+         * extra width would scale into a lot of extra height, mostly the
+         * unused C1/C2 rows towering over the actual A2-B2 data. A flatter
+         * ratio here keeps it proportionate without changing the real
+         * Dashboard. */}
+        <ProgressChart points={SAMPLE_PROGRESS_POINTS} height={170} />
       </div>
     </div>
   );
