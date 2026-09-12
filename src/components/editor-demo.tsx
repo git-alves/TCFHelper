@@ -122,9 +122,18 @@ export function EditorDemo({ taskLabel, taskPrompt }: EditorDemoProps) {
         <p className="mt-1 text-sm text-zinc-400">{taskPrompt}</p>
       </div>
 
-      <div className="relative min-h-[190px]">
+      {/* A CSS-grid stack, not absolutely-positioned overlays: every phase
+       * is a normal grid item sharing the same cell, so the row's auto
+       * height is always the tallest phase's natural content height --
+       * including the diff phase, which is much taller than the others on
+       * narrow screens (it shows both the removed and added text at once).
+       * Absolute positioning would pull the inactive phases out of layout
+       * entirely, leaving the container's height to whichever phase is
+       * currently active and making it visibly grow/shrink between phases,
+       * pushing everything below it up and down each loop. */}
+      <div className="grid">
         <div
-          className={`transition-opacity duration-300 ${showCorrecting || showResult ? "pointer-events-none absolute inset-0 opacity-0" : "opacity-100"}`}
+          className={`[grid-area:1/1] transition-opacity duration-300 ${showCorrecting || showResult ? "pointer-events-none opacity-0" : "opacity-100"}`}
         >
           <div className="min-h-[130px] rounded-xl border border-white/[.25] bg-white/[.03] px-4 py-3 text-base leading-7 text-zinc-200">
             {typedText}
@@ -144,14 +153,14 @@ export function EditorDemo({ taskLabel, taskPrompt }: EditorDemoProps) {
           </div>
         </div>
 
-        <div className={`transition-opacity duration-300 ${showCorrecting ? "opacity-100" : "pointer-events-none absolute inset-0 opacity-0"}`}>
+        <div className={`[grid-area:1/1] transition-opacity duration-300 ${showCorrecting ? "opacity-100" : "pointer-events-none opacity-0"}`}>
           <div className="flex min-h-[190px] flex-col items-center justify-center text-center">
             <span className="h-8 w-8 animate-spin rounded-full border-2 border-violet-400 border-t-transparent" aria-hidden="true" />
             <p className="mt-4 text-sm font-medium text-zinc-200">{copy.workspace.correctionModal.loading}</p>
           </div>
         </div>
 
-        <div className={`transition-opacity duration-300 ${showResult ? "opacity-100" : "pointer-events-none absolute inset-0 opacity-0"}`}>
+        <div className={`[grid-area:1/1] transition-opacity duration-300 ${showResult ? "opacity-100" : "pointer-events-none opacity-0"}`}>
           <div className="flex flex-wrap items-center gap-2 text-xs font-medium">
             <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-emerald-300">{copy.workspace.correctionModal.statusEvaluated}</span>
             <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-emerald-300">
