@@ -86,8 +86,7 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
           <p className="text-sm font-medium text-violet-300">{copy.problemEyebrow}</p>
           <h2 id="problem-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.problemTitle}</h2>
           <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.problemDescription}</p>
-          <p className="mt-10 text-sm font-medium text-violet-300">{copy.proofEyebrow}</p><h3 id="proof-heading" className="mt-3 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl">{copy.proofTitle}</h3>
-          <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
             <article className="rounded-2xl border border-white/[.12] bg-black/20 p-6 transition-all duration-300 hover:-translate-y-1 hover:border-white/25 hover:shadow-xl hover:shadow-black/30 motion-reduce:transition-none motion-reduce:hover:translate-y-0">
               <p className="text-sm font-medium text-zinc-400">{copy.before}</p>
               <p className="mt-5 text-lg leading-8 text-zinc-300">{copy.beforeText}</p>

@@ -7,8 +7,6 @@ type LandingCopy = {
   primaryAction: string;
   demoTaskLabel: string;
   demoTaskPrompt: string;
-  proofEyebrow: string;
-  proofTitle: string;
   before: string;
   after: string;
   beforeText: string;
@@ -50,8 +48,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     primaryAction: "Access the tool",
     demoTaskLabel: "Task 2 · Recount and comment",
     demoTaskPrompt: "Do social media strengthen or weaken real relationships? Give your opinion.",
-    proofEyebrow: "From draft to clearer expression",
-    proofTitle: "See what a more precise response can sound like.",
     before: "Before",
     after: "After",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
@@ -70,7 +66,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     ],
     problemEyebrow: "More than spell check",
     problemTitle: "Writing in French is difficult. Writing for the TCF is even harder.",
-    problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task.",
+    problemDescription: "You may know a lot of French and still lose marks when your response is not sufficiently structured, precise, or adapted to the task. See what a more precise response can sound like.",
     whyEyebrow: "Built specifically for TCF Writing",
     whyTitle: "Why MyTCFLab?",
     whyDescription: "MyTCFLab is not a generic French corrector. It is designed specifically around TCF written expression.",
@@ -109,8 +105,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     primaryAction: "Accéder à l’outil",
     demoTaskLabel: "Tâche 2 · Raconter et commenter",
     demoTaskPrompt: "Les réseaux sociaux renforcent-ils ou affaiblissent-ils les relations réelles ? Donnez votre avis.",
-    proofEyebrow: "Du brouillon à une expression plus claire",
-    proofTitle: "Découvrez ce qu’une réponse plus précise peut devenir.",
     before: "Avant",
     after: "Après",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
@@ -129,7 +123,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     ],
     problemEyebrow: "Bien plus qu’un correcteur",
     problemTitle: "Écrire en français est difficile. Écrire pour le TCF l’est encore plus.",
-    problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche.",
+    problemDescription: "Vous pouvez connaître beaucoup de français et perdre des points si votre réponse manque de structure, de précision ou d’adaptation à la tâche. Découvrez ce qu’une réponse plus précise peut devenir.",
     whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
     whyTitle: "Pourquoi MyTCFLab ?",
     whyDescription: "MyTCFLab n’est pas un correcteur de français générique. Il est conçu spécifiquement autour de l’expression écrite du TCF.",
@@ -164,8 +158,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     primaryAction: "Acceder a la herramienta",
     demoTaskLabel: "Tarea 2 · Narrar y comentar",
     demoTaskPrompt: "¿Las redes sociales fortalecen o debilitan las relaciones reales? Da tu opinión.",
-    proofEyebrow: "Del borrador a una expresión más clara",
-    proofTitle: "Descubre cómo puede sonar una respuesta más precisa.",
     before: "Antes",
     after: "Después",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
@@ -184,7 +176,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     ],
     problemEyebrow: "Mucho más que un corrector",
     problemTitle: "Escribir en francés es difícil. Escribir para el TCF lo es aún más.",
-    problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea.",
+    problemDescription: "Puedes saber mucho francés y aun así perder puntos si tu respuesta no tiene suficiente estructura, precisión o adaptación a la tarea. Descubre cómo puede sonar una respuesta más precisa.",
     whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
     whyTitle: "¿Por qué MyTCFLab?",
     whyDescription: "MyTCFLab no es un corrector de francés genérico. Está diseñado específicamente en torno a la expresión escrita del TCF.",
@@ -219,8 +211,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     primaryAction: "Acessar a ferramenta",
     demoTaskLabel: "Tarefa 2 · Narrar e comentar",
     demoTaskPrompt: "As redes sociais fortalecem ou enfraquecem os relacionamentos reais? Dê sua opinião.",
-    proofEyebrow: "Do rascunho a uma expressão mais clara",
-    proofTitle: "Veja como uma resposta mais precisa pode soar.",
     before: "Antes",
     after: "Depois",
     beforeText: "Je pense que les réseaux sociaux sont importants parce que les gens peuvent facilement communiquer avec leurs amis et découvrir des informations.",
@@ -239,7 +229,7 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     ],
     problemEyebrow: "Mais do que um corretor ortográfico",
     problemTitle: "Escrever em francês é difícil. Escrever para o TCF é ainda mais.",
-    problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa.",
+    problemDescription: "Você pode conhecer muito francês e ainda perder pontos se sua resposta não for suficientemente estruturada, precisa ou adequada à tarefa. Veja como uma resposta mais precisa pode soar.",
     whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
     whyTitle: "Por que MyTCFLab?",
     whyDescription: "MyTCFLab não é um corretor de francês genérico. Ele foi projetado especificamente para a expressão escrita do TCF.",
