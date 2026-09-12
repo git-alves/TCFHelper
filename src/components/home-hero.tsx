@@ -125,26 +125,25 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
         <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.whyDescription}</p>
         <div className="mt-10 overflow-x-auto">
-          <table className="w-full min-w-[560px] text-left">
+          <table className="w-full min-w-[560px] table-fixed text-left">
             <thead>
               <tr className="border-b border-white/[.12]">
-                <th scope="col" className="py-4 pr-4 text-sm text-zinc-500">{copy.comparisonFeatureHeading}</th>
-                <th scope="col" className="px-4 py-4 text-sm text-zinc-500">{copy.comparisonGenericHeading}</th>
-                <th scope="col" className="px-4 py-4 text-sm text-zinc-500">{copy.comparisonMyTcfLabHeading}</th>
+                <th scope="col" className="w-1/3 py-4 pr-4 text-sm text-zinc-500">{copy.comparisonFeatureHeading}</th>
+                <th scope="col" className="w-1/3 px-4 py-4 text-sm text-zinc-500">{copy.comparisonGenericHeading}</th>
+                <th scope="col" className="w-1/3 px-4 py-4 text-sm text-zinc-500">{copy.comparisonMyTcfLabHeading}</th>
               </tr>
             </thead>
             <tbody>
               {copy.comparisonRows.map((row) => (
-                <tr key={row.feature} className="border-b border-white/[.08] last:border-b-0">
+                <tr key={row.feature} className="group border-b border-white/[.08] transition-colors duration-300 last:border-b-0 hover:bg-white/[.04]">
                   <td className="py-5 pr-4 text-sm font-semibold text-zinc-100">{row.feature}</td>
                   <td className="px-4 py-5 text-sm text-zinc-300">{row.generic}</td>
-                  <td className="px-4 py-5 text-sm text-zinc-300">{row.mytcflab}</td>
+                  <td className="px-4 py-5 text-sm text-zinc-300 transition-colors duration-300 group-hover:text-violet-200">{row.mytcflab}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.whyItems.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul>
       </section>
 
       <section
