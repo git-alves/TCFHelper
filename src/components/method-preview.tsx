@@ -33,9 +33,9 @@ export function MethodPreview() {
   const modalCopy = copy.workspace.correctionModal;
 
   return (
-    <div className="mt-6 rounded-2xl border border-white/[.12] p-4 sm:p-5">
+    <div className="rounded-2xl border border-white/[.12] p-4 sm:p-5">
       <h3 className="font-semibold text-zinc-100">{modalCopy.correctionsHeading({ count: SAMPLE_CORRECTIONS.length })}</h3>
-      <ol className="mt-4 space-y-3">
+      <ol className="mt-4 grid gap-3 sm:grid-cols-2">
         {SAMPLE_CORRECTIONS.map((correction, index) => (
           <li key={index} className="overflow-hidden rounded-xl border border-white/[.12] text-sm">
             <div className="flex flex-wrap items-start justify-between gap-3 p-3">
