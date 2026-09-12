@@ -23,9 +23,10 @@ type LandingCopy = {
   whyEyebrow: string;
   whyTitle: string;
   whyDescription: string;
+  comparisonFeatureHeading: string;
   comparisonGenericHeading: string;
   comparisonMyTcfLabHeading: string;
-  comparisonRows: { generic: string; mytcflab: string }[];
+  comparisonRows: { feature: string; generic: string; mytcflab: string }[];
   whyItems: string[];
   stepsEyebrow: string;
   stepsTitle: string;
@@ -73,14 +74,15 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyEyebrow: "Built specifically for TCF Writing",
     whyTitle: "Why MyTCFLab?",
     whyDescription: "MyTCFLab is not a generic French corrector. It is designed specifically around TCF written expression.",
+    comparisonFeatureHeading: "Feature",
     comparisonGenericHeading: "Generic AI tools",
     comparisonMyTcfLabHeading: "MyTCFLab",
     comparisonRows: [
-      { generic: "General French correction", mytcflab: "TCF-focused practice" },
-      { generic: "Open-ended feedback", mytcflab: "Structured feedback" },
-      { generic: "No TCF task context", mytcflab: "Tasks 1, 2 & 3" },
-      { generic: "Corrects your text", mytcflab: "Helps you improve your next response" },
-      { generic: "Generic suggestions", mytcflab: "Focus on TCF-relevant criteria" },
+      { feature: "Focus Area", generic: "General French correction", mytcflab: "TCF-focused practice" },
+      { feature: "Feedback Style", generic: "Open-ended feedback", mytcflab: "Structured feedback" },
+      { feature: "Task Context", generic: "No TCF task context", mytcflab: "Tailored for Tasks 1, 2 & 3" },
+      { feature: "Improvement Goal", generic: "Corrects your text as-is", mytcflab: "Helps you improve your next response" },
+      { feature: "Suggestions", generic: "Generic suggestions", mytcflab: "Focus on TCF-relevant criteria" },
     ],
     whyItems: ["TCF Tasks 1, 2 & 3", "Task-specific requirements", "Timed practice", "Progressive improvement"],
     stepsEyebrow: "How it works",
@@ -131,14 +133,15 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyEyebrow: "Conçu spécifiquement pour l’expression écrite du TCF",
     whyTitle: "Pourquoi MyTCFLab ?",
     whyDescription: "MyTCFLab n’est pas un correcteur de français générique. Il est conçu spécifiquement autour de l’expression écrite du TCF.",
+    comparisonFeatureHeading: "Critère",
     comparisonGenericHeading: "Outils d’IA génériques",
     comparisonMyTcfLabHeading: "MyTCFLab",
     comparisonRows: [
-      { generic: "Correction générale du français", mytcflab: "Entraînement axé sur le TCF" },
-      { generic: "Retour ouvert et vague", mytcflab: "Retour structuré" },
-      { generic: "Aucun contexte lié aux tâches du TCF", mytcflab: "Tâches 1, 2 et 3" },
-      { generic: "Corrige votre texte", mytcflab: "Vous aide à améliorer votre prochaine réponse" },
-      { generic: "Suggestions génériques", mytcflab: "Axé sur les critères pertinents du TCF" },
+      { feature: "Domaine de travail", generic: "Correction générale du français", mytcflab: "Entraînement axé sur le TCF" },
+      { feature: "Style de retour", generic: "Retour ouvert et vague", mytcflab: "Retour structuré" },
+      { feature: "Contexte de la tâche", generic: "Aucun contexte lié aux tâches du TCF", mytcflab: "Adapté aux tâches 1, 2 et 3" },
+      { feature: "Objectif d’amélioration", generic: "Corrige votre texte tel quel", mytcflab: "Vous aide à améliorer votre prochaine réponse" },
+      { feature: "Suggestions", generic: "Suggestions génériques", mytcflab: "Axé sur les critères pertinents du TCF" },
     ],
     whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
@@ -185,14 +188,15 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyEyebrow: "Diseñado específicamente para la expresión escrita del TCF",
     whyTitle: "¿Por qué MyTCFLab?",
     whyDescription: "MyTCFLab no es un corrector de francés genérico. Está diseñado específicamente en torno a la expresión escrita del TCF.",
+    comparisonFeatureHeading: "Criterio",
     comparisonGenericHeading: "Herramientas de IA genéricas",
     comparisonMyTcfLabHeading: "MyTCFLab",
     comparisonRows: [
-      { generic: "Corrección general de francés", mytcflab: "Práctica enfocada en el TCF" },
-      { generic: "Comentarios abiertos", mytcflab: "Comentarios estructurados" },
-      { generic: "Sin contexto de las tareas del TCF", mytcflab: "Tareas 1, 2 y 3" },
-      { generic: "Corrige tu texto", mytcflab: "Te ayuda a mejorar tu próxima respuesta" },
-      { generic: "Sugerencias genéricas", mytcflab: "Enfocado en los criterios relevantes del TCF" },
+      { feature: "Área de enfoque", generic: "Corrección general de francés", mytcflab: "Práctica enfocada en el TCF" },
+      { feature: "Estilo de comentarios", generic: "Comentarios abiertos", mytcflab: "Comentarios estructurados" },
+      { feature: "Contexto de la tarea", generic: "Sin contexto de las tareas del TCF", mytcflab: "Adaptado a las tareas 1, 2 y 3" },
+      { feature: "Objetivo de mejora", generic: "Corrige tu texto tal cual", mytcflab: "Te ayuda a mejorar tu próxima respuesta" },
+      { feature: "Sugerencias", generic: "Sugerencias genéricas", mytcflab: "Enfocado en los criterios relevantes del TCF" },
     ],
     whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
@@ -239,14 +243,15 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
     whyEyebrow: "Criado especificamente para a expressão escrita do TCF",
     whyTitle: "Por que MyTCFLab?",
     whyDescription: "MyTCFLab não é um corretor de francês genérico. Ele foi projetado especificamente para a expressão escrita do TCF.",
+    comparisonFeatureHeading: "Critério",
     comparisonGenericHeading: "Ferramentas de IA genéricas",
     comparisonMyTcfLabHeading: "MyTCFLab",
     comparisonRows: [
-      { generic: "Correção geral de francês", mytcflab: "Prática focada no TCF" },
-      { generic: "Feedback aberto e vago", mytcflab: "Feedback estruturado" },
-      { generic: "Sem contexto das tarefas do TCF", mytcflab: "Tarefas 1, 2 e 3" },
-      { generic: "Corrige seu texto", mytcflab: "Ajuda você a melhorar sua próxima resposta" },
-      { generic: "Sugestões genéricas", mytcflab: "Foco nos critérios relevantes do TCF" },
+      { feature: "Área de foco", generic: "Correção geral de francês", mytcflab: "Prática focada no TCF" },
+      { feature: "Estilo de feedback", generic: "Feedback aberto e vago", mytcflab: "Feedback estruturado" },
+      { feature: "Contexto da tarefa", generic: "Sem contexto das tarefas do TCF", mytcflab: "Adaptado às tarefas 1, 2 e 3" },
+      { feature: "Objetivo de melhoria", generic: "Corrige seu texto como está", mytcflab: "Ajuda você a melhorar sua próxima resposta" },
+      { feature: "Sugestões", generic: "Sugestões genéricas", mytcflab: "Foco nos critérios relevantes do TCF" },
     ],
     whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",

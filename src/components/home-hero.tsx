@@ -125,19 +125,21 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
       >
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
         <p className="mt-5 max-w-2xl leading-7 text-zinc-400">{copy.whyDescription}</p>
-        <div className="mt-10 overflow-hidden rounded-2xl border border-white/[.12]">
-          <table className="w-full text-left">
+        <div className="mt-10 overflow-x-auto">
+          <table className="w-full min-w-[560px] text-left">
             <thead>
               <tr className="border-b border-white/[.12]">
-                <th scope="col" className="px-5 py-4 text-sm font-semibold text-zinc-400">{copy.comparisonGenericHeading}</th>
-                <th scope="col" className="px-5 py-4 text-sm font-semibold text-violet-200">{copy.comparisonMyTcfLabHeading}</th>
+                <th scope="col" className="py-4 pr-4 text-sm text-zinc-500">{copy.comparisonFeatureHeading}</th>
+                <th scope="col" className="px-4 py-4 text-sm text-zinc-500">{copy.comparisonGenericHeading}</th>
+                <th scope="col" className="px-4 py-4 text-sm text-zinc-500">{copy.comparisonMyTcfLabHeading}</th>
               </tr>
             </thead>
             <tbody>
               {copy.comparisonRows.map((row) => (
-                <tr key={row.generic} className="border-b border-white/[.08] last:border-b-0">
-                  <td className="px-5 py-4 text-sm text-zinc-400">{row.generic}</td>
-                  <td className="px-5 py-4 text-sm font-medium text-violet-200">{row.mytcflab}</td>
+                <tr key={row.feature} className="border-b border-white/[.08] last:border-b-0">
+                  <td className="py-5 pr-4 text-sm font-semibold text-zinc-100">{row.feature}</td>
+                  <td className="px-4 py-5 text-sm text-zinc-300">{row.generic}</td>
+                  <td className="px-4 py-5 text-sm text-zinc-300">{row.mytcflab}</td>
                 </tr>
               ))}
             </tbody>

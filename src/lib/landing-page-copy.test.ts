@@ -18,9 +18,11 @@ describe("landing page copy", () => {
       expect(copy.afterAnalysis).toHaveLength(3);
       expect(copy.beforeAnalysis.map((item) => item.label)).toEqual(copy.afterAnalysis.map((item) => item.label));
       expect(copy.whyDescription).not.toHaveLength(0);
+      expect(copy.comparisonFeatureHeading).not.toHaveLength(0);
       expect(copy.comparisonGenericHeading).not.toHaveLength(0);
       expect(copy.comparisonMyTcfLabHeading).not.toHaveLength(0);
       expect(copy.comparisonRows).toHaveLength(5);
+      expect(copy.comparisonRows.every((row) => row.feature.length > 0)).toBe(true);
       expect(copy.whyItems).toHaveLength(4);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
