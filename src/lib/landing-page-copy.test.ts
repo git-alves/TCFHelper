@@ -23,7 +23,6 @@ describe("landing page copy", () => {
       expect(copy.comparisonMyTcfLabHeading).not.toHaveLength(0);
       expect(copy.comparisonRows).toHaveLength(5);
       expect(copy.comparisonRows.every((row) => row.feature.length > 0)).toBe(true);
-      expect(copy.whyItems).toHaveLength(4);
       expect(copy.steps).toHaveLength(3);
       expect(copy.assessed).toHaveLength(4);
       expect(copy.closingTitle).not.toHaveLength(0);

@@ -25,7 +25,6 @@ type LandingCopy = {
   comparisonGenericHeading: string;
   comparisonMyTcfLabHeading: string;
   comparisonRows: { feature: string; generic: string; mytcflab: string }[];
-  whyItems: string[];
   stepsEyebrow: string;
   stepsTitle: string;
   steps: { title: string; description: string }[];
@@ -80,7 +79,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { feature: "Improvement Goal", generic: "Corrects your text as-is", mytcflab: "Helps you improve your next response" },
       { feature: "Suggestions", generic: "Generic suggestions", mytcflab: "Focus on TCF-relevant criteria" },
     ],
-    whyItems: ["TCF Tasks 1, 2 & 3", "Task-specific requirements", "Timed practice", "Progressive improvement"],
     stepsEyebrow: "How it works",
     stepsTitle: "A focused practice loop in three steps.",
     steps: [
@@ -137,7 +135,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { feature: "Objectif d’amélioration", generic: "Corrige votre texte tel quel", mytcflab: "Vous aide à améliorer votre prochaine réponse" },
       { feature: "Suggestions", generic: "Suggestions génériques", mytcflab: "Axé sur les critères pertinents du TCF" },
     ],
-    whyItems: ["Tâches 1, 2 et 3 du TCF", "Exigences propres à chaque tâche", "Entraînement chronométré", "Progression continue"],
     stepsEyebrow: "Comment ça marche",
     stepsTitle: "Un cycle d’entraînement ciblé en trois étapes.",
     steps: [{ title: "Entraînez une compétence précise", description: "Travaillez les éléments clés d’une tâche à travers de courts exercices jusqu’à ce que la structure devienne naturelle." }, { title: "Simulez une tâche complète", description: "Rédigez une réponse chronométrée avec des indices, puis consultez votre correction pour un retour personnalisé." }, { title: "Suivez votre progression", description: "Consultez vos réponses corrigées et votre niveau CECRL estimé sur votre tableau de bord." }],
@@ -190,7 +187,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { feature: "Objetivo de mejora", generic: "Corrige tu texto tal cual", mytcflab: "Te ayuda a mejorar tu próxima respuesta" },
       { feature: "Sugerencias", generic: "Sugerencias genéricas", mytcflab: "Enfocado en los criterios relevantes del TCF" },
     ],
-    whyItems: ["Tareas 1, 2 y 3 del TCF", "Requisitos específicos de cada tarea", "Práctica cronometrada", "Mejora progresiva"],
     stepsEyebrow: "Cómo funciona",
     stepsTitle: "Un ciclo de práctica enfocado en tres pasos.",
     steps: [{ title: "Entrena una habilidad específica", description: "Practica las partes clave de una tarea con ejercicios breves hasta que la estructura te resulte natural." }, { title: "Simula una tarea completa", description: "Escribe una respuesta cronometrada con pistas y luego revisa tu corrección para recibir comentarios personalizados." }, { title: "Sigue tu progreso", description: "Revisa tus respuestas corregidas y tu nivel MCER estimado en tu panel." }],
@@ -243,7 +239,6 @@ export const LANDING_PAGE_COPY: Record<AppLocale, LandingCopy> = {
       { feature: "Objetivo de melhoria", generic: "Corrige seu texto como está", mytcflab: "Ajuda você a melhorar sua próxima resposta" },
       { feature: "Sugestões", generic: "Sugestões genéricas", mytcflab: "Foco nos critérios relevantes do TCF" },
     ],
-    whyItems: ["Tarefas 1, 2 e 3 do TCF", "Requisitos específicos de cada tarefa", "Prática cronometrada", "Melhoria progressiva"],
     stepsEyebrow: "Como funciona",
     stepsTitle: "Um ciclo de prática focado em três etapas.",
     steps: [{ title: "Treine uma habilidade específica", description: "Pratique as partes principais de uma tarefa com exercícios curtos até que a estrutura fique natural." }, { title: "Simule uma tarefa completa", description: "Escreva uma resposta cronometrada com dicas e depois veja sua correção para receber feedback personalizado." }, { title: "Acompanhe seu progresso", description: "Revise suas respostas corrigidas e seu nível QECR estimado no seu Dashboard." }],
