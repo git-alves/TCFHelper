@@ -6,13 +6,14 @@ import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
 import { DashboardNavGuardProvider } from "@/components/dashboard-nav-guard";
+import { FaviconSync } from "@/components/favicon-sync";
 import { NavBar } from "@/components/nav-bar";
 import { TimezoneReporter } from "@/components/timezone-reporter";
 import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
 import { getCurrentAdminUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
-import { THEME_INIT_SCRIPT } from "@/lib/app-theme";
+import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -64,12 +65,17 @@ export default async function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        {/* Rendered before the script below so it exists in the DOM by the
+         * time that (synchronous, blocking) script runs and looks it up. */}
+        <link rel="icon" id={APP_FAVICON_LINK_ID} href="/favicon-light.svg" type="image/svg+xml" />
         {/* Runs before first paint so a stored ("system" or explicit)
-         * theme preference never flashes the wrong theme. */}
+         * theme preference never flashes the wrong theme -- see
+         * THEME_INIT_SCRIPT for why it also sets the favicon above. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <AppThemeProvider>
+          <FaviconSync />
           <AppLocaleProvider initialLocale={locale}>
             <ClerkLocaleProvider>
               <DashboardNavGuardProvider>

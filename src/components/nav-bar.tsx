@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
+import { BrandMark } from "@/components/brand-mark";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { LocaleFlag } from "@/components/locale-flag";
 import { ThemedSelect } from "@/components/themed-select";
@@ -208,8 +209,9 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
       }
     >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="font-semibold tracking-tight">
-          MyTCFLab
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
+          <BrandMark className="h-6 w-6" accentClassName={isHome ? "text-violet-300" : undefined} />
+          MyTCF<span className={isHome ? "text-violet-300" : "text-violet-700 dark:text-violet-300"}>Lab</span>
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
           {isHome && (
