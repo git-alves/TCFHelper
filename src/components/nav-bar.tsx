@@ -221,7 +221,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
            * each other with no gap between them, unlike the gap-1.5 between
            * the icon and this whole wordmark. */}
           <span>
-            <span className={wordmarkAccentClassName}>My</span>TCF<span className={wordmarkAccentClassName}>Lab</span>
+            My<span className={wordmarkAccentClassName}>TCF</span>Lab
           </span>
         </Link>
         <div className="flex items-center gap-2 text-sm sm:gap-3">
