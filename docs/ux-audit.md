@@ -118,28 +118,21 @@ same short helper to the Writing guide and Timed task controls so all three
 follow one predictable pattern. Do not hide the controls; seeing the available
 aids helps the learner plan their next step.
 
-### P1 — Shorten and stage the first-run walkthrough
+### Product decision — The 21-step first-run walkthrough is intentional
 
-**Observed:** The comprehensive “Take a tour” is now 21 steps and drives
-real workspace state (topic loading, sample text, correction preview).
+**Confirmed direction:** Every new learner is deliberately taken through the
+full Dashboard → Train → Simulate tour on first login. Its 21 steps drive real
+workspace state (topic loading, sample text, and correction preview), so it is
+part of the activation experience—not an accidental default or a defect to
+shorten.
 
-**Why it matters:** A 21-step sequential tutorial is a high commitment before
-a learner has taken a meaningful action. The same learner must also process a
-new dashboard, a six-step practice route, and a dense full-writing workspace.
-The walkthrough is excellent as a reference, but too linear as the default
-orientation mechanism.
-
-**Recommendation:** Make the initial path a three-step “start here” guide:
-
-1. Choose **Train** or **Simulate**, with one-sentence fit guidance.
-2. On the chosen page, point to the immediate first control.
-3. At the first editor, point to **Correct response** and say feedback is not
-   an official TCF score.
-
-Keep the full tour as an optional, resumable “Explore all tools (about 3 min)”
-experience. Group the editor aids into one step labelled “Optional writing
-aids” with expandable mini-cards for Guide, Timer, Spell check, and
-Translation. This reduces tour length without removing discoverability.
+**UX implication:** Because completion of the full tour is the intended
+outcome, reliability and recoverability matter more than reducing its length.
+Each scripted step must wait for its target to be actionable, dismissal must
+remain respected, and all onboarding, loading, and error language must match
+the learner’s locale. Future work may improve individual explanations or add
+an explicit opt-out, but must not silently replace the required first-run
+experience with a compact guide.
 
 ### P1 — Restore a clear primary action for returning Dashboard users
 
@@ -296,8 +289,8 @@ time; secondary tools remain discoverable but do not compete with it.
 2. Ask six learners across B2–C2 to start a task and find the writing aids.
    Measure time to a first draft sentence and whether they understand what
    spell check does *not* cover.
-3. Run the proposed compact orientation against the 21-step tour. Measure
-   completion, voluntary use of the full tour, and whether learners can later
+3. Test the intentional 21-step tour with new learners. Measure completion,
+   step-level stalls, skip/return behaviour, and whether learners can later
    find Guide, Timer, Spell check, and Correction without prompting.
 4. Give six learners an intentionally grammar-wrong but correctly spelled
    French sentence. Confirm that none interpret the absence of an underline
@@ -314,7 +307,129 @@ time; secondary tools remain discoverable but do not compete with it.
    admission disclosure.
 3. Add persistent Dashboard “start/continue” actions.
 4. Prototype the aids disclosure and feedback revision CTA with learners
-   before moving controls or changing the tour.
-5. Only then shorten the default walkthrough, retaining the full tour as an
-   opt-in reference.
+   before moving controls. Preserve the intentional 21-step first-run tour
+   while resolving its loading and recovery failure states.
 
+## Follow-up implementation scan — 14 September 2026
+
+This follow-up checked the current route and component logic, rendered the
+public landing page locally, and ran the linter. Authenticated browser flows
+could not be exercised in this environment because no browser automation
+endpoint was available and Clerk credentials are required for those routes.
+
+### Confirmed findings
+
+#### P2 — Prevent full-tour steps from spotlighting controls before their workspace state is ready
+
+**Observed:** The full first-run tour intentionally advances from
+`topic-picker` to `guided-writing`, `timed-task`, and `spell-check`.
+`tasks-walkthrough-runner.tsx` advances immediately, while the prior
+`getRecentTopic(...)` request is asynchronous. During that gap the latter
+controls can still be disabled because no topic has resolved.
+
+**Why this matters:** The tour is the required first-run path. Highlighting a
+disabled control with no usable action can make a new learner believe the tour
+has stalled, particularly on a slow or failed topic request.
+
+**Recommendation:** Make the scripted transition deterministic: either wait
+for the topic request to settle before advancing to an aid control, or set the
+scripted topic state synchronously before its corresponding spotlight is
+shown. On request failure, give the overlay a localized retry/skip recovery
+state rather than pointing at disabled controls. Cover slow success, failure,
+and a Next click while loading in component and browser tests.
+
+#### Cleanup — Remove or repurpose unreachable compact-guide code
+
+**Observed:** `DashboardWalkthroughRunner` keeps the `firstUseSteps` branch
+and `hasGettingStarted` prop, but automatic first-run opening sets
+`isFullTour`, so the concise branch is not part of the approved journey. The
+nearby initialization comment still describes a “first-use choice panel.”
+
+**Recommendation:** Delete this branch and its stale comment, or wire it to a
+deliberate, product-approved opt-out. This is maintenance cleanup, not an
+onboarding blocker.
+
+#### P1 — Give Clerk mount failures a recoverable login and sign-up state
+
+**Observed:** `/login` and `/signup` render Clerk’s `<SignIn />` and
+`<SignUp />` directly. The route shells provide no application-owned loading,
+error, or retry UI if Clerk cannot initialize or render (for example, a
+configuration, network, or third-party outage). The documented Clerk
+configuration failure mode can therefore present as an unhelpful blank page
+before admission or onboarding begins.
+
+**Why this matters:** Authentication is the front door to a mandatory first
+run. A blank screen gives a learner neither an explanation nor a next action;
+refreshing blindly is an especially poor recovery path for someone who has
+just followed an invitation.
+
+**Recommendation:** Wrap each auth route in an application-owned fallback
+that preserves the page frame and states plainly: “We couldn’t load sign in.”
+Offer **Try again**, a status/support path, and a link to the other auth route
+only when it remains meaningful. Localize these states and ensure failures do
+not expose Clerk configuration details. Test offline, a delayed Clerk script,
+and an initialization error at mobile and desktop widths.
+
+#### P1 — Admission and welcome surfaces bypass the locale system
+
+**Observed:** The landing page, dashboard and walkthrough resolve strings
+through locale-aware copy. In contrast, `activate/page.tsx`,
+`access-code-activation-form.tsx`, and `access-code-welcome-modal.tsx` render
+their headings, errors, CTA labels and close label as English literals. This
+includes the first success moment: “Access Successfully Granted! 🎉”.
+
+**Why this matters:** A learner who selected French, Spanish, or Portuguese
+can understand the marketing page and then encounters an English-only access
+barrier. This is a trust break before they have even reached the learning
+experience, and error recovery is where language clarity matters most.
+
+**Recommendation:** Add an `activation` slice to the existing `AppCopy`
+contract (including loading and network-error states) and pass resolved copy
+into the client form and welcome modal. Keep the success CTA accurate to its
+destination: “Get started” for Dashboard and “Start writing” for the task
+workspace. Localise the visually hidden “Close” label too.
+
+#### P1 — Tour dismissal has no durable local fallback when the API fails
+
+**Observed:** The full-tour `dismiss` handlers send `POST
+/api/walkthrough/dismiss` as fire-and-forget and discard failures. Until that
+server update succeeds, `walkthroughCompletedVersion` remains behind the
+current version and the full tour auto-opens again on the next Dashboard
+visit. There is no visible status or local suppression for the learner.
+
+**Why this matters:** A transient connectivity or service issue converts a
+learner’s explicit “Skip” into repeated interruption. The learner cannot tell
+whether the button worked, violating the expected immediate feedback for an
+action that changes future behaviour.
+
+**Recommendation:** Immediately store a local “dismissed this version” flag
+when the user skips/finishes, and use it to suppress automatic opening on
+this browser. Retry the server update on a later safe page load; if it still
+fails, leave the tour available from “Take a tour” rather than forcing it.
+The API remains the cross-device source of truth, while the local flag protects
+the current learner’s intent.
+
+#### P2 — Social icons behave as links but lead nowhere
+
+**Observed:** Both landing-page social controls use `href="#"`. Activating
+either moves focus/scroll position to the document top rather than opening a
+social profile, and the icon-only controls offer no expectation-setting copy.
+
+**Why this matters:** A social icon implies an external destination. A
+non-destination looks like a broken tap, especially on mobile where the user
+may lose their reading position.
+
+**Recommendation:** Hide these controls until real, verified URLs exist.
+When enabled, use the destination URL, an accessible name such as “MyTCFLab
+on Instagram”, and `target="_blank" rel="noreferrer"` only if opening a new
+tab is intentional.
+
+### Validation status
+
+| Check | Result | Follow-up needed |
+| --- | --- | --- |
+| Public landing route | Rendered locally with HTTP 200 and the expected primary CTA | Visual/responsive browser pass when automation is available. |
+| Login/sign-up resilience | Route implementation inspected; Clerk mount failure has no app-owned recovery UI | Exercise Clerk loading, offline, initialization-error, retry, and alternate-auth navigation states. |
+| Unauthenticated activation route | Correctly redirects (307) to sign-in | Exercise valid/invalid/redeemed code states with a test Clerk user. |
+| ESLint | No errors; two pre-existing warnings in `themed-select.tsx` for unsupported `aria-*` attributes on a button | Correct the semantic/ARIA contract separately before accessibility sign-off. |
+| Authenticated onboarding | Not browser-verified in this environment | Test first admission, slow/failed topic loading between tour steps, skip, completion, refresh, Back, locale change and failed-dismiss API states at phone and desktop widths. |
