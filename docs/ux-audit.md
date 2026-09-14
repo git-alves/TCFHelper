@@ -318,3 +318,103 @@ time; secondary tools remain discoverable but do not compete with it.
 5. Only then shorten the default walkthrough, retaining the full tour as an
    opt-in reference.
 
+## Follow-up implementation scan — 14 September 2026
+
+This follow-up checked the current route and component logic, rendered the
+public landing page locally, and ran the linter. Authenticated browser flows
+could not be exercised in this environment because no browser automation
+endpoint was available and Clerk credentials are required for those routes.
+
+### Confirmed findings
+
+#### P0 — The code still makes the 21-step tour the automatic first-run experience
+
+**Observed:** `DashboardPage` passes `shouldAutoStartWalkthrough(...)` to
+`DashboardWalkthroughRunner`. The runner treats that value as `isFullTour`,
+which selects the five Dashboard steps, displays progress out of 21, and hands
+the learner to the three Train and 13 Simulate steps. The concise,
+three-step `firstUseSteps` array is therefore unreachable for a new learner;
+it only applies when the runner is open but `isFullTour` is false.
+
+**Why this matters:** This directly conflicts with the recommended first-run
+flow above. A learner who has just redeemed an access code is asked to
+progress through 21 explanations before performing the promised activity.
+The individual steps are useful, but the sequential commitment is too high
+at the exact point a tired learner needs proof that the tool is useful.
+
+**Recommendation:** Split the concepts in `DashboardWalkthroughRunner`:
+
+```text
+first account visit → concise Dashboard guide (3 steps) → learner chooses Train or Simulate
+Take a tour       → explicit `?walkthrough=full` → 21-step cross-page reference tour
+```
+
+Keep `shouldAutoStartWalkthrough` for opening the concise guide, and reserve
+`isFullWalkthrough(searchParams...)` for the explicit tour. Mark the
+account-level walkthrough complete after the concise guide is skipped or
+finished; retain the per-browser contextual guides when the learner later
+opens Train or Simulate. This preserves discoverability without turning
+orientation into a gate.
+
+#### P1 — Admission and welcome surfaces bypass the locale system
+
+**Observed:** The landing page, dashboard and walkthrough resolve strings
+through locale-aware copy. In contrast, `activate/page.tsx`,
+`access-code-activation-form.tsx`, and `access-code-welcome-modal.tsx` render
+their headings, errors, CTA labels and close label as English literals. This
+includes the first success moment: “Access Successfully Granted! 🎉”.
+
+**Why this matters:** A learner who selected French, Spanish, or Portuguese
+can understand the marketing page and then encounters an English-only access
+barrier. This is a trust break before they have even reached the learning
+experience, and error recovery is where language clarity matters most.
+
+**Recommendation:** Add an `activation` slice to the existing `AppCopy`
+contract (including loading and network-error states) and pass resolved copy
+into the client form and welcome modal. Keep the success CTA accurate to its
+destination: “Get started” for Dashboard and “Start writing” for the task
+workspace. Localise the visually hidden “Close” label too.
+
+#### P1 — Tour dismissal has no durable local fallback when the API fails
+
+**Observed:** The full-tour `dismiss` handlers send `POST
+/api/walkthrough/dismiss` as fire-and-forget and discard failures. Until that
+server update succeeds, `walkthroughCompletedVersion` remains behind the
+current version and the full tour auto-opens again on the next Dashboard
+visit. There is no visible status or local suppression for the learner.
+
+**Why this matters:** A transient connectivity or service issue converts a
+learner’s explicit “Skip” into repeated interruption. The learner cannot tell
+whether the button worked, violating the expected immediate feedback for an
+action that changes future behaviour.
+
+**Recommendation:** Immediately store a local “dismissed this version” flag
+when the user skips/finishes, and use it to suppress automatic opening on
+this browser. Retry the server update on a later safe page load; if it still
+fails, leave the tour available from “Take a tour” rather than forcing it.
+The API remains the cross-device source of truth, while the local flag protects
+the current learner’s intent.
+
+#### P2 — Social icons behave as links but lead nowhere
+
+**Observed:** Both landing-page social controls use `href="#"`. Activating
+either moves focus/scroll position to the document top rather than opening a
+social profile, and the icon-only controls offer no expectation-setting copy.
+
+**Why this matters:** A social icon implies an external destination. A
+non-destination looks like a broken tap, especially on mobile where the user
+may lose their reading position.
+
+**Recommendation:** Hide these controls until real, verified URLs exist.
+When enabled, use the destination URL, an accessible name such as “MyTCFLab
+on Instagram”, and `target="_blank" rel="noreferrer"` only if opening a new
+tab is intentional.
+
+### Validation status
+
+| Check | Result | Follow-up needed |
+| --- | --- | --- |
+| Public landing route | Rendered locally with HTTP 200 and the expected primary CTA | Visual/responsive browser pass when automation is available. |
+| Unauthenticated activation route | Correctly redirects (307) to sign-in | Exercise valid/invalid/redeemed code states with a test Clerk user. |
+| ESLint | No errors; two pre-existing warnings in `themed-select.tsx` for unsupported `aria-*` attributes on a button | Correct the semantic/ARIA contract separately before accessibility sign-off. |
+| Authenticated onboarding | Not browser-verified in this environment | Test first admission, skip, completion, refresh, Back, locale change and failed-dismiss API states at phone and desktop widths. |
