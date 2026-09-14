@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useRef, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from "react";
 
 export interface WalkthroughScriptHandlers {
   // Called every time the /tasks tour's active step changes. WritingWorkspace
@@ -21,6 +21,17 @@ interface WalkthroughWorkspaceScriptContextValue {
   register: (handlers: WalkthroughScriptHandlers | null) => void;
   applyStep: (stepId: string) => boolean;
   resetDemo: () => void;
+  // The step id whose Next button TasksWalkthroughRunner should hold
+  // disabled -- WritingWorkspace is still waiting on real data for it (e.g.
+  // "topic-picker" while its recent-topic fetch is in flight) -- or null
+  // once it's clear to advance. Reactive state rather than another ref
+  // field, since TasksWalkthroughRunner needs to re-render (to disable
+  // Next) the moment this changes -- unlike applyStep/resetDemo, which only
+  // ever fire in response to a discrete event. Not to be confused with
+  // pendingStepIdRef below, which buffers an applyStep call made before a
+  // handler has registered -- an unrelated startup-ordering concern.
+  blockedStepId: string | null;
+  setBlockedStep: (stepId: string | null) => void;
 }
 
 const WalkthroughWorkspaceScriptContext = createContext<WalkthroughWorkspaceScriptContextValue | null>(null);
@@ -51,6 +62,7 @@ export function WalkthroughWorkspaceScriptProvider({ children }: { children: Rea
   // shouldSkip result has nowhere to go (register() isn't the runner), but
   // this only ever applies to the very first step, which never skips.
   const pendingStepIdRef = useRef<string | null>(null);
+  const [blockedStepId, setBlockedStep] = useState<string | null>(null);
 
   const register = useCallback((handlers: WalkthroughScriptHandlers | null) => {
     handlersRef.current = handlers;
@@ -71,10 +83,14 @@ export function WalkthroughWorkspaceScriptProvider({ children }: { children: Rea
 
   const resetDemo = useCallback(() => {
     pendingStepIdRef.current = null;
+    setBlockedStep(null);
     handlersRef.current?.resetDemo();
   }, []);
 
-  const value = useMemo(() => ({ register, applyStep, resetDemo }), [register, applyStep, resetDemo]);
+  const value = useMemo(
+    () => ({ register, applyStep, resetDemo, blockedStepId, setBlockedStep }),
+    [register, applyStep, resetDemo, blockedStepId],
+  );
 
   return (
     <WalkthroughWorkspaceScriptContext.Provider value={value}>{children}</WalkthroughWorkspaceScriptContext.Provider>

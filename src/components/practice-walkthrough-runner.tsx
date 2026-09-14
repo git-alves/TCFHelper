@@ -10,24 +10,31 @@ import {
   markContextualWalkthroughSeen,
   shouldShowContextualWalkthrough,
 } from "@/lib/contextual-walkthrough";
-import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE, isFullWalkthrough } from "@/lib/walkthrough";
-
-interface PracticeWalkthroughRunnerProps {
-  shouldAutoStart: boolean;
-}
+import {
+  FULL_WALKTHROUGH_PARAM,
+  FULL_WALKTHROUGH_VALUE,
+  isFullWalkthrough,
+  TOTAL_WALKTHROUGH_STEPS,
+} from "@/lib/walkthrough";
 
 /**
  * The middle Train page in the app tour. Unlike the Simulate walkthrough, this
  * never populates a learner response: it only introduces the fixed task-part
  * curriculum and the controlled-to-independent practice progression.
+ *
+ * The full tour's auto-start decision is made once, server-side, on
+ * Dashboard (see shouldAutoStartWalkthrough there); it reaches this page
+ * only via the `walkthrough=full` URL param that Dashboard's continue-to-
+ * Practice handoff appends, never as a prop of its own -- this page never
+ * independently decides to auto-start the full tour.
  */
-export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthroughRunnerProps) {
+export function PracticeWalkthroughRunner() {
   const copy = useAppCopy();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
   const [isFullTour] = useState(() => isFullWalkthrough(searchParams.get(FULL_WALKTHROUGH_PARAM)));
-  const [isOpen, setIsOpen] = useState(shouldAutoStart || isFullTour);
+  const [isOpen, setIsOpen] = useState(isFullTour);
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
@@ -39,13 +46,13 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
   // Train. It is separate from the account-level Dashboard orientation,
   // so completing one never suppresses the other.
   useEffect(() => {
-    if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
+    if (isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "practice")) return;
     // Defer the state change until after this synchronization effect so the
     // page's initial render stays stable (and the overlay measures its
     // targets only after Train has painted).
     const timer = window.setTimeout(() => setIsOpen(true), 0);
     return () => window.clearTimeout(timer);
-  }, [isFullTour, shouldAutoStart]);
+  }, [isFullTour]);
 
   useEffect(() => {
     register(() => {
@@ -101,7 +108,7 @@ export function PracticeWalkthroughRunner({ shouldAutoStart }: PracticeWalkthrou
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToTasks : dismiss}
-      progress={isFullTour ? { step: stepIndex + 6, total: 21 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 6, total: TOTAL_WALKTHROUGH_STEPS } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToFullTask : undefined}
     />
   );

@@ -11,14 +11,7 @@ import {
   markContextualWalkthroughSeen,
   shouldShowContextualWalkthrough,
 } from "@/lib/contextual-walkthrough";
-import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
-
-interface TasksWalkthroughRunnerProps {
-  // A plain boolean, computed server-side from the signed-in learner's
-  // walkthroughCompletedVersion -- never the full AppCopy or a richer object
-  // crossing the server/client boundary here (see the Dashboard RSC outage).
-  shouldAutoStart: boolean;
-}
+import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough, TOTAL_WALKTHROUGH_STEPS } from "@/lib/walkthrough";
 
 /**
  * Owns the tour itself for the /tasks workspace. Its "Take a tour" trigger
@@ -33,15 +26,21 @@ interface TasksWalkthroughRunnerProps {
  * This runner only announces which step is active; WritingWorkspace decides
  * what that means and guards every action so it can never overwrite a
  * returning learner's real in-progress work.
+ *
+ * The full tour's auto-start decision is made once, server-side, on
+ * Dashboard (see shouldAutoStartWalkthrough there); it reaches this page
+ * only via the `walkthrough=full` URL param that Dashboard's own
+ * continue-to-Practice/Tasks handoff appends, never as a prop of its own --
+ * this page never independently decides to auto-start the full tour.
  */
-export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunnerProps) {
+export function TasksWalkthroughRunner() {
   const copy = useAppCopy();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { register } = useWalkthroughTrigger();
-  const { applyStep, resetDemo } = useWalkthroughWorkspaceScript();
+  const { applyStep, resetDemo, blockedStepId } = useWalkthroughWorkspaceScript();
   const [isFullTour] = useState(() => isFullWalkthrough(searchParams.get(FULL_WALKTHROUGH_PARAM)));
-  const [isOpen, setIsOpen] = useState(shouldAutoStart || isFullTour);
+  const [isOpen, setIsOpen] = useState(isFullTour);
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
@@ -52,12 +51,12 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
   // Show this concise guide when the learner chooses Simulate for the first
   // time on this browser. It does not depend on, or redirect from, Train.
   useEffect(() => {
-    if (shouldAutoStart || isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
+    if (isFullTour || !shouldShowContextualWalkthrough(getContextualWalkthroughStorage(), "tasks")) return;
     // Let the workspace render its first state before opening a guide that
     // measures targets and drives its illustrative sample.
     const timer = window.setTimeout(() => setIsOpen(true), 0);
     return () => window.clearTimeout(timer);
-  }, [isFullTour, shouldAutoStart]);
+  }, [isFullTour]);
 
   useEffect(() => {
     register(() => {
@@ -147,7 +146,14 @@ export function TasksWalkthroughRunner({ shouldAutoStart }: TasksWalkthroughRunn
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={dismiss}
-      progress={isFullTour ? { step: stepIndex + 9, total: 21 } : undefined}
+      // The topic-picker step kicks off an async fetch (see
+      // applyWalkthroughStep's "topic-picker" case); the immediately
+      // following steps target buttons that stay disabled until that topic
+      // actually lands. Holding Next here instead of letting the tour race
+      // ahead means the learner never gets to spotlight a still-disabled
+      // control.
+      nextDisabled={activeStepId !== null && activeStepId === blockedStepId}
+      progress={isFullTour ? { step: stepIndex + 9, total: TOTAL_WALKTHROUGH_STEPS } : undefined}
     />
   );
 }

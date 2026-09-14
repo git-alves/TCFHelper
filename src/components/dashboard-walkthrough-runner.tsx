@@ -9,6 +9,7 @@ import {
   FULL_WALKTHROUGH_PARAM,
   FULL_WALKTHROUGH_VALUE,
   isFullWalkthrough,
+  TOTAL_WALKTHROUGH_STEPS,
 } from "@/lib/walkthrough";
 
 interface DashboardWalkthroughRunnerProps {
@@ -159,7 +160,7 @@ export function DashboardWalkthroughRunner({ shouldAutoStart, hasGettingStarted 
       onBack={() => setStepIndex((index) => Math.max(index - 1, 0))}
       onSkip={dismiss}
       onFinish={isFullTour ? continueToPractice : dismiss}
-      progress={isFullTour ? { step: stepIndex + 1, total: 21 } : undefined}
+      progress={isFullTour ? { step: stepIndex + 1, total: TOTAL_WALKTHROUGH_STEPS } : undefined}
       finishLabel={isFullTour ? copy.walkthrough.continueToPractice : undefined}
     />
   );
