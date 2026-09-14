@@ -10,7 +10,9 @@ const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMo
   requestNavigationMock: vi.fn(() => false),
   pathnameMock: vi.fn(() => "/practice"),
   setLocaleMock: vi.fn(),
-  useAuthMock: vi.fn((): { isSignedIn: boolean | undefined } => ({ isSignedIn: true })),
+  useAuthMock: vi.fn(
+    (): { isSignedIn: boolean | undefined; isLoaded: boolean } => ({ isSignedIn: true, isLoaded: true }),
+  ),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -71,7 +73,7 @@ describe("NavBar", () => {
     requestNavigationMock.mockReturnValue(false);
     pathnameMock.mockReturnValue("/practice");
     setLocaleMock.mockClear();
-    useAuthMock.mockReturnValue({ isSignedIn: true });
+    useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true });
   });
 
   it("keeps the three learning destinations visible in a stable order", () => {
@@ -96,20 +98,20 @@ describe("NavBar", () => {
   });
 
   it("sends the logo to the landing page while signed out", () => {
-    useAuthMock.mockReturnValue({ isSignedIn: false });
+    useAuthMock.mockReturnValue({ isSignedIn: false, isLoaded: true });
 
     const markup = renderToStaticMarkup(<NavBar />);
 
     expect(markup).toMatch(/<a class="[^"]*" href="\/">[\s\S]*?>TCF</);
   });
 
-  it("guards the logo's click even while Clerk auth is still resolving", () => {
-    // isSignedIn is undefined mid-load, before Clerk settles on true/false --
-    // the click must still go through the draft guard instead of falling
-    // through to an unguarded link, which would let a signed-in learner with
-    // an unsaved draft navigate away unprompted.
-    useAuthMock.mockReturnValue({ isSignedIn: undefined });
-    requestNavigationMock.mockReturnValue(true);
+  it("blocks the logo's click while Clerk auth is still resolving, instead of guarding toward a guessed destination", () => {
+    // logoHref falls back to "/" until isLoaded is true, since isSignedIn is
+    // still undefined -- guarding toward it here would risk sending an
+    // actually-signed-in learner who confirms the dialog to the landing
+    // page instead of the dashboard. Blocking the click is the safe
+    // fallback: the same click, retried once auth settles, lands correctly.
+    useAuthMock.mockReturnValue({ isSignedIn: undefined, isLoaded: false });
 
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -120,11 +122,44 @@ describe("NavBar", () => {
 
     const logo = container.querySelector<HTMLAnchorElement>('a[href="/"]');
     expect(logo).not.toBeNull();
+    let event!: MouseEvent;
+    act(() => {
+      event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      logo!.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(requestNavigationMock).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("guards the logo toward the dashboard, not the landing page, once a signed-in session resolves", () => {
+    // Regression test for the destination a confirmed guard click carries
+    // the learner to: it must be /dashboard once Clerk has resolved
+    // isSignedIn, not the "/" logoHref falls back to while unresolved.
+    useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true });
+    requestNavigationMock.mockReturnValue(true);
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<NavBar />);
+    });
+
+    // The Dashboard nav link also has href="/dashboard" -- the "font-semibold"
+    // class is unique to the logo, unlike the nav link's own classes.
+    const logo = container.querySelector<HTMLAnchorElement>('a.font-semibold[href="/dashboard"]');
+    expect(logo).not.toBeNull();
     act(() => {
       logo!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
     });
 
-    expect(requestNavigationMock).toHaveBeenCalledWith("/");
+    expect(requestNavigationMock).toHaveBeenCalledWith("/dashboard");
 
     act(() => {
       root.unmount();
