@@ -4,12 +4,13 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hoisted(() => ({
+const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMock, useAuthMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   prefetchMock: vi.fn(),
   requestNavigationMock: vi.fn(() => false),
   pathnameMock: vi.fn(() => "/practice"),
   setLocaleMock: vi.fn(),
+  useAuthMock: vi.fn(() => ({ isSignedIn: true })),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -37,6 +38,7 @@ vi.mock("@clerk/nextjs", () => {
     Show: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     UserButton,
+    useAuth: useAuthMock,
   };
 });
 
@@ -69,6 +71,7 @@ describe("NavBar", () => {
     requestNavigationMock.mockReturnValue(false);
     pathnameMock.mockReturnValue("/practice");
     setLocaleMock.mockClear();
+    useAuthMock.mockReturnValue({ isSignedIn: true });
   });
 
   it("keeps the three learning destinations visible in a stable order", () => {
@@ -81,8 +84,23 @@ describe("NavBar", () => {
     expect(dashboard).toBeGreaterThanOrEqual(0);
     expect(practice).toBeGreaterThan(dashboard);
     expect(tasks).toBeGreaterThan(practice);
-    expect(markup.match(/href="\/dashboard"/g)).toHaveLength(1);
+    // The logo also links to /dashboard while signed in, alongside the nav item.
+    expect(markup.match(/href="\/dashboard"/g)).toHaveLength(2);
     expect(markup).toContain('aria-current="page"');
+  });
+
+  it("sends the logo to the dashboard once signed in", () => {
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toMatch(/<a class="[^"]*" href="\/dashboard">[\s\S]*?>TCF</);
+  });
+
+  it("sends the logo to the landing page while signed out", () => {
+    useAuthMock.mockReturnValue({ isSignedIn: false });
+
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toMatch(/<a class="[^"]*" href="\/">[\s\S]*?>TCF</);
   });
 
   it("offers an accessibly labelled Support icon in the signed-in navigation only", () => {
