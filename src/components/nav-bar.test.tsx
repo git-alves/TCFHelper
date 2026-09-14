@@ -4,12 +4,15 @@ import { createRoot } from "react-dom/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 
-const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMock } = vi.hoisted(() => ({
+const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMock, useAuthMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
   prefetchMock: vi.fn(),
   requestNavigationMock: vi.fn(() => false),
   pathnameMock: vi.fn(() => "/practice"),
   setLocaleMock: vi.fn(),
+  useAuthMock: vi.fn(
+    (): { isSignedIn: boolean | undefined; isLoaded: boolean } => ({ isSignedIn: true, isLoaded: true }),
+  ),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -37,6 +40,7 @@ vi.mock("@clerk/nextjs", () => {
     Show: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
     UserButton,
+    useAuth: useAuthMock,
   };
 });
 
@@ -69,6 +73,7 @@ describe("NavBar", () => {
     requestNavigationMock.mockReturnValue(false);
     pathnameMock.mockReturnValue("/practice");
     setLocaleMock.mockClear();
+    useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true });
   });
 
   it("keeps the three learning destinations visible in a stable order", () => {
@@ -81,8 +86,85 @@ describe("NavBar", () => {
     expect(dashboard).toBeGreaterThanOrEqual(0);
     expect(practice).toBeGreaterThan(dashboard);
     expect(tasks).toBeGreaterThan(practice);
-    expect(markup.match(/href="\/dashboard"/g)).toHaveLength(1);
+    // The logo also links to /dashboard while signed in, alongside the nav item.
+    expect(markup.match(/href="\/dashboard"/g)).toHaveLength(2);
     expect(markup).toContain('aria-current="page"');
+  });
+
+  it("sends the logo to the dashboard once signed in", () => {
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toMatch(/<a class="[^"]*" href="\/dashboard">[\s\S]*?>TCF</);
+  });
+
+  it("sends the logo to the landing page while signed out", () => {
+    useAuthMock.mockReturnValue({ isSignedIn: false, isLoaded: true });
+
+    const markup = renderToStaticMarkup(<NavBar />);
+
+    expect(markup).toMatch(/<a class="[^"]*" href="\/">[\s\S]*?>TCF</);
+  });
+
+  it("blocks the logo's click while Clerk auth is still resolving, instead of guarding toward a guessed destination", () => {
+    // logoHref falls back to "/" until isLoaded is true, since isSignedIn is
+    // still undefined -- guarding toward it here would risk sending an
+    // actually-signed-in learner who confirms the dialog to the landing
+    // page instead of the dashboard. Blocking the click is the safe
+    // fallback: the same click, retried once auth settles, lands correctly.
+    useAuthMock.mockReturnValue({ isSignedIn: undefined, isLoaded: false });
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<NavBar />);
+    });
+
+    const logo = container.querySelector<HTMLAnchorElement>('a[href="/"]');
+    expect(logo).not.toBeNull();
+    let event!: MouseEvent;
+    act(() => {
+      event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+      logo!.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(requestNavigationMock).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+
+  it("guards the logo toward the dashboard, not the landing page, once a signed-in session resolves", () => {
+    // Regression test for the destination a confirmed guard click carries
+    // the learner to: it must be /dashboard once Clerk has resolved
+    // isSignedIn, not the "/" logoHref falls back to while unresolved.
+    useAuthMock.mockReturnValue({ isSignedIn: true, isLoaded: true });
+    requestNavigationMock.mockReturnValue(true);
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<NavBar />);
+    });
+
+    // The Dashboard nav link also has href="/dashboard" -- the "font-semibold"
+    // class is unique to the logo, unlike the nav link's own classes.
+    const logo = container.querySelector<HTMLAnchorElement>('a.font-semibold[href="/dashboard"]');
+    expect(logo).not.toBeNull();
+    act(() => {
+      logo!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    });
+
+    expect(requestNavigationMock).toHaveBeenCalledWith("/dashboard");
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
   });
 
   it("offers an accessibly labelled Support icon in the signed-in navigation only", () => {

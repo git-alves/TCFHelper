@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, UserButton, useAuth } from "@clerk/nextjs";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { BrandMark } from "@/components/brand-mark";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
@@ -132,6 +132,7 @@ const ACTIVE_NAV_LINK_CLASS =
 export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const copy = useAppCopy();
   const { locale, setLocale } = useAppLocale();
+  const { isSignedIn, isLoaded } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { requestNavigation, isNavigationBusy, isWorkspaceMounted } = useDashboardNavGuard();
@@ -167,6 +168,7 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
   const isHome = realPathname === "/";
+  const logoHref = isSignedIn ? "/dashboard" : "/";
   // The landing header is unconditionally dark (see the header className
   // below), independent of the app's light/dark theme setting, so the
   // wordmark's violet needs an explicit override there instead of relying
@@ -198,6 +200,21 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
     };
   }
 
+  // logoHref falls back to "/" until Clerk resolves isSignedIn, so guarding
+  // toward it during that window could carry a signed-in learner who
+  // confirms the dialog to the landing page instead of the dashboard.
+  // Block the click instead of guessing; it targets the right place, guard
+  // included, the moment auth settles and the learner clicks again.
+  function logoClickHandler(event: MouseEvent<HTMLAnchorElement>) {
+    if (event.defaultPrevented || event.button !== 0) return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    if (!isLoaded) {
+      event.preventDefault();
+      return;
+    }
+    if (requestNavigation(logoHref)) event.preventDefault();
+  }
+
   function startFullWalkthrough() {
     const destination = `/dashboard?${FULL_WALKTHROUGH_PARAM}=${FULL_WALKTHROUGH_VALUE}`;
     // Preserve the same draft/correction guard as the Dashboard button when
@@ -215,7 +232,11 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
       }
     >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-1.5 font-semibold tracking-tight">
+        <Link
+          href={logoHref}
+          onClick={logoClickHandler}
+          className="flex items-center gap-1.5 font-semibold tracking-tight"
+        >
           <BrandMark className="h-8 w-8" accentClassName={wordmarkAccentClassName} />
           {/* One flex child, not two: My/TCF/Lab must sit directly next to
            * each other with no gap between them, unlike the gap-1.5 between
