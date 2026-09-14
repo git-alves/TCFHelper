@@ -10,7 +10,7 @@ const { pushMock, prefetchMock, requestNavigationMock, pathnameMock, setLocaleMo
   requestNavigationMock: vi.fn(() => false),
   pathnameMock: vi.fn(() => "/practice"),
   setLocaleMock: vi.fn(),
-  useAuthMock: vi.fn(() => ({ isSignedIn: true })),
+  useAuthMock: vi.fn((): { isSignedIn: boolean | undefined } => ({ isSignedIn: true })),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -101,6 +101,35 @@ describe("NavBar", () => {
     const markup = renderToStaticMarkup(<NavBar />);
 
     expect(markup).toMatch(/<a class="[^"]*" href="\/">[\s\S]*?>TCF</);
+  });
+
+  it("guards the logo's click even while Clerk auth is still resolving", () => {
+    // isSignedIn is undefined mid-load, before Clerk settles on true/false --
+    // the click must still go through the draft guard instead of falling
+    // through to an unguarded link, which would let a signed-in learner with
+    // an unsaved draft navigate away unprompted.
+    useAuthMock.mockReturnValue({ isSignedIn: undefined });
+    requestNavigationMock.mockReturnValue(true);
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(<NavBar />);
+    });
+
+    const logo = container.querySelector<HTMLAnchorElement>('a[href="/"]');
+    expect(logo).not.toBeNull();
+    act(() => {
+      logo!.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    });
+
+    expect(requestNavigationMock).toHaveBeenCalledWith("/");
+
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
   });
 
   it("offers an accessibly labelled Support icon in the signed-in navigation only", () => {

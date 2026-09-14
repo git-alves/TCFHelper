@@ -168,6 +168,11 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
   const realPathname = pathname === "/settings" ? lastRealPathname : pathname;
   const isOnAdminPage = realPathname === "/admin" || realPathname.startsWith("/admin/");
   const isHome = realPathname === "/";
+  // isSignedIn is undefined while Clerk is still resolving auth, so this
+  // falls back to "/" until it settles -- but the click is guarded either
+  // way (see the Link below), so a signed-in learner with an unsaved draft
+  // can't slip past the discard-confirmation dialog during that window.
+  const logoHref = isSignedIn ? "/dashboard" : "/";
   // The landing header is unconditionally dark (see the header className
   // below), independent of the app's light/dark theme setting, so the
   // wordmark's violet needs an explicit override there instead of relying
@@ -217,8 +222,8 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
     >
       <nav className="flex w-full flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <Link
-          href={isSignedIn ? "/dashboard" : "/"}
-          onClick={isSignedIn ? guardedNavigationHandler("/dashboard") : undefined}
+          href={logoHref}
+          onClick={guardedNavigationHandler(logoHref)}
           className="flex items-center gap-1.5 font-semibold tracking-tight"
         >
           <BrandMark className="h-8 w-8" accentClassName={wordmarkAccentClassName} />
