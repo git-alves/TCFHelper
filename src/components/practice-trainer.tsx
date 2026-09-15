@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
 import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
@@ -408,6 +409,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [savedSession, setSavedSession] = useState<StoredPracticeSession | null>(null);
+  const [isChangePartConfirmOpen, setIsChangePartConfirmOpen] = useState(false);
   // Local storage remains the fast, private resume mechanism. This separate
   // server session is intentionally just an activity ledger for the
   // Dashboard; its request must never block a learner from working through a
@@ -450,6 +452,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
       : answer.trim().length > 0;
+  // Organize's ordering is always pre-filled (scrambled on entry), so its
+  // "ordering.length > 0" isn't a signal of learner work the way a typed
+  // answer is -- redoing a shuffle costs seconds, not a lost paragraph.
+  const hasDraftInProgress = currentExercise != null && currentExercise.exercise_type !== "organize" && answer.trim().length > 0;
   const reviewedAnswers = getReviewedAnswers(currentExercise);
   const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
   const isExerciseComplete =
@@ -771,6 +777,17 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     resetExercise(null);
   }
 
+  // "Change task part" reads as ordinary navigation, but it silently
+  // discards an in-progress answer via returnToSkills() above. Confirm
+  // first whenever there's a draft worth losing.
+  function requestReturnToSkills() {
+    if (hasDraftInProgress) {
+      setIsChangePartConfirmOpen(true);
+      return;
+    }
+    returnToSkills();
+  }
+
   function resumeSavedSession() {
     if (!savedSession) return;
     const resolved = resolveStoredSession(curriculum, savedSession);
@@ -1057,11 +1074,24 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     <section aria-labelledby="exercise-heading" className="flex w-full flex-col gap-6">
       <button
         type="button"
-        onClick={returnToSkills}
+        onClick={requestReturnToSkills}
         className="w-fit text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
       >
         {practice.changePart}
       </button>
+
+      <ConfirmDialog
+        open={isChangePartConfirmOpen}
+        title={practice.changePartConfirmTitle}
+        description={practice.changePartConfirmDescription}
+        confirmLabel={practice.changePartConfirmDiscard}
+        cancelLabel={practice.changePartConfirmKeep}
+        onConfirm={() => {
+          setIsChangePartConfirmOpen(false);
+          returnToSkills();
+        }}
+        onCancel={() => setIsChangePartConfirmOpen(false)}
+      />
 
       <header>
         <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
