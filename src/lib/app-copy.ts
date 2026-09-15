@@ -128,6 +128,7 @@ export interface AppCopy {
     reviewedAnswerLabel: string;
     explanationLabel: string;
     retryExplanationLabel: string;
+    selfReviewExplanationLabel: string;
     completedWithHelpLabel: string;
     finishSequence: string;
     nextExercise: string;
@@ -640,6 +641,7 @@ export const APP_COPY = {
       reviewedAnswerLabel: "Reviewed answer:",
       explanationLabel: "Why this works:",
       retryExplanationLabel: "Why this isn't quite right yet:",
+      selfReviewExplanationLabel: "What to include:",
       completedWithHelpLabel: "Completed with help",
       finishSequence: "Finish the sequence",
       nextExercise: "Next exercise",
@@ -1302,6 +1304,7 @@ export const APP_COPY = {
       reviewedAnswerLabel: "Réponse validée :",
       explanationLabel: "Pourquoi c’est juste :",
       retryExplanationLabel: "Pourquoi ce n’est pas encore juste :",
+      selfReviewExplanationLabel: "Ce qu’il faut inclure :",
       completedWithHelpLabel: "Terminé avec de l’aide",
       finishSequence: "Terminer la séquence",
       nextExercise: "Exercice suivant",
@@ -1977,6 +1980,7 @@ export const APP_COPY = {
       reviewedAnswerLabel: "Respuesta revisada:",
       explanationLabel: "Por qué es correcta:",
       retryExplanationLabel: "Por qué aún no es correcta:",
+      selfReviewExplanationLabel: "Qué debes incluir:",
       completedWithHelpLabel: "Completado con ayuda",
       finishSequence: "Terminar la secuencia",
       nextExercise: "Siguiente ejercicio",
@@ -2650,6 +2654,7 @@ export const APP_COPY = {
       reviewedAnswerLabel: "Resposta revisada:",
       explanationLabel: "Por que está correta:",
       retryExplanationLabel: "Por que ainda não está correta:",
+      selfReviewExplanationLabel: "O que deve incluir:",
       completedWithHelpLabel: "Concluído com ajuda",
       finishSequence: "Terminar a sequência",
       nextExercise: "Próximo exercício",

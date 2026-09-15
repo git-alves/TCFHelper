@@ -1136,7 +1136,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             </p>
             <p className="mt-3">
               <span className="font-semibold">
-                {checkState === "try-again" ? practice.retryExplanationLabel : practice.explanationLabel}
+                {checkState === "try-again"
+                  ? practice.retryExplanationLabel
+                  : checkState === "self-review"
+                    ? practice.selfReviewExplanationLabel
+                    : practice.explanationLabel}
               </span>{" "}
               {currentExercise.explanation}
             </p>
