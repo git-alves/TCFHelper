@@ -127,6 +127,7 @@ export interface AppCopy {
     revealedFeedback: string;
     reviewedAnswerLabel: string;
     explanationLabel: string;
+    retryExplanationLabel: string;
     completedWithHelpLabel: string;
     finishSequence: string;
     nextExercise: string;
@@ -638,6 +639,7 @@ export const APP_COPY = {
       revealedFeedback: "Here is the reviewed answer. Use it to understand the writing move, then continue when you are ready.",
       reviewedAnswerLabel: "Reviewed answer:",
       explanationLabel: "Why this works:",
+      retryExplanationLabel: "Why this isn't quite right yet:",
       completedWithHelpLabel: "Completed with help",
       finishSequence: "Finish the sequence",
       nextExercise: "Next exercise",
@@ -1299,6 +1301,7 @@ export const APP_COPY = {
       revealedFeedback: "Voici la réponse validée. Utilisez-la pour comprendre la compétence travaillée, puis continuez lorsque vous êtes prêt·e.",
       reviewedAnswerLabel: "Réponse validée :",
       explanationLabel: "Pourquoi c’est juste :",
+      retryExplanationLabel: "Pourquoi ce n’est pas encore juste :",
       completedWithHelpLabel: "Terminé avec de l’aide",
       finishSequence: "Terminer la séquence",
       nextExercise: "Exercice suivant",
@@ -1973,6 +1976,7 @@ export const APP_COPY = {
       revealedFeedback: "Esta es la respuesta revisada. Úsala para entender la habilidad que practicas y continúa cuando estés listo.",
       reviewedAnswerLabel: "Respuesta revisada:",
       explanationLabel: "Por qué es correcta:",
+      retryExplanationLabel: "Por qué aún no es correcta:",
       completedWithHelpLabel: "Completado con ayuda",
       finishSequence: "Terminar la secuencia",
       nextExercise: "Siguiente ejercicio",
@@ -2645,6 +2649,7 @@ export const APP_COPY = {
       revealedFeedback: "Esta é a resposta revisada. Use-a para entender a habilidade praticada e continue quando estiver pronto.",
       reviewedAnswerLabel: "Resposta revisada:",
       explanationLabel: "Por que está correta:",
+      retryExplanationLabel: "Por que ainda não está correta:",
       completedWithHelpLabel: "Concluído com ajuda",
       finishSequence: "Terminar a sequência",
       nextExercise: "Próximo exercício",
