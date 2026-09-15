@@ -14,6 +14,7 @@ import { getAppCopy } from "@/lib/app-copy";
 import { getCurrentAdminUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
 import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
+import { REVEAL_INIT_SCRIPT } from "@/lib/reveal-init-script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -72,6 +73,11 @@ export default async function RootLayout({
          * theme preference never flashes the wrong theme -- see
          * THEME_INIT_SCRIPT for why it also sets the favicon above. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* Runs before first paint so the landing page's scroll-reveal
+         * sections default to visible for every visitor except the ones
+         * this confirms can actually animate them -- see
+         * REVEAL_INIT_SCRIPT. */}
+        <script dangerouslySetInnerHTML={{ __html: REVEAL_INIT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <AppThemeProvider>
