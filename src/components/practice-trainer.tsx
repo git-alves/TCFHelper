@@ -1135,7 +1135,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                   : practice.retryFeedback}
             </p>
             <p className="mt-3">
-              <span className="font-semibold">{practice.explanationLabel}</span> {currentExercise.explanation}
+              <span className="font-semibold">
+                {checkState === "try-again" ? practice.retryExplanationLabel : practice.explanationLabel}
+              </span>{" "}
+              {currentExercise.explanation}
             </p>
             {checkState === "revealed" && (
               <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
