@@ -116,6 +116,27 @@ function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExe
   );
 }
 
+// Many reviewed "organize" items happen to list their source sentences in
+// already-correct order, which would let a learner pass by clicking Check
+// without reordering anything. Scrambling on entry, and guaranteeing the
+// scramble isn't itself the correct order, keeps the stage meaningful
+// regardless of how a given exercise's options were authored.
+export function scrambleOrdering(
+  options: readonly string[],
+  correctAnswer: readonly string[] | undefined,
+): readonly string[] {
+  if (options.length < 2) return [...options];
+  const shuffled = [...options];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapWith = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapWith]] = [shuffled[swapWith], shuffled[index]];
+  }
+  if (correctAnswer && shuffled.every((item, index) => item === correctAnswer[index])) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  return shuffled;
+}
+
 function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
   if (!exercise) return [];
   if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
@@ -255,7 +276,7 @@ function ExerciseInput({
   disabled: boolean;
   practice: AppCopy["practice"];
 }) {
-  if (exercise.exercise_type === "recognize") {
+  if (exercise.exercise_type === "recognize" || (exercise.exercise_type === "complete" && exercise.options && exercise.options.length > 0)) {
     return (
       <fieldset className="grid gap-3">
         <legend className="sr-only">{practice.selectAnswer}</legend>
@@ -602,7 +623,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function resetExercise(nextExercise: CuratedPracticeExercise | null) {
     setAnswer("");
-    setOrdering(nextExercise?.exercise_type === "organize" ? [...(nextExercise.options ?? [])] : []);
+    setOrdering(
+      nextExercise?.exercise_type === "organize" && Array.isArray(nextExercise.correct_answer)
+        ? scrambleOrdering(nextExercise.options ?? [], nextExercise.correct_answer)
+        : nextExercise?.exercise_type === "organize"
+          ? [...(nextExercise.options ?? [])]
+          : [],
+    );
     setCheckState(null);
     setIsHintVisible(false);
   }
@@ -763,7 +790,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
       currentSavedExercise.exercise_type === "organize"
         ? savedSession.ordering.length > 0
           ? savedSession.ordering
-          : [...(currentSavedExercise.options ?? [])]
+          : Array.isArray(currentSavedExercise.correct_answer)
+            ? scrambleOrdering(currentSavedExercise.options ?? [], currentSavedExercise.correct_answer)
+            : [...(currentSavedExercise.options ?? [])]
         : [],
     );
     setCheckState(savedSession.checkState);
