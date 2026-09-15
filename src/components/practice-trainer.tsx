@@ -797,6 +797,15 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     }
 
     const currentSavedExercise = resolved.exercises[savedSession.currentExerciseIndex];
+    // A session saved before the pre-solved-ordering fix (6291776) may have
+    // persisted its ordering from back when entry didn't scramble it, so it
+    // can still equal correct_answer verbatim. Re-apply the same "never
+    // pre-solved" invariant used on fresh entry rather than trusting
+    // whatever ordering was on disk.
+    const savedOrderingIsPreSolved =
+      currentSavedExercise.exercise_type === "organize" &&
+      savedSession.ordering.length > 0 &&
+      isOrderedCorrect(savedSession.ordering, currentSavedExercise);
     setSelectedTask(resolved.skill.task);
     setSelectedLevel(resolved.skill.level);
     setSelectedSkill(resolved.skill);
@@ -805,7 +814,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setAnswer(savedSession.answer);
     setOrdering(
       currentSavedExercise.exercise_type === "organize"
-        ? savedSession.ordering.length > 0
+        ? savedSession.ordering.length > 0 && !savedOrderingIsPreSolved
           ? savedSession.ordering
           : Array.isArray(currentSavedExercise.correct_answer)
             ? scrambleOrdering(currentSavedExercise.options ?? [], currentSavedExercise.correct_answer)
