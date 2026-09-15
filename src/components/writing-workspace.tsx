@@ -79,7 +79,7 @@ const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
 const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
 const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
-const WALKTHROUGH_GUIDED_WRITING_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
+const WALKTHROUGH_SAMPLE_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
 const writingPreferenceListeners = new Set<() => void>();
 const inMemoryWritingPreferences = new Map<string, string>();
 let cachedTimedTaskSessionRaw: string | null | undefined;
@@ -286,7 +286,7 @@ export function WritingWorkspace() {
   const copy = useAppCopy();
   const router = useRouter();
   const { register: registerDashboardNavGuard, setNavigationBusy } = useDashboardNavGuard();
-  const { register: registerWalkthroughScript } = useWalkthroughWorkspaceScript();
+  const { register: registerWalkthroughScript, setBlockedStep } = useWalkthroughWorkspaceScript();
   // Set the moment the tour's own scripted action first runs (the
   // task-picker step selecting a task while none was picked yet) -- true
   // only when every subsequent scripted overwrite is our own doing, never
@@ -904,6 +904,10 @@ export function WritingWorkspace() {
     // can start typing immediately after requesting a topic.
     recentTopicRequestId.current += 1;
     setIsRecentTopicLoading(false);
+    // The invalidated request's own finally block will see its stale
+    // requestId and skip clearing this itself -- clear it here instead, so
+    // a walkthrough Next lock never outlives the fetch it was guarding.
+    setBlockedStep(null);
   }
 
   function cancelPendingExampleRequest() {
@@ -1051,11 +1055,36 @@ export function WritingWorkspace() {
     );
   }
 
+  // The scripted demo's topic-picker step has no real exam to fall back on
+  // if /api/topics/recent fails -- and unlike the full tour, the short
+  // contextual guide (task-picker -> topic-picker -> editor -> correct-
+  // button) never reaches guided-writing, whose own step would otherwise
+  // paper over exactly this by scripting its own topic. Scripting the same
+  // fallback here instead, on any failure, means both tours always have a
+  // real topic by the time topic-picker's lock releases, regardless of step
+  // order. Never applies outside the demo: a returning learner's own failed
+  // "get another topic" click should show the real error, not a fabricated
+  // draft.
+  function applyWalkthroughTopicFallback() {
+    setRecentTopic(null);
+    setRecentTopicError(null);
+    setTopicMode("custom");
+    setCustomTopic(WALKTHROUGH_SAMPLE_TOPIC);
+  }
+
   async function fetchRecentTopic(currentTaskType: TaskType) {
     cancelPendingExampleRequest();
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
+    // Set in the same synchronous call as setIsRecentTopicLoading above (not
+    // a useEffect reacting to it afterwards) so TasksWalkthroughRunner's
+    // Next-button lock lands in the same commit as this fetch actually
+    // starting -- an effect watching isRecentTopicLoading would add a whole
+    // extra render/commit pass between "the fetch started" and "Next is
+    // disabled", wide enough for a fast double-click on Next to land in
+    // between and advance past a still-loading topic-picker step.
+    setBlockedStep("topic-picker");
 
     try {
       const res = await fetch(
@@ -1069,7 +1098,11 @@ export function WritingWorkspace() {
             ? (data as { code?: unknown }).code
             : undefined;
         if (requestId === recentTopicRequestId.current) {
-          setRecentTopicError(errorCode === "RECENT_EXAM_NOT_PUBLISHED" ? "notPublished" : "fetch");
+          if (walkthroughDemoActiveRef.current) {
+            applyWalkthroughTopicFallback();
+          } else {
+            setRecentTopicError(errorCode === "RECENT_EXAM_NOT_PUBLISHED" ? "notPublished" : "fetch");
+          }
         }
         return;
       }
@@ -1079,7 +1112,11 @@ export function WritingWorkspace() {
 
       const nextTopic = readRecentExamTopic(data, currentTaskType);
       if (!nextTopic) {
-        setRecentTopicError("unavailable");
+        if (walkthroughDemoActiveRef.current) {
+          applyWalkthroughTopicFallback();
+        } else {
+          setRecentTopicError("unavailable");
+        }
         return;
       }
 
@@ -1093,10 +1130,17 @@ export function WritingWorkspace() {
       resetDraftAndFeedback();
     } catch {
       if (requestId === recentTopicRequestId.current) {
-        setRecentTopicError("fetch");
+        if (walkthroughDemoActiveRef.current) {
+          applyWalkthroughTopicFallback();
+        } else {
+          setRecentTopicError("fetch");
+        }
       }
     } finally {
-      if (requestId === recentTopicRequestId.current) setIsRecentTopicLoading(false);
+      if (requestId === recentTopicRequestId.current) {
+        setIsRecentTopicLoading(false);
+        setBlockedStep(null);
+      }
     }
   }
 
@@ -1144,7 +1188,7 @@ export function WritingWorkspace() {
         setRecentTopic(null);
         setRecentTopicError(null);
         setTopicMode("custom");
-        setCustomTopic(WALKTHROUGH_GUIDED_WRITING_TOPIC);
+        setCustomTopic(WALKTHROUGH_SAMPLE_TOPIC);
         storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "1");
         return false;
       }

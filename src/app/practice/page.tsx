@@ -94,7 +94,7 @@ export default async function PracticePage() {
 
   return (
     <main className="flex w-full flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <PracticeWalkthroughRunner shouldAutoStart={false} />
+      <PracticeWalkthroughRunner />
       <PracticeTrainer curriculum={getTrainerCurriculum()} />
     </main>
   );

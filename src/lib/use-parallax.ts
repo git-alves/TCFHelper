@@ -20,6 +20,11 @@ export function useScrollParallax<T extends HTMLElement>(maxOffsetPx = 24) {
     const node = ref.current;
     if (!node) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // Matches useReveal's fallback: without IntersectionObserver there's
+    // nothing to gate the scroll work on, so skip the effect entirely
+    // rather than let `new IntersectionObserver` below throw and break the
+    // hero's mount.
+    if (typeof IntersectionObserver === "undefined") return;
 
     let ticking = false;
     let isNearViewport = true;

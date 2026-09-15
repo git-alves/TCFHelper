@@ -41,15 +41,15 @@ interface HomeHeroProps {
 }
 
 // Fades/slides a section in the first time it scrolls into view, so the
-// page reads as a living product tour rather than a static document. Skips
-// straight to visible for anyone who never gets a qualifying
-// IntersectionObserver entry (reduced motion, SSR, older browsers) -- see
-// useReveal. print: always wins regardless of `visible`: a browser's
-// print/"Save as PDF" layout renders the whole page at once rather than
-// scrolling it, so nothing here would ever intersect and every section
-// below the hero would print blank without this override.
-function revealClassName(visible: boolean) {
-  return `transition-all duration-700 ease-out print:opacity-100 print:translate-y-0 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`;
+// page reads as a living product tour rather than a static document. The
+// actual hidden-until-revealed styling lives in globals.css, keyed off
+// these data attributes rather than a className here: it needs to stay
+// visible by default for a no-JS visitor, a failed hydration, or a browser
+// missing IntersectionObserver, none of which useReveal's `visible` state
+// (a React value with no way to differ between server and first client
+// render) can express on its own -- see reveal-init-script.ts.
+function revealProps(visible: boolean): Record<string, string> {
+  return visible ? { "data-reveal": "true", "data-reveal-visible": "true" } : { "data-reveal": "true" };
 }
 
 export function HomeHero({ isAuthenticated }: HomeHeroProps) {
@@ -79,7 +79,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={proofRef}
-        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(proofVisible)}`}
+        className="border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16"
+        {...revealProps(proofVisible)}
         aria-labelledby="problem-heading"
       >
         <div className="mx-auto max-w-7xl">
@@ -119,7 +120,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={whyRef}
-        className={`mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(whyVisible)}`}
+        className="mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-12 xl:px-16"
+        {...revealProps(whyVisible)}
         aria-labelledby="why-heading"
       >
         <p className="text-sm font-medium text-violet-300">{copy.whyEyebrow}</p><h2 id="why-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.whyTitle}</h2>
@@ -163,7 +165,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={stepsRef}
-        className={`bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(stepsVisible)}`}
+        className="bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16"
+        {...revealProps(stepsVisible)}
         aria-labelledby="steps-heading"
       >
         <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.stepsEyebrow}</p><h2 id="steps-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.stepsTitle}</h2><ol className="mt-10 grid gap-4 md:grid-cols-3">{copy.steps.map((step, index) => <li key={step.title} className="rounded-2xl border border-white/[.12] p-6"><span className="text-sm font-semibold text-violet-200">0{index + 1}</span><h3 className="mt-5 text-lg font-semibold">{step.title}</h3><p className="mt-2 text-sm leading-6 text-zinc-400">{step.description}</p></li>)}</ol><DashboardPreview /></div>
@@ -171,7 +174,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={methodRef}
-        className={`mx-auto grid max-w-7xl gap-10 px-6 py-20 sm:px-10 lg:px-12 xl:px-16 md:grid-cols-2 ${revealClassName(methodVisible)}`}
+        className="mx-auto grid max-w-7xl gap-10 px-6 py-20 sm:px-10 lg:px-12 xl:px-16 md:grid-cols-2"
+        {...revealProps(methodVisible)}
         aria-labelledby="method-heading"
       >
         <div><p className="text-sm font-medium text-violet-300">{copy.methodEyebrow}</p><h2 id="method-heading" className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">{copy.methodTitle}</h2><p className="mt-5 leading-7 text-zinc-400">{copy.methodDescription}</p></div><ul className="space-y-3 self-center">{copy.methodPoints.map((point) => <li key={point} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{point}</li>)}</ul><div className="md:col-span-2"><MethodPreview /></div>
@@ -179,7 +183,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={assessedRef}
-        className={`border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16 ${revealClassName(assessedVisible)}`}
+        className="border-y border-white/[.12] bg-white/[.035] px-6 py-20 sm:px-10 lg:px-12 xl:px-16"
+        {...revealProps(assessedVisible)}
         aria-labelledby="assessed-heading"
       >
         <div className="mx-auto max-w-7xl"><p className="text-sm font-medium text-violet-300">{copy.assessedEyebrow}</p><h2 id="assessed-heading" className="mt-3 max-w-2xl text-3xl font-semibold tracking-tight sm:text-4xl">{copy.assessedTitle}</h2><ul className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{copy.assessed.map((item) => <li key={item} className="rounded-xl border border-white/[.12] px-5 py-4 text-zinc-200">{item}</li>)}</ul><AssessedPreview /></div>
@@ -187,7 +192,8 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
 
       <section
         ref={closingRef}
-        className={`mx-auto max-w-3xl px-6 py-20 text-center sm:px-10 lg:px-12 xl:px-16 ${revealClassName(closingVisible)}`}
+        className="mx-auto max-w-3xl px-6 py-20 text-center sm:px-10 lg:px-12 xl:px-16"
+        {...revealProps(closingVisible)}
         aria-labelledby="closing-heading"
       >
         <h2 id="closing-heading" className="text-3xl font-semibold tracking-tight sm:text-4xl">{copy.closingTitle}</h2>

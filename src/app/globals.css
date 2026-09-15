@@ -154,3 +154,38 @@ body {
     animation: none;
   }
 }
+
+/* The landing page's scroll-reveal sections (useReveal/home-hero.tsx). The
+ * hidden starting state lives here, gated behind `.reveal-ready` on <html>
+ * -- a class only the blocking script in the root layout's <head> ever
+ * adds, and only once it has confirmed IntersectionObserver actually
+ * exists (see reveal-init-script.ts). Without that class -- no-JS, a
+ * failed hydration, an old browser -- [data-reveal] has no rule here at
+ * all, so the element just renders normally, fully visible. React's own
+ * `data-reveal-visible` toggle (driven by useReveal's `visible` state) only
+ * matters once this whole block is already active.
+ *
+ * prefers-reduced-motion is a plain media query here rather than another
+ * check in that one-shot script, so -- unlike the IntersectionObserver
+ * check -- it keeps working if the OS preference changes while the page is
+ * already open. */
+@media (prefers-reduced-motion: no-preference) {
+  html.reveal-ready [data-reveal] {
+    transition: opacity 700ms ease-out, transform 700ms ease-out;
+  }
+
+  html.reveal-ready [data-reveal]:not([data-reveal-visible]) {
+    opacity: 0;
+    transform: translateY(2rem);
+  }
+}
+
+@media print {
+  /* A browser's print/"Save as PDF" layout renders the whole page at once
+   * rather than scrolling it, so nothing here would ever intersect and
+   * every section below the hero would print blank without this. */
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

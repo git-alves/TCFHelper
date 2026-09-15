@@ -30,6 +30,10 @@ interface WalkthroughOverlayProps {
   onBack: () => void;
   onSkip: () => void;
   onFinish: () => void;
+  /** Disables the Next/Finish button -- for a step whose target depends on
+   * data the host page is still fetching, so the tour can wait rather than
+   * spotlight a control that isn't usable yet. */
+  nextDisabled?: boolean;
   /** A cross-page tour can show its overall progress, rather than resetting
    * the count on every page. */
   progress?: { step: number; total: number };
@@ -54,6 +58,7 @@ export function WalkthroughOverlay({
   onBack,
   onSkip,
   onFinish,
+  nextDisabled = false,
   progress,
   finishLabel,
 }: WalkthroughOverlayProps) {
@@ -225,7 +230,9 @@ export function WalkthroughOverlay({
               ref={nextButtonRef}
               type="button"
               onClick={isLastStep ? onFinish : onNext}
-              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+              disabled={nextDisabled}
+              aria-disabled={nextDisabled}
+              className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-foreground dark:hover:bg-[#ccc] dark:disabled:hover:bg-foreground"
             >
               {isLastStep ? (finishLabel ?? copy.finish) : copy.next}
             </button>
