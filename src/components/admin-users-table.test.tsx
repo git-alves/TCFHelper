@@ -65,6 +65,20 @@ describe("AdminUsersTable", () => {
     expect(markup).not.toContain(">Activated<");
   });
 
+  it("shows both today's and this month's Corrections count, matching the per-user detail page", () => {
+    const markup = renderUsers([
+      user({
+        usage: {
+          ...BASE_USAGE,
+          corrections: { currentDayRequests: 3, currentMonthRequests: 41 },
+        },
+      }),
+    ]);
+
+    expect(markup).toContain("Corrections: 3 today");
+    expect(markup).toContain("41 this month");
+  });
+
   it("prioritizes the Blocked and Owner access badges over live-admission state", () => {
     const blockedMarkup = renderUsers([
       user({ isBlocked: true, activatedAt: "2026-08-05T00:00:00.000Z", hasLiveAdmission: true }),
