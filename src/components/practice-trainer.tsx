@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
 import type { AppCopy } from "@/lib/app-copy";
 import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
@@ -114,6 +115,27 @@ function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExe
     order.length === exercise.correct_answer.length &&
     order.every((item, index) => item === exercise.correct_answer?.[index])
   );
+}
+
+// Many reviewed "organize" items happen to list their source sentences in
+// already-correct order, which would let a learner pass by clicking Check
+// without reordering anything. Scrambling on entry, and guaranteeing the
+// scramble isn't itself the correct order, keeps the stage meaningful
+// regardless of how a given exercise's options were authored.
+export function scrambleOrdering(
+  options: readonly string[],
+  correctAnswer: readonly string[] | undefined,
+): readonly string[] {
+  if (options.length < 2) return [...options];
+  const shuffled = [...options];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapWith = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swapWith]] = [shuffled[swapWith], shuffled[index]];
+  }
+  if (correctAnswer && shuffled.every((item, index) => item === correctAnswer[index])) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+  return shuffled;
 }
 
 function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
@@ -255,7 +277,7 @@ function ExerciseInput({
   disabled: boolean;
   practice: AppCopy["practice"];
 }) {
-  if (exercise.exercise_type === "recognize") {
+  if (exercise.exercise_type === "recognize" || (exercise.exercise_type === "complete" && exercise.options && exercise.options.length > 0)) {
     return (
       <fieldset className="grid gap-3">
         <legend className="sr-only">{practice.selectAnswer}</legend>
@@ -387,6 +409,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
   const [storageLoaded, setStorageLoaded] = useState(false);
   const [savedSession, setSavedSession] = useState<StoredPracticeSession | null>(null);
+  const [isChangePartConfirmOpen, setIsChangePartConfirmOpen] = useState(false);
   // Local storage remains the fast, private resume mechanism. This separate
   // server session is intentionally just an activity ledger for the
   // Dashboard; its request must never block a learner from working through a
@@ -429,6 +452,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
       : answer.trim().length > 0;
+  // Organize's ordering is always pre-filled (scrambled on entry), so its
+  // "ordering.length > 0" isn't a signal of learner work the way a typed
+  // answer is -- redoing a shuffle costs seconds, not a lost paragraph.
+  const hasDraftInProgress = currentExercise != null && currentExercise.exercise_type !== "organize" && answer.trim().length > 0;
   const reviewedAnswers = getReviewedAnswers(currentExercise);
   const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
   const isExerciseComplete =
@@ -602,7 +629,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
   function resetExercise(nextExercise: CuratedPracticeExercise | null) {
     setAnswer("");
-    setOrdering(nextExercise?.exercise_type === "organize" ? [...(nextExercise.options ?? [])] : []);
+    setOrdering(
+      nextExercise?.exercise_type === "organize" && Array.isArray(nextExercise.correct_answer)
+        ? scrambleOrdering(nextExercise.options ?? [], nextExercise.correct_answer)
+        : nextExercise?.exercise_type === "organize"
+          ? [...(nextExercise.options ?? [])]
+          : [],
+    );
     setCheckState(null);
     setIsHintVisible(false);
   }
@@ -744,6 +777,17 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     resetExercise(null);
   }
 
+  // "Change task part" reads as ordinary navigation, but it silently
+  // discards an in-progress answer via returnToSkills() above. Confirm
+  // first whenever there's a draft worth losing.
+  function requestReturnToSkills() {
+    if (hasDraftInProgress) {
+      setIsChangePartConfirmOpen(true);
+      return;
+    }
+    returnToSkills();
+  }
+
   function resumeSavedSession() {
     if (!savedSession) return;
     const resolved = resolveStoredSession(curriculum, savedSession);
@@ -753,6 +797,15 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     }
 
     const currentSavedExercise = resolved.exercises[savedSession.currentExerciseIndex];
+    // A session saved before the pre-solved-ordering fix (6291776) may have
+    // persisted its ordering from back when entry didn't scramble it, so it
+    // can still equal correct_answer verbatim. Re-apply the same "never
+    // pre-solved" invariant used on fresh entry rather than trusting
+    // whatever ordering was on disk.
+    const savedOrderingIsPreSolved =
+      currentSavedExercise.exercise_type === "organize" &&
+      savedSession.ordering.length > 0 &&
+      isOrderedCorrect(savedSession.ordering, currentSavedExercise);
     setSelectedTask(resolved.skill.task);
     setSelectedLevel(resolved.skill.level);
     setSelectedSkill(resolved.skill);
@@ -761,9 +814,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setAnswer(savedSession.answer);
     setOrdering(
       currentSavedExercise.exercise_type === "organize"
-        ? savedSession.ordering.length > 0
+        ? savedSession.ordering.length > 0 && !savedOrderingIsPreSolved
           ? savedSession.ordering
-          : [...(currentSavedExercise.options ?? [])]
+          : Array.isArray(currentSavedExercise.correct_answer)
+            ? scrambleOrdering(currentSavedExercise.options ?? [], currentSavedExercise.correct_answer)
+            : [...(currentSavedExercise.options ?? [])]
         : [],
     );
     setCheckState(savedSession.checkState);
@@ -1028,11 +1083,24 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     <section aria-labelledby="exercise-heading" className="flex w-full flex-col gap-6">
       <button
         type="button"
-        onClick={returnToSkills}
+        onClick={requestReturnToSkills}
         className="w-fit text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
       >
         {practice.changePart}
       </button>
+
+      <ConfirmDialog
+        open={isChangePartConfirmOpen}
+        title={practice.changePartConfirmTitle}
+        description={practice.changePartConfirmDescription}
+        confirmLabel={practice.changePartConfirmDiscard}
+        cancelLabel={practice.changePartConfirmKeep}
+        onConfirm={() => {
+          setIsChangePartConfirmOpen(false);
+          returnToSkills();
+        }}
+        onCancel={() => setIsChangePartConfirmOpen(false)}
+      />
 
       <header>
         <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
@@ -1135,7 +1203,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                   : practice.retryFeedback}
             </p>
             <p className="mt-3">
-              <span className="font-semibold">{practice.explanationLabel}</span> {currentExercise.explanation}
+              <span className="font-semibold">
+                {checkState === "try-again"
+                  ? practice.retryExplanationLabel
+                  : checkState === "self-review"
+                    ? practice.selfReviewExplanationLabel
+                    : practice.explanationLabel}
+              </span>{" "}
+              {currentExercise.explanation}
             </p>
             {checkState === "revealed" && (
               <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">

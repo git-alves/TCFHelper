@@ -109,6 +109,10 @@ export interface AppCopy {
     availableLevel: (values: { level: string; parts: number }) => string;
     partHelp: string;
     changePart: string;
+    changePartConfirmTitle: string;
+    changePartConfirmDescription: string;
+    changePartConfirmDiscard: string;
+    changePartConfirmKeep: string;
     sequenceDescription: (values: { count: number }) => string;
     progress: (values: { step: number; total: number }) => string;
     stageMap: (values: { current: string; next: string | null }) => string;
@@ -127,6 +131,8 @@ export interface AppCopy {
     revealedFeedback: string;
     reviewedAnswerLabel: string;
     explanationLabel: string;
+    retryExplanationLabel: string;
+    selfReviewExplanationLabel: string;
     completedWithHelpLabel: string;
     finishSequence: string;
     nextExercise: string;
@@ -620,6 +626,10 @@ export const APP_COPY = {
       availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "task part" : "task parts"}`,
       partHelp: "The available task parts follow the chosen task and target level.",
       changePart: "← Change task part",
+      changePartConfirmTitle: "Discard this draft?",
+      changePartConfirmDescription: "Changing the task part clears your current answer and progress on this exercise. This can't be undone.",
+      changePartConfirmDiscard: "Discard and change part",
+      changePartConfirmKeep: "Keep this draft and stay",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
       progress: ({ step, total }) => `Step ${step} of ${total}`,
       stageMap: ({ current, next }) => (next ? `Now: ${current}. Next: ${next}.` : `Now: ${current}. This is your final stage.`),
@@ -638,6 +648,8 @@ export const APP_COPY = {
       revealedFeedback: "Here is the reviewed answer. Use it to understand the writing move, then continue when you are ready.",
       reviewedAnswerLabel: "Reviewed answer:",
       explanationLabel: "Why this works:",
+      retryExplanationLabel: "Why this isn't quite right yet:",
+      selfReviewExplanationLabel: "What to include:",
       completedWithHelpLabel: "Completed with help",
       finishSequence: "Finish the sequence",
       nextExercise: "Next exercise",
@@ -1281,6 +1293,10 @@ export const APP_COPY = {
       availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "partie" : "parties"}`,
       partHelp: "Les parties disponibles suivent la tâche et le niveau cible que vous choisissez.",
       changePart: "← Changer de partie de la tâche",
+      changePartConfirmTitle: "Abandonner ce brouillon ?",
+      changePartConfirmDescription: "Changer de partie de la tâche efface votre réponse actuelle et la progression de cet exercice. Cette action est irréversible.",
+      changePartConfirmDiscard: "Abandonner et changer de partie",
+      changePartConfirmKeep: "Garder ce brouillon et rester",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
       progress: ({ step, total }) => `Étape ${step} sur ${total}`,
       stageMap: ({ current, next }) => (next ? `En cours : ${current}. Prochaine étape : ${next}.` : `En cours : ${current}. C’est votre dernière étape.`),
@@ -1299,6 +1315,8 @@ export const APP_COPY = {
       revealedFeedback: "Voici la réponse validée. Utilisez-la pour comprendre la compétence travaillée, puis continuez lorsque vous êtes prêt·e.",
       reviewedAnswerLabel: "Réponse validée :",
       explanationLabel: "Pourquoi c’est juste :",
+      retryExplanationLabel: "Pourquoi ce n’est pas encore juste :",
+      selfReviewExplanationLabel: "Ce qu’il faut inclure :",
       completedWithHelpLabel: "Terminé avec de l’aide",
       finishSequence: "Terminer la séquence",
       nextExercise: "Exercice suivant",
@@ -1955,6 +1973,10 @@ export const APP_COPY = {
       availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "parte" : "partes"}`,
       partHelp: "Las partes disponibles siguen la tarea y el nivel objetivo que elijas.",
       changePart: "← Cambiar de parte de la tarea",
+      changePartConfirmTitle: "¿Descartar este borrador?",
+      changePartConfirmDescription: "Cambiar de parte de la tarea borra tu respuesta actual y el progreso de este ejercicio. Esta acción no se puede deshacer.",
+      changePartConfirmDiscard: "Descartar y cambiar de parte",
+      changePartConfirmKeep: "Conservar este borrador y quedarme",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
       progress: ({ step, total }) => `Paso ${step} de ${total}`,
       stageMap: ({ current, next }) => (next ? `Ahora: ${current}. Siguiente: ${next}.` : `Ahora: ${current}. Esta es tu última etapa.`),
@@ -1973,6 +1995,8 @@ export const APP_COPY = {
       revealedFeedback: "Esta es la respuesta revisada. Úsala para entender la habilidad que practicas y continúa cuando estés listo.",
       reviewedAnswerLabel: "Respuesta revisada:",
       explanationLabel: "Por qué es correcta:",
+      retryExplanationLabel: "Por qué aún no es correcta:",
+      selfReviewExplanationLabel: "Qué debes incluir:",
       completedWithHelpLabel: "Completado con ayuda",
       finishSequence: "Terminar la secuencia",
       nextExercise: "Siguiente ejercicio",
@@ -2627,6 +2651,10 @@ export const APP_COPY = {
       availableLevel: ({ level, parts }) => `${level} · ${parts} ${parts === 1 ? "parte" : "partes"}`,
       partHelp: "As partes disponíveis seguem a tarefa e o nível-alvo escolhidos.",
       changePart: "← Mudar de parte da tarefa",
+      changePartConfirmTitle: "Descartar este rascunho?",
+      changePartConfirmDescription: "Mudar de parte da tarefa apaga sua resposta atual e o progresso deste exercício. Essa ação não pode ser desfeita.",
+      changePartConfirmDiscard: "Descartar e mudar de parte",
+      changePartConfirmKeep: "Manter este rascunho e ficar",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
       progress: ({ step, total }) => `Etapa ${step} de ${total}`,
       stageMap: ({ current, next }) => (next ? `Agora: ${current}. Próxima: ${next}.` : `Agora: ${current}. Esta é sua última etapa.`),
@@ -2645,6 +2673,8 @@ export const APP_COPY = {
       revealedFeedback: "Esta é a resposta revisada. Use-a para entender a habilidade praticada e continue quando estiver pronto.",
       reviewedAnswerLabel: "Resposta revisada:",
       explanationLabel: "Por que está correta:",
+      retryExplanationLabel: "Por que ainda não está correta:",
+      selfReviewExplanationLabel: "O que deve incluir:",
       completedWithHelpLabel: "Concluído com ajuda",
       finishSequence: "Terminar a sequência",
       nextExercise: "Próximo exercício",
