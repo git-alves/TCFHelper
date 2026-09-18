@@ -1,13 +1,18 @@
 // @vitest-environment happy-dom
 //
-// Regression tests for three Develop/Produce UX fixes:
+// Regression tests for the Develop/Produce UX work:
 // 1. A live word/sentence counter, since the length target ("80 à 100 mots")
 //    lives only as prose in the instructions with no other feedback signal.
-// 2. Self-review no longer permanently locks the exercise: the learner can
-//    keep editing and re-run self-review instead of a one-shot final verdict.
-// 3. An explicit note that the exercise content is French exam material, so
-//    a Portuguese/English/Spanish interface doesn't read as an incomplete
-//    translation.
+// 2. Develop gets an optional, ungraded structure aid (Context / Objective)
+//    that never gates or replaces the free-write textarea.
+// 3. Produce requires a mandatory, ungraded mini-plan (main idea, two
+//    points, conclusion) before the response field unlocks; once unlocked
+//    (or resumed with existing text), it stays unlocked even if the plan is
+//    later edited.
+// 4. Self-review no longer permanently locks the exercise -- both the plan
+//    and the response stay editable, and editing either un-commits the
+//    verdict until self-review runs again.
+// 5. An explicit note that the exercise content is French exam material.
 // Mounts the real PracticeTrainer via happy-dom + act, same pattern as
 // practice-trainer.change-part-guard.test.tsx.
 import { act } from "react";
@@ -41,6 +46,23 @@ const curriculum: CuratedPracticeCurriculum = {
     },
   ],
   exercises: [
+    {
+      id: "ex-develop",
+      task: "TASK_1",
+      level: "B2",
+      skill: "skill-1",
+      sub_skill: "openings",
+      exercise_type: "develop",
+      prompt: "Vous écrivez au service des objets trouvés.",
+      instructions: "Rédigez deux phrases d'ouverture.",
+      accepted_answers: [],
+      explanation: "Votre ouverture doit être claire.",
+      target_language_feature: "but et contexte",
+      difficulty: 5,
+      sequence_order: 5,
+      tags: [],
+      self_check: ["J'annonce clairement le but du message."],
+    },
     {
       id: "ex-produce",
       task: "TASK_1",
@@ -92,8 +114,12 @@ function clickButtonWithText(text: string) {
   });
 }
 
-function textarea(): HTMLTextAreaElement {
-  const el = container.querySelector("textarea");
+function textarea(): HTMLTextAreaElement | null {
+  return container.querySelector("textarea");
+}
+
+function requireTextarea(): HTMLTextAreaElement {
+  const el = textarea();
   if (!el) throw new Error("textarea not found");
   return el;
 }
@@ -101,12 +127,31 @@ function textarea(): HTMLTextAreaElement {
 function typeAnswer(text: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
   act(() => {
-    setter?.call(textarea(), text);
-    textarea().dispatchEvent(new Event("input", { bubbles: true }));
+    setter?.call(requireTextarea(), text);
+    requireTextarea().dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
 
-function startProduceExercise() {
+function fillInputByLabel(labelText: string, value: string) {
+  const label = [...container.querySelectorAll("label")].find((el) => el.textContent?.startsWith(labelText));
+  if (!label) throw new Error(`label "${labelText}" not found`);
+  const input = label.querySelector("input");
+  if (!input) throw new Error(`input for label "${labelText}" not found`);
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+  act(() => {
+    setter?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
+function fillProducePlan(overrides: Partial<Record<"mainIdea" | "point1" | "point2" | "conclusion", string>> = {}) {
+  fillInputByLabel(copy.producePlanMainIdeaLabel, overrides.mainIdea ?? "Reporter mon inscription");
+  fillInputByLabel(copy.producePlanPoint1Label, overrides.point1 ?? "Raison du report");
+  fillInputByLabel(copy.producePlanPoint2Label, overrides.point2 ?? "Nouvelle date souhaitée");
+  fillInputByLabel(copy.producePlanConclusionLabel, overrides.conclusion ?? "Demande de confirmation");
+}
+
+function startSequence() {
   act(() => {
     root.render(
       <AppLocaleProvider initialLocale="en">
@@ -128,43 +173,88 @@ function startProduceExercise() {
   clickButtonWithText(copy.startFresh);
 }
 
+function advanceFromDevelopToProduce() {
+  typeAnswer("Madame, Monsieur, je vous écris.");
+  clickButtonWithText(copy.selfReview);
+  clickButtonWithText(copy.nextExercise);
+}
+
 describe("PracticeTrainer: Develop/Produce UX", () => {
   it("shows the exam-task language note above the French prompt", () => {
-    startProduceExercise();
+    startSequence();
 
     expect(container.textContent).toContain(copy.examTaskLanguageNote);
   });
 
-  it("shows a live word/sentence counter that updates as the learner types", () => {
-    startProduceExercise();
+  it("Develop: the structure aid is optional and collapsed by default; the main textarea works without it", () => {
+    startSequence();
 
-    expect(container.textContent).toContain(copy.lengthCounter({ words: 0, sentences: 0 }));
+    expect(container.textContent).not.toContain(copy.developContextLabel);
+    expect(requireTextarea().disabled).toBe(false);
 
     typeAnswer("Bonjour. Comment allez-vous");
-
     expect(container.textContent).toContain(copy.lengthCounter({ words: 3, sentences: 2 }));
+
+    clickButtonWithText(copy.developShowStructureAid);
+    expect(container.textContent).toContain(copy.developContextLabel);
+    expect(container.textContent).toContain(copy.developStructureExampleText);
   });
 
-  it("keeps the response editable after self-review and lets the learner revise before finishing", () => {
-    startProduceExercise();
+  it("Produce: the response field stays locked until the full mini-plan is filled in", () => {
+    startSequence();
+    advanceFromDevelopToProduce();
 
-    typeAnswer("Madame, Monsieur, je vous écris.");
+    expect(textarea()).toBeNull();
+    expect(container.textContent).toContain(copy.producePlanRequiredNotice);
+
+    fillInputByLabel(copy.producePlanMainIdeaLabel, "Reporter mon inscription");
+    fillInputByLabel(copy.producePlanPoint1Label, "Raison du report");
+    fillInputByLabel(copy.producePlanPoint2Label, "Nouvelle date souhaitée");
+    expect(textarea()).toBeNull();
+
+    fillInputByLabel(copy.producePlanConclusionLabel, "Demande de confirmation");
+    expect(textarea()).not.toBeNull();
+  });
+
+  it("Produce: stays unlocked once a response exists, even if a plan field is cleared afterward", () => {
+    startSequence();
+    advanceFromDevelopToProduce();
+
+    fillProducePlan();
+    typeAnswer("Je vous contacte car je souhaite reporter mon inscription.");
+
+    fillInputByLabel(copy.producePlanMainIdeaLabel, "");
+
+    expect(textarea()).not.toBeNull();
+    expect(requireTextarea().value).toBe("Je vous contacte car je souhaite reporter mon inscription.");
+  });
+
+  it("keeps the plan and response editable after self-review, and includes the plan in the self-review recap", () => {
+    startSequence();
+    advanceFromDevelopToProduce();
+
+    fillProducePlan();
+    typeAnswer("Je vous contacte car je souhaite reporter mon inscription.");
     clickButtonWithText(copy.selfReview);
 
-    // Checklist and the finish action both appear -- not locked into a
-    // one-shot verdict.
-    expect(textarea().disabled).toBe(false);
+    // Recap of the (ungraded) plan, the self-check, and the finish action
+    // all appear together -- not a one-shot final verdict.
+    expect(requireTextarea().disabled).toBe(false);
+    expect(container.textContent).toContain(copy.producePlanRecapLabel);
+    expect(container.textContent).toContain("Reporter mon inscription");
     expect(container.textContent).toContain("Le but du message est clair");
     expect(container.textContent).toContain(copy.finishSequence);
 
-    // Editing invalidates the previous self-assessment: checklist and the
-    // finish action drop away until self-review runs again.
-    typeAnswer("Madame, Monsieur, je vous écris car je souhaite reporter mon inscription.");
-    expect(container.textContent).not.toContain("Le but du message est clair");
+    // Editing the response un-commits the verdict.
+    typeAnswer("Je vous contacte car je souhaite reporter mon inscription à l'année prochaine.");
+    expect(container.textContent).not.toContain(copy.producePlanRecapLabel);
     expect(container.textContent).not.toContain(copy.finishSequence);
 
     clickButtonWithText(copy.selfReview);
-    expect(container.textContent).toContain("Le but du message est clair");
     expect(container.textContent).toContain(copy.finishSequence);
+
+    // Editing the plan (not just the response) also un-commits the verdict.
+    fillInputByLabel(copy.producePlanConclusionLabel, "Demande de confirmation écrite");
+    expect(container.textContent).not.toContain(copy.finishSequence);
   });
 });

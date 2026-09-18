@@ -127,6 +127,22 @@ export interface AppCopy {
     suggestionPlaceholder: string;
     lengthCounter: (values: { words: number; sentences: number }) => string;
     examTaskLanguageNote: string;
+    developShowStructureAid: string;
+    developHideStructureAid: string;
+    developContextLabel: string;
+    developContextPlaceholder: string;
+    developObjectiveLabel: string;
+    developObjectivePlaceholder: string;
+    developStructureExampleLabel: string;
+    developStructureExampleText: string;
+    producePlanHeading: string;
+    producePlanMainIdeaLabel: string;
+    producePlanPoint1Label: string;
+    producePlanPoint2Label: string;
+    producePlanConclusionLabel: string;
+    producePlanHint: string;
+    producePlanRequiredNotice: string;
+    producePlanRecapLabel: string;
     correctFeedback: string;
     selfReviewFeedback: string;
     retryFeedback: string;
@@ -646,6 +662,22 @@ export const APP_COPY = {
       suggestionPlaceholder: "Write your proposal in French…",
       lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "word" : "words"} · ${sentences} ${sentences === 1 ? "sentence" : "sentences"}`,
       examTaskLanguageNote: "Exam task, shown in French — as in the real exam.",
+      developShowStructureAid: "Need a structure?",
+      developHideStructureAid: "Hide structure aid",
+      developContextLabel: "Context (optional)",
+      developContextPlaceholder: "Who are you writing to, and why?",
+      developObjectiveLabel: "Objective / action (optional)",
+      developObjectivePlaceholder: "What do you want the reader to understand or do?",
+      developStructureExampleLabel: "Structure example — not a model answer",
+      developStructureExampleText: "Contexte : … / Objectif ou action demandée : …",
+      producePlanHeading: "Plan your response first",
+      producePlanMainIdeaLabel: "Main idea",
+      producePlanPoint1Label: "Point 1",
+      producePlanPoint2Label: "Point 2",
+      producePlanConclusionLabel: "Conclusion",
+      producePlanHint: "This plan is just for you — it isn't graded and won't be part of your final answer.",
+      producePlanRequiredNotice: "Complete your plan above to unlock the response field.",
+      producePlanRecapLabel: "Your plan",
       correctFeedback: "Well done.",
       selfReviewFeedback: "Review your writing with this checklist.",
       retryFeedback: "Not yet — edit your response and try again.",
@@ -1315,6 +1347,22 @@ export const APP_COPY = {
       suggestionPlaceholder: "Écrivez votre proposition en français…",
       lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "mot" : "mots"} · ${sentences} ${sentences === 1 ? "phrase" : "phrases"}`,
       examTaskLanguageNote: "Sujet d'examen, présenté en français — comme à l'examen réel.",
+      developShowStructureAid: "Besoin d'une structure ?",
+      developHideStructureAid: "Masquer l'aide à la structure",
+      developContextLabel: "Contexte (facultatif)",
+      developContextPlaceholder: "À qui écrivez-vous, et pourquoi ?",
+      developObjectiveLabel: "Objectif / action (facultatif)",
+      developObjectivePlaceholder: "Que voulez-vous que le lecteur comprenne ou fasse ?",
+      developStructureExampleLabel: "Exemple de structure — pas un modèle de réponse",
+      developStructureExampleText: "Contexte : … / Objectif ou action demandée : …",
+      producePlanHeading: "Planifiez d'abord votre réponse",
+      producePlanMainIdeaLabel: "Idée principale",
+      producePlanPoint1Label: "Point 1",
+      producePlanPoint2Label: "Point 2",
+      producePlanConclusionLabel: "Conclusion",
+      producePlanHint: "Ce plan est pour vous seul — il n'est pas noté et ne fait pas partie de votre réponse finale.",
+      producePlanRequiredNotice: "Complétez votre plan ci-dessus pour débloquer le champ de réponse.",
+      producePlanRecapLabel: "Votre plan",
       correctFeedback: "Bien vu.",
       selfReviewFeedback: "Relisez votre production avec cette grille.",
       retryFeedback: "Pas encore — modifiez votre réponse et réessayez.",
@@ -1997,6 +2045,22 @@ export const APP_COPY = {
       suggestionPlaceholder: "Escribe tu propuesta en francés…",
       lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "palabra" : "palabras"} · ${sentences} ${sentences === 1 ? "frase" : "frases"}`,
       examTaskLanguageNote: "Tarea del examen, mostrada en francés, como en el examen real.",
+      developShowStructureAid: "¿Necesitas una estructura?",
+      developHideStructureAid: "Ocultar ayuda de estructura",
+      developContextLabel: "Contexto (opcional)",
+      developContextPlaceholder: "¿A quién le escribes y por qué?",
+      developObjectiveLabel: "Objetivo / acción (opcional)",
+      developObjectivePlaceholder: "¿Qué quieres que el lector entienda o haga?",
+      developStructureExampleLabel: "Ejemplo de estructura — no es un modelo de respuesta",
+      developStructureExampleText: "Contexte : … / Objectif ou action demandée : …",
+      producePlanHeading: "Primero planifica tu respuesta",
+      producePlanMainIdeaLabel: "Idea principal",
+      producePlanPoint1Label: "Punto 1",
+      producePlanPoint2Label: "Punto 2",
+      producePlanConclusionLabel: "Conclusión",
+      producePlanHint: "Este plan es solo para ti — no se califica y no forma parte de tu respuesta final.",
+      producePlanRequiredNotice: "Completa tu plan arriba para desbloquear el campo de respuesta.",
+      producePlanRecapLabel: "Tu plan",
       correctFeedback: "Correcto.",
       selfReviewFeedback: "Revisa tu producción con esta lista.",
       retryFeedback: "Aún no; modifica tu respuesta e inténtalo de nuevo.",
@@ -2677,6 +2741,22 @@ export const APP_COPY = {
       suggestionPlaceholder: "Escreva sua proposta em francês…",
       lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "palavra" : "palavras"} · ${sentences} ${sentences === 1 ? "frase" : "frases"}`,
       examTaskLanguageNote: "Tarefa do exame, exibida em francês — como na prova real.",
+      developShowStructureAid: "Precisa de uma estrutura?",
+      developHideStructureAid: "Ocultar ajuda de estrutura",
+      developContextLabel: "Contexto (opcional)",
+      developContextPlaceholder: "Para quem você está escrevendo, e por quê?",
+      developObjectiveLabel: "Objetivo / ação (opcional)",
+      developObjectivePlaceholder: "O que você quer que o leitor entenda ou faça?",
+      developStructureExampleLabel: "Exemplo de estrutura — não é um modelo de resposta",
+      developStructureExampleText: "Contexte : … / Objectif ou action demandée : …",
+      producePlanHeading: "Planeje sua resposta primeiro",
+      producePlanMainIdeaLabel: "Ideia principal",
+      producePlanPoint1Label: "Ponto 1",
+      producePlanPoint2Label: "Ponto 2",
+      producePlanConclusionLabel: "Conclusão",
+      producePlanHint: "Este plano é só para você — não é avaliado e não faz parte da sua resposta final.",
+      producePlanRequiredNotice: "Complete seu plano acima para liberar o campo de resposta.",
+      producePlanRecapLabel: "Seu plano",
       correctFeedback: "Muito bem.",
       selfReviewFeedback: "Revise sua produção com esta lista.",
       retryFeedback: "Ainda não; modifique sua resposta e tente novamente.",
