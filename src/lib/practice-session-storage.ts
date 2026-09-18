@@ -8,13 +8,6 @@ export type StoredPracticeDifficultyRating = "too-easy" | "appropriate" | "too-h
  * A deliberately local-only snapshot for resuming an unfinished practice
  * path. It is never sent to the server and is cleared after completion.
  */
-export interface StoredProducePlan {
-  mainIdea: string;
-  point1: string;
-  point2: string;
-  conclusion: string;
-}
-
 export interface StoredPracticeSession {
   version: 1;
   task: "TASK_1" | "TASK_2" | "TASK_3";
@@ -31,11 +24,6 @@ export interface StoredPracticeSession {
   // resumable. Once present, it prevents a browser refresh from creating a
   // second server session for the same six exercises.
   progressSessionId?: string;
-  // Produce's mini-plan is required scaffolding (see practice-trainer.tsx)
-  // but never graded and never part of the final answer, so it is stored
-  // separately rather than folded into `answer`. Optional so sessions saved
-  // before this shipped remain resumable.
-  producePlan?: StoredProducePlan;
 }
 
 function isCompletionMethodEntry(value: unknown): value is readonly [string, StoredPracticeCompletionMethod] {
@@ -53,17 +41,6 @@ function isDifficultyRatingEntry(value: unknown): value is readonly [string, Sto
     value.length === 2 &&
     typeof value[0] === "string" &&
     (value[1] === "too-easy" || value[1] === "appropriate" || value[1] === "too-hard")
-  );
-}
-
-function isStoredProducePlan(value: unknown): value is StoredProducePlan {
-  if (!value || typeof value !== "object") return false;
-  const plan = value as Partial<StoredProducePlan>;
-  return (
-    typeof plan.mainIdea === "string" &&
-    typeof plan.point1 === "string" &&
-    typeof plan.point2 === "string" &&
-    typeof plan.conclusion === "string"
   );
 }
 
@@ -93,8 +70,7 @@ function isStoredPracticeSession(value: unknown): value is StoredPracticeSession
     session.completionMethods.every(isCompletionMethodEntry) &&
     Array.isArray(session.difficultyRatings) &&
     session.difficultyRatings.every(isDifficultyRatingEntry) &&
-    (session.progressSessionId === undefined || typeof session.progressSessionId === "string") &&
-    (session.producePlan === undefined || isStoredProducePlan(session.producePlan))
+    (session.progressSessionId === undefined || typeof session.progressSessionId === "string")
   );
 }
 
