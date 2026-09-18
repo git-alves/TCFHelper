@@ -138,6 +138,24 @@ export function scrambleOrdering(
   return shuffled;
 }
 
+// Length targets ("80 à 100 mots", "3 ou 4 phrases") live only as prose
+// inside each exercise's authored instructions, not as a structured field --
+// parsing that text would be fragile against copy changes. Counting the
+// learner's own input instead gives an always-correct live signal they can
+// check against the instructions above, without the app needing to know the
+// exact target.
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+function countSentences(text: string): number {
+  return text
+    .split(/[.!?]+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0).length;
+}
+
 function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
   if (!exercise) return [];
   if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
@@ -359,19 +377,27 @@ function ExerciseInput({
 
   const isIndependentWriting = exercise.exercise_type === "develop" || exercise.exercise_type === "produce";
   return (
-    <textarea
-      value={answer}
-      disabled={disabled}
-      onChange={(event) => onAnswerChange(event.target.value)}
-      rows={isIndependentWriting ? 6 : 3}
-      aria-label={practice.responseLabel}
-      placeholder={
-        isIndependentWriting
-          ? practice.responsePlaceholder
-          : practice.suggestionPlaceholder
-      }
-      className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
-    />
+    <div className="flex flex-col gap-1.5">
+      <textarea
+        value={answer}
+        disabled={disabled}
+        onChange={(event) => onAnswerChange(event.target.value)}
+        rows={isIndependentWriting ? 6 : 3}
+        aria-label={practice.responseLabel}
+        aria-describedby={isIndependentWriting ? "practice-length-counter" : undefined}
+        placeholder={
+          isIndependentWriting
+            ? practice.responsePlaceholder
+            : practice.suggestionPlaceholder
+        }
+        className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
+      />
+      {isIndependentWriting && (
+        <p id="practice-length-counter" className="text-xs text-zinc-500 dark:text-zinc-400">
+          {practice.lengthCounter({ words: countWords(answer), sentences: countSentences(answer) })}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -1138,7 +1164,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             {practice.progress({ step: currentExerciseIndex + 1, total: exercises.length })}
           </span>
         </div>
-        <h2 className="mt-5 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
+        <p className="mt-5 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          {practice.examTaskLanguageNote}
+        </p>
+        <h2 className="mt-1 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{currentExercise.instructions}</p>
         <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-white/[.06] dark:text-zinc-300">
           <span className="font-semibold">{practice.attentionLabel}</span> {currentExercise.target_language_feature}
@@ -1151,7 +1180,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             onAnswerChange={updateAnswer}
             ordering={ordering}
             onOrderingChange={updateOrdering}
-            disabled={isExerciseComplete}
+            disabled={checkState === "correct" || checkState === "revealed"}
             practice={practice}
           />
         </div>
@@ -1274,7 +1303,26 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {isExerciseComplete ? (
+          {(!isExerciseComplete || checkState === "self-review") && (
+            <button
+              type="button"
+              disabled={!hasAnswer}
+              onClick={checkAnswer}
+              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
+            >
+              {isIndependentWriting ? practice.selfReview : practice.verify}
+            </button>
+          )}
+          {canRevealAnswer && !isExerciseComplete && (
+            <button
+              type="button"
+              onClick={revealAnswer}
+              className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              {practice.revealAnswer}
+            </button>
+          )}
+          {isExerciseComplete && (
             <button
               type="button"
               onClick={moveNext}
@@ -1282,26 +1330,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             >
               {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={!hasAnswer}
-                onClick={checkAnswer}
-                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
-              >
-                {isIndependentWriting ? practice.selfReview : practice.verify}
-              </button>
-              {canRevealAnswer && (
-                <button
-                  type="button"
-                  onClick={revealAnswer}
-                  className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                >
-                  {practice.revealAnswer}
-                </button>
-              )}
-            </>
           )}
           {checkState === "try-again" && (
             <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>

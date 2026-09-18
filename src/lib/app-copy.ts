@@ -125,6 +125,8 @@ export interface AppCopy {
     responseLabel: string;
     responsePlaceholder: string;
     suggestionPlaceholder: string;
+    lengthCounter: (values: { words: number; sentences: number }) => string;
+    examTaskLanguageNote: string;
     correctFeedback: string;
     selfReviewFeedback: string;
     retryFeedback: string;
@@ -642,6 +644,8 @@ export const APP_COPY = {
       responseLabel: "Your response in French",
       responsePlaceholder: "Write your response in French…",
       suggestionPlaceholder: "Write your proposal in French…",
+      lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "word" : "words"} · ${sentences} ${sentences === 1 ? "sentence" : "sentences"}`,
+      examTaskLanguageNote: "Exam task, shown in French — as in the real exam.",
       correctFeedback: "Well done.",
       selfReviewFeedback: "Review your writing with this checklist.",
       retryFeedback: "Not yet — edit your response and try again.",
@@ -1309,6 +1313,8 @@ export const APP_COPY = {
       responseLabel: "Votre réponse en français",
       responsePlaceholder: "Écrivez votre réponse en français…",
       suggestionPlaceholder: "Écrivez votre proposition en français…",
+      lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "mot" : "mots"} · ${sentences} ${sentences === 1 ? "phrase" : "phrases"}`,
+      examTaskLanguageNote: "Sujet d'examen, présenté en français — comme à l'examen réel.",
       correctFeedback: "Bien vu.",
       selfReviewFeedback: "Relisez votre production avec cette grille.",
       retryFeedback: "Pas encore — modifiez votre réponse et réessayez.",
@@ -1989,6 +1995,8 @@ export const APP_COPY = {
       responseLabel: "Tu respuesta en francés",
       responsePlaceholder: "Escribe tu respuesta en francés…",
       suggestionPlaceholder: "Escribe tu propuesta en francés…",
+      lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "palabra" : "palabras"} · ${sentences} ${sentences === 1 ? "frase" : "frases"}`,
+      examTaskLanguageNote: "Tarea del examen, mostrada en francés, como en el examen real.",
       correctFeedback: "Correcto.",
       selfReviewFeedback: "Revisa tu producción con esta lista.",
       retryFeedback: "Aún no; modifica tu respuesta e inténtalo de nuevo.",
@@ -2667,6 +2675,8 @@ export const APP_COPY = {
       responseLabel: "Sua resposta em francês",
       responsePlaceholder: "Escreva sua resposta em francês…",
       suggestionPlaceholder: "Escreva sua proposta em francês…",
+      lengthCounter: ({ words, sentences }) => `${words} ${words === 1 ? "palavra" : "palavras"} · ${sentences} ${sentences === 1 ? "frase" : "frases"}`,
+      examTaskLanguageNote: "Tarefa do exame, exibida em francês — como na prova real.",
       correctFeedback: "Muito bem.",
       selfReviewFeedback: "Revise sua produção com esta lista.",
       retryFeedback: "Ainda não; modifique sua resposta e tente novamente.",
