@@ -13,6 +13,7 @@ import {
   loadStoredPracticeSession,
   saveStoredPracticeSession,
   type StoredPracticeSession,
+  type StoredProducePlan,
 } from "@/lib/practice-session-storage";
 import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
 
@@ -87,6 +88,17 @@ type PendingProgressCompletion = { exerciseId: string; completionMethod: Complet
 
 const DIFFICULTY_RATINGS: readonly DifficultyRating[] = ["too-easy", "appropriate", "too-hard"];
 
+const EMPTY_PRODUCE_PLAN: StoredProducePlan = { mainIdea: "", point1: "", point2: "", conclusion: "" };
+
+function isProducePlanComplete(plan: StoredProducePlan): boolean {
+  return (
+    plan.mainIdea.trim().length > 0 &&
+    plan.point1.trim().length > 0 &&
+    plan.point2.trim().length > 0 &&
+    plan.conclusion.trim().length > 0
+  );
+}
+
 const SELECT_BUTTON_CLASS =
   "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
 const SELECT_LIST_CLASS =
@@ -136,6 +148,24 @@ export function scrambleOrdering(
     [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
   }
   return shuffled;
+}
+
+// Length targets ("80 à 100 mots", "3 ou 4 phrases") live only as prose
+// inside each exercise's authored instructions, not as a structured field --
+// parsing that text would be fragile against copy changes. Counting the
+// learner's own input instead gives an always-correct live signal they can
+// check against the instructions above, without the app needing to know the
+// exact target.
+function countWords(text: string): number {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
+}
+
+function countSentences(text: string): number {
+  return text
+    .split(/[.!?]+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0).length;
 }
 
 function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
@@ -260,12 +290,116 @@ function ProgressSteps({
   );
 }
 
+function DevelopStructureAid({
+  disabled,
+  practice,
+}: {
+  disabled: boolean;
+  practice: AppCopy["practice"];
+}) {
+  // Purely local scratch space: optional, ungraded, and never folded into
+  // the exercise's answer -- resetting when the learner moves to a
+  // different exercise (via the `key={exercise.id}` the caller renders this
+  // with) is the desired behavior, not state to persist.
+  const [isVisible, setIsVisible] = useState(false);
+  const [context, setContext] = useState("");
+  const [objective, setObjective] = useState("");
+
+  return (
+    <div>
+      <button
+        type="button"
+        aria-expanded={isVisible}
+        aria-controls="practice-develop-structure-aid"
+        onClick={() => setIsVisible((visible) => !visible)}
+        className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+      >
+        {isVisible ? practice.developHideStructureAid : practice.developShowStructureAid}
+      </button>
+      {isVisible && (
+        <div
+          id="practice-develop-structure-aid"
+          className="mt-3 flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900 dark:bg-sky-950/30"
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-sky-950 dark:text-sky-100">{practice.developContextLabel}</span>
+            <input
+              type="text"
+              value={context}
+              disabled={disabled}
+              onChange={(event) => setContext(event.target.value)}
+              placeholder={practice.developContextPlaceholder}
+              className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900 dark:bg-zinc-950"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="font-medium text-sky-950 dark:text-sky-100">{practice.developObjectiveLabel}</span>
+            <input
+              type="text"
+              value={objective}
+              disabled={disabled}
+              onChange={(event) => setObjective(event.target.value)}
+              placeholder={practice.developObjectivePlaceholder}
+              className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900 dark:bg-zinc-950"
+            />
+          </label>
+          <p className="text-xs leading-5 text-sky-900/80 dark:text-sky-100/80">
+            <span className="font-semibold">{practice.developStructureExampleLabel}:</span>{" "}
+            {practice.developStructureExampleText}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProducePlanFields({
+  plan,
+  onFieldChange,
+  disabled,
+  practice,
+}: {
+  plan: StoredProducePlan;
+  onFieldChange: (field: keyof StoredProducePlan, value: string) => void;
+  disabled: boolean;
+  practice: AppCopy["practice"];
+}) {
+  const fields: { key: keyof StoredProducePlan; label: string }[] = [
+    { key: "mainIdea", label: practice.producePlanMainIdeaLabel },
+    { key: "point1", label: practice.producePlanPoint1Label },
+    { key: "point2", label: practice.producePlanPoint2Label },
+    { key: "conclusion", label: practice.producePlanConclusionLabel },
+  ];
+
+  return (
+    <fieldset className="flex flex-col gap-3 rounded-xl border border-black/[.1] bg-zinc-50 px-4 py-3 dark:border-white/[.15] dark:bg-white/[.04]">
+      <legend className="px-1 text-sm font-semibold">{practice.producePlanHeading}</legend>
+      {fields.map((field) => (
+        <label key={field.key} className="flex flex-col gap-1 text-sm">
+          <span className="font-medium">{field.label}</span>
+          <input
+            type="text"
+            value={plan[field.key]}
+            disabled={disabled}
+            onChange={(event) => onFieldChange(field.key, event.target.value)}
+            className="rounded-lg border border-black/[.15] bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950"
+          />
+        </label>
+      ))}
+      <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-400">{practice.producePlanHint}</p>
+    </fieldset>
+  );
+}
+
 function ExerciseInput({
   exercise,
   answer,
   onAnswerChange,
   ordering,
   onOrderingChange,
+  producePlan,
+  onProducePlanFieldChange,
+  isProduceResponseUnlocked,
   disabled,
   practice,
 }: {
@@ -274,6 +408,9 @@ function ExerciseInput({
   onAnswerChange: (answer: string) => void;
   ordering: readonly string[];
   onOrderingChange: (ordering: readonly string[]) => void;
+  producePlan: StoredProducePlan;
+  onProducePlanFieldChange: (field: keyof StoredProducePlan, value: string) => void;
+  isProduceResponseUnlocked: boolean;
   disabled: boolean;
   practice: AppCopy["practice"];
 }) {
@@ -357,21 +494,68 @@ function ExerciseInput({
     );
   }
 
-  const isIndependentWriting = exercise.exercise_type === "develop" || exercise.exercise_type === "produce";
+  if (exercise.exercise_type === "develop") {
+    return (
+      <div className="flex flex-col gap-4">
+        <DevelopStructureAid key={exercise.id} disabled={disabled} practice={practice} />
+        <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />
+      </div>
+    );
+  }
+
+  if (exercise.exercise_type === "produce") {
+    return (
+      <div className="flex flex-col gap-4">
+        <ProducePlanFields plan={producePlan} onFieldChange={onProducePlanFieldChange} disabled={disabled} practice={practice} />
+        {isProduceResponseUnlocked ? (
+          <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />
+        ) : (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{practice.producePlanRequiredNotice}</p>
+        )}
+      </div>
+    );
+  }
+
   return (
     <textarea
       value={answer}
       disabled={disabled}
       onChange={(event) => onAnswerChange(event.target.value)}
-      rows={isIndependentWriting ? 6 : 3}
+      rows={3}
       aria-label={practice.responseLabel}
-      placeholder={
-        isIndependentWriting
-          ? practice.responsePlaceholder
-          : practice.suggestionPlaceholder
-      }
+      placeholder={practice.suggestionPlaceholder}
       className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
     />
+  );
+}
+
+function WritingResponseField({
+  answer,
+  onAnswerChange,
+  disabled,
+  practice,
+}: {
+  answer: string;
+  onAnswerChange: (answer: string) => void;
+  disabled: boolean;
+  practice: AppCopy["practice"];
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <textarea
+        value={answer}
+        disabled={disabled}
+        onChange={(event) => onAnswerChange(event.target.value)}
+        rows={6}
+        aria-label={practice.responseLabel}
+        aria-describedby="practice-length-counter"
+        placeholder={practice.responsePlaceholder}
+        className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
+      />
+      <p id="practice-length-counter" className="text-xs text-zinc-500 dark:text-zinc-400">
+        {practice.lengthCounter({ words: countWords(answer), sentences: countSentences(answer) })}
+      </p>
+    </div>
   );
 }
 
@@ -399,6 +583,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
+  // Produce's mini-plan gates the response editor but is never graded and
+  // never folded into `answer` -- see EMPTY_PRODUCE_PLAN and isProducePlanComplete.
+  const [producePlan, setProducePlan] = useState<StoredProducePlan>(EMPTY_PRODUCE_PLAN);
   const [checkState, setCheckState] = useState<CheckState>(null);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [isSequenceComplete, setIsSequenceComplete] = useState(false);
@@ -451,11 +638,18 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const hasAnswer =
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
-      : answer.trim().length > 0;
+      : currentExercise?.exercise_type === "produce"
+        ? answer.trim().length > 0 && isProducePlanComplete(producePlan)
+        : answer.trim().length > 0;
   // Organize's ordering is always pre-filled (scrambled on entry), so its
   // "ordering.length > 0" isn't a signal of learner work the way a typed
   // answer is -- redoing a shuffle costs seconds, not a lost paragraph.
   const hasDraftInProgress = currentExercise != null && currentExercise.exercise_type !== "organize" && answer.trim().length > 0;
+  // Sticky by design: once the plan has unlocked the response editor (or a
+  // resumed session already has response text), clearing a plan field later
+  // must not yank away an in-progress or already-written response.
+  const isProduceResponseUnlocked =
+    currentExercise?.exercise_type !== "produce" || isProducePlanComplete(producePlan) || answer.trim().length > 0;
   const reviewedAnswers = getReviewedAnswers(currentExercise);
   const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
   const isExerciseComplete =
@@ -611,6 +805,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
       completionMethods: [...completionMethods.entries()],
       difficultyRatings: [...difficultyRatings.entries()],
       progressSessionId: progressSessionId ?? undefined,
+      producePlan,
     });
   }, [
     answer,
@@ -622,6 +817,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     exercises,
     isSequenceComplete,
     ordering,
+    producePlan,
     progressSessionId,
     selectedSkill,
     storageLoaded,
@@ -638,6 +834,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     );
     setCheckState(null);
     setIsHintVisible(false);
+    setProducePlan(EMPTY_PRODUCE_PLAN);
   }
 
   function chooseTask(task: PracticeTask) {
@@ -703,6 +900,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(null);
   }
 
+  function updateProducePlanField(field: keyof StoredProducePlan, value: string) {
+    setProducePlan((previous) => ({ ...previous, [field]: value }));
+    // The plan is part of what "self-review" reflects on -- revising it
+    // after an assessment un-commits that verdict, same as editing the
+    // response itself.
+    setCheckState(null);
+  }
+
   function markCompletion(exerciseId: string, method: CompletionMethod) {
     setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
     reportExerciseCompletion(exerciseId, method);
@@ -715,8 +920,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   function checkAnswer() {
     if (!currentExercise) return;
     if (isIndependentWriting) {
+      // Not yet a completion: self-review only shows the checklist. Editing
+      // the plan or response afterward resets checkState to null (see
+      // updateAnswer/updateProducePlanField), which must mean "not
+      // complete" for real, not just in the UI -- so the actual completion
+      // (local + server report) is recorded in moveNext, once the learner
+      // explicitly chooses to move on rather than keep revising.
       setCheckState("self-review");
-      markCompletion(currentExercise.id, "self-review");
       return;
     }
 
@@ -735,6 +945,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function moveNext() {
+    // Reachable only while isExerciseComplete is true (the sole caller is
+    // the Next/Finish button), so checkState is always one of the three
+    // completed states here. "correct"/"revealed" already recorded their
+    // completion the moment they were reached, since neither is revisable;
+    // "self-review" defers to here specifically because it is.
+    if (checkState === "self-review" && currentExercise) {
+      markCompletion(currentExercise.id, "self-review");
+    }
     const nextIndex = currentExerciseIndex + 1;
     if (nextIndex >= exercises.length) {
       clearLocalSession();
@@ -824,6 +1042,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(savedSession.checkState);
     setCompletionMethods(new Map(savedSession.completionMethods));
     setDifficultyRatings(new Map(savedSession.difficultyRatings));
+    setProducePlan(savedSession.producePlan ?? EMPTY_PRODUCE_PLAN);
     setIsSequenceComplete(false);
     setSavedSession(null);
     beginProgressSession(
@@ -1138,7 +1357,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             {practice.progress({ step: currentExerciseIndex + 1, total: exercises.length })}
           </span>
         </div>
-        <h2 className="mt-5 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
+        <p className="mt-5 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          {practice.examTaskLanguageNote}
+        </p>
+        <h2 className="mt-1 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
         <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{currentExercise.instructions}</p>
         <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-white/[.06] dark:text-zinc-300">
           <span className="font-semibold">{practice.attentionLabel}</span> {currentExercise.target_language_feature}
@@ -1151,7 +1373,10 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             onAnswerChange={updateAnswer}
             ordering={ordering}
             onOrderingChange={updateOrdering}
-            disabled={isExerciseComplete}
+            producePlan={producePlan}
+            onProducePlanFieldChange={updateProducePlanField}
+            isProduceResponseUnlocked={isProduceResponseUnlocked}
+            disabled={checkState === "correct" || checkState === "revealed"}
             practice={practice}
           />
         </div>
@@ -1226,6 +1451,25 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 )}
               </div>
             )}
+            {checkState === "self-review" && currentExercise.exercise_type === "produce" && (
+              <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
+                <p className="font-medium">{practice.producePlanRecapLabel}</p>
+                <ul className="mt-1 list-disc space-y-1 pl-5">
+                  <li>
+                    <span className="font-medium">{practice.producePlanMainIdeaLabel}:</span> {producePlan.mainIdea}
+                  </li>
+                  <li>
+                    <span className="font-medium">{practice.producePlanPoint1Label}:</span> {producePlan.point1}
+                  </li>
+                  <li>
+                    <span className="font-medium">{practice.producePlanPoint2Label}:</span> {producePlan.point2}
+                  </li>
+                  <li>
+                    <span className="font-medium">{practice.producePlanConclusionLabel}:</span> {producePlan.conclusion}
+                  </li>
+                </ul>
+              </div>
+            )}
             {checkState === "self-review" && currentExercise.self_check && (
               <ul className="mt-3 list-disc space-y-1 pl-5">
                 {currentExercise.self_check.map((check) => (
@@ -1274,7 +1518,26 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
         )}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          {isExerciseComplete ? (
+          {(!isExerciseComplete || checkState === "self-review") && (
+            <button
+              type="button"
+              disabled={!hasAnswer}
+              onClick={checkAnswer}
+              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
+            >
+              {isIndependentWriting ? practice.selfReview : practice.verify}
+            </button>
+          )}
+          {canRevealAnswer && !isExerciseComplete && (
+            <button
+              type="button"
+              onClick={revealAnswer}
+              className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              {practice.revealAnswer}
+            </button>
+          )}
+          {isExerciseComplete && (
             <button
               type="button"
               onClick={moveNext}
@@ -1282,26 +1545,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             >
               {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
             </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                disabled={!hasAnswer}
-                onClick={checkAnswer}
-                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
-              >
-                {isIndependentWriting ? practice.selfReview : practice.verify}
-              </button>
-              {canRevealAnswer && (
-                <button
-                  type="button"
-                  onClick={revealAnswer}
-                  className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                >
-                  {practice.revealAnswer}
-                </button>
-              )}
-            </>
           )}
           {checkState === "try-again" && (
             <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>
