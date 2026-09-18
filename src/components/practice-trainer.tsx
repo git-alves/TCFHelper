@@ -920,8 +920,13 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   function checkAnswer() {
     if (!currentExercise) return;
     if (isIndependentWriting) {
+      // Not yet a completion: self-review only shows the checklist. Editing
+      // the plan or response afterward resets checkState to null (see
+      // updateAnswer/updateProducePlanField), which must mean "not
+      // complete" for real, not just in the UI -- so the actual completion
+      // (local + server report) is recorded in moveNext, once the learner
+      // explicitly chooses to move on rather than keep revising.
       setCheckState("self-review");
-      markCompletion(currentExercise.id, "self-review");
       return;
     }
 
@@ -940,6 +945,14 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   }
 
   function moveNext() {
+    // Reachable only while isExerciseComplete is true (the sole caller is
+    // the Next/Finish button), so checkState is always one of the three
+    // completed states here. "correct"/"revealed" already recorded their
+    // completion the moment they were reached, since neither is revisable;
+    // "self-review" defers to here specifically because it is.
+    if (checkState === "self-review" && currentExercise) {
+      markCompletion(currentExercise.id, "self-review");
+    }
     const nextIndex = currentExerciseIndex + 1;
     if (nextIndex >= exercises.length) {
       clearLocalSession();

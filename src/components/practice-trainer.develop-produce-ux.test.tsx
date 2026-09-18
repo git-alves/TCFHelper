@@ -257,4 +257,43 @@ describe("PracticeTrainer: Develop/Produce UX", () => {
     fillInputByLabel(copy.producePlanConclusionLabel, "Demande de confirmation écrite");
     expect(container.textContent).not.toContain(copy.finishSequence);
   });
+
+  it("does not report a self-review completion to the server until the learner clicks Next", async () => {
+    const completionCalls: unknown[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/practice/sessions") {
+          return { ok: true, json: async () => ({ sessionId: "sess-1" }) } as Response;
+        }
+        if (url.includes("/completions")) {
+          completionCalls.push(init?.body ? JSON.parse(init.body as string) : null);
+        }
+        return { ok: true, json: async () => ({}) } as Response;
+      }),
+    );
+
+    startSequence();
+    // Let beginProgressSession's fetch chain resolve so it actually has a
+    // session id to report against, instead of only queuing locally.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    typeAnswer("Madame, Monsieur, je vous écris.");
+    clickButtonWithText(copy.selfReview);
+
+    expect(completionCalls).toHaveLength(0);
+
+    clickButtonWithText(copy.nextExercise);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(completionCalls).toHaveLength(1);
+    expect(completionCalls[0]).toMatchObject({ exerciseId: "ex-develop", completionMethod: "self-review" });
+  });
 });
