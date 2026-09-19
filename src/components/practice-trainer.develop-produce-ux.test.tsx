@@ -5,14 +5,10 @@
 //    lives only as prose in the instructions with no other feedback signal.
 // 2. Develop gets an optional, ungraded structure aid (Context / Objective)
 //    that never gates or replaces the free-write textarea.
-// 3. Produce requires a mandatory, ungraded mini-plan (main idea, two
-//    points, conclusion) before the response field unlocks; once unlocked
-//    (or resumed with existing text), it stays unlocked even if the plan is
-//    later edited.
-// 4. Self-review no longer permanently locks the exercise -- both the plan
-//    and the response stay editable, and editing either un-commits the
-//    verdict until self-review runs again.
-// 5. An explicit note that the exercise content is French exam material.
+// 3. Self-review no longer permanently locks the exercise -- the response
+//    stays editable, and editing it un-commits the verdict until self-review
+//    runs again.
+// 4. An explicit note that the exercise content is French exam material.
 // Mounts the real PracticeTrainer via happy-dom + act, same pattern as
 // practice-trainer.change-part-guard.test.tsx.
 import { act } from "react";
@@ -114,12 +110,8 @@ function clickButtonWithText(text: string) {
   });
 }
 
-function textarea(): HTMLTextAreaElement | null {
-  return container.querySelector("textarea");
-}
-
 function requireTextarea(): HTMLTextAreaElement {
-  const el = textarea();
+  const el = container.querySelector("textarea");
   if (!el) throw new Error("textarea not found");
   return el;
 }
@@ -130,25 +122,6 @@ function typeAnswer(text: string) {
     setter?.call(requireTextarea(), text);
     requireTextarea().dispatchEvent(new Event("input", { bubbles: true }));
   });
-}
-
-function fillInputByLabel(labelText: string, value: string) {
-  const label = [...container.querySelectorAll("label")].find((el) => el.textContent?.startsWith(labelText));
-  if (!label) throw new Error(`label "${labelText}" not found`);
-  const input = label.querySelector("input");
-  if (!input) throw new Error(`input for label "${labelText}" not found`);
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  act(() => {
-    setter?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-}
-
-function fillProducePlan(overrides: Partial<Record<"mainIdea" | "point1" | "point2" | "conclusion", string>> = {}) {
-  fillInputByLabel(copy.producePlanMainIdeaLabel, overrides.mainIdea ?? "Reporter mon inscription");
-  fillInputByLabel(copy.producePlanPoint1Label, overrides.point1 ?? "Raison du report");
-  fillInputByLabel(copy.producePlanPoint2Label, overrides.point2 ?? "Nouvelle date souhaitée");
-  fillInputByLabel(copy.producePlanConclusionLabel, overrides.conclusion ?? "Demande de confirmation");
 }
 
 function startSequence() {
@@ -200,62 +173,33 @@ describe("PracticeTrainer: Develop/Produce UX", () => {
     expect(container.textContent).toContain(copy.developStructureExampleText);
   });
 
-  it("Produce: the response field stays locked until the full mini-plan is filled in", () => {
+  it("Produce: the response field is available immediately, with no gating step", () => {
     startSequence();
     advanceFromDevelopToProduce();
 
-    expect(textarea()).toBeNull();
-    expect(container.textContent).toContain(copy.producePlanRequiredNotice);
-
-    fillInputByLabel(copy.producePlanMainIdeaLabel, "Reporter mon inscription");
-    fillInputByLabel(copy.producePlanPoint1Label, "Raison du report");
-    fillInputByLabel(copy.producePlanPoint2Label, "Nouvelle date souhaitée");
-    expect(textarea()).toBeNull();
-
-    fillInputByLabel(copy.producePlanConclusionLabel, "Demande de confirmation");
-    expect(textarea()).not.toBeNull();
-  });
-
-  it("Produce: stays unlocked once a response exists, even if a plan field is cleared afterward", () => {
-    startSequence();
-    advanceFromDevelopToProduce();
-
-    fillProducePlan();
+    expect(requireTextarea().disabled).toBe(false);
     typeAnswer("Je vous contacte car je souhaite reporter mon inscription.");
-
-    fillInputByLabel(copy.producePlanMainIdeaLabel, "");
-
-    expect(textarea()).not.toBeNull();
-    expect(requireTextarea().value).toBe("Je vous contacte car je souhaite reporter mon inscription.");
+    expect(container.textContent).toContain(copy.lengthCounter({ words: 9, sentences: 1 }));
   });
 
-  it("keeps the plan and response editable after self-review, and includes the plan in the self-review recap", () => {
+  it("keeps the response editable after self-review, instead of a one-shot final verdict", () => {
     startSequence();
     advanceFromDevelopToProduce();
 
-    fillProducePlan();
     typeAnswer("Je vous contacte car je souhaite reporter mon inscription.");
     clickButtonWithText(copy.selfReview);
 
-    // Recap of the (ungraded) plan, the self-check, and the finish action
-    // all appear together -- not a one-shot final verdict.
     expect(requireTextarea().disabled).toBe(false);
-    expect(container.textContent).toContain(copy.producePlanRecapLabel);
-    expect(container.textContent).toContain("Reporter mon inscription");
     expect(container.textContent).toContain("Le but du message est clair");
     expect(container.textContent).toContain(copy.finishSequence);
 
     // Editing the response un-commits the verdict.
     typeAnswer("Je vous contacte car je souhaite reporter mon inscription à l'année prochaine.");
-    expect(container.textContent).not.toContain(copy.producePlanRecapLabel);
+    expect(container.textContent).not.toContain("Le but du message est clair");
     expect(container.textContent).not.toContain(copy.finishSequence);
 
     clickButtonWithText(copy.selfReview);
     expect(container.textContent).toContain(copy.finishSequence);
-
-    // Editing the plan (not just the response) also un-commits the verdict.
-    fillInputByLabel(copy.producePlanConclusionLabel, "Demande de confirmation écrite");
-    expect(container.textContent).not.toContain(copy.finishSequence);
   });
 
   it("does not report a self-review completion to the server until the learner clicks Next", async () => {

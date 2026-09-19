@@ -13,7 +13,6 @@ import {
   loadStoredPracticeSession,
   saveStoredPracticeSession,
   type StoredPracticeSession,
-  type StoredProducePlan,
 } from "@/lib/practice-session-storage";
 import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
 
@@ -87,17 +86,6 @@ type DifficultyRating = "too-easy" | "appropriate" | "too-hard";
 type PendingProgressCompletion = { exerciseId: string; completionMethod: CompletionMethod };
 
 const DIFFICULTY_RATINGS: readonly DifficultyRating[] = ["too-easy", "appropriate", "too-hard"];
-
-const EMPTY_PRODUCE_PLAN: StoredProducePlan = { mainIdea: "", point1: "", point2: "", conclusion: "" };
-
-function isProducePlanComplete(plan: StoredProducePlan): boolean {
-  return (
-    plan.mainIdea.trim().length > 0 &&
-    plan.point1.trim().length > 0 &&
-    plan.point2.trim().length > 0 &&
-    plan.conclusion.trim().length > 0
-  );
-}
 
 const SELECT_BUTTON_CLASS =
   "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
@@ -353,53 +341,12 @@ function DevelopStructureAid({
   );
 }
 
-function ProducePlanFields({
-  plan,
-  onFieldChange,
-  disabled,
-  practice,
-}: {
-  plan: StoredProducePlan;
-  onFieldChange: (field: keyof StoredProducePlan, value: string) => void;
-  disabled: boolean;
-  practice: AppCopy["practice"];
-}) {
-  const fields: { key: keyof StoredProducePlan; label: string }[] = [
-    { key: "mainIdea", label: practice.producePlanMainIdeaLabel },
-    { key: "point1", label: practice.producePlanPoint1Label },
-    { key: "point2", label: practice.producePlanPoint2Label },
-    { key: "conclusion", label: practice.producePlanConclusionLabel },
-  ];
-
-  return (
-    <fieldset className="flex flex-col gap-3 rounded-xl border border-black/[.1] bg-zinc-50 px-4 py-3 dark:border-white/[.15] dark:bg-white/[.04]">
-      <legend className="px-1 text-sm font-semibold">{practice.producePlanHeading}</legend>
-      {fields.map((field) => (
-        <label key={field.key} className="flex flex-col gap-1 text-sm">
-          <span className="font-medium">{field.label}</span>
-          <input
-            type="text"
-            value={plan[field.key]}
-            disabled={disabled}
-            onChange={(event) => onFieldChange(field.key, event.target.value)}
-            className="rounded-lg border border-black/[.15] bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950"
-          />
-        </label>
-      ))}
-      <p className="text-xs leading-5 text-zinc-600 dark:text-zinc-400">{practice.producePlanHint}</p>
-    </fieldset>
-  );
-}
-
 function ExerciseInput({
   exercise,
   answer,
   onAnswerChange,
   ordering,
   onOrderingChange,
-  producePlan,
-  onProducePlanFieldChange,
-  isProduceResponseUnlocked,
   disabled,
   practice,
 }: {
@@ -408,9 +355,6 @@ function ExerciseInput({
   onAnswerChange: (answer: string) => void;
   ordering: readonly string[];
   onOrderingChange: (ordering: readonly string[]) => void;
-  producePlan: StoredProducePlan;
-  onProducePlanFieldChange: (field: keyof StoredProducePlan, value: string) => void;
-  isProduceResponseUnlocked: boolean;
   disabled: boolean;
   practice: AppCopy["practice"];
 }) {
@@ -504,16 +448,7 @@ function ExerciseInput({
   }
 
   if (exercise.exercise_type === "produce") {
-    return (
-      <div className="flex flex-col gap-4">
-        <ProducePlanFields plan={producePlan} onFieldChange={onProducePlanFieldChange} disabled={disabled} practice={practice} />
-        {isProduceResponseUnlocked ? (
-          <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />
-        ) : (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{practice.producePlanRequiredNotice}</p>
-        )}
-      </div>
-    );
+    return <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />;
   }
 
   return (
@@ -583,9 +518,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [answer, setAnswer] = useState("");
   const [ordering, setOrdering] = useState<readonly string[]>([]);
-  // Produce's mini-plan gates the response editor but is never graded and
-  // never folded into `answer` -- see EMPTY_PRODUCE_PLAN and isProducePlanComplete.
-  const [producePlan, setProducePlan] = useState<StoredProducePlan>(EMPTY_PRODUCE_PLAN);
   const [checkState, setCheckState] = useState<CheckState>(null);
   const [isHintVisible, setIsHintVisible] = useState(false);
   const [isSequenceComplete, setIsSequenceComplete] = useState(false);
@@ -638,18 +570,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
   const hasAnswer =
     currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
       ? ordering.length > 0
-      : currentExercise?.exercise_type === "produce"
-        ? answer.trim().length > 0 && isProducePlanComplete(producePlan)
-        : answer.trim().length > 0;
+      : answer.trim().length > 0;
   // Organize's ordering is always pre-filled (scrambled on entry), so its
   // "ordering.length > 0" isn't a signal of learner work the way a typed
   // answer is -- redoing a shuffle costs seconds, not a lost paragraph.
   const hasDraftInProgress = currentExercise != null && currentExercise.exercise_type !== "organize" && answer.trim().length > 0;
-  // Sticky by design: once the plan has unlocked the response editor (or a
-  // resumed session already has response text), clearing a plan field later
-  // must not yank away an in-progress or already-written response.
-  const isProduceResponseUnlocked =
-    currentExercise?.exercise_type !== "produce" || isProducePlanComplete(producePlan) || answer.trim().length > 0;
   const reviewedAnswers = getReviewedAnswers(currentExercise);
   const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
   const isExerciseComplete =
@@ -805,7 +730,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
       completionMethods: [...completionMethods.entries()],
       difficultyRatings: [...difficultyRatings.entries()],
       progressSessionId: progressSessionId ?? undefined,
-      producePlan,
     });
   }, [
     answer,
@@ -817,7 +741,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     exercises,
     isSequenceComplete,
     ordering,
-    producePlan,
     progressSessionId,
     selectedSkill,
     storageLoaded,
@@ -834,7 +757,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     );
     setCheckState(null);
     setIsHintVisible(false);
-    setProducePlan(EMPTY_PRODUCE_PLAN);
   }
 
   function chooseTask(task: PracticeTask) {
@@ -900,14 +822,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(null);
   }
 
-  function updateProducePlanField(field: keyof StoredProducePlan, value: string) {
-    setProducePlan((previous) => ({ ...previous, [field]: value }));
-    // The plan is part of what "self-review" reflects on -- revising it
-    // after an assessment un-commits that verdict, same as editing the
-    // response itself.
-    setCheckState(null);
-  }
-
   function markCompletion(exerciseId: string, method: CompletionMethod) {
     setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
     reportExerciseCompletion(exerciseId, method);
@@ -921,11 +835,11 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     if (!currentExercise) return;
     if (isIndependentWriting) {
       // Not yet a completion: self-review only shows the checklist. Editing
-      // the plan or response afterward resets checkState to null (see
-      // updateAnswer/updateProducePlanField), which must mean "not
-      // complete" for real, not just in the UI -- so the actual completion
-      // (local + server report) is recorded in moveNext, once the learner
-      // explicitly chooses to move on rather than keep revising.
+      // the response afterward resets checkState to null (see updateAnswer),
+      // which must mean "not complete" for real, not just in the UI -- so
+      // the actual completion (local + server report) is recorded in
+      // moveNext, once the learner explicitly chooses to move on rather
+      // than keep revising.
       setCheckState("self-review");
       return;
     }
@@ -1042,7 +956,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
     setCheckState(savedSession.checkState);
     setCompletionMethods(new Map(savedSession.completionMethods));
     setDifficultyRatings(new Map(savedSession.difficultyRatings));
-    setProducePlan(savedSession.producePlan ?? EMPTY_PRODUCE_PLAN);
     setIsSequenceComplete(false);
     setSavedSession(null);
     beginProgressSession(
@@ -1373,9 +1286,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             onAnswerChange={updateAnswer}
             ordering={ordering}
             onOrderingChange={updateOrdering}
-            producePlan={producePlan}
-            onProducePlanFieldChange={updateProducePlanField}
-            isProduceResponseUnlocked={isProduceResponseUnlocked}
             disabled={checkState === "correct" || checkState === "revealed"}
             practice={practice}
           />
@@ -1449,25 +1359,6 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
                 ) : (
                   <p className="mt-1">{reviewedAnswers.join(" / ")}</p>
                 )}
-              </div>
-            )}
-            {checkState === "self-review" && currentExercise.exercise_type === "produce" && (
-              <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
-                <p className="font-medium">{practice.producePlanRecapLabel}</p>
-                <ul className="mt-1 list-disc space-y-1 pl-5">
-                  <li>
-                    <span className="font-medium">{practice.producePlanMainIdeaLabel}:</span> {producePlan.mainIdea}
-                  </li>
-                  <li>
-                    <span className="font-medium">{practice.producePlanPoint1Label}:</span> {producePlan.point1}
-                  </li>
-                  <li>
-                    <span className="font-medium">{practice.producePlanPoint2Label}:</span> {producePlan.point2}
-                  </li>
-                  <li>
-                    <span className="font-medium">{practice.producePlanConclusionLabel}:</span> {producePlan.conclusion}
-                  </li>
-                </ul>
               </div>
             )}
             {checkState === "self-review" && currentExercise.self_check && (
