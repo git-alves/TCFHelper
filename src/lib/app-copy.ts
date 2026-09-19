@@ -343,6 +343,7 @@ export interface AppCopy {
     };
   };
   workspace: {
+    stepLabel: (values: { number: number }) => string;
     task: {
       heading: string;
       targetLength: (values: TargetLengthValues) => string;
@@ -893,12 +894,13 @@ export const APP_COPY = {
       },
     },
     workspace: {
+      stepLabel: ({ number }) => `Step ${number}: `,
       task: {
-        heading: "1. Choose a task",
+        heading: "Choose a task",
         targetLength: ({ minWords, maxWords }) => `Target length: ${minWords}–${maxWords} words.`,
       },
       topic: {
-        heading: "2. Choose an exam prompt",
+        heading: "Choose an exam prompt",
         recentExamTitle: "Get a prompt from recent exams",
         recentExamDescription: "Load an authentic prompt for the task you selected.",
         customTitle: "Write or paste my own prompt",
@@ -915,7 +917,7 @@ export const APP_COPY = {
         customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
       editor: {
-        heading: "3. Write",
+        heading: "Write",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
         minimumWordCount: ({ remainingWords, minWords }) =>
           `Write ${remainingWords} more word${remainingWords === 1 ? "" : "s"} to reach the ${minWords}-word minimum for correction.`,
@@ -1575,12 +1577,13 @@ export const APP_COPY = {
       },
     },
     workspace: {
+      stepLabel: ({ number }) => `Étape ${number} : `,
       task: {
-        heading: "1. Choisissez une tâche",
+        heading: "Choisissez une tâche",
         targetLength: ({ minWords, maxWords }) => `Longueur visée : ${minWords}–${maxWords} mots.`,
       },
       topic: {
-        heading: "2. Choisissez une consigne d’examen",
+        heading: "Choisissez une consigne d’examen",
         recentExamTitle: "Obtenir une consigne d’examens récents",
         recentExamDescription: "Chargez une consigne authentique pour la tâche choisie.",
         customTitle: "Écrire ou coller ma propre consigne",
@@ -1599,7 +1602,7 @@ export const APP_COPY = {
         customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
       editor: {
-        heading: "3. Rédigez",
+        heading: "Rédigez",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
         minimumWordCount: ({ remainingWords, minWords }) =>
           `Ajoutez encore ${remainingWords} mot${remainingWords === 1 ? "" : "s"} pour atteindre le minimum de ${minWords} mots avant la correction.`,
@@ -2263,12 +2266,13 @@ export const APP_COPY = {
       },
     },
     workspace: {
+      stepLabel: ({ number }) => `Paso ${number}: `,
       task: {
-        heading: "1. Elige una tarea",
+        heading: "Elige una tarea",
         targetLength: ({ minWords, maxWords }) => `Extensión objetivo: ${minWords}–${maxWords} palabras.`,
       },
       topic: {
-        heading: "2. Elige una consigna de examen",
+        heading: "Elige una consigna de examen",
         recentExamTitle: "Obtén una consigna de exámenes recientes",
         recentExamDescription: "Carga una consigna auténtica para la tarea que seleccionaste.",
         customTitle: "Escribe o pega mi propia consigna",
@@ -2287,7 +2291,7 @@ export const APP_COPY = {
         customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
       editor: {
-        heading: "3. Escribe",
+        heading: "Escribe",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
         minimumWordCount: ({ remainingWords, minWords }) =>
           `Escribe ${remainingWords} palabra${remainingWords === 1 ? "" : "s"} más para alcanzar el mínimo de ${minWords} palabras antes de solicitar una corrección.`,
@@ -2951,12 +2955,13 @@ export const APP_COPY = {
       },
     },
     workspace: {
+      stepLabel: ({ number }) => `Passo ${number}: `,
       task: {
-        heading: "1. Escolha uma tarefa",
+        heading: "Escolha uma tarefa",
         targetLength: ({ minWords, maxWords }) => `Extensão desejada: ${minWords}–${maxWords} palavras.`,
       },
       topic: {
-        heading: "2. Escolha um enunciado de exame",
+        heading: "Escolha um enunciado de exame",
         recentExamTitle: "Obtenha um enunciado de exames recentes",
         recentExamDescription: "Carregue um enunciado autêntico para a tarefa escolhida.",
         customTitle: "Escreva ou cole meu próprio enunciado",
@@ -2975,7 +2980,7 @@ export const APP_COPY = {
         customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },
       editor: {
-        heading: "3. Escreva",
+        heading: "Escreva",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
         minimumWordCount: ({ remainingWords, minWords }) =>
           `Escreva mais ${remainingWords} palavra${remainingWords === 1 ? "" : "s"} para atingir o mínimo de ${minWords} palavras antes de solicitar uma correção.`,

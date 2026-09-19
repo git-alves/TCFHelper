@@ -160,4 +160,29 @@ describe("WritingWorkspace: independent level menus", () => {
     expect(exampleCalls).toHaveLength(1);
     expect(exampleCalls[0].body).toMatchObject({ level: "C1" });
   });
+
+  it("opens the level menu upward when the trigger is near the bottom of the viewport", async () => {
+    await reachReadyState();
+
+    const originalInnerHeight = window.innerHeight;
+    const originalGetBoundingClientRect = HTMLElement.prototype.getBoundingClientRect;
+    Object.defineProperty(window, "innerHeight", { value: 600, configurable: true });
+    // Every element reports the same near-the-bottom rect -- only the
+    // trigger's own rect is read by resolveMenuPlacement's caller, so this
+    // is a simpler stand-in than tracking which element is being measured.
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return { top: 580, bottom: 595, left: 0, right: 100, width: 100, height: 15, x: 0, y: 580, toJSON() {} } as DOMRect;
+    };
+
+    try {
+      clickButtonWithText("Generate example");
+      const menu = container.querySelector('[role="menu"]');
+      if (!menu) throw new Error("level menu not found");
+      expect(menu.className).toContain("bottom-full");
+      expect(menu.className).not.toContain("top-full");
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+      Object.defineProperty(window, "innerHeight", { value: originalInnerHeight, configurable: true });
+    }
+  });
 });

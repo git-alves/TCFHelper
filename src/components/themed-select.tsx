@@ -40,6 +40,24 @@ export function selectMenuPlacement({
   return roomBelow >= menuHeight || roomBelow >= roomAbove ? "below" : "above";
 }
 
+// The nearest scrollable ancestor, if any -- a dropdown's usable vertical
+// room is bounded by that container's visible slice, not the full viewport.
+export function visibleBoundaryFor(element: HTMLElement) {
+  let ancestor = element.parentElement;
+  while (ancestor) {
+    const { overflow, overflowY } = window.getComputedStyle(ancestor);
+    if (/(auto|scroll|hidden|clip)/.test(`${overflow} ${overflowY}`)) {
+      const bounds = ancestor.getBoundingClientRect();
+      return {
+        top: Math.max(0, bounds.top),
+        bottom: Math.min(window.innerHeight, bounds.bottom),
+      };
+    }
+    ancestor = ancestor.parentElement;
+  }
+  return { top: 0, bottom: window.innerHeight };
+}
+
 interface ThemedSelectProps<T extends string> {
   id?: string;
   value: T;
@@ -103,22 +121,6 @@ export function ThemedSelect<T extends string>({
       document.removeEventListener("keydown", handleKeyDown, true);
     };
   }, [isOpen]);
-
-  function visibleBoundaryFor(element: HTMLElement) {
-    let ancestor = element.parentElement;
-    while (ancestor) {
-      const { overflow, overflowY } = window.getComputedStyle(ancestor);
-      if (/(auto|scroll|hidden|clip)/.test(`${overflow} ${overflowY}`)) {
-        const bounds = ancestor.getBoundingClientRect();
-        return {
-          top: Math.max(0, bounds.top),
-          bottom: Math.min(window.innerHeight, bounds.bottom),
-        };
-      }
-      ancestor = ancestor.parentElement;
-    }
-    return { top: 0, bottom: window.innerHeight };
-  }
 
   function resolveMenuPlacement(): Exclude<MenuPlacement, "auto"> {
     if (menuPlacement !== "auto") return menuPlacement;
