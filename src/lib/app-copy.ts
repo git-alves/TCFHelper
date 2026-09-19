@@ -407,9 +407,9 @@ export interface AppCopy {
     // profile + target level -- see docs/guided-writing.md and
     // src/lib/guided-writing.ts, which holds the actual tips (localized
     // separately, the same way task instructions and profile/stage labels
-    // are). This block is only the guide's chrome copy. It shares
-    // editor.exampleLevelLabel's "Target level" selector rather than adding
-    // a second one -- one target level for the whole workspace.
+    // are). This block is only the guide's chrome copy. Its own level menu
+    // reuses editor.exampleLevelLabel ("Target level") as its aria-label,
+    // but the level itself is independent from the example generator's.
     guidedWriting: {
       show: string;
       hide: string;
