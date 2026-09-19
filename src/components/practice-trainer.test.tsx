@@ -17,6 +17,19 @@ describe("PracticeTrainer initial render", () => {
       renderToStaticMarkup(<PracticeTrainer curriculum={{ skills: [], exercises: [] }} />),
     ).not.toThrow();
   });
+
+  it("shows the three setup steps as numbered badges, not a baked-in digit prefix", () => {
+    const markup = renderToStaticMarkup(<PracticeTrainer curriculum={{ skills: [], exercises: [] }} />);
+
+    // The visible label no longer starts with "1. "/"2. "/"3. " -- that's
+    // now a separate badge -- while the step order is still announced to
+    // assistive tech via the visually-hidden "Step N:" prefix.
+    expect(markup).toContain("Which task would you like to improve?");
+    expect(markup).not.toContain("1. Which task");
+    expect(markup).toContain("Step 1: ");
+    expect(markup).toContain("Step 2: ");
+    expect(markup).toContain("Step 3: ");
+  });
 });
 
 describe("scrambleOrdering", () => {

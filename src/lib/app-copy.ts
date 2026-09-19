@@ -613,10 +613,10 @@ export const APP_COPY = {
       eyebrow: "Focused practice",
       title: "Work on one part of the task at a time.",
       description: "This is not an exam simulation. Choose a task, your target level and a task part; you will then follow a fixed, reviewed progression from recognition to independent writing.",
-      chooseTask: "1. Which task would you like to improve?",
-      chooseLevel: "2. What is your target level?",
+      chooseTask: "Which task would you like to improve?",
+      chooseLevel: "What is your target level?",
       levelHelp: "Choose a task first: difficulty is linked to its writing purpose.",
-      choosePart: "3. Part to work on",
+      choosePart: "Part to work on",
       partPlaceholder: "Part to work on",
       partLabel: ({ order }) => `Part ${order}`,
       previewEyebrow: "Your practice plan",
@@ -851,7 +851,7 @@ export const APP_COPY = {
       spellCheckTourBody: "Turn on spell check to underline misspelled French words in your response, with a suggested correction on click. It runs locally and never sends your writing to a third-party AI service.",
       guidedWritingTitle: "Plan before you write",
       guidedWritingBody:
-        "Open the Writing guide when you need ideas. Choose the writing situation, then use its planning questions, French phrases, and suggested verb tenses for your target level.",
+        "Open the Writing guide when you need ideas. Click the small arrow next to it to pick a target level — B2, C1, or C2 — then use its planning questions, French phrases, and suggested verb tenses for that level.",
       editorTitle: "Write your response",
       editorBody:
         "Write your response in French here — we've pasted in a sample response so you can see how the rest of the tour works. The word count updates as you type.",
@@ -863,7 +863,7 @@ export const APP_COPY = {
         "Your corrected text, an estimated CEFR level, and detailed comments open right here. The Overview, Compared, and Comments tabs break everything down.",
       exampleGenerateTitle: "Need inspiration?",
       exampleGenerateBody:
-        "Generate Example writes a full model answer at the CEFR level you choose, so you can see what a strong response looks like. We won't generate one during the tour — try it any time.",
+        "Click Generate example, then pick a CEFR level — B2, C1, or C2 — to see a full model answer at that level. We won't generate one during the tour — try it any time.",
       editorCopyTitle: "Copy your text",
       editorCopyBody:
         "Copy sends your response to the clipboard, handy for pasting it into a document or an official practice test.",
@@ -1291,10 +1291,10 @@ export const APP_COPY = {
       eyebrow: "Entraînement ciblé",
       title: "Travaillez une partie de la tâche à la fois.",
       description: "Ce n’est pas une simulation d’examen. Choisissez une tâche, votre niveau cible et une partie de la tâche ; vous suivrez ensuite une progression fixe et validée, de la reconnaissance à la production autonome.",
-      chooseTask: "1. Quelle tâche voulez-vous améliorer ?",
-      chooseLevel: "2. Quel est votre niveau cible ?",
+      chooseTask: "Quelle tâche voulez-vous améliorer ?",
+      chooseLevel: "Quel est votre niveau cible ?",
       levelHelp: "Choisissez d’abord une tâche : la difficulté est liée à son objectif d’écriture.",
-      choosePart: "3. Partie à travailler",
+      choosePart: "Partie à travailler",
       partPlaceholder: "Partie à travailler",
       partLabel: ({ order }) => `Partie ${order}`,
       previewEyebrow: "Votre plan d’entraînement",
@@ -1533,7 +1533,7 @@ export const APP_COPY = {
       spellCheckTourBody: "Activez la vérification orthographique pour souligner les mots mal orthographiés dans votre réponse, avec une correction suggérée au clic. Elle s’exécute localement et n’envoie jamais votre texte à un service d’IA tiers.",
       guidedWritingTitle: "Planifiez avant d’écrire",
       guidedWritingBody:
-        "Ouvrez le guide de rédaction lorsque vous manquez d’idées. Choisissez la situation d’écriture, puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour votre niveau visé.",
+        "Ouvrez le Guide de rédaction lorsque vous manquez d’idées. Cliquez sur la petite flèche à côté pour choisir un niveau visé — B2, C1 ou C2 — puis utilisez ses questions de planification, ses formules en français et ses temps verbaux suggérés pour ce niveau.",
       editorTitle: "Rédigez votre réponse",
       editorBody:
         "Rédigez votre réponse en français ici — nous avons collé une réponse d’exemple pour vous montrer la suite de la visite. Le nombre de mots se met à jour au fur et à mesure.",
@@ -1545,7 +1545,7 @@ export const APP_COPY = {
         "Votre texte corrigé, un niveau CECR estimé et des commentaires détaillés s’ouvrent ici même. Les onglets Aperçu, Comparaison et Commentaires détaillent tout.",
       exampleGenerateTitle: "Besoin d’inspiration ?",
       exampleGenerateBody:
-        "Générer un exemple rédige une réponse modèle complète au niveau CECR de votre choix, pour voir à quoi ressemble une bonne réponse. Nous n’en générerons pas pendant la visite — essayez-le quand vous voulez.",
+        "Cliquez sur Générer un exemple, puis choisissez un niveau CECR — B2, C1 ou C2 — pour voir une réponse modèle complète à ce niveau. Nous n’en générerons pas pendant la visite — essayez-le quand vous voulez.",
       editorCopyTitle: "Copiez votre texte",
       editorCopyBody:
         "Copier envoie votre réponse dans le presse-papiers, pratique pour la coller dans un document ou un test blanc officiel.",
@@ -1982,10 +1982,10 @@ export const APP_COPY = {
       eyebrow: "Práctica específica",
       title: "Trabaja una parte de la tarea cada vez.",
       description: "No es una simulación de examen. Elige una tarea, tu nivel objetivo y una parte de la tarea; después seguirás una progresión fija y revisada, del reconocimiento a la producción autónoma.",
-      chooseTask: "1. ¿Qué tarea quieres mejorar?",
-      chooseLevel: "2. ¿Cuál es tu nivel objetivo?",
+      chooseTask: "¿Qué tarea quieres mejorar?",
+      chooseLevel: "¿Cuál es tu nivel objetivo?",
       levelHelp: "Elige primero una tarea: la dificultad está ligada a su propósito de escritura.",
-      choosePart: "3. Parte a trabajar",
+      choosePart: "Parte a trabajar",
       partPlaceholder: "Parte a trabajar",
       partLabel: ({ order }) => `Parte ${order}`,
       previewEyebrow: "Tu plan de práctica",
@@ -2222,7 +2222,7 @@ export const APP_COPY = {
       spellCheckTourBody: "Activa la revisión ortográfica para subrayar las palabras mal escritas en tu respuesta, con una corrección sugerida al hacer clic. Se ejecuta localmente y nunca envía tu texto a un servicio de IA externo.",
       guidedWritingTitle: "Planifica antes de escribir",
       guidedWritingBody:
-        "Abre la Guía de redacción cuando necesites ideas. Elige la situación de escritura y usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para tu nivel objetivo.",
+        "Abre la Guía de redacción cuando necesites ideas. Haz clic en la pequeña flecha junto a ella para elegir un nivel objetivo — B2, C1 o C2 — y luego usa sus preguntas de planificación, frases en francés y tiempos verbales sugeridos para ese nivel.",
       editorTitle: "Escribe tu respuesta",
       editorBody:
         "Escribe tu respuesta en francés aquí — hemos pegado una respuesta de ejemplo para que veas el resto del recorrido. El conteo de palabras se actualiza mientras escribes.",
@@ -2234,7 +2234,7 @@ export const APP_COPY = {
         "Tu texto corregido, un nivel MCER estimado y comentarios detallados se abren aquí mismo. Las pestañas Resumen, Comparación y Comentarios lo desglosan todo.",
       exampleGenerateTitle: "¿Necesitas inspiración?",
       exampleGenerateBody:
-        "Generar ejemplo escribe una respuesta modelo completa en el nivel MCER que elijas, para que veas cómo es una buena respuesta. No generaremos ninguna durante el recorrido — pruébalo cuando quieras.",
+        "Haz clic en Generar ejemplo y elige un nivel MCER — B2, C1 o C2 — para ver una respuesta modelo completa en ese nivel. No generaremos ninguna durante el recorrido — pruébalo cuando quieras.",
       editorCopyTitle: "Copia tu texto",
       editorCopyBody:
         "Copiar envía tu respuesta al portapapeles, útil para pegarla en un documento o en un examen de práctica oficial.",
@@ -2671,10 +2671,10 @@ export const APP_COPY = {
       eyebrow: "Prática direcionada",
       title: "Trabalhe uma parte da tarefa de cada vez.",
       description: "Isto não é uma simulação de exame. Escolha uma tarefa, seu nível-alvo e uma parte da tarefa; em seguida, você seguirá uma progressão fixa e revisada, do reconhecimento à produção autônoma.",
-      chooseTask: "1. Qual tarefa você quer melhorar?",
-      chooseLevel: "2. Qual é seu nível-alvo?",
+      chooseTask: "Qual tarefa você quer melhorar?",
+      chooseLevel: "Qual é seu nível-alvo?",
       levelHelp: "Escolha primeiro uma tarefa: a dificuldade está ligada ao objetivo de escrita.",
-      choosePart: "3. Parte a trabalhar",
+      choosePart: "Parte a trabalhar",
       partPlaceholder: "Parte a trabalhar",
       partLabel: ({ order }) => `Parte ${order}`,
       previewEyebrow: "Seu plano de prática",
@@ -2911,7 +2911,7 @@ export const APP_COPY = {
       spellCheckTourBody: "Ative a verificação ortográfica para sublinhar palavras escritas incorretamente na sua resposta, com uma correção sugerida ao clicar. Ela roda localmente e nunca envia seu texto para um serviço de IA de terceiros.",
       guidedWritingTitle: "Planeje antes de escrever",
       guidedWritingBody:
-        "Abra o Guia de escrita quando precisar de ideias. Escolha a situação de escrita e use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para o nível desejado.",
+        "Abra o Guia de escrita quando precisar de ideias. Clique na pequena seta ao lado dele para escolher um nível desejado — B2, C1 ou C2 — e depois use suas perguntas de planejamento, frases em francês e tempos verbais sugeridos para esse nível.",
       editorTitle: "Escreva sua resposta",
       editorBody:
         "Escreva sua resposta em francês aqui — colamos uma resposta de exemplo para você ver o restante do tour. A contagem de palavras é atualizada conforme você digita.",
@@ -2923,7 +2923,7 @@ export const APP_COPY = {
         "Seu texto corrigido, um nível QECR estimado e feedback detalhado abrem bem aqui. As abas Visão geral, Comparação e Comentários detalham tudo.",
       exampleGenerateTitle: "Precisa de inspiração?",
       exampleGenerateBody:
-        "Gerar exemplo escreve uma resposta modelo completa no nível QECR escolhido, para você ver como é uma boa resposta. Não vamos gerar nenhuma durante o tour — experimente quando quiser.",
+        "Clique em Gerar exemplo e escolha um nível QECR — B2, C1 ou C2 — para ver uma resposta modelo completa nesse nível. Não vamos gerar nenhuma durante o tour — experimente quando quiser.",
       editorCopyTitle: "Copie seu texto",
       editorCopyBody:
         "Copiar envia sua resposta para a área de transferência, útil para colar em um documento ou em uma prova oficial de treino.",
