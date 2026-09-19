@@ -17,7 +17,6 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { GrammarCheckedEditor, type LanguageCheckStatus } from "@/components/grammar-checked-editor";
-import { ThemedSelect } from "@/components/themed-select";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
@@ -70,13 +69,14 @@ interface TimedTaskSummary {
   wordCount: number;
   reachedPhaseIds: readonly TimedTaskPhaseId[];
 }
-// Shared by the example generator and the writing guide -- one "target
-// level" for the whole workspace rather than two adjacent B2/C1/C2 controls
-// with different meanings. See docs/guided-writing.md.
+// Each of the example generator and the writing guide has its own
+// independent target level (folded into that feature's own action button as
+// a dropdown, rather than one shared B2/C1/C2 control elsewhere on the
+// page) -- see docs/guided-writing.md for the guide's own persisted level.
 type ExampleLevel = "B2" | "C1" | "C2";
 type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
-const TARGET_LEVEL_STORAGE_KEY = "mytcflab:target-level";
+const GUIDED_WRITING_LEVEL_STORAGE_KEY = "mytcflab:guided-writing-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
 const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
 const WALKTHROUGH_SAMPLE_TOPIC = "Vous avez passé un week-end à Lyon. Écrivez à votre amie Marie pour raconter votre séjour, vos activités et ce qui vous a le plus marqué.";
@@ -89,8 +89,8 @@ function isExampleLevel(value: unknown): value is ExampleLevel {
   return value === "B2" || value === "C1" || value === "C2";
 }
 
-function getStoredTargetLevel(): ExampleLevel {
-  const stored = readWritingPreference(TARGET_LEVEL_STORAGE_KEY);
+function getStoredGuidedWritingLevel(): ExampleLevel {
+  const stored = readWritingPreference(GUIDED_WRITING_LEVEL_STORAGE_KEY);
   return isExampleLevel(stored) ? stored : "B2";
 }
 
@@ -281,6 +281,186 @@ function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
   }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
 }
 
+// Shared open/close plumbing for the two level-picker menus below: closes on
+// an outside click or Escape, mirroring ThemedSelect's own dismiss behavior
+// so both pickers on this page feel consistent.
+function useDismissableMenu<T extends HTMLElement>() {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<T>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setIsOpen(false);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return { isOpen, setIsOpen, containerRef };
+}
+
+function LevelMenu({
+  levels,
+  ariaLabel,
+  onSelect,
+}: {
+  levels: readonly ExampleLevel[];
+  ariaLabel: string;
+  onSelect: (level: ExampleLevel) => void;
+}) {
+  return (
+    <ul
+      role="menu"
+      aria-label={ariaLabel}
+      className="absolute left-0 top-full z-20 mt-1 flex min-w-[5rem] flex-col gap-0.5 rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]"
+    >
+      {levels.map((level) => (
+        <li key={level} role="none">
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => onSelect(level)}
+            className="w-full rounded-lg px-3 py-1.5 text-left text-sm hover:bg-black/[.04] dark:hover:bg-white/[.06]"
+          >
+            {level}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// Folds the "which level?" choice into the generate action itself, instead
+// of a standalone selector elsewhere on the page whose relationship to this
+// button was not obvious. Every click opens the level menu; picking a level
+// both remembers it and generates immediately -- there is no separate
+// "generate at whatever level was last picked" affordance, since a one-shot
+// action has no persisted "current value" worth displaying on the trigger.
+function ExampleLevelMenuButton({
+  levels,
+  ariaLabel,
+  generateLabel,
+  generatingLabel,
+  isGenerating,
+  disabled,
+  onSelectLevel,
+}: {
+  levels: readonly ExampleLevel[];
+  ariaLabel: string;
+  generateLabel: string;
+  generatingLabel: string;
+  isGenerating: boolean;
+  disabled: boolean;
+  onSelectLevel: (level: ExampleLevel) => void;
+}) {
+  const { isOpen, setIsOpen, containerRef } = useDismissableMenu<HTMLDivElement>();
+
+  return (
+    <div
+      ref={containerRef}
+      data-walkthrough="example-generate"
+      className="relative flex rounded-full border border-black/[.15] p-1 dark:border-white/[.2]"
+    >
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        onClick={() => setIsOpen((open) => !open)}
+        disabled={disabled || isGenerating}
+        className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+      >
+        {isGenerating ? generatingLabel : generateLabel} <span aria-hidden="true">▾</span>
+      </button>
+      {isOpen && (
+        <LevelMenu
+          levels={levels}
+          ariaLabel={ariaLabel}
+          onSelect={(level) => {
+            setIsOpen(false);
+            onSelectLevel(level);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// A split button: the main segment keeps the existing show/hide toggle
+// (using whichever level was last picked) exactly as it worked before, so
+// the several other places in this file that programmatically open/close
+// the guide via GUIDED_WRITING_OPEN_STORAGE_KEY need no changes. The caret
+// segment folds in the level choice, symmetric with the generate button --
+// picking a level there also ensures the guide is open, showing that level.
+function GuidedWritingSplitButton({
+  isOpen,
+  showLabel,
+  hideLabel,
+  levels,
+  ariaLabel,
+  disabled,
+  onToggle,
+  onSelectLevel,
+}: {
+  isOpen: boolean;
+  showLabel: string;
+  hideLabel: string;
+  levels: readonly ExampleLevel[];
+  ariaLabel: string;
+  disabled: boolean;
+  onToggle: () => void;
+  onSelectLevel: (level: ExampleLevel) => void;
+}) {
+  const { isOpen: isMenuOpen, setIsOpen: setIsMenuOpen, containerRef } = useDismissableMenu<HTMLDivElement>();
+
+  return (
+    <div ref={containerRef} className="relative flex items-stretch rounded-full border border-black/[.15] dark:border-white/[.2]">
+      <button
+        type="button"
+        data-walkthrough="guided-writing"
+        onClick={onToggle}
+        disabled={disabled}
+        aria-pressed={isOpen}
+        className="rounded-l-full px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+      >
+        {isOpen ? hideLabel : showLabel}
+      </button>
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isMenuOpen}
+        aria-label={ariaLabel}
+        onClick={() => setIsMenuOpen((open) => !open)}
+        disabled={disabled}
+        className="rounded-r-full border-l border-black/[.15] px-2 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+      >
+        <span aria-hidden="true">▾</span>
+      </button>
+      {isMenuOpen && (
+        <LevelMenu
+          levels={levels}
+          ariaLabel={ariaLabel}
+          onSelect={(level) => {
+            setIsMenuOpen(false);
+            onSelectLevel(level);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 export function WritingWorkspace() {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
@@ -342,15 +522,15 @@ export function WritingWorkspace() {
   // then reads the browser preference after hydration without a mismatched
   // initial tree. The storage wrapper falls back to in-memory state if the
   // browser blocks localStorage.
-  const exampleLevel = useSyncExternalStore<ExampleLevel>(
-    subscribeToWritingPreferences,
-    getStoredTargetLevel,
-    (): ExampleLevel => "B2",
-  );
   const isGuidedWritingOpen = useSyncExternalStore(
     subscribeToWritingPreferences,
     getStoredGuidedWritingOpen,
     () => false,
+  );
+  const guidedWritingLevel = useSyncExternalStore<ExampleLevel>(
+    subscribeToWritingPreferences,
+    getStoredGuidedWritingLevel,
+    (): ExampleLevel => "B2",
   );
   // Deliberately not a persisted preference (unlike the other toggles on this
   // panel): sending a learner's draft to the spell-check endpoint must be an
@@ -1395,8 +1575,11 @@ export function WritingWorkspace() {
 
   // A generated example replaces the whole draft, so an existing draft
   // needs the same explicit confirmation as a destructive task/topic switch
-  // before it is overwritten.
-  function requestGenerateExample() {
+  // before it is overwritten. The level is an explicit parameter, not read
+  // from `exampleLevel` state, since the caller (the level menu) persists a
+  // freshly-picked level and requests generation in the same handler --
+  // reading state instead would race the not-yet-applied render.
+  function requestGenerateExample(level: ExampleLevel) {
     if (!taskType || isTopicLoading || isCorrecting || isGeneratingExample) return;
 
     // An example may only be generated for a topic the learner actually has
@@ -1412,14 +1595,14 @@ export function WritingWorkspace() {
     setExampleNeedsTopic(false);
 
     if (content.trim()) {
-      setPendingSwitch({ kind: "example", run: () => void generateExample() });
+      setPendingSwitch({ kind: "example", run: () => void generateExample(level) });
       return;
     }
 
-    void generateExample();
+    void generateExample(level);
   }
 
-  async function generateExample() {
+  async function generateExample(level: ExampleLevel) {
     if (!taskType || !activeTopicPrompt) return;
 
     const topicContext =
@@ -1438,7 +1621,7 @@ export function WritingWorkspace() {
       const res = await fetch("/api/essays/example", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ taskType, level: exampleLevel, ...topicContext }),
+        body: JSON.stringify({ taskType, level, ...topicContext }),
         signal: controller.signal,
       });
 
@@ -1690,32 +1873,21 @@ export function WritingWorkspace() {
                 <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   {copy.workspace.editor.heading}
                 </h2>
-                <div className="flex items-center gap-1 rounded-full border border-black/[.15] py-1 pl-3 pr-1 dark:border-white/[.2]">
-                  <label htmlFor="target-level" className="text-sm text-zinc-600 dark:text-zinc-300">
-                    {copy.workspace.editor.exampleLevelLabel}
-                  </label>
-                  <ThemedSelect<ExampleLevel>
-                    id="target-level"
-                    value={exampleLevel}
-                    onChange={(level) => storeWritingPreference(TARGET_LEVEL_STORAGE_KEY, level)}
-                    options={EXAMPLE_LEVELS.map((level) => ({ value: level, label: level }))}
-                    disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                    buttonClassName="flex items-center gap-1.5 rounded-full bg-background px-2 py-1 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
-                    listClassName="absolute left-0 z-20 mt-1 flex min-w-full flex-col gap-0.5 rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]"
-                  />
-                </div>
-                <button
-                  type="button"
-                  data-walkthrough="guided-writing"
-                  onClick={() =>
+                <GuidedWritingSplitButton
+                  isOpen={isGuidedWritingOpen}
+                  showLabel={copy.workspace.guidedWriting.show}
+                  hideLabel={copy.workspace.guidedWriting.hide}
+                  levels={EXAMPLE_LEVELS}
+                  ariaLabel={copy.workspace.editor.exampleLevelLabel}
+                  disabled={!activeTopicPrompt}
+                  onToggle={() =>
                     storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, isGuidedWritingOpen ? "0" : "1")
                   }
-                  disabled={!activeTopicPrompt}
-                  aria-pressed={isGuidedWritingOpen}
-                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                >
-                  {isGuidedWritingOpen ? copy.workspace.guidedWriting.hide : copy.workspace.guidedWriting.show}
-                </button>
+                  onSelectLevel={(level) => {
+                    storeWritingPreference(GUIDED_WRITING_LEVEL_STORAGE_KEY, level);
+                    if (!isGuidedWritingOpen) storeWritingPreference(GUIDED_WRITING_OPEN_STORAGE_KEY, "1");
+                  }}
+                />
                 <button
                   type="button"
                   data-walkthrough="timed-task"
@@ -1783,7 +1955,7 @@ export function WritingWorkspace() {
                 topicMode={topicMode}
                 recentTopicContext={topicMode === "recent" ? recentTopic?.guideContext ?? null : null}
                 customTopicPrompt={topicMode === "custom" ? customTopic : ""}
-                level={exampleLevel}
+                level={guidedWritingLevel}
                 locale={locale}
                 copy={copy}
               />
@@ -2001,19 +2173,15 @@ export function WritingWorkspace() {
                 )
               )}
 
-              <div
-                data-walkthrough="example-generate"
-                className="flex rounded-full border border-black/[.15] p-1 dark:border-white/[.2]"
-              >
-                <button
-                  type="button"
-                  onClick={requestGenerateExample}
-                  disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                  className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
-                >
-                  {isGeneratingExample ? copy.workspace.editor.generatingExample : copy.workspace.editor.generateExample}
-                </button>
-              </div>
+              <ExampleLevelMenuButton
+                levels={EXAMPLE_LEVELS}
+                ariaLabel={copy.workspace.editor.exampleLevelLabel}
+                generateLabel={copy.workspace.editor.generateExample}
+                generatingLabel={copy.workspace.editor.generatingExample}
+                isGenerating={isGeneratingExample}
+                disabled={isCorrecting || isTopicLoading}
+                onSelectLevel={requestGenerateExample}
+              />
 
               <button
                 type="button"
