@@ -440,6 +440,7 @@ function ExerciseInput({
             <div className="flex shrink-0 gap-1">
               <button
                 type="button"
+                aria-label={practice.moveUp}
                 disabled={disabled || index === 0}
                 onClick={() => {
                   const next = [...ordering];
@@ -448,10 +449,14 @@ function ExerciseInput({
                 }}
                 className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                {practice.moveUp}
+                <span aria-hidden="true" className="sm:hidden">
+                  ↑
+                </span>
+                <span className="hidden sm:inline">{practice.moveUp}</span>
               </button>
               <button
                 type="button"
+                aria-label={practice.moveDown}
                 disabled={disabled || index === ordering.length - 1}
                 onClick={() => {
                   const next = [...ordering];
@@ -460,7 +465,10 @@ function ExerciseInput({
                 }}
                 className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
-                {practice.moveDown}
+                <span aria-hidden="true" className="sm:hidden">
+                  ↓
+                </span>
+                <span className="hidden sm:inline">{practice.moveDown}</span>
               </button>
             </div>
           </div>
@@ -1140,6 +1148,7 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             data-walkthrough="practice-part-selector"
             disabled={!selectedTask || !selectedLevel}
             aria-describedby={!selectedLevel ? "part-help" : undefined}
+            className="min-w-0"
           >
             <StepLegend number={3} id="practice-part-label" stepLabel={appCopy.workspace.stepLabel}>
               {practice.choosePart}
