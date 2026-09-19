@@ -17,6 +17,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { GrammarCheckedEditor, type LanguageCheckStatus } from "@/components/grammar-checked-editor";
+import { selectMenuPlacement, visibleBoundaryFor } from "@/components/themed-select";
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
@@ -284,8 +285,14 @@ function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
 // Shared open/close plumbing for the two level-picker menus below: closes on
 // an outside click or Escape, mirroring ThemedSelect's own dismiss behavior
 // so both pickers on this page feel consistent.
+// menuHeight matches ThemedSelect's own estimate for a short options list
+// (text-sm items at py-1.5): enough to avoid opening downward into a menu
+// that would immediately be clipped by the viewport or a scrollable ancestor.
+const LEVEL_MENU_HEIGHT_ESTIMATE = 3 * 38 + 10;
+
 function useDismissableMenu<T extends HTMLElement>() {
   const [isOpen, setIsOpen] = useState(false);
+  const [placement, setPlacement] = useState<"above" | "below">("below");
   const containerRef = useRef<T>(null);
 
   useEffect(() => {
@@ -308,23 +315,44 @@ function useDismissableMenu<T extends HTMLElement>() {
     };
   }, [isOpen]);
 
-  return { isOpen, setIsOpen, containerRef };
+  function toggle() {
+    if (!isOpen && containerRef.current) {
+      const trigger = containerRef.current.getBoundingClientRect();
+      const boundary = visibleBoundaryFor(containerRef.current);
+      setPlacement(
+        selectMenuPlacement({
+          triggerTop: trigger.top,
+          triggerBottom: trigger.bottom,
+          boundaryTop: boundary.top,
+          boundaryBottom: boundary.bottom,
+          menuHeight: LEVEL_MENU_HEIGHT_ESTIMATE,
+        }),
+      );
+    }
+    setIsOpen((open) => !open);
+  }
+
+  return { isOpen, placement, toggle, close: () => setIsOpen(false), containerRef };
 }
 
 function LevelMenu({
   levels,
   ariaLabel,
+  placement,
   onSelect,
 }: {
   levels: readonly ExampleLevel[];
   ariaLabel: string;
+  placement: "above" | "below";
   onSelect: (level: ExampleLevel) => void;
 }) {
   return (
     <ul
       role="menu"
       aria-label={ariaLabel}
-      className="absolute left-0 top-full z-20 mt-1 flex min-w-[5rem] flex-col gap-0.5 rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2]"
+      className={`absolute left-0 z-20 flex min-w-[5rem] flex-col gap-0.5 rounded-xl border border-black/[.15] bg-background p-1 shadow-lg dark:border-white/[.2] ${
+        placement === "above" ? "bottom-full mb-1" : "top-full mt-1"
+      }`}
     >
       {levels.map((level) => (
         <li key={level} role="none">
@@ -365,7 +393,7 @@ function ExampleLevelMenuButton({
   disabled: boolean;
   onSelectLevel: (level: ExampleLevel) => void;
 }) {
-  const { isOpen, setIsOpen, containerRef } = useDismissableMenu<HTMLDivElement>();
+  const { isOpen, placement, toggle, close, containerRef } = useDismissableMenu<HTMLDivElement>();
 
   return (
     <div
@@ -377,7 +405,7 @@ function ExampleLevelMenuButton({
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={toggle}
         disabled={disabled || isGenerating}
         className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
       >
@@ -387,8 +415,9 @@ function ExampleLevelMenuButton({
         <LevelMenu
           levels={levels}
           ariaLabel={ariaLabel}
+          placement={placement}
           onSelect={(level) => {
-            setIsOpen(false);
+            close();
             onSelectLevel(level);
           }}
         />
@@ -422,7 +451,7 @@ function GuidedWritingSplitButton({
   onToggle: () => void;
   onSelectLevel: (level: ExampleLevel) => void;
 }) {
-  const { isOpen: isMenuOpen, setIsOpen: setIsMenuOpen, containerRef } = useDismissableMenu<HTMLDivElement>();
+  const { isOpen: isMenuOpen, placement, toggle: toggleMenu, close: closeMenu, containerRef } = useDismissableMenu<HTMLDivElement>();
 
   return (
     <div ref={containerRef} className="relative flex items-stretch rounded-full border border-black/[.15] dark:border-white/[.2]">
@@ -441,7 +470,7 @@ function GuidedWritingSplitButton({
         aria-haspopup="menu"
         aria-expanded={isMenuOpen}
         aria-label={ariaLabel}
-        onClick={() => setIsMenuOpen((open) => !open)}
+        onClick={toggleMenu}
         disabled={disabled}
         className="rounded-r-full border-l border-black/[.15] px-2 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
       >
@@ -451,13 +480,43 @@ function GuidedWritingSplitButton({
         <LevelMenu
           levels={levels}
           ariaLabel={ariaLabel}
+          placement={placement}
           onSelect={(level) => {
-            setIsMenuOpen(false);
+            closeMenu();
             onSelectLevel(level);
           }}
         />
       )}
     </div>
+  );
+}
+
+// The page's three top-level steps (task, prompt, write) used to be a plain
+// small gray caption with the number baked into the string -- easy to miss
+// entirely. A numbered badge plus a bolder, accent-colored label reuses the
+// same visual language as the landing page's own numbered steps section.
+function StepHeading({
+  number,
+  stepLabel,
+  id,
+  children,
+}: {
+  number: number;
+  stepLabel: (values: { number: number }) => string;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <h2 id={id} className="flex items-center gap-2 text-base font-semibold text-violet-700 dark:text-violet-300">
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white dark:bg-violet-500"
+      >
+        {number}
+      </span>
+      <span className="sr-only">{stepLabel({ number })}</span>
+      {children}
+    </h2>
   );
 }
 
@@ -1721,9 +1780,9 @@ export function WritingWorkspace() {
     <div className="flex w-full flex-col gap-8">
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+        <StepHeading number={1} stepLabel={copy.workspace.stepLabel}>
           {copy.workspace.task.heading}
-        </h2>
+        </StepHeading>
         <div data-walkthrough="task-picker" className="grid gap-3 sm:grid-cols-3">
           {TASK_ORDER.map((type) => (
             <button
@@ -1761,9 +1820,9 @@ export function WritingWorkspace() {
       {task && (
         <>
           <section className="flex flex-col gap-3" aria-labelledby="topic-heading">
-            <h2 id="topic-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+            <StepHeading number={2} id="topic-heading" stepLabel={copy.workspace.stepLabel}>
               {copy.workspace.topic.heading}
-            </h2>
+            </StepHeading>
             <div data-walkthrough="topic-picker" className="grid gap-3 sm:grid-cols-2">
               <button
                 type="button"
@@ -1870,9 +1929,9 @@ export function WritingWorkspace() {
           <section className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                <StepHeading number={3} stepLabel={copy.workspace.stepLabel}>
                   {copy.workspace.editor.heading}
-                </h2>
+                </StepHeading>
                 <GuidedWritingSplitButton
                   isOpen={isGuidedWritingOpen}
                   showLabel={copy.workspace.guidedWriting.show}
