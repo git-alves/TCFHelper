@@ -205,6 +205,37 @@ function getBrowserStorage(): Storage | null {
   }
 }
 
+// Matches the writing workspace's own step-heading treatment (a numbered
+// violet badge plus a bolder, accent-colored label) so both pages use the
+// same visual language for "these are the primary steps" -- see StepHeading
+// in writing-workspace.tsx. A <legend>, not an <h2>, since these caption a
+// <fieldset> here; the step number is still announced to assistive tech via
+// a visually-hidden "Step N:" prefix, since it's no longer in the visible text.
+function StepLegend({
+  number,
+  stepLabel,
+  id,
+  children,
+}: {
+  number: number;
+  stepLabel: (values: { number: number }) => string;
+  id?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <legend id={id} className="flex items-center gap-2 text-base font-semibold text-violet-700 dark:text-violet-300">
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white dark:bg-violet-500"
+      >
+        {number}
+      </span>
+      <span className="sr-only">{stepLabel({ number })}</span>
+      {children}
+    </legend>
+  );
+}
+
 function ChoiceCard({
   selected,
   onClick,
@@ -495,7 +526,8 @@ function WritingResponseField({
 }
 
 export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
-  const practice = useAppCopy().practice;
+  const appCopy = useAppCopy();
+  const practice = appCopy.practice;
   const searchParams = useSearchParams();
   // The comprehensive tour's final Practice step points at the six-stage
   // plan panel below, which normally only renders after a manual selection.
@@ -1067,7 +1099,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
 
         <div className="grid gap-6">
           <fieldset>
-            <legend className="text-sm font-semibold">{practice.chooseTask}</legend>
+            <StepLegend number={1} stepLabel={appCopy.workspace.stepLabel}>
+              {practice.chooseTask}
+            </StepLegend>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {TASKS.map((task) => (
                 <ChoiceCard key={task} selected={selectedTask === task} onClick={() => chooseTask(task)}>
@@ -1079,7 +1113,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
           </fieldset>
 
           <fieldset disabled={!selectedTask} aria-describedby={!selectedTask ? "level-help" : undefined}>
-            <legend className="text-sm font-semibold">{practice.chooseLevel}</legend>
+            <StepLegend number={2} stepLabel={appCopy.workspace.stepLabel}>
+              {practice.chooseLevel}
+            </StepLegend>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               {LEVELS.map((level) => (
                 <ChoiceCard
@@ -1105,7 +1141,9 @@ export function PracticeTrainer({ curriculum }: PracticeTrainerProps) {
             disabled={!selectedTask || !selectedLevel}
             aria-describedby={!selectedLevel ? "part-help" : undefined}
           >
-            <legend id="practice-part-label" className="text-sm font-semibold">{practice.choosePart}</legend>
+            <StepLegend number={3} id="practice-part-label" stepLabel={appCopy.workspace.stepLabel}>
+              {practice.choosePart}
+            </StepLegend>
             <ThemedSelect<string>
               value={selectedSkill?.id ?? ""}
               options={[
