@@ -2222,111 +2222,115 @@ export function WritingWorkspace() {
               enabled={isSpellCheckActive}
               onStatusChange={setSpellCheckStatus}
             />
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                data-walkthrough="correct-button"
-                onClick={handleCorrect}
-                disabled={
-                  !activeTopicPrompt ||
-                  isCorrecting ||
-                  isTopicLoading ||
-                  isGeneratingExample ||
-                  isCorrectionInProgressElsewhere ||
-                  isCurrentDraftAlreadyCorrected
-                }
-                aria-describedby={
-                  [
-                    showMinimumWordWarning && isBelowMinimumWordCount ? "minimum-word-count-note" : null,
-                    isCurrentDraftAlreadyCorrected ? "already-corrected-note" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" ") || undefined
-                }
-                className="flex items-center gap-2 self-start rounded-full bg-violet-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400"
-              >
-                <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
-                {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
-              </button>
-
-              {feedback ? (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setCorrectionModalState("result");
-                    setCorrectionModalOpen(true);
-                  }}
-                  className="self-start rounded-full border border-violet-500/30 bg-violet-500/[.06] px-4 py-2.5 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:border-violet-400/35 dark:bg-violet-400/[.1] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                  data-walkthrough="correct-button"
+                  onClick={handleCorrect}
+                  disabled={
+                    !activeTopicPrompt ||
+                    isCorrecting ||
+                    isTopicLoading ||
+                    isGeneratingExample ||
+                    isCorrectionInProgressElsewhere ||
+                    isCurrentDraftAlreadyCorrected
+                  }
+                  aria-describedby={
+                    [
+                      showMinimumWordWarning && isBelowMinimumWordCount ? "minimum-word-count-note" : null,
+                      isCurrentDraftAlreadyCorrected ? "already-corrected-note" : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined
+                  }
+                  className="flex items-center gap-2 self-start rounded-full bg-violet-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400"
                 >
-                  {copy.workspace.correctionModal.viewCorrection}
+                  <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                  {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
                 </button>
-              ) : (
-                existingCorrectionEssayId &&
-                isCurrentDraftAlreadyCorrected && (
-                  <Link
-                    href={`/dashboard/history/${encodeURIComponent(existingCorrectionEssayId)}`}
+
+                {feedback ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCorrectionModalState("result");
+                      setCorrectionModalOpen(true);
+                    }}
                     className="self-start rounded-full border border-violet-500/30 bg-violet-500/[.06] px-4 py-2.5 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:border-violet-400/35 dark:bg-violet-400/[.1] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
                   >
                     {copy.workspace.correctionModal.viewCorrection}
-                  </Link>
-                )
-              )}
+                  </button>
+                ) : (
+                  existingCorrectionEssayId &&
+                  isCurrentDraftAlreadyCorrected && (
+                    <Link
+                      href={`/dashboard/history/${encodeURIComponent(existingCorrectionEssayId)}`}
+                      className="self-start rounded-full border border-violet-500/30 bg-violet-500/[.06] px-4 py-2.5 text-sm font-medium text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:border-violet-400/35 dark:bg-violet-400/[.1] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                    >
+                      {copy.workspace.correctionModal.viewCorrection}
+                    </Link>
+                  )
+                )}
+              </div>
 
-              <ExampleLevelMenuButton
-                levels={EXAMPLE_LEVELS}
-                ariaLabel={copy.workspace.editor.exampleLevelLabel}
-                generateLabel={copy.workspace.editor.generateExample}
-                generatingLabel={copy.workspace.editor.generatingExample}
-                isGenerating={isGeneratingExample}
-                disabled={isCorrecting || isTopicLoading}
-                onSelectLevel={requestGenerateExample}
-              />
+              <div className="flex flex-wrap items-center gap-2">
+                <ExampleLevelMenuButton
+                  levels={EXAMPLE_LEVELS}
+                  ariaLabel={copy.workspace.editor.exampleLevelLabel}
+                  generateLabel={copy.workspace.editor.generateExample}
+                  generatingLabel={copy.workspace.editor.generatingExample}
+                  isGenerating={isGeneratingExample}
+                  disabled={isCorrecting || isTopicLoading}
+                  onSelectLevel={requestGenerateExample}
+                />
 
-              <button
-                type="button"
-                data-walkthrough="editor-copy"
-                onClick={handleCopyContent}
-                disabled={!content.trim()}
-                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                <CopyIcon aria-hidden="true" className="h-4 w-4" />
-                {copyStatus === "copied"
-                  ? copy.workspace.editor.copied
-                  : copyStatus === "failed"
-                    ? copy.workspace.editor.copyFailed
-                    : copy.workspace.editor.copy}
-              </button>
-              <button
-                type="button"
-                data-walkthrough="editor-clear"
-                onClick={handleClearDraft}
-                disabled={!content.trim()}
-                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                <Trash2 aria-hidden="true" className="h-4 w-4" />
-                {copy.workspace.editor.clear}
-              </button>
-              <button
-                type="button"
-                data-walkthrough="translation"
-                onClick={handleToggleTranslation}
-                // Also disabled while loading: each click that lands during
-                // an in-flight request aborts it and starts another, and
-                // the server intentionally keeps the quota reservation for
-                // the aborted one (see the no-refund note in
-                // /api/translate/route.ts) -- repeated clicks here would
-                // burn real quota on requests that never even finish.
-                disabled={!content.trim() || isTranslationLoading}
-                aria-pressed={isTranslationVisible && !isTranslationStale}
-                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                <Languages aria-hidden="true" className="h-4 w-4" />
-                {!isTranslationVisible
-                  ? copy.workspace.translation.show
-                  : isTranslationStale
-                    ? copy.workspace.translation.update
-                    : copy.workspace.translation.hide}
-              </button>
+                <button
+                  type="button"
+                  data-walkthrough="editor-copy"
+                  onClick={handleCopyContent}
+                  disabled={!content.trim()}
+                  className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  <CopyIcon aria-hidden="true" className="h-4 w-4" />
+                  {copyStatus === "copied"
+                    ? copy.workspace.editor.copied
+                    : copyStatus === "failed"
+                      ? copy.workspace.editor.copyFailed
+                      : copy.workspace.editor.copy}
+                </button>
+                <button
+                  type="button"
+                  data-walkthrough="editor-clear"
+                  onClick={handleClearDraft}
+                  disabled={!content.trim()}
+                  className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                  {copy.workspace.editor.clear}
+                </button>
+                <button
+                  type="button"
+                  data-walkthrough="translation"
+                  onClick={handleToggleTranslation}
+                  // Also disabled while loading: each click that lands during
+                  // an in-flight request aborts it and starts another, and
+                  // the server intentionally keeps the quota reservation for
+                  // the aborted one (see the no-refund note in
+                  // /api/translate/route.ts) -- repeated clicks here would
+                  // burn real quota on requests that never even finish.
+                  disabled={!content.trim() || isTranslationLoading}
+                  aria-pressed={isTranslationVisible && !isTranslationStale}
+                  className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                >
+                  <Languages aria-hidden="true" className="h-4 w-4" />
+                  {!isTranslationVisible
+                    ? copy.workspace.translation.show
+                    : isTranslationStale
+                      ? copy.workspace.translation.update
+                      : copy.workspace.translation.hide}
+                </button>
+              </div>
             </div>
             {isCorrecting && (
               <p role="status" className="sr-only">
