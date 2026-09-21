@@ -170,7 +170,7 @@ export function WalkthroughOverlay({
         aria-labelledby={titleId}
         aria-describedby={bodyId}
         onClick={(event) => event.stopPropagation()}
-        className="absolute overflow-y-auto rounded-2xl border border-black/[.1] bg-background p-5 shadow-2xl dark:border-white/[.15]"
+        className="absolute flex flex-col overflow-hidden rounded-2xl border border-black/[.1] bg-background shadow-2xl dark:border-white/[.15]"
         style={{
           top: tooltip.top,
           left: tooltip.left,
@@ -178,37 +178,46 @@ export function WalkthroughOverlay({
           maxWidth: "calc(100vw - 2rem)",
           // A longer step body (e.g. the tasks tour's example-generate step)
           // can render taller than TOOLTIP_HEIGHT, the fixed estimate
-          // computeTooltipPosition uses for placement math -- without this,
-          // the Next/Back/Skip/Finish row could render below the viewport
-          // with no way to reach it. Anchored to this panel's own computed
-          // `top`, not a flat "100vh - 2rem": a cap relative to the viewport
-          // alone would still let a panel positioned partway down the page
-          // render past the bottom edge, since nothing stops its natural
-          // height from being smaller than that flat cap but still bigger
-          // than the room actually left below `top`.
+          // computeTooltipPosition uses for placement math. On a short or
+          // narrow viewport the body can still be taller than the room this
+          // leaves it -- the scrollable region below handles that -- but the
+          // Skip/Back/Next row stays outside that scroll area (see below) so
+          // it's never what ends up needing to be scrolled to. Anchored to
+          // this panel's own computed `top`, not a flat "100vh - 2rem": a cap
+          // relative to the viewport alone would still let a panel positioned
+          // partway down the page render past the bottom edge, since nothing
+          // stops its natural height from being smaller than that flat cap
+          // but still bigger than the room actually left below `top`.
           maxHeight: `calc(100vh - ${tooltip.top}px - 1rem)`,
         }}
       >
-        {/* role="status"/aria-live so screen readers announce each new step
-            on its own -- focus moves to Next/Finish on every step change,
-            not to this text, so nothing else would announce the change. */}
-        <p
-          role="status"
-          aria-live="polite"
-          className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
-        >
-          {copy.stepProgress({
-            step: progress?.step ?? stepIndex + 1,
-            total: progress?.total ?? steps.length,
-          })}
-        </p>
-        <h2 id={titleId} className="mt-1 text-base font-semibold">
-          {step.title}
-        </h2>
-        <p id={bodyId} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          {step.body}
-        </p>
-        <div className="mt-5 flex items-center justify-between gap-3">
+        {/* Scrollable independently of the Skip/Back/Next row below: a long
+            step body on a short or narrow viewport (see the maxHeight note
+            above) must never be able to push those buttons out of view --
+            they stay reachable without the learner having to notice this
+            region itself scrolls. */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">
+          {/* role="status"/aria-live so screen readers announce each new step
+              on its own -- focus moves to Next/Finish on every step change,
+              not to this text, so nothing else would announce the change. */}
+          <p
+            role="status"
+            aria-live="polite"
+            className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+          >
+            {copy.stepProgress({
+              step: progress?.step ?? stepIndex + 1,
+              total: progress?.total ?? steps.length,
+            })}
+          </p>
+          <h2 id={titleId} className="mt-1 text-base font-semibold">
+            {step.title}
+          </h2>
+          <p id={bodyId} className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+            {step.body}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-black/[.08] p-5 pt-4 dark:border-white/[.1]">
           <button
             type="button"
             onClick={onSkip}
