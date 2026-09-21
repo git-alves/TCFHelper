@@ -90,6 +90,15 @@ interface TimedTaskSummary {
 type ExampleLevel = "B2" | "C1" | "C2";
 type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
+// Distinguishes the three task cards at a glance, reused for the recent
+// exams/write-your-own prompt cards to visually tie "Get a prompt from
+// recent exams" back to Task 1's color and "Write or paste my own prompt"
+// back to Task 3's, rather than introducing unrelated colors there.
+const TASK_TITLE_COLOR: Record<TaskType, string> = {
+  TASK_1: "text-blue-600 dark:text-blue-400",
+  TASK_2: "text-amber-600 dark:text-amber-400",
+  TASK_3: "text-cyan-600 dark:text-cyan-400",
+};
 const GUIDED_WRITING_LEVEL_STORAGE_KEY = "mytcflab:guided-writing-level";
 const GUIDED_WRITING_OPEN_STORAGE_KEY = "mytcflab:guided-writing-open";
 const TIMED_TASK_SESSION_STORAGE_KEY = "mytcflab:timed-task-session";
@@ -1818,7 +1827,7 @@ export function WritingWorkspace() {
                   className="absolute right-3 top-3 h-2 w-2 rounded-full bg-violet-600 dark:bg-violet-300"
                 />
               )}
-              <div lang="fr" className="font-medium">{TASK_INSTRUCTIONS[type].label}</div>
+              <div lang="fr" className={`font-medium ${TASK_TITLE_COLOR[type]}`}>{TASK_INSTRUCTIONS[type].label}</div>
               <div lang="fr" className="text-sm text-zinc-500 dark:text-zinc-400">
                 {TASK_INSTRUCTIONS[type].title}
               </div>
@@ -1867,7 +1876,7 @@ export function WritingWorkspace() {
                   <Sparkles className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block font-medium">{copy.workspace.topic.recentExamTitle}</span>
+                  <span className={`block font-medium ${TASK_TITLE_COLOR.TASK_1}`}>{copy.workspace.topic.recentExamTitle}</span>
                   <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
                     {copy.workspace.topic.recentExamDescription}
                   </span>
@@ -1891,7 +1900,7 @@ export function WritingWorkspace() {
                   <PenLine className="h-4 w-4" />
                 </span>
                 <span className="min-w-0">
-                  <span className="block font-medium">{copy.workspace.topic.customTitle}</span>
+                  <span className={`block font-medium ${TASK_TITLE_COLOR.TASK_3}`}>{copy.workspace.topic.customTitle}</span>
                   <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
                     {copy.workspace.topic.customDescription}
                   </span>
