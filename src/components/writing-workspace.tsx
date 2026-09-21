@@ -3,6 +3,19 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  BookOpen,
+  CheckCircle2,
+  Clock,
+  Copy as CopyIcon,
+  Languages,
+  Lightbulb,
+  PenLine,
+  Sparkles,
+  SpellCheck2,
+  Tag,
+  Trash2,
+} from "lucide-react";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
 import { TASK_INSTRUCTIONS, TASK_ORDER } from "@/lib/tcf-tasks";
@@ -399,7 +412,7 @@ function ExampleLevelMenuButton({
     <div
       ref={containerRef}
       data-walkthrough="example-generate"
-      className="relative flex rounded-full border border-black/[.15] p-1 dark:border-white/[.2]"
+      className="relative flex rounded-full border border-amber-300 p-1 dark:border-amber-800"
     >
       <button
         type="button"
@@ -407,8 +420,9 @@ function ExampleLevelMenuButton({
         aria-expanded={isOpen}
         onClick={toggle}
         disabled={disabled || isGenerating}
-        className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+        className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-400 dark:hover:bg-amber-950/30"
       >
+        <Lightbulb aria-hidden="true" className="h-4 w-4" />
         {isGenerating ? generatingLabel : generateLabel} <span aria-hidden="true">▾</span>
       </button>
       {isOpen && (
@@ -461,8 +475,9 @@ function GuidedWritingSplitButton({
         onClick={onToggle}
         disabled={disabled}
         aria-pressed={isOpen}
-        className="rounded-l-full px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
+        className="flex items-center gap-1.5 rounded-l-full px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[.06]"
       >
+        <BookOpen aria-hidden="true" className="h-4 w-4" />
         {isOpen ? hideLabel : showLabel}
       </button>
       <button
@@ -1791,12 +1806,18 @@ export function WritingWorkspace() {
               onClick={() => resetForTask(type)}
               aria-pressed={taskType === type}
               disabled={isCorrecting || isGeneratingExample}
-              className={`rounded-xl border px-4 py-3 text-left transition-colors ${
+              className={`relative rounded-xl border px-4 py-3 text-left transition-colors ${
                 taskType === type
-                  ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                  ? "border-violet-600 bg-violet-50 ring-1 ring-violet-600 dark:border-violet-300 dark:bg-violet-950/50 dark:ring-violet-300"
                   : "border-black/[.1] hover:bg-black/[.03] dark:border-white/[.15] dark:hover:bg-white/[.05]"
               } disabled:cursor-not-allowed disabled:opacity-60`}
             >
+              {taskType === type && (
+                <span
+                  aria-hidden="true"
+                  className="absolute right-3 top-3 h-2 w-2 rounded-full bg-violet-600 dark:bg-violet-300"
+                />
+              )}
               <div lang="fr" className="font-medium">{TASK_INSTRUCTIONS[type].label}</div>
               <div lang="fr" className="text-sm text-zinc-500 dark:text-zinc-400">
                 {TASK_INSTRUCTIONS[type].title}
@@ -1805,14 +1826,17 @@ export function WritingWorkspace() {
           ))}
         </div>
         {task && (
-          <div className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 text-sm dark:border-white/[.1] dark:bg-white/[.03]">
-            <p lang="fr">{task.description}</p>
-            <p className="mt-1 text-zinc-500 dark:text-zinc-400">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50/60 p-4 text-sm dark:border-violet-900 dark:bg-violet-950/20">
+            <p lang="fr" className="min-w-0 flex-1">
+              {task.description}
+            </p>
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-violet-300 bg-white px-3 py-1 text-xs font-medium text-violet-700 dark:border-violet-700 dark:bg-zinc-950 dark:text-violet-300">
+              <Tag aria-hidden="true" className="h-3.5 w-3.5" />
               {copy.workspace.task.targetLength({
                 minWords: task.minWords,
                 maxWords: task.maxWords,
               })}
-            </p>
+            </span>
           </div>
         )}
       </section>
@@ -1830,15 +1854,23 @@ export function WritingWorkspace() {
                 aria-pressed={topicMode === "recent"}
                 aria-busy={isRecentTopicLoading}
                 disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-                className={`rounded-xl border p-4 text-left transition-colors ${
+                className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "recent"
-                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                    ? "border-violet-600 bg-violet-50 ring-1 ring-violet-600 dark:border-violet-300 dark:bg-violet-950/50 dark:ring-violet-300"
                     : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                <span className="block font-medium">{copy.workspace.topic.recentExamTitle}</span>
-                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.recentExamDescription}
+                <span
+                  aria-hidden="true"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600 dark:bg-violet-900/50 dark:text-violet-300"
+                >
+                  <Sparkles className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-medium">{copy.workspace.topic.recentExamTitle}</span>
+                  <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                    {copy.workspace.topic.recentExamDescription}
+                  </span>
                 </span>
               </button>
               <button
@@ -1846,15 +1878,23 @@ export function WritingWorkspace() {
                 onClick={chooseCustomTopic}
                 aria-pressed={topicMode === "custom"}
                 disabled={isCorrecting || isGeneratingExample}
-                className={`rounded-xl border p-4 text-left transition-colors ${
+                className={`flex items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
                   topicMode === "custom"
-                    ? "border-foreground bg-black/[.04] dark:bg-white/[.08]"
+                    ? "border-violet-600 bg-violet-50 ring-1 ring-violet-600 dark:border-violet-300 dark:bg-violet-950/50 dark:ring-violet-300"
                     : "border-black/[.15] hover:bg-black/[.03] dark:border-white/[.2] dark:hover:bg-white/[.05]"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
-                <span className="block font-medium">{copy.workspace.topic.customTitle}</span>
-                <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.customDescription}
+                <span
+                  aria-hidden="true"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-600 dark:bg-white/[.08] dark:text-zinc-300"
+                >
+                  <PenLine className="h-4 w-4" />
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-medium">{copy.workspace.topic.customTitle}</span>
+                  <span className="mt-1 block text-sm text-zinc-500 dark:text-zinc-400">
+                    {copy.workspace.topic.customDescription}
+                  </span>
                 </span>
               </button>
             </div>
@@ -1927,11 +1967,11 @@ export function WritingWorkspace() {
           </section>
 
           <section className="flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <StepHeading number={3} stepLabel={copy.workspace.stepLabel}>
-                  {copy.workspace.editor.heading}
-                </StepHeading>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <StepHeading number={3} stepLabel={copy.workspace.stepLabel}>
+                {copy.workspace.editor.heading}
+              </StepHeading>
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <GuidedWritingSplitButton
                   isOpen={isGuidedWritingOpen}
                   showLabel={copy.workspace.guidedWriting.show}
@@ -1952,9 +1992,9 @@ export function WritingWorkspace() {
                   data-walkthrough="timed-task"
                   onClick={startTimedTask}
                   disabled={!activeTopicPrompt || Boolean(timedTaskSession)}
-                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                  className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
-                  <span aria-hidden="true">⏱ </span>
+                  <Clock aria-hidden="true" className="h-4 w-4" />
                   {copy.workspace.timedTask.show}
                 </button>
                 <button
@@ -1969,8 +2009,9 @@ export function WritingWorkspace() {
                   disabled={!activeTopicPrompt}
                   aria-pressed={isSpellCheckActive}
                   aria-label={copy.workspace.spellCheck.toggleAriaLabel({ enabled: isSpellCheckActive })}
-                  className="rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                  className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-3 py-1 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
                 >
+                  <SpellCheck2 aria-hidden="true" className="h-4 w-4" />
                   {copy.workspace.spellCheck.toggleLabel}: {isSpellCheckActive ? copy.workspace.spellCheck.statusOn : copy.workspace.spellCheck.statusOff}
                 </button>
                 {isSpellCheckActive && spellCheckStatus === "checking" && (
@@ -1983,14 +2024,12 @@ export function WritingWorkspace() {
                     {copy.workspace.spellCheck.unavailable}
                   </span>
                 )}
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
                 <span
                   id="word-count"
-                  className={`shrink-0 text-sm ${
+                  className={`shrink-0 rounded-full border px-3 py-1 text-sm font-medium ${
                     wordCountInRange
-                      ? "text-zinc-500 dark:text-zinc-400"
-                      : "text-amber-600 dark:text-amber-400"
+                      ? "border-black/[.15] text-zinc-500 dark:border-white/[.2] dark:text-zinc-400"
+                      : "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
                   }`}
                 >
                   {copy.workspace.editor.wordCount({
@@ -2204,8 +2243,9 @@ export function WritingWorkspace() {
                     .filter(Boolean)
                     .join(" ") || undefined
                 }
-                className="self-start rounded-full bg-foreground px-5 py-2.5 font-medium text-background transition-colors hover:bg-[#383838] disabled:opacity-60 dark:hover:bg-[#ccc]"
+                className="flex items-center gap-2 self-start rounded-full bg-violet-600 px-5 py-2.5 font-medium text-white transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400"
               >
+                <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
                 {isCorrecting ? copy.workspace.editor.correcting : copy.workspace.editor.correct}
               </button>
 
@@ -2247,8 +2287,9 @@ export function WritingWorkspace() {
                 data-walkthrough="editor-copy"
                 onClick={handleCopyContent}
                 disabled={!content.trim()}
-                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
+                <CopyIcon aria-hidden="true" className="h-4 w-4" />
                 {copyStatus === "copied"
                   ? copy.workspace.editor.copied
                   : copyStatus === "failed"
@@ -2260,8 +2301,9 @@ export function WritingWorkspace() {
                 data-walkthrough="editor-clear"
                 onClick={handleClearDraft}
                 disabled={!content.trim()}
-                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
+                <Trash2 aria-hidden="true" className="h-4 w-4" />
                 {copy.workspace.editor.clear}
               </button>
               <button
@@ -2276,8 +2318,9 @@ export function WritingWorkspace() {
                 // burn real quota on requests that never even finish.
                 disabled={!content.trim() || isTranslationLoading}
                 aria-pressed={isTranslationVisible && !isTranslationStale}
-                className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
+                className="flex items-center gap-1.5 rounded-full border border-black/[.15] px-4 py-1.5 text-sm transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.06]"
               >
+                <Languages aria-hidden="true" className="h-4 w-4" />
                 {!isTranslationVisible
                   ? copy.workspace.translation.show
                   : isTranslationStale
