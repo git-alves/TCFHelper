@@ -96,6 +96,20 @@ describe("generateModelAnswer", () => {
     expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
   });
 
+  it("never sends a temperature parameter, since the admin-configurable model may be a Flash-Lite model that rejects it", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((requestInit as RequestInit).body as string);
+    expect(body.generationConfig).not.toHaveProperty("temperature");
+  });
+
   it("uses the default model unless GEMINI_MODEL overrides it", async () => {
     mockFetchOnce({
       ok: true,

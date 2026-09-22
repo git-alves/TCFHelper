@@ -254,11 +254,15 @@ export async function generateModelAnswer(
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
+        // No `temperature`: this model is admin-configurable (see
+        // GEMINI_MODEL/exampleModel) and Google documents `temperature` as
+        // deprecated -- an error, not merely ignored -- for the Flash-Lite
+        // family (the same reason gradeEssayWithGemini below never sends it).
         // Only the final French text is ever used -- reasoning would only
         // eat into the 512-token budget meant for the answer itself, which
         // is the likely cause of the "invalid response" (too-short) outputs
         // seen once the underlying model started thinking by default.
-        generationConfig: { temperature: 0.7, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
