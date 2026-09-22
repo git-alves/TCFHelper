@@ -248,25 +248,50 @@ export async function generateModelAnswer(
   // The key is sent only via the x-goog-api-key header, never as a ?key=
   // query parameter: a URL-embedded secret is far more likely to end up in
   // an access log or proxy trace than a header is.
-  let response: Response;
-  try {
-    response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
+  const requestExample = () =>
+    fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
+        // No `temperature`: this model is admin-configurable (see
+        // GEMINI_MODEL/exampleModel) and Google documents `temperature` as
+        // deprecated -- an error, not merely ignored -- for the Flash-Lite
+        // family (the same reason gradeEssayWithGemini below never sends it).
         // Only the final French text is ever used -- reasoning would only
         // eat into the 512-token budget meant for the answer itself, which
         // is the likely cause of the "invalid response" (too-short) outputs
         // seen once the underlying model started thinking by default.
-        generationConfig: { temperature: 0.7, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
+        generationConfig: { maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
+
+  // A 503 from Gemini means the model is transiently overloaded, not that
+  // the request itself is bad -- Google's own guidance is that it's safe to
+  // retry. One short retry absorbs a momentary capacity blip instead of
+  // forcing the learner to notice the failure and click "Generate" again.
+  const MAX_OVERLOAD_ATTEMPTS = 2;
+  const OVERLOAD_RETRY_DELAY_MS = 1_000;
+
+  let response: Response;
+  try {
+    response = await requestExample();
   } catch (error) {
     console.error("Gemini example-generation transport failure", error);
     throw new GeminiTransportError();
+  }
+
+  for (let attempt = 1; response.status === 503 && attempt < MAX_OVERLOAD_ATTEMPTS; attempt++) {
+    console.error(`Gemini example generation overloaded (503), retrying (attempt ${attempt})`);
+    await new Promise((resolve) => setTimeout(resolve, OVERLOAD_RETRY_DELAY_MS));
+    try {
+      response = await requestExample();
+    } catch (error) {
+      console.error("Gemini example-generation transport failure", error);
+      throw new GeminiTransportError();
+    }
   }
 
   if (response.status === 429) {

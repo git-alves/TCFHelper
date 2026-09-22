@@ -96,6 +96,20 @@ describe("generateModelAnswer", () => {
     expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
   });
 
+  it("never sends a temperature parameter, since the admin-configurable model may be a Flash-Lite model that rejects it", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer(params);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse((requestInit as RequestInit).body as string);
+    expect(body.generationConfig).not.toHaveProperty("temperature");
+  });
+
   it("uses the default model unless GEMINI_MODEL overrides it", async () => {
     mockFetchOnce({
       ok: true,
@@ -128,6 +142,30 @@ describe("generateModelAnswer", () => {
     mockFetchOnce({ ok: false, status: 500, json: async () => ({ error: { message: "boom" } }) });
 
     await expect(generateModelAnswer(params)).rejects.toThrow(/Gemini request failed \(500\)/);
+  });
+
+  it("retries once and succeeds after a transient 503 (model overloaded)", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+      } as Response);
+
+    await expect(generateModelAnswer(params)).resolves.toBe("Réponse.");
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after exhausting retries on a persistent 503", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as Response);
+
+    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(503);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it("carries only the HTTP status, never Google's own error message", async () => {
