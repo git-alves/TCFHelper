@@ -26,6 +26,38 @@ export function isAppLocale(value: unknown): value is AppLocale {
   return typeof value === "string" && (APP_LOCALES as readonly string[]).includes(value);
 }
 
+// Picks the best supported locale from a raw `Accept-Language` header, e.g.
+// "fr-CA,fr;q=0.9,en-US;q=0.8". Only the primary subtag (before any "-") is
+// matched against APP_LOCALES, in the browser's stated preference order;
+// returns null (letting the caller fall back to DEFAULT_APP_LOCALE) when
+// none of the browser's preferred languages are supported.
+export function pickLocaleFromAcceptLanguage(header: string | null | undefined): AppLocale | null {
+  if (!header) return null;
+
+  const entries = header
+    .split(",")
+    .map((part) => {
+      const [tag, ...params] = part.trim().split(";");
+      const qParam = params.map((p) => p.trim()).find((p) => p.startsWith("q="));
+      const q = qParam ? Number.parseFloat(qParam.slice(2)) : 1;
+      return { tag: tag.trim().toLowerCase(), q: Number.isFinite(q) ? q : 1 };
+    })
+    // q=0 is RFC 7231's explicit "not acceptable" marker, not merely a low
+    // preference -- it must exclude the language, not just rank it last.
+    .filter((entry) => entry.tag && entry.tag !== "*" && entry.q > 0)
+    // Array#sort is stable, so entries with equal q keep the header's
+    // original (already preference-ordered) relative order.
+    .sort((a, b) => b.q - a.q);
+
+  for (const { tag } of entries) {
+    const primary = tag.split("-")[0];
+    const match = (APP_LOCALES as readonly string[]).find((locale) => locale === primary);
+    if (match) return match as AppLocale;
+  }
+
+  return null;
+}
+
 export const APP_LOCALE_STORAGE_KEY = "mytcflab:app-locale";
 
 // The cookie lets Server Components render in the learner's selected
