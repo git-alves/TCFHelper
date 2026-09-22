@@ -264,7 +264,8 @@ export async function generateModelAnswer(
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    console.error("Gemini example-generation transport failure", error);
     throw new GeminiTransportError();
   }
 
@@ -289,6 +290,7 @@ export async function generateModelAnswer(
     if (error instanceof SyntaxError) {
       throw new GeminiRequestError(response.status);
     }
+    console.error("Gemini example-generation body-read transport failure", error);
     throw new GeminiTransportError();
   }
 
@@ -437,7 +439,8 @@ export async function gradeEssayWithGemini(
       cache: "no-store",
       signal: AbortSignal.timeout(CORRECTION_REQUEST_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    console.error("Gemini correction transport failure", error);
     throw new GeminiTransportError();
   }
 
@@ -456,6 +459,7 @@ export async function gradeEssayWithGemini(
     if (error instanceof SyntaxError) {
       throw new GeminiRequestError(response.status);
     }
+    console.error("Gemini correction body-read transport failure", error);
     throw new GeminiTransportError();
   }
 
