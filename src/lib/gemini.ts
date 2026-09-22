@@ -254,15 +254,23 @@ export async function generateModelAnswer(
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildExamplePrompt(params) }] }],
-        // No `temperature`: this model is admin-configurable (see
-        // GEMINI_MODEL/exampleModel) and Google documents `temperature` as
-        // deprecated -- an error, not merely ignored -- for the Flash-Lite
-        // family (the same reason gradeEssayWithGemini below never sends it).
-        // Only the final French text is ever used -- reasoning would only
-        // eat into the 512-token budget meant for the answer itself, which
-        // is the likely cause of the "invalid response" (too-short) outputs
-        // seen once the underlying model started thinking by default.
-        generationConfig: { maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
+        // No `temperature` and no `thinkingConfig`: this model is
+        // admin-configurable (see GEMINI_MODEL/exampleModel), and Google
+        // rejects both with a 400 for a Flash-Lite model -- `temperature` is
+        // documented as deprecated (an error, not merely ignored) for that
+        // family, and `thinkingConfig` errors with "Thinking is not enabled
+        // for this model" wherever thinking isn't available by default. This
+        // mirrors gradeEssayWithGemini below, which has only ever targeted
+        // Flash-Lite and has never sent either field.
+        //
+        // The tradeoff: a *thinking-enabled* model (the original default,
+        // full Flash) has no explicit thinkingBudget: 0 here to stop it
+        // spending the 512-token output budget on reasoning instead of the
+        // answer -- the "invalid response" (too-short) failure this
+        // parameter was first added to fix. If a thinking-enabled model is
+        // configured for example generation again, raise maxOutputTokens
+        // well above 512 to leave room for that reasoning.
+        generationConfig: { maxOutputTokens: 512 },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

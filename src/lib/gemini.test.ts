@@ -82,7 +82,7 @@ describe("generateModelAnswer", () => {
     await expect(generateModelAnswer(params)).resolves.toBe("Le télétravail présente des avantages.");
   });
 
-  it("disables thinking so the whole output budget goes to the answer", async () => {
+  it("never sends a thinkingConfig parameter, since Google rejects it with a 400 for models where thinking isn't available", async () => {
     mockFetchOnce({
       ok: true,
       status: 200,
@@ -93,7 +93,7 @@ describe("generateModelAnswer", () => {
 
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse((requestInit as RequestInit).body as string);
-    expect(body.generationConfig.thinkingConfig).toEqual({ thinkingBudget: 0 });
+    expect(body.generationConfig).not.toHaveProperty("thinkingConfig");
   });
 
   it("never sends a temperature parameter, since the admin-configurable model may be a Flash-Lite model that rejects it", async () => {
