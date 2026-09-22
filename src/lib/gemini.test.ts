@@ -130,6 +130,30 @@ describe("generateModelAnswer", () => {
     await expect(generateModelAnswer(params)).rejects.toThrow(/Gemini request failed \(500\)/);
   });
 
+  it("retries once and succeeds after a transient 503 (model overloaded)", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+      } as Response);
+
+    await expect(generateModelAnswer(params)).resolves.toBe("Réponse.");
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after exhausting retries on a persistent 503", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as Response);
+
+    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(503);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("carries only the HTTP status, never Google's own error message", async () => {
     const sentinelUpstreamMessage = "SENTINEL_UPSTREAM_TEXT_MUST_NOT_LEAK";
     mockFetchOnce({
