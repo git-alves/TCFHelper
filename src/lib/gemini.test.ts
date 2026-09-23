@@ -123,7 +123,7 @@ describe("generateModelAnswer", () => {
       expect.stringContaining("/models/gemini-3.5-flash:generateContent"),
       expect.objectContaining({
         headers: expect.objectContaining({ "x-goog-api-key": "test-key" }),
-        body: expect.stringContaining('"maxOutputTokens":512'),
+        body: expect.stringContaining('"maxOutputTokens":2048'),
       }),
     );
     // The key must never be sent in the URL: query strings are far more
