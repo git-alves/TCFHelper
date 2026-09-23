@@ -453,9 +453,8 @@ export async function gradeEssayWithGemini(
   // never implicitly rides on the model-answer generator's configuration.
   const model = overrides?.model?.trim() || process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
 
-  let response: Response;
-  try {
-    response = await fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
+  const requestCorrection = () =>
+    fetch(`${GEMINI_API_BASE}/${model}:generateContent`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
@@ -474,9 +473,32 @@ export async function gradeEssayWithGemini(
       cache: "no-store",
       signal: AbortSignal.timeout(CORRECTION_REQUEST_TIMEOUT_MS),
     });
+
+  // A 503 from Gemini means the model is transiently overloaded, not that
+  // the request itself is bad -- see the matching comment in
+  // generateModelAnswer above. Only one retry (not more): each attempt
+  // already carries the full 45s CORRECTION_REQUEST_TIMEOUT_MS budget, so a
+  // second attempt is already a meaningful worst-case latency cost.
+  const MAX_OVERLOAD_ATTEMPTS = 2;
+  const OVERLOAD_RETRY_DELAY_MS = 1_000;
+
+  let response: Response;
+  try {
+    response = await requestCorrection();
   } catch (error) {
     console.error("Gemini correction transport failure", error);
     throw new GeminiTransportError();
+  }
+
+  for (let attempt = 1; response.status === 503 && attempt < MAX_OVERLOAD_ATTEMPTS; attempt++) {
+    console.error(`Gemini correction overloaded (503), retrying (attempt ${attempt})`);
+    await new Promise((resolve) => setTimeout(resolve, OVERLOAD_RETRY_DELAY_MS));
+    try {
+      response = await requestCorrection();
+    } catch (error) {
+      console.error("Gemini correction transport failure", error);
+      throw new GeminiTransportError();
+    }
   }
 
   if (response.status === 429) {
