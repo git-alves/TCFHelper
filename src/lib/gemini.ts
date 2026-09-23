@@ -264,13 +264,15 @@ export async function generateModelAnswer(
         // Flash-Lite and has never sent either field.
         //
         // The tradeoff: a *thinking-enabled* model (the original default,
-        // full Flash) has no explicit thinkingBudget: 0 here to stop it
-        // spending the 512-token output budget on reasoning instead of the
-        // answer -- the "invalid response" (too-short) failure this
-        // parameter was first added to fix. If a thinking-enabled model is
-        // configured for example generation again, raise maxOutputTokens
-        // well above 512 to leave room for that reasoning.
-        generationConfig: { maxOutputTokens: 512 },
+        // full Flash, and any other model with thinking on by default) has
+        // no explicit thinkingBudget: 0 here to stop it spending part of the
+        // output budget on reasoning instead of the answer -- the "invalid
+        // response" (too-short) failure this parameter was first added to
+        // fix. maxOutputTokens is sized well above what the answer itself
+        // ever needs (TCF tasks top out around 250 words) specifically to
+        // leave room for that reasoning; a Flash-Lite model with no thinking
+        // simply never uses the extra headroom.
+        generationConfig: { maxOutputTokens: 2048 },
       }),
       cache: "no-store",
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
