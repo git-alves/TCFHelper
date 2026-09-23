@@ -539,6 +539,30 @@ describe("gradeEssayWithGemini", () => {
     await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRateLimitedError);
   });
 
+  it("retries once and succeeds after a transient 503 (model overloaded)", async () => {
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }] }),
+      } as Response);
+
+    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("gives up after exhausting retries on a persistent 503", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as Response);
+
+    const error: unknown = await gradeEssayWithGemini(correctionParams).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GeminiRequestError);
+    expect((error as GeminiRequestError).status).toBe(503);
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
   it("throws GeminiTransportError when fetch itself fails", async () => {
     global.fetch = vi.fn().mockRejectedValue(new TypeError("fetch failed"));
 
