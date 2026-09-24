@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { buildCorrectionSystemPrompt } from "./essay-correction-prompt";
+import {
+  DEFAULT_CORRECTION_BASE_PROMPT,
+  DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT,
+  DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT,
+  DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS,
+  buildCorrectionSystemPrompt,
+} from "./essay-correction-prompt";
 
 const taskThreeTopicWithDocuments =
   "Faut-il interdire les téléphones portables à l'école ?\n\n" +
@@ -75,5 +81,63 @@ describe("buildCorrectionSystemPrompt", () => {
     expect(prompt).toContain("complex structures used naturally, without sounding forced");
     expect(prompt).toContain("a C2 text can and should still contain simple sentences");
     expect(prompt).toContain("occasional evidence still supports a C2 estimatedLevel");
+  });
+
+  describe("admin prompt overrides", () => {
+    it("uses each override in place of its corresponding built-in default block", () => {
+      const prompt = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.", {
+        base: "CUSTOM BASE {{feedbackLanguage}}.",
+        task1: "CUSTOM TASK 1.",
+      });
+
+      expect(prompt).toBe("CUSTOM BASE English.\n\nCUSTOM TASK 1.");
+    });
+
+    it("substitutes the feedback-language token in a custom base prompt just like the default", () => {
+      const prompt = buildCorrectionSystemPrompt("Français", "TASK_1", "Écrivez à votre voisin.", {
+        base: "Respond in {{feedbackLanguage}} please.",
+      });
+
+      expect(prompt).toContain("Respond in Français please.");
+      expect(prompt).not.toContain("{{feedbackLanguage}}");
+    });
+
+    it("falls back to the built-in default for a block left null/blank", () => {
+      const prompt = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.", {
+        base: null,
+        task1: "   ",
+      });
+
+      expect(prompt).toBe(buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin."));
+    });
+
+    it("picks the correct override for each Task 3 variant independently", () => {
+      const overrides = { task3Documents: "CUSTOM WITH DOCS.", task3Documentless: "CUSTOM WITHOUT DOCS." };
+
+      expect(
+        buildCorrectionSystemPrompt("English", "TASK_3", taskThreeTopicWithDocuments, overrides),
+      ).toContain("CUSTOM WITH DOCS.");
+      expect(
+        buildCorrectionSystemPrompt("English", "TASK_3", "Le télétravail devrait-il être généralisé ?", overrides),
+      ).toContain("CUSTOM WITHOUT DOCS.");
+    });
+
+    it("never lets a Task 3 override leak into another task type", () => {
+      const prompt = buildCorrectionSystemPrompt("English", "TASK_2", "Racontez un voyage récent à vos collègues.", {
+        task3Documents: "CUSTOM WITH DOCS.",
+        task3Documentless: "CUSTOM WITHOUT DOCS.",
+      });
+
+      expect(prompt).not.toContain("CUSTOM WITH DOCS.");
+      expect(prompt).not.toContain("CUSTOM WITHOUT DOCS.");
+    });
+
+    it("exports a non-empty, token-bearing default for every editable block", () => {
+      expect(DEFAULT_CORRECTION_BASE_PROMPT).toContain("{{feedbackLanguage}}");
+      expect(DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_1.length).toBeGreaterThan(0);
+      expect(DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_2.length).toBeGreaterThan(0);
+      expect(DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT.length).toBeGreaterThan(0);
+      expect(DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT.length).toBeGreaterThan(0);
+    });
   });
 });

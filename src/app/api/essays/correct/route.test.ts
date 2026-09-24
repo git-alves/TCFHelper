@@ -9,6 +9,7 @@ const {
   gradeEssayWithGeminiMock,
   hasConfiguredGeminiMock,
   getAppConfigMock,
+  getPromptOverridesMock,
   GeminiCorrectionParseErrorMock,
   GeminiNotConfiguredErrorMock,
   GeminiRateLimitedErrorMock,
@@ -40,6 +41,7 @@ const {
     gradeEssayWithGeminiMock: vi.fn(),
     hasConfiguredGeminiMock: vi.fn(),
     getAppConfigMock: vi.fn(),
+    getPromptOverridesMock: vi.fn(),
     GeminiCorrectionParseErrorMock,
     GeminiNotConfiguredErrorMock,
     GeminiRateLimitedErrorMock,
@@ -67,6 +69,16 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/lib/app-config", () => ({
   getAppConfig: getAppConfigMock,
+}));
+vi.mock("@/lib/prompt-overrides", () => ({
+  getPromptOverrides: getPromptOverridesMock,
+  toCorrectionPromptOverrides: (values: Record<string, string | null>) => ({
+    base: values.correctionBase,
+    task1: values.correctionTask1,
+    task2: values.correctionTask2,
+    task3Documents: values.correctionTask3Documents,
+    task3Documentless: values.correctionTask3Documentless,
+  }),
 }));
 vi.mock("@/lib/gemini", () => ({
   gradeEssayWithGemini: gradeEssayWithGeminiMock,
@@ -125,6 +137,7 @@ beforeEach(() => {
   gradeEssayWithGeminiMock.mockReset();
   hasConfiguredGeminiMock.mockReset();
   getAppConfigMock.mockReset();
+  getPromptOverridesMock.mockReset();
   claimCorrectionMock.mockReset();
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
@@ -137,6 +150,13 @@ beforeEach(() => {
     correctionModel: null,
     exampleApiKey: null,
     exampleModel: null,
+  });
+  getPromptOverridesMock.mockResolvedValue({
+    correctionBase: null,
+    correctionTask1: null,
+    correctionTask2: null,
+    correctionTask3Documents: null,
+    correctionTask3Documentless: null,
   });
   gradeEssayWithGeminiMock.mockResolvedValue(feedback);
   claimCorrectionMock.mockResolvedValue({

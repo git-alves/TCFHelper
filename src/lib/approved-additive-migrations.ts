@@ -58,4 +58,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // Widens the same closed vocabulary for the bundled Hunspell checker.
   // Existing events retain their exact shapes and meanings.
   "20260910100000_add_hunspell_spell_check_failed_event",
+  // A new, empty key/value table. No existing row is touched, and a missing
+  // key just means "use the built-in default" until an admin explicitly
+  // overrides a correction prompt block from /admin/prompts.
+  "20260924100000_add_prompt_override",
 ]);
