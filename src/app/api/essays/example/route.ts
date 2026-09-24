@@ -5,6 +5,7 @@ import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
 import { getAppConfig } from "@/lib/app-config";
+import { getPromptOverrides, toExamplePromptOverrides } from "@/lib/prompt-overrides";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
@@ -225,6 +226,7 @@ export async function POST(request: Request) {
         taskType,
         level: typedLevel,
         topicPrompt: resolvedTopicPrompt,
+        promptOverrides: toExamplePromptOverrides(await getPromptOverrides()),
       },
       geminiOverrides,
     );

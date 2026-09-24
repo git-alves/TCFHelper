@@ -26,7 +26,9 @@ const {
   getPromptOverrides,
   updatePromptOverrides,
   toCorrectionPromptOverrides,
+  toExamplePromptOverrides,
 } = await import("./prompt-overrides");
+type PromptOverrideKey = (typeof PROMPT_OVERRIDE_KEYS)[number];
 
 beforeEach(() => {
   findManyMock.mockReset();
@@ -99,15 +101,24 @@ describe("updatePromptOverrides", () => {
   });
 });
 
+function blankValues(overrides: Partial<Record<PromptOverrideKey, string | null>> = {}) {
+  return Object.fromEntries(PROMPT_OVERRIDE_KEYS.map((key) => [key, overrides[key] ?? null])) as Record<
+    PromptOverrideKey,
+    string | null
+  >;
+}
+
 describe("toCorrectionPromptOverrides", () => {
   it("maps every stored key to its buildCorrectionSystemPrompt field", () => {
-    const mapped = toCorrectionPromptOverrides({
-      correctionBase: "base",
-      correctionTask1: "t1",
-      correctionTask2: "t2",
-      correctionTask3Documents: "t3d",
-      correctionTask3Documentless: "t3nd",
-    });
+    const mapped = toCorrectionPromptOverrides(
+      blankValues({
+        correctionBase: "base",
+        correctionTask1: "t1",
+        correctionTask2: "t2",
+        correctionTask3Documents: "t3d",
+        correctionTask3Documentless: "t3nd",
+      }),
+    );
 
     expect(mapped).toEqual({
       base: "base",
@@ -115,6 +126,36 @@ describe("toCorrectionPromptOverrides", () => {
       task2: "t2",
       task3Documents: "t3d",
       task3Documentless: "t3nd",
+    });
+  });
+});
+
+describe("toExamplePromptOverrides", () => {
+  it("maps every stored key to its buildExamplePrompt field, grouping levels by task", () => {
+    const mapped = toExamplePromptOverrides(
+      blankValues({
+        exampleTask1Structure: "s1",
+        exampleTask2Structure: "s2",
+        exampleTask3Structure: "s3",
+        exampleTask1LevelB2: "1b2",
+        exampleTask1LevelC1: "1c1",
+        exampleTask1LevelC2: "1c2",
+        exampleTask2LevelB2: "2b2",
+        exampleTask2LevelC1: "2c1",
+        exampleTask2LevelC2: "2c2",
+        exampleTask3LevelB2: "3b2",
+        exampleTask3LevelC1: "3c1",
+        exampleTask3LevelC2: "3c2",
+      }),
+    );
+
+    expect(mapped).toEqual({
+      task1Structure: "s1",
+      task2Structure: "s2",
+      task3Structure: "s3",
+      task1Levels: { B2: "1b2", C1: "1c1", C2: "1c2" },
+      task2Levels: { B2: "2b2", C1: "2c1", C2: "2c2" },
+      task3Levels: { B2: "3b2", C1: "3c1", C2: "3c2" },
     });
   });
 });

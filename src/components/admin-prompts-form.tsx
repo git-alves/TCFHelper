@@ -198,19 +198,38 @@ export function AdminPromptsForm({ initialDisplay }: AdminPromptsFormProps) {
     }
   }
 
+  const correctionKeys = keys.filter((key) => key.startsWith("correction"));
+  const exampleKeys = keys.filter((key) => key.startsWith("example"));
+
+  function renderField(key: PromptOverrideKey) {
+    return (
+      <PromptBlockField
+        key={key}
+        section={display[key]}
+        value={fields[key]}
+        isDirty={fields[key] !== savedFields[key]}
+        onChange={(next) => setFields((prev) => ({ ...prev, [key]: next }))}
+        onLoadDefault={() => setFields((prev) => ({ ...prev, [key]: display[key].defaultValue }))}
+        onResetToDefault={() => setFields((prev) => ({ ...prev, [key]: "" }))}
+      />
+    );
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-      {keys.map((key) => (
-        <PromptBlockField
-          key={key}
-          section={display[key]}
-          value={fields[key]}
-          isDirty={fields[key] !== savedFields[key]}
-          onChange={(next) => setFields((prev) => ({ ...prev, [key]: next }))}
-          onLoadDefault={() => setFields((prev) => ({ ...prev, [key]: display[key].defaultValue }))}
-          onResetToDefault={() => setFields((prev) => ({ ...prev, [key]: "" }))}
-        />
-      ))}
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+      {correctionKeys.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold tracking-tight">Essay correction</h2>
+          {correctionKeys.map(renderField)}
+        </section>
+      )}
+
+      {exampleKeys.length > 0 && (
+        <section className="flex flex-col gap-4">
+          <h2 className="text-lg font-semibold tracking-tight">Example generation</h2>
+          {exampleKeys.map(renderField)}
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button

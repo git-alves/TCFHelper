@@ -13,6 +13,7 @@ const {
   generatePreferredModelAnswerMock,
   hasConfiguredModelAnswerProviderMock,
   getAppConfigMock,
+  getPromptOverridesMock,
   ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputErrorMock,
@@ -35,6 +36,7 @@ const {
     generatePreferredModelAnswerMock: vi.fn(),
     hasConfiguredModelAnswerProviderMock: vi.fn(),
     getAppConfigMock: vi.fn(),
+    getPromptOverridesMock: vi.fn(),
     ModelAnswerNotConfiguredErrorMock,
     ModelAnswerRateLimitedErrorMock,
     ModelAnswerInvalidOutputErrorMock,
@@ -50,6 +52,17 @@ vi.mock("@/lib/activated-app-user", () => ({
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock } } }));
 vi.mock("@/lib/app-config", () => ({ getAppConfig: getAppConfigMock }));
+vi.mock("@/lib/prompt-overrides", () => ({
+  getPromptOverrides: getPromptOverridesMock,
+  toExamplePromptOverrides: (values: Record<string, string | null>) => ({
+    task1Structure: values.exampleTask1Structure,
+    task2Structure: values.exampleTask2Structure,
+    task3Structure: values.exampleTask3Structure,
+    task1Levels: { B2: values.exampleTask1LevelB2, C1: values.exampleTask1LevelC1, C2: values.exampleTask1LevelC2 },
+    task2Levels: { B2: values.exampleTask2LevelB2, C1: values.exampleTask2LevelC1, C2: values.exampleTask2LevelC2 },
+    task3Levels: { B2: values.exampleTask3LevelB2, C1: values.exampleTask3LevelC1, C2: values.exampleTask3LevelC2 },
+  }),
+}));
 vi.mock("@/lib/example-answer-cache", () => ({
   hashExampleTopic: vi.fn(() => "topic_hash"),
   findCachedExample: findCachedExampleMock,
@@ -82,6 +95,7 @@ beforeEach(() => {
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredModelAnswerProviderMock.mockReset();
   getAppConfigMock.mockReset();
+  getPromptOverridesMock.mockReset();
   recordAdminEventMock.mockReset();
 
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
@@ -97,6 +111,20 @@ beforeEach(() => {
     correctionModel: null,
     exampleApiKey: null,
     exampleModel: null,
+  });
+  getPromptOverridesMock.mockResolvedValue({
+    exampleTask1Structure: null,
+    exampleTask2Structure: null,
+    exampleTask3Structure: null,
+    exampleTask1LevelB2: null,
+    exampleTask1LevelC1: null,
+    exampleTask1LevelC2: null,
+    exampleTask2LevelB2: null,
+    exampleTask2LevelC1: null,
+    exampleTask2LevelC2: null,
+    exampleTask3LevelB2: null,
+    exampleTask3LevelC1: null,
+    exampleTask3LevelC2: null,
   });
 });
 
@@ -234,6 +262,36 @@ describe("POST /api/essays/example", () => {
       "gemini",
       "claim_1",
     );
+  });
+
+  it("sends a stored admin prompt override through to the model-answer generator", async () => {
+    getPromptOverridesMock.mockResolvedValue({
+      exampleTask1Structure: null,
+      exampleTask2Structure: "CUSTOM TASK 2 STRUCTURE.",
+      exampleTask3Structure: null,
+      exampleTask1LevelB2: null,
+      exampleTask1LevelC1: null,
+      exampleTask1LevelC2: null,
+      exampleTask2LevelB2: "CUSTOM TASK 2 B2 LEVEL.",
+      exampleTask2LevelC1: null,
+      exampleTask2LevelC2: null,
+      exampleTask3LevelB2: null,
+      exampleTask3LevelC1: null,
+      exampleTask3LevelC2: null,
+    });
+
+    const response = await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
+
+    expect(response.status).toBe(200);
+    const [requestParams] = generatePreferredModelAnswerMock.mock.calls[0];
+    expect(requestParams.promptOverrides).toEqual({
+      task1Structure: null,
+      task2Structure: "CUSTOM TASK 2 STRUCTURE.",
+      task3Structure: null,
+      task1Levels: { B2: null, C1: null, C2: null },
+      task2Levels: { B2: "CUSTOM TASK 2 B2 LEVEL.", C1: null, C2: null },
+      task3Levels: { B2: null, C1: null, C2: null },
+    });
   });
 
   it("returns a daily limit with its reset time before calling either provider", async () => {
