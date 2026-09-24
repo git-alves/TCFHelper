@@ -148,6 +148,20 @@ export function toExamplePromptOverrides(values: PromptOverrideValues): ExampleP
   };
 }
 
+/**
+ * A stable string identifying the exact example-prompt override state in
+ * effect, for folding into the example-answer cache key (see
+ * hashExampleTopic in example-answer-cache.ts). The object-literal key
+ * order in toExamplePromptOverrides is fixed at the source, so JSON.stringify
+ * here is already deterministic across calls -- no separate key-sorting
+ * needed. Without this, editing a prompt block from /admin/prompts would
+ * silently keep serving an already-cached answer generated under the old
+ * wording, since nothing about the cached row's key would ever change.
+ */
+export function examplePromptOverridesFingerprint(overrides: ExamplePromptOverrides): string {
+  return JSON.stringify(overrides);
+}
+
 export type PromptOverrideUpdateInput = Partial<Record<PromptOverrideKey, string | null>>;
 
 /**

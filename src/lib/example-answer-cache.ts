@@ -25,9 +25,22 @@ const CLAIM_COOLDOWN_MS = 10_000;
 // failed-provider retries.
 const DAILY_ATTEMPT_CAP = 1_000;
 
-export function hashExampleTopic(taskType: TaskType, topicPrompt: string) {
+/**
+ * `promptOverridesFingerprint` must reflect whatever admin-editable
+ * example-prompt overrides (see prompt-overrides.ts) are actually in effect
+ * for this taskType/level at call time. Without it, an admin edit to a
+ * prompt block would silently keep serving an already-cached answer
+ * generated under the old wording -- MODEL_ANSWER_PROMPT_VERSION only
+ * catches a *code* change to the prompt-building logic, never a runtime
+ * admin edit, so the caller must fold the current override state in itself.
+ */
+export function hashExampleTopic(
+  taskType: TaskType,
+  topicPrompt: string,
+  promptOverridesFingerprint: string,
+) {
   return createHash("sha256")
-    .update(`${MODEL_ANSWER_PROMPT_VERSION}\n${taskType}\n${topicPrompt}`, "utf8")
+    .update(`${MODEL_ANSWER_PROMPT_VERSION}\n${taskType}\n${topicPrompt}\n${promptOverridesFingerprint}`, "utf8")
     .digest("hex");
 }
 

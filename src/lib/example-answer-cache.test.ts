@@ -28,6 +28,7 @@ vi.mock("@/lib/prisma", () => ({
 import {
   cacheExample,
   claimExampleGeneration,
+  hashExampleTopic,
   refundExampleGenerationLease,
   releaseExampleGenerationLease,
 } from "./example-answer-cache";
@@ -54,6 +55,25 @@ beforeEach(() => {
       exampleGenerationQuota: { updateMany: quotaUpdateManyMock },
     }),
   );
+});
+
+describe("hashExampleTopic", () => {
+  it("changes when the prompt-overrides fingerprint changes, even for the same task/topic", () => {
+    const withDefaultPrompt = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "default-fingerprint");
+    const withEditedPrompt = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "edited-fingerprint");
+
+    // This is the actual regression this guards: an admin editing an
+    // example-generation prompt block must invalidate any answer already
+    // cached under the old wording, not keep silently serving it forever.
+    expect(withEditedPrompt).not.toBe(withDefaultPrompt);
+  });
+
+  it("is stable for the same task/topic/fingerprint", () => {
+    const first = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "same-fingerprint");
+    const second = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "same-fingerprint");
+
+    expect(first).toBe(second);
+  });
 });
 
 describe("example answer lease ownership", () => {

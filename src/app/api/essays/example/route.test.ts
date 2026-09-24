@@ -5,6 +5,7 @@ const {
   getCurrentActivatedAppUserMock,
   AppUserProvisioningErrorMock,
   findUniqueMock,
+  hashExampleTopicMock,
   findCachedExampleMock,
   claimExampleGenerationMock,
   cacheExampleMock,
@@ -28,6 +29,9 @@ const {
     getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findUniqueMock: vi.fn(),
+    hashExampleTopicMock: vi.fn<(taskType: string, topicPrompt: string, fingerprint: string) => string>(
+      () => "topic_hash",
+    ),
     findCachedExampleMock: vi.fn(),
     claimExampleGenerationMock: vi.fn(),
     cacheExampleMock: vi.fn(),
@@ -62,9 +66,10 @@ vi.mock("@/lib/prompt-overrides", () => ({
     task2Levels: { B2: values.exampleTask2LevelB2, C1: values.exampleTask2LevelC1, C2: values.exampleTask2LevelC2 },
     task3Levels: { B2: values.exampleTask3LevelB2, C1: values.exampleTask3LevelC1, C2: values.exampleTask3LevelC2 },
   }),
+  examplePromptOverridesFingerprint: (overrides: unknown) => JSON.stringify(overrides),
 }));
 vi.mock("@/lib/example-answer-cache", () => ({
-  hashExampleTopic: vi.fn(() => "topic_hash"),
+  hashExampleTopic: hashExampleTopicMock,
   findCachedExample: findCachedExampleMock,
   claimExampleGeneration: claimExampleGenerationMock,
   cacheExample: cacheExampleMock,
@@ -87,6 +92,8 @@ const LOCAL_USER_ID = "cuid_local_user_1";
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   findUniqueMock.mockReset();
+  hashExampleTopicMock.mockReset();
+  hashExampleTopicMock.mockReturnValue("topic_hash");
   findCachedExampleMock.mockReset();
   claimExampleGenerationMock.mockReset();
   cacheExampleMock.mockReset();
@@ -292,6 +299,45 @@ describe("POST /api/essays/example", () => {
       task2Levels: { B2: "CUSTOM TASK 2 B2 LEVEL.", C1: null, C2: null },
       task3Levels: { B2: null, C1: null, C2: null },
     });
+  });
+
+  it("loads prompt overrides before computing the cache key, so an edited prompt bypasses a stale cached answer", async () => {
+    const DEFAULT_OVERRIDES = {
+      exampleTask1Structure: null,
+      exampleTask2Structure: null,
+      exampleTask3Structure: null,
+      exampleTask1LevelB2: null,
+      exampleTask1LevelC1: null,
+      exampleTask1LevelC2: null,
+      exampleTask2LevelB2: null,
+      exampleTask2LevelC1: null,
+      exampleTask2LevelC2: null,
+      exampleTask3LevelB2: null,
+      exampleTask3LevelC1: null,
+      exampleTask3LevelC2: null,
+    };
+
+    // First request: no admin override yet -- this is what would have
+    // produced (and cached) an answer generated from the built-in prompt.
+    await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
+    const [, , fingerprintBeforeEdit] = hashExampleTopicMock.mock.calls[0];
+
+    // An admin then edits the Tache 2 B2 level description from
+    // /admin/prompts. The same learner, task, level, and topic must now
+    // compute a *different* cache key -- reusing the old cached answer
+    // (generated under the old wording) here would be exactly the bug this
+    // guards against.
+    getPromptOverridesMock.mockResolvedValue({ ...DEFAULT_OVERRIDES, exampleTask2LevelB2: "EDITED LEVEL." });
+    await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
+    const [, , fingerprintAfterEdit] = hashExampleTopicMock.mock.calls[1];
+
+    expect(fingerprintAfterEdit).not.toBe(fingerprintBeforeEdit);
+    // getPromptOverrides is the source of truth read before hashExampleTopic
+    // is ever called -- not read only after a cache miss.
+    expect(getPromptOverridesMock).toHaveBeenCalledTimes(2);
+    expect(hashExampleTopicMock.mock.invocationCallOrder[0]).toBeLessThan(
+      findCachedExampleMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("returns a daily limit with its reset time before calling either provider", async () => {

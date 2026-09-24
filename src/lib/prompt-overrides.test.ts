@@ -27,6 +27,7 @@ const {
   updatePromptOverrides,
   toCorrectionPromptOverrides,
   toExamplePromptOverrides,
+  examplePromptOverridesFingerprint,
 } = await import("./prompt-overrides");
 type PromptOverrideKey = (typeof PROMPT_OVERRIDE_KEYS)[number];
 
@@ -157,6 +158,21 @@ describe("toExamplePromptOverrides", () => {
       task2Levels: { B2: "2b2", C1: "2c1", C2: "2c2" },
       task3Levels: { B2: "3b2", C1: "3c1", C2: "3c2" },
     });
+  });
+});
+
+describe("examplePromptOverridesFingerprint", () => {
+  it("differs when a level-description override changes, so a stale cache entry can be detected", () => {
+    const before = toExamplePromptOverrides(blankValues());
+    const after = toExamplePromptOverrides(blankValues({ exampleTask2LevelB2: "EDITED LEVEL." }));
+
+    expect(examplePromptOverridesFingerprint(after)).not.toBe(examplePromptOverridesFingerprint(before));
+  });
+
+  it("is stable for the same overrides", () => {
+    const overrides = toExamplePromptOverrides(blankValues({ exampleTask1Structure: "s1" }));
+
+    expect(examplePromptOverridesFingerprint(overrides)).toBe(examplePromptOverridesFingerprint(overrides));
   });
 });
 
