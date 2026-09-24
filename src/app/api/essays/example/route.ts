@@ -5,6 +5,11 @@ import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
 import { getAppConfig } from "@/lib/app-config";
+import {
+  examplePromptOverridesFingerprint,
+  getPromptOverrides,
+  toExamplePromptOverrides,
+} from "@/lib/prompt-overrides";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
 import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
@@ -112,7 +117,16 @@ export async function POST(request: Request) {
   }
 
   const typedLevel = level as ExampleCefrLevel;
-  const topicHash = hashExampleTopic(taskType, resolvedTopicPrompt);
+  // Loaded before the cache lookup, and folded into the cache key below, so
+  // an admin edit to a prompt block (/admin/prompts) invalidates any
+  // already-cached answer generated under the old wording instead of
+  // silently continuing to serve it.
+  const examplePromptOverrides = toExamplePromptOverrides(await getPromptOverrides());
+  const topicHash = hashExampleTopic(
+    taskType,
+    resolvedTopicPrompt,
+    examplePromptOverridesFingerprint(examplePromptOverrides),
+  );
   let cached: { content: string } | null;
   try {
     cached = await findCachedExample(user.id, taskType, typedLevel, topicHash);
@@ -225,6 +239,7 @@ export async function POST(request: Request) {
         taskType,
         level: typedLevel,
         topicPrompt: resolvedTopicPrompt,
+        promptOverrides: examplePromptOverrides,
       },
       geminiOverrides,
     );

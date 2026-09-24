@@ -81,11 +81,26 @@ export class GeminiCorrectionParseError extends Error {
   }
 }
 
+// Admin overrides for the 12 independently-editable example-generation
+// blocks (see /admin/prompts and prompt-overrides.ts): one structural note
+// per task type, plus one level description per (task type, CEFR level)
+// pair. A field left null/blank falls back to that block's DEFAULT_*
+// constant below.
+export interface ExamplePromptOverrides {
+  task1Structure?: string | null;
+  task2Structure?: string | null;
+  task3Structure?: string | null;
+  task1Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
+  task2Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
+  task3Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
+}
+
 export interface GenerateModelAnswerParams {
   task: TaskDefinition;
   taskType: TaskType;
   level: ExampleCefrLevel;
   topicPrompt: string;
+  promptOverrides?: ExamplePromptOverrides;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -97,14 +112,18 @@ function isRecord(value: unknown): value is JsonRecord {
 // Mirrors the CEFR bands the correction prompt (essay-correction-prompt.ts)
 // grades Tache 1 against, phrased as writing instructions instead of grading
 // criteria, so the study example and the grading rubric never drift apart.
-const TASK_ONE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+// Admin-editable individually per level from /admin/prompts; this is only
+// ever the built-in fallback.
+export const DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
   B2: "clear and reasonably detailed communication, appropriate organization, sufficient vocabulary, and generally controlled grammar -- describing or explaining the required information without excessive ambiguity.",
   C1: "consistently precise communication, strong control of register, flexible vocabulary, and sophisticated organization where appropriate, communicating detailed information naturally and efficiently.",
   C2: "exceptionally precise, natural, flexible, and nuanced communication with near-complete control of grammar, vocabulary, syntax, and register -- without resorting to unnecessarily literary or sophisticated language.",
 };
 
 // Mirrors the CEFR bands the correction prompt grades Tache 2 against.
-const TASK_TWO_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+// Admin-editable individually per level from /admin/prompts; this is only
+// ever the built-in fallback.
+export const DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
   B2: "a clear narrative with generally well-connected commentary, reasonably developed opinions or arguments, appropriate connectors, and register suited to the stated objective.",
   C1: "a fluent narrative with flexible, natural cohesion between the account and the commentary, precise and varied vocabulary, effective paragraph organization, and well-justified opinions or arguments.",
   C2: "a highly natural, nuanced narrative and commentary with sophisticated cohesion, subtle control of tone and register, and near-complete linguistic control.",
@@ -116,14 +135,17 @@ const TASK_TWO_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
 // -- real Tache 3 responses at B2 still need to compare viewpoints and argue
 // a position -- but how sophisticated that execution should be does vary,
 // which is what this supplies instead of the generic, task-agnostic
-// LEVEL_DESCRIPTIONS fallback.
-const TASK_THREE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
+// LEVEL_DESCRIPTIONS fallback. Admin-editable individually per level from
+// /admin/prompts; this is only ever the built-in fallback.
+export const DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
   B2: "a clear position with understandable reasons, sufficiently developed arguments, logically connected ideas, a generally clear comparison of viewpoints, and a coherent overall structure. Arguments may still be relatively straightforward.",
   C1: "well-developed and logically connected arguments, clear synthesis of the viewpoints, precise comparison, effective justification, relevant qualification and nuance, strong cohesion, precise vocabulary, and controlled complex syntax.",
   C2: "exceptionally sophisticated and controlled argumentation: precise synthesis, subtle distinctions, nuanced evaluation, natural handling of counterarguments, precise qualification, flexible and sophisticated cohesion, and very high linguistic accuracy -- functional and sustained, not just decorative vocabulary or long sentences.",
 };
 
-const TASK_ONE_EXAMPLE_STRUCTURE =
+// Admin-editable as a whole block from /admin/prompts; this is only ever
+// the built-in fallback.
+export const DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE =
   "Write this as a short, natural message (a letter, an email, or a note) addressed directly to the recipient " +
   "described in the topic. Open with a greeting and close appropriately for the register the situation calls " +
   "for, and make sure every piece of information or event the topic asks for is covered.";
@@ -132,7 +154,9 @@ const TASK_ONE_EXAMPLE_STRUCTURE =
 // to several/general readers (not a single private recipient), recounting an
 // experience and adding commentary suited to a stated objective -- not a
 // plain opinion essay with an introduction/development/conclusion.
-const TASK_TWO_EXAMPLE_STRUCTURE =
+// Admin-editable as a whole block from /admin/prompts; this is only ever
+// the built-in fallback.
+export const DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE =
   "This format is an article, a letter/courrier (which may be an open letter, but can also be an ordinary letter " +
   "addressed to several or general readers -- for example a group, a committee, or an organization), or a note. " +
   "It is addressed to several or general readers -- not a single private individual. Recount the experience or " +
@@ -144,8 +168,9 @@ const TASK_TWO_EXAMPLE_STRUCTURE =
 // returned text, title included -- so the prompt must not tell the model a
 // title is exempt from the word range, or the two would disagree about what
 // "120-180 words" means. The title is kept in the total by asking for it to
-// be brief rather than by excluding it.
-const TASK_THREE_STRUCTURE =
+// be brief rather than by excluding it. Admin-editable as a whole block from
+// /admin/prompts; this is only ever the built-in fallback.
+export const DEFAULT_TASK_THREE_STRUCTURE =
   "This topic presents two source documents with opposing viewpoints on a social issue. Structure the " +
   "response in exactly three parts, in this order, keeping the total length (title included) within the " +
   "required word range below, aiming for around 160-180 words overall:\n" +
@@ -166,22 +191,28 @@ const TASK_THREE_STRUCTURE =
   "\"En conclusion\"/\"Pour conclure\" for the conclusion.\n" +
   "Separate the title, the summary, and the opinion each with a blank line.";
 
-export function buildExamplePrompt({ task, taskType, level, topicPrompt }: GenerateModelAnswerParams): string {
+export function buildExamplePrompt({
+  task,
+  taskType,
+  level,
+  topicPrompt,
+  promptOverrides,
+}: GenerateModelAnswerParams): string {
   const isTaskThree = taskType === "TASK_3" && hasTaskThreeDocuments(topicPrompt);
   const structuralNote =
     taskType === "TASK_1"
-      ? TASK_ONE_EXAMPLE_STRUCTURE
+      ? promptOverrides?.task1Structure?.trim() || DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE
       : taskType === "TASK_2"
-        ? TASK_TWO_EXAMPLE_STRUCTURE
+        ? promptOverrides?.task2Structure?.trim() || DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE
         : isTaskThree
-          ? TASK_THREE_STRUCTURE
+          ? promptOverrides?.task3Structure?.trim() || DEFAULT_TASK_THREE_STRUCTURE
           : "";
   const levelDescription =
     taskType === "TASK_1"
-      ? TASK_ONE_LEVEL_DESCRIPTIONS[level]
+      ? promptOverrides?.task1Levels?.[level]?.trim() || DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS[level]
       : taskType === "TASK_2"
-        ? TASK_TWO_LEVEL_DESCRIPTIONS[level]
-        : TASK_THREE_LEVEL_DESCRIPTIONS[level];
+        ? promptOverrides?.task2Levels?.[level]?.trim() || DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS[level]
+        : promptOverrides?.task3Levels?.[level]?.trim() || DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS[level];
   const outputFormatNote = isTaskThree
     ? ", formatted exactly as described above"
     : taskType === "TASK_2"

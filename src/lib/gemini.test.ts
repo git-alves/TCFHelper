@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import {
+  DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS,
+  DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
+  buildExamplePrompt,
   generateModelAnswer,
   gradeEssayWithGemini,
 } from "./gemini";
@@ -38,9 +41,67 @@ const params = {
   topicPrompt: "Le télétravail est-il bénéfique ?",
 };
 
+const TASK_ONE_PARAMS = {
+  task: TASK_INSTRUCTIONS.TASK_1,
+  taskType: "TASK_1" as const,
+  level: "C1" as const,
+  topicPrompt: "Écrivez à votre voisin.",
+};
+
 function mockFetchOnce(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   global.fetch = vi.fn().mockResolvedValue(response as Response);
 }
+
+describe("buildExamplePrompt", () => {
+  it("uses the default structure and level description when no overrides are given", () => {
+    const prompt = buildExamplePrompt(params);
+
+    expect(prompt).toContain(DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE);
+  });
+
+  it("uses an override in place of its corresponding built-in default block", () => {
+    const prompt = buildExamplePrompt({
+      ...params,
+      promptOverrides: {
+        task2Structure: "CUSTOM TASK 2 STRUCTURE.",
+        task2Levels: { C1: "CUSTOM TASK 2 C1 LEVEL." },
+      },
+    });
+
+    expect(prompt).toContain("CUSTOM TASK 2 STRUCTURE.");
+    expect(prompt).toContain("CUSTOM TASK 2 C1 LEVEL.");
+    expect(prompt).not.toContain(DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE);
+  });
+
+  it("falls back to the built-in default for a level left null/blank", () => {
+    const prompt = buildExamplePrompt({
+      ...params,
+      promptOverrides: { task2Levels: { C1: "   " } },
+    });
+
+    expect(prompt).toBe(buildExamplePrompt(params));
+  });
+
+  it("never lets one task's override leak into another task's prompt", () => {
+    const prompt = buildExamplePrompt({
+      ...TASK_ONE_PARAMS,
+      promptOverrides: { task2Structure: "CUSTOM TASK 2 STRUCTURE.", task2Levels: { C1: "CUSTOM TASK 2 C1 LEVEL." } },
+    });
+
+    expect(prompt).not.toContain("CUSTOM TASK 2 STRUCTURE.");
+    expect(prompt).not.toContain("CUSTOM TASK 2 C1 LEVEL.");
+  });
+
+  it("picks the override for the requested level only, leaving other levels at their default", () => {
+    const promptC1 = buildExamplePrompt({
+      ...TASK_ONE_PARAMS,
+      promptOverrides: { task1Levels: { C2: "CUSTOM TASK 1 C2 LEVEL." } },
+    });
+
+    expect(promptC1).toContain(DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS.C1);
+    expect(promptC1).not.toContain("CUSTOM TASK 1 C2 LEVEL.");
+  });
+});
 
 describe("generateModelAnswer", () => {
   it("fails closed when GEMINI_API_KEY is not set", async () => {

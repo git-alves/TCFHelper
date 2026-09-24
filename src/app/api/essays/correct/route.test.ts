@@ -696,6 +696,32 @@ describe("POST /api/essays/correct", () => {
     expect(requestToGemini.systemPrompt).toContain("English");
   });
 
+  it("sends a stored admin prompt override through to the actual Gemini system prompt", async () => {
+    getPromptOverridesMock.mockResolvedValue({
+      correctionBase: "CUSTOM BASE PROMPT {{feedbackLanguage}}.",
+      correctionTask1: "CUSTOM TASK 1 PROMPT.",
+      correctionTask2: null,
+      correctionTask3Documents: null,
+      correctionTask3Documentless: null,
+    });
+    findUniqueMock.mockResolvedValue({
+      id: "topic_1",
+      taskType: "TASK_1",
+      source: "OFFICIAL_EXAM",
+      prompt: "Écrivez à votre voisin pour décrire votre quartier.",
+    });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicId: "topic_1",
+      content: VALID_TASK_1_CONTENT,
+    });
+
+    expect(response.status).toBe(200);
+    const requestToGemini = gradeEssayWithGeminiMock.mock.calls[0][0];
+    expect(requestToGemini.systemPrompt).toBe("CUSTOM BASE PROMPT English.\n\nCUSTOM TASK 1 PROMPT.");
+  });
+
   it("rejects an unsupported feedback locale before calling Gemini", async () => {
     const response = await post({
       taskType: "TASK_1",
