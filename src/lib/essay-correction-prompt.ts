@@ -6,7 +6,10 @@ import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 // somewhere in its text -- substituted for the actual feedback language
 // after the override-or-default choice is made, so both paths render
 // identically instead of only the hardcoded default ever interpolating it.
-const FEEDBACK_LANGUAGE_TOKEN = "{{feedbackLanguage}}";
+// Exported so the admin API route can reject a base-prompt override that
+// silently drops the only instruction to write feedback in the learner's
+// selected language, rather than duplicating this literal there.
+export const FEEDBACK_LANGUAGE_TOKEN = "{{feedbackLanguage}}";
 
 // Shared by every tache. Grounded in a hybrid grid: the official TCF Canada
 // Expression ecrite grid -- linguistic, pragmatic, and sociolinguistic

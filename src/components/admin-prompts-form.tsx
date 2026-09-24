@@ -1,7 +1,9 @@
 "use client";
 
-import { type FormEvent, useEffect, useId, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check as CheckIcon, Copy as CopyIcon } from "lucide-react";
+import { useAdminPromptsNavGuard } from "@/components/admin-prompts-nav-guard";
 import type { PromptOverrideDisplay, PromptOverrideKey } from "@/lib/prompt-overrides";
 
 interface AdminPromptsFormProps {
@@ -15,6 +17,9 @@ const INPUT_CLASSES =
 
 const ACTION_BUTTON_CLASSES =
   "rounded-full border border-black/[.15] px-3 py-1 text-xs font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:hover:bg-white/[.06]";
+
+const ICON_BUTTON_CLASSES =
+  "rounded-full border border-black/[.15] p-1.5 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
 function fieldsFromDisplay(display: PromptOverrideDisplay): FieldValues {
   return Object.fromEntries(
@@ -39,11 +44,46 @@ function PromptBlockField({
 }) {
   const fieldId = useId();
   const isOverridden = section.value !== null;
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function handleCopy() {
+    // The effective prompt is whichever text Gemini would actually receive
+    // right now: the edited/loaded field content, or the built-in default
+    // when the field is still blank -- never an empty clipboard.
+    const effectiveText = value.trim() || section.defaultValue;
+    try {
+      await navigator.clipboard.writeText(effectiveText);
+      setCopyStatus("copied");
+    } catch {
+      setCopyStatus("failed");
+    }
+    if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+    copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
+  }
 
   return (
     <fieldset className="flex flex-col gap-2 rounded-xl border border-black/[.1] p-4 dark:border-white/[.15]">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <legend className="px-1 text-sm font-semibold">{section.label}</legend>
+        <div className="flex items-center gap-2">
+          <legend className="px-1 text-sm font-semibold">{section.label}</legend>
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={`Copy the ${section.label} prompt`}
+            title="Copy prompt"
+            className={ICON_BUTTON_CLASSES}
+          >
+            {copyStatus === "copied" ? (
+              <CheckIcon aria-hidden="true" className="h-3.5 w-3.5" />
+            ) : (
+              <CopyIcon aria-hidden="true" className="h-3.5 w-3.5" />
+            )}
+          </button>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400" role="status" aria-live="polite">
+            {copyStatus === "copied" ? "Copied." : copyStatus === "failed" ? "Copy failed." : ""}
+          </span>
+        </div>
         <div className="flex items-center gap-2 text-xs">
           {isDirty && (
             <span className="font-medium text-amber-700 dark:text-amber-400">Unsaved changes</span>
@@ -88,6 +128,7 @@ function PromptBlockField({
 
 export function AdminPromptsForm({ initialDisplay }: AdminPromptsFormProps) {
   const router = useRouter();
+  const { setHasUnsavedChanges } = useAdminPromptsNavGuard();
   const [display, setDisplay] = useState(initialDisplay);
   // The last-saved (or initially loaded) value per field, so dirtiness can be
   // judged against what's actually persisted rather than re-derived from
@@ -115,6 +156,12 @@ export function AdminPromptsForm({ initialDisplay }: AdminPromptsFormProps) {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [hasUnsavedChanges]);
+
+  // Lets this page's own "Admin sections" nav links (rendered by the server
+  // page, outside this form) confirm before discarding an unsaved edit.
+  useEffect(() => {
+    setHasUnsavedChanges(hasUnsavedChanges);
+  }, [hasUnsavedChanges, setHasUnsavedChanges]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

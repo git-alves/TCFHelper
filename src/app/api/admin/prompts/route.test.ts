@@ -88,12 +88,52 @@ describe("PUT /api/admin/prompts", () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/prompts", {
         method: "PUT",
-        body: JSON.stringify({ correctionBase: "x".repeat(20_001) }),
+        body: JSON.stringify({ correctionTask1: "x".repeat(20_001) }),
       }),
     );
 
     expect(response.status).toBe(400);
     expect(updatePromptOverridesMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a nonblank correctionBase override missing the feedback-language token", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/prompts", {
+        method: "PUT",
+        body: JSON.stringify({ correctionBase: "You are a strict evaluator with no language instruction." }),
+      }),
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.error).toContain("{{feedbackLanguage}}");
+    expect(updatePromptOverridesMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a nonblank correctionBase override that includes the feedback-language token", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/prompts", {
+        method: "PUT",
+        body: JSON.stringify({ correctionBase: "Write feedback in {{feedbackLanguage}}." }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updatePromptOverridesMock).toHaveBeenCalledWith({
+      correctionBase: "Write feedback in {{feedbackLanguage}}.",
+    });
+  });
+
+  it("accepts clearing correctionBase to blank without requiring the feedback-language token", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/prompts", {
+        method: "PUT",
+        body: JSON.stringify({ correctionBase: "" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updatePromptOverridesMock).toHaveBeenCalledWith({ correctionBase: "" });
   });
 
   it("only forwards fields present in the request body, then returns the fresh display state", async () => {
