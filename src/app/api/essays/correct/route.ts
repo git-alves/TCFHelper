@@ -17,6 +17,7 @@ import {
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { freshEssayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
+import { getPromptOverrides, toCorrectionPromptOverrides } from "@/lib/prompt-overrides";
 import { APP_LOCALES, APP_LOCALE_LANGUAGE_NAMES, DEFAULT_APP_LOCALE } from "@/lib/app-locale";
 import {
   claimCorrection,
@@ -306,7 +307,13 @@ export async function POST(request: Request) {
     return correctionDailyLimitResponse(usageReservation.resetAt);
   }
 
-  const systemPrompt = buildCorrectionSystemPrompt(feedbackLanguage, taskType, resolvedTopicPrompt);
+  const promptOverrides = await getPromptOverrides();
+  const systemPrompt = buildCorrectionSystemPrompt(
+    feedbackLanguage,
+    taskType,
+    resolvedTopicPrompt,
+    toCorrectionPromptOverrides(promptOverrides),
+  );
   const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
   let shouldReleaseClaim = true;
   try {

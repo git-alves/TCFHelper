@@ -2,13 +2,20 @@ import type { TaskType } from "@prisma/client";
 import type { TaskDefinition } from "@/lib/tcf-tasks";
 import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 
+// The token an admin-edited base prompt (see prompt-overrides.ts) must keep
+// somewhere in its text -- substituted for the actual feedback language
+// after the override-or-default choice is made, so both paths render
+// identically instead of only the hardcoded default ever interpolating it.
+const FEEDBACK_LANGUAGE_TOKEN = "{{feedbackLanguage}}";
+
 // Shared by every tache. Grounded in a hybrid grid: the official TCF Canada
 // Expression ecrite grid -- linguistic, pragmatic, and sociolinguistic
 // competence, marked independently by two examiners in the real exam -- is
 // the main authority, refined by the conservative CEFR calibration rules
 // below so this tool never inflates a level the real exam wouldn't award.
-function buildBaseCorrectionPrompt(feedbackLanguage: string): string {
-  return `You are a strict, experienced, and conservative evaluator of TCF Canada written expression practice.
+// Admin-editable as a whole block from /admin/prompts (see
+// prompt-overrides.ts); this is only ever the built-in fallback.
+export const DEFAULT_CORRECTION_BASE_PROMPT = `You are a strict, experienced, and conservative evaluator of TCF Canada written expression practice.
 
 Your purpose is to assess the student's ORIGINAL French writing as accurately as possible, identify errors, estimate the student's CEFR level honestly, and provide useful preparation feedback for the TCF Canada.
 
@@ -142,10 +149,11 @@ FEEDBACK
 
 Be constructive and encouraging, but never generous merely to encourage the student. Prioritize: 1. accuracy; 2. realistic CEFR assessment; 3. useful feedback; 4. encouragement.
 
-Write all feedback in ${feedbackLanguage}. The corrected version and model version must remain in French.`;
-}
+Write all feedback in ${FEEDBACK_LANGUAGE_TOKEN}. The corrected version and model version must remain in French.`;
 
-const TASK_SPECIFIC_CORRECTION_PROMPTS: Record<"TASK_1" | "TASK_2", string> = {
+// Admin-editable individually as the "Tache 1" / "Tache 2" blocks from
+// /admin/prompts; this map is only ever the built-in fallback.
+export const DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS: Record<"TASK_1" | "TASK_2", string> = {
   TASK_1: `TASK-SPECIFIC INSTRUCTIONS -- TACHE 1
 
 You are now evaluating a TCF Canada Written Expression Tache 1.
@@ -253,8 +261,9 @@ If the student is C1, identify the main limitation preventing C2.
 For C2, identify the strongest evidence supporting C2 and any remaining limitations without inventing a higher level.`;
 
 // Used when the topic contains two opposing source documents (see
-// hasTaskThreeDocuments in task-three-topic.ts).
-const TASK_THREE_DOCUMENTS_PROMPT = `TASK-SPECIFIC INSTRUCTIONS -- TACHE 3
+// hasTaskThreeDocuments in task-three-topic.ts). Admin-editable as a whole
+// block from /admin/prompts; this is only ever the built-in fallback.
+export const DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT = `TASK-SPECIFIC INSTRUCTIONS -- TACHE 3
 
 Tache 3 requires the student to work with the viewpoints or information presented in the task documents and produce a coherent, developed response.
 
@@ -295,7 +304,9 @@ ${TASK_THREE_CEFR_BLOCKER}`;
 // not the documents variant with a caveat prepended, so nothing in it ever
 // asks the grader to assess document comprehension, source-document
 // comparison, or synthesis of documents that were never given.
-const TASK_THREE_DOCUMENTLESS_PROMPT = `TASK-SPECIFIC INSTRUCTIONS -- TACHE 3 (no source documents provided)
+// Admin-editable as a whole block from /admin/prompts; this is only ever
+// the built-in fallback.
+export const DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT = `TASK-SPECIFIC INSTRUCTIONS -- TACHE 3 (no source documents provided)
 
 This topic is free text and does not present two opposing source documents. Tache 3 here still requires the student to analyze a social issue by presenting more than one point of view and produce a coherent, developed response defending their own position -- but nothing below should assess document comprehension, source-document comparison, or synthesis of two documents, since none exist for this submission.
 
@@ -327,6 +338,17 @@ Separate: A. Understanding the issue; B. Comparing/synthesizing viewpoints; C. D
 
 ${TASK_THREE_CEFR_BLOCKER}`;
 
+// Admin overrides for each of the 5 independently-editable blocks (see
+// /admin/prompts and prompt-overrides.ts). A field left null/blank falls
+// back to that block's DEFAULT_* constant above.
+export interface CorrectionPromptOverrides {
+  base?: string | null;
+  task1?: string | null;
+  task2?: string | null;
+  task3Documents?: string | null;
+  task3Documentless?: string | null;
+}
+
 // The single source of truth for Gemini correction instructions, so schema
 // and UI changes cannot silently drift the grading criteria. Composed as a
 // shared base (CEFR calibration, error/scoring/output rules) plus a
@@ -337,15 +359,26 @@ export function buildCorrectionSystemPrompt(
   feedbackLanguage: string,
   taskType: TaskType,
   topicPrompt: string,
+  overrides?: CorrectionPromptOverrides,
 ): string {
+  // The substitution runs on whichever text was chosen -- default or
+  // admin-edited -- so an override author only needs to keep the token
+  // somewhere in their text, not reimplement the interpolation.
+  const basePrompt = (overrides?.base?.trim() || DEFAULT_CORRECTION_BASE_PROMPT).replaceAll(
+    FEEDBACK_LANGUAGE_TOKEN,
+    feedbackLanguage,
+  );
+
   const taskSpecificPrompt =
     taskType === "TASK_3"
       ? hasTaskThreeDocuments(topicPrompt)
-        ? TASK_THREE_DOCUMENTS_PROMPT
-        : TASK_THREE_DOCUMENTLESS_PROMPT
-      : TASK_SPECIFIC_CORRECTION_PROMPTS[taskType];
+        ? overrides?.task3Documents?.trim() || DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT
+        : overrides?.task3Documentless?.trim() || DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT
+      : taskType === "TASK_1"
+        ? overrides?.task1?.trim() || DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_1
+        : overrides?.task2?.trim() || DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_2;
 
-  return `${buildBaseCorrectionPrompt(feedbackLanguage)}
+  return `${basePrompt}
 
 ${taskSpecificPrompt}`;
 }

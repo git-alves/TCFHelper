@@ -601,6 +601,19 @@ model AppConfig {
   updatedAt            DateTime @updatedAt
 }
 
+/// One row per admin-editable correction prompt block (see
+/// src/lib/prompt-overrides.ts and /admin/prompts). `key` is one of a fixed,
+/// application-defined set (PROMPT_OVERRIDE_KEYS) -- not a DB enum, so a new
+/// editable block never needs a schema migration, only an application-code
+/// addition. A missing row for a given key means "use the built-in default"
+/// (see the DEFAULT_* constants in essay-correction-prompt.ts); this table
+/// only ever holds the keys an admin has actually overridden.
+model PromptOverride {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 /// A learner-authored support message. senderEmail is intentionally a
 /// submission-time snapshot: the owner can answer the address the learner saw
 /// in "Send as", even if the account profile changes before triage.

@@ -86,6 +86,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260910100000_add_hunspell_spell_check_failed_event");
   });
 
+  it("allows the additive PromptOverride key/value table", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260924100000_add_prompt_override");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

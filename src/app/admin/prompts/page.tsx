@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AdminApiKeysForm } from "@/components/admin-api-keys-form";
+import { AdminPromptsForm } from "@/components/admin-prompts-form";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
-import { getAppConfigDisplay } from "@/lib/app-config";
+import { getPromptOverridesDisplay } from "@/lib/prompt-overrides";
 
-export default async function AdminApiKeysPage() {
+export default async function AdminPromptsPage() {
   try {
     if (!(await getCurrentAdminUser())) notFound();
   } catch (error) {
@@ -12,17 +12,17 @@ export default async function AdminApiKeysPage() {
     throw error;
   }
 
-  const display = await getAppConfigDisplay();
+  const display = await getPromptOverridesDisplay();
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Admin</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">API Keys</h1>
+          <h1 className="mt-1 text-3xl font-semibold tracking-tight">Prompts</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-            Override the Gemini API key and model used for essay correction and for example generation,
-            independently, without an env var change or a redeploy.
+            Override the wording of the essay-correction prompt, block by block, without an env var change or a
+            redeploy. Clear a block to revert it to the built-in default shown as its placeholder.
           </p>
         </div>
         <nav aria-label="Admin sections" className="flex flex-wrap gap-3 text-sm font-medium">
@@ -51,15 +51,15 @@ export default async function AdminApiKeysPage() {
             Operational log
           </Link>
           <Link
-            href="/admin/prompts"
+            href="/admin/api-keys"
             className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
           >
-            Prompts
+            API Keys
           </Link>
         </nav>
       </div>
 
-      <AdminApiKeysForm initialDisplay={display} />
+      <AdminPromptsForm initialDisplay={display} />
     </main>
   );
 }
