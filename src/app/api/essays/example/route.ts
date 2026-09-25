@@ -120,15 +120,27 @@ export async function POST(request: Request) {
   }
 
   const typedLevel = level as ExampleCefrLevel;
+  // Admin-panel overrides (see src/lib/app-config.ts), layered over each
+  // provider's own env-var defaults -- fetched before the cache lookup (a
+  // plain DB read, not a provider call, so this doesn't weaken the
+  // during-an-outage cache tolerance below) and reused for the cache key,
+  // the availability check, and the actual call.
+  const appConfig = await getAppConfig();
+  const exampleProviderId = resolveExampleProviderId(appConfig.exampleProvider);
+  const exampleProvider = getExampleProvider(exampleProviderId);
+  const exampleOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
+
   // Loaded before the cache lookup, and folded into the cache key below, so
-  // an admin edit to a prompt block (/admin/prompts) invalidates any
-  // already-cached answer generated under the old wording instead of
-  // silently continuing to serve it.
+  // an admin edit to a prompt block (/admin/prompts) -- or switching the
+  // selected AI Provider/model on /admin/api-keys -- invalidates any
+  // already-cached answer generated under the old wording or a different
+  // provider, instead of silently continuing to serve it.
   const examplePromptOverrides = toExamplePromptOverrides(await getPromptOverrides());
   const topicHash = hashExampleTopic(
     taskType,
     resolvedTopicPrompt,
     examplePromptOverridesFingerprint(examplePromptOverrides),
+    `${exampleProviderId}:${appConfig.exampleModel ?? ""}`,
   );
   let cached: { content: string } | null;
   try {
@@ -143,14 +155,6 @@ export async function POST(request: Request) {
   if (cached) {
     return NextResponse.json({ text: cached.content, cached: true }, { headers: NO_STORE_HEADERS });
   }
-
-  // Admin-panel overrides (see src/lib/app-config.ts), layered over each
-  // provider's own env-var defaults -- fetched once and reused for both the
-  // availability check below and the actual call.
-  const appConfig = await getAppConfig();
-  const exampleProviderId = resolveExampleProviderId(appConfig.exampleProvider);
-  const exampleProvider = getExampleProvider(exampleProviderId);
-  const exampleOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
 
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.

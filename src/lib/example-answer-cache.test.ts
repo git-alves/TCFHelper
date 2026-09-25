@@ -59,8 +59,18 @@ beforeEach(() => {
 
 describe("hashExampleTopic", () => {
   it("changes when the prompt-overrides fingerprint changes, even for the same task/topic", () => {
-    const withDefaultPrompt = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "default-fingerprint");
-    const withEditedPrompt = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "edited-fingerprint");
+    const withDefaultPrompt = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "default-fingerprint",
+      "gemini:",
+    );
+    const withEditedPrompt = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "edited-fingerprint",
+      "gemini:",
+    );
 
     // This is the actual regression this guards: an admin editing an
     // example-generation prompt block must invalidate any answer already
@@ -68,9 +78,40 @@ describe("hashExampleTopic", () => {
     expect(withEditedPrompt).not.toBe(withDefaultPrompt);
   });
 
-  it("is stable for the same task/topic/fingerprint", () => {
-    const first = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "same-fingerprint");
-    const second = hashExampleTopic("TASK_2", "Le télétravail est-il bénéfique ?", "same-fingerprint");
+  it("changes when the provider fingerprint changes, even for the same task/topic/prompt", () => {
+    const withGemini = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "same-fingerprint",
+      "gemini:",
+    );
+    const withOpenRouter = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "same-fingerprint",
+      "openrouter:qwen/qwen3-30b-a3b",
+    );
+
+    // The actual regression this guards: switching the admin's selected AI
+    // Provider (or its model override) on /admin/api-keys must invalidate
+    // any answer already cached under the previously selected provider, not
+    // keep silently serving it.
+    expect(withOpenRouter).not.toBe(withGemini);
+  });
+
+  it("is stable for the same task/topic/fingerprint/provider", () => {
+    const first = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "same-fingerprint",
+      "gemini:",
+    );
+    const second = hashExampleTopic(
+      "TASK_2",
+      "Le télétravail est-il bénéfique ?",
+      "same-fingerprint",
+      "gemini:",
+    );
 
     expect(first).toBe(second);
   });
