@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "eval:corrections": "NODE_OPTIONS='--conditions react-server' tsx scripts/evaluate-corrections.ts",
     "verify:prisma-engine": "node scripts/verify-prisma-engine.mjs .next/server",
     "prune:prisma-engine": "node scripts/prune-local-prisma-engine.mjs",
     "postinstall": "prisma generate",

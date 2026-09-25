@@ -42,8 +42,8 @@ Create a versioned, access-controlled fixture set; do not commit identifiable le
 
 | Field | Purpose |
 | --- | --- |
-| `id`, `taskType`, `topicPrompt`, `wordCount`, `essay` | Reproduces the exact grading context. |
-| `reference.estimatedLevel`, `reference.conservativeLevel` | Adjudicated labels for the original writing, kept distinct. |
+| `id`, `taskType`, `topicPrompt`, `essay` | Reproduces the exact grading context; the evaluator derives word count from the original essay. |
+| `expected.estimatedLevel`, `expected.conservativeLevel` | Adjudicated labels for the original writing, kept distinct. |
 | `reference.confidence`, `rationale`, `evidence` | Makes a disagreement reviewable rather than a black-box label. |
 | `expectedTaskFulfillment`, `knownCorrectionRisks` | Separates CEFR calibration from a wrong-task or meaning-changing-correction failure. |
 | `source`, `consent/redaction status`, `setVersion` | Preserves provenance and prevents accidental use of private data. |
@@ -61,6 +61,20 @@ For every candidate, call the same production prompt builder, provider adapter, 
 - temperature/other decoding settings, schema version, and application commit;
 - timestamp, request completion/error, latency, token/cost data when the provider returns it; and
 - raw response stored only in the restricted evaluation store.
+
+The implemented runner is `npm run eval:corrections`. Create a private fixture from `docs/correction-eval-dataset.example.json` (never commit learner work), then compare candidates and the two prompt variants with one command:
+
+```bash
+npm run eval:corrections -- \
+  --dataset /secure/path/correction-eval.json \
+  --candidate gemini:gemini-3.5-flash-lite \
+  --candidate openrouter:openai/gpt-5-mini \
+  --prompt baseline \
+  --prompt calibration-review \
+  --output /secure/path/correction-eval-report.json
+```
+
+Gemini candidates use `GEMINI_API_KEY`; OpenRouter candidates use `OPENROUTER_API_KEY`. The report exposes exact secure-level accuracy, invalid responses, under/over-classifications, and the full confusion matrix, including direct `C2 -> C1` and `C1 -> B2` counts.
 
 Run each case at least three times if the provider is non-deterministic. Report both the per-run result and the modal result; a model that varies by a CEFR band is not suitable merely because one run looks good. Keep failed structured responses in the denominator.
 
@@ -90,6 +104,8 @@ Use the pilot only to eliminate weak candidates and tune the prompt. Lock the ch
 
 ## Review-prompt option
 
+The runner also includes `calibration-review`, a single-pass prompt variant that asks the same model to audit adjacent CEFR bands silently before returning the existing JSON. It is a low-cost prompt experiment, not an independent review: retain it only if it improves the unseen holdout without worsening a known boundary regression.
+
 An independent reviewer can be useful, but only under a disciplined design:
 
 - Give the reviewer the task, topic, original essay, and rubric; do **not** show the first model's level or rationale, which would anchor its judgment.
@@ -102,7 +118,7 @@ If a later production trial is justified, invoke the reviewer only for pre-defin
 ## Delivery plan
 
 1. **Prepare labels.** Recruit reviewers, define the rubric sheet, create and adjudicate the 54-case pilot, then calculate reviewer agreement. Owner: product + qualified reviewers.
-2. **Build a non-production evaluator.** Add a protected CLI/job that reads the fixture, calls a named provider/model override, validates via `freshEssayFeedbackSchema`, and writes a CSV/JSON scorecard plus confusion matrix. It must never write `Essay`/`Feedback` records or use production learner data. Owner: engineering.
+2. **Run the non-production evaluator.** The protected `eval:corrections` CLI reads the fixture, calls a named provider/model override, validates via `freshEssayFeedbackSchema`, and writes a JSON scorecard plus confusion matrix. It never writes `Essay`/`Feedback` records or reads production learner data. Owner: engineering.
 3. **Benchmark and calibrate.** Run baseline, anchored-prompt, and selected model candidates. Inspect all primary-boundary failures with the reviewers, then make at most one prompt revision before locking the candidate.
 4. **Confirm.** Expand/finalize the 108-case release set and run the locked candidate. Publish the scorecard and decision in the repository without raw private essays.
 5. **Roll out safely.** Change the admin-configured provider/model, monitor the same metrics on consented or redacted audit samples, and retain the former configuration for rollback. A review-prompt production experiment is a separate decision after this step.
