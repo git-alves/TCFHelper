@@ -18,6 +18,10 @@ The planned [Practice exercises specification](docs/practice-exercises.md)
 defines the separate, curated trainer for task-specific micro-skills; it does
 not replace the full-task writing workspace.
 
+The [correction model evaluation specification](docs/correction-model-evaluation.md)
+defines how provider/model changes and CEFR-prompt revisions are benchmarked
+against adjudicated writing samples before they affect learners.
+
 ## Stack
 
 - Next.js 16 (App Router) + TypeScript + Tailwind CSS 4
