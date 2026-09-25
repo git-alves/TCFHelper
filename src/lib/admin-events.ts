@@ -55,7 +55,14 @@ export const ADMIN_EVENT_REASON_CODES = [
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
-export const ADMIN_EVENT_PROVIDERS = ["gemini", "deepl", "unofficial", "deepl_or_unofficial", "hunspell"] as const;
+export const ADMIN_EVENT_PROVIDERS = [
+  "gemini",
+  "openrouter",
+  "deepl",
+  "unofficial",
+  "deepl_or_unofficial",
+  "hunspell",
+] as const;
 export const ADMIN_EVENT_QUOTA_WINDOWS = ["minute", "day", "month"] as const;
 export const ADMIN_EVENT_BROWSER_FAMILIES = [
   "Chrome",
@@ -319,9 +326,27 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         hasNoAuthenticationContext(input)
       );
     case "CORRECTION_PROVIDER_FAILED":
+      return (
+        (input.provider === "gemini" || input.provider === "openrouter") &&
+        input.httpStatus !== undefined &&
+        hasNoQuotaSnapshot(input) &&
+        input.reasonCode !== undefined &&
+        isMember(
+          [
+            "not_configured",
+            "rate_limited",
+            "transport_error",
+            "upstream_http_error",
+            "invalid_response",
+            "provider_unavailable",
+          ] as const,
+          input.reasonCode,
+        ) &&
+        hasNoAuthenticationContext(input)
+      );
     case "EXAMPLE_PROVIDER_FAILED":
       return (
-        input.provider === "gemini" &&
+        (input.provider === "gemini" || input.provider === "openrouter") &&
         input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&

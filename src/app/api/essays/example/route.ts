@@ -4,7 +4,12 @@ import { TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
-import { getAppConfig } from "@/lib/app-config";
+import { getAppConfig, resolveExampleProviderId } from "@/lib/app-config";
+import { getExampleProvider } from "@/lib/example-provider-registry";
+import {
+  ExampleProviderRequestError,
+  ExampleProviderTransportError,
+} from "@/lib/example-provider";
 import {
   examplePromptOverridesFingerprint,
   getPromptOverrides,
@@ -12,7 +17,6 @@ import {
 } from "@/lib/prompt-overrides";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import type { ExampleCefrLevel } from "@/lib/gemini";
-import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
 import {
   cacheExample,
   claimExampleGeneration,
@@ -22,7 +26,6 @@ import {
   releaseExampleGenerationLease,
 } from "@/lib/example-answer-cache";
 import {
-  hasConfiguredModelAnswerProvider,
   ModelAnswerInvalidOutputError,
   ModelAnswerNotConfiguredError,
   ModelAnswerRateLimitedError,
@@ -60,13 +63,13 @@ const requestSchema = z
 // request content.
 function classifyExampleGenerationFailure(error: unknown): AdminEventReasonCode {
   if (error instanceof ModelAnswerInvalidOutputError) return "invalid_response";
-  if (error instanceof GeminiRequestError) return "upstream_http_error";
-  if (error instanceof GeminiTransportError) return "transport_error";
+  if (error instanceof ExampleProviderRequestError) return "upstream_http_error";
+  if (error instanceof ExampleProviderTransportError) return "transport_error";
   return "provider_unavailable";
 }
 
-function boundedGeminiHttpStatus(error: unknown): number | undefined {
-  if (!(error instanceof GeminiRequestError)) return undefined;
+function boundedExampleProviderHttpStatus(error: unknown): number | undefined {
+  if (!(error instanceof ExampleProviderRequestError)) return undefined;
   return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
     ? error.status
     : undefined;
@@ -117,15 +120,27 @@ export async function POST(request: Request) {
   }
 
   const typedLevel = level as ExampleCefrLevel;
+  // Admin-panel overrides (see src/lib/app-config.ts), layered over each
+  // provider's own env-var defaults -- fetched before the cache lookup (a
+  // plain DB read, not a provider call, so this doesn't weaken the
+  // during-an-outage cache tolerance below) and reused for the cache key,
+  // the availability check, and the actual call.
+  const appConfig = await getAppConfig();
+  const exampleProviderId = resolveExampleProviderId(appConfig.exampleProvider);
+  const exampleProvider = getExampleProvider(exampleProviderId);
+  const exampleOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
+
   // Loaded before the cache lookup, and folded into the cache key below, so
-  // an admin edit to a prompt block (/admin/prompts) invalidates any
-  // already-cached answer generated under the old wording instead of
-  // silently continuing to serve it.
+  // an admin edit to a prompt block (/admin/prompts) -- or switching the
+  // selected AI Provider/model on /admin/api-keys -- invalidates any
+  // already-cached answer generated under the old wording or a different
+  // provider, instead of silently continuing to serve it.
   const examplePromptOverrides = toExamplePromptOverrides(await getPromptOverrides());
   const topicHash = hashExampleTopic(
     taskType,
     resolvedTopicPrompt,
     examplePromptOverridesFingerprint(examplePromptOverrides),
+    `${exampleProviderId}:${appConfig.exampleModel ?? ""}`,
   );
   let cached: { content: string } | null;
   try {
@@ -141,19 +156,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ text: cached.content, cached: true }, { headers: NO_STORE_HEADERS });
   }
 
-  // Admin-panel overrides (see src/lib/app-config.ts), layered over the
-  // GEMINI_API_KEY/GEMINI_MODEL env vars -- fetched once and reused for both
-  // the availability check below and the actual call.
-  const appConfig = await getAppConfig();
-  const geminiOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
-
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.
-  if (!hasConfiguredModelAnswerProvider(geminiOverrides)) {
+  if (!exampleProvider.hasConfiguredCredentials(exampleOverrides)) {
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
-      provider: "gemini",
+      provider: exampleProviderId,
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -234,6 +243,7 @@ export async function POST(request: Request) {
 
   try {
     const generated = await generatePreferredModelAnswer(
+      exampleProvider,
       {
         task,
         taskType,
@@ -241,7 +251,7 @@ export async function POST(request: Request) {
         topicPrompt: resolvedTopicPrompt,
         promptOverrides: examplePromptOverrides,
       },
-      geminiOverrides,
+      exampleOverrides,
     );
     // The fixed provider name remains in the cache metadata and logs so each
     // saved example has a clear provenance record.
@@ -283,7 +293,7 @@ export async function POST(request: Request) {
       await recordAdminEvent({
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
-        provider: "gemini",
+        provider: exampleProviderId,
         reasonCode: "not_configured",
         httpStatus: 503,
       });
@@ -297,7 +307,7 @@ export async function POST(request: Request) {
       await recordAdminEvent({
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
-        provider: "gemini",
+        provider: exampleProviderId,
         reasonCode: "rate_limited",
         httpStatus: 429,
       });
@@ -317,9 +327,9 @@ export async function POST(request: Request) {
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
-      provider: "gemini",
+      provider: exampleProviderId,
       reasonCode,
-      httpStatus: boundedGeminiHttpStatus(error) ?? 502,
+      httpStatus: boundedExampleProviderHttpStatus(error) ?? 502,
     });
     console.error("Example generation failed:", reasonCode);
     return NextResponse.json(

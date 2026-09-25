@@ -352,6 +352,23 @@ export interface CorrectionPromptOverrides {
   task3Documentless?: string | null;
 }
 
+// A prompt variant is deliberately an explicit evaluation input rather than
+// an implicit change to the production prompt. This lets an evaluator compare
+// a calibration/review instruction against the current prompt on exactly the
+// same labelled essays before it is exposed to learners.
+export const CORRECTION_PROMPT_VARIANTS = ["baseline", "calibration-review"] as const;
+export type CorrectionPromptVariant = (typeof CORRECTION_PROMPT_VARIANTS)[number];
+
+const CALIBRATION_REVIEW_PROMPT = `CALIBRATION REVIEW BEFORE FINALIZING
+
+Before producing the JSON response, independently review your provisional CEFR assessment using ONLY the student's original writing. Do this review silently; return only the requested JSON.
+
+1. List internally the sustained evidence and the recurring limitations for the two adjacent bands around the provisional secure level.
+2. Challenge the provisional result: ask whether the text genuinely demonstrates the higher band throughout, or only isolated features of it.
+3. Check that task completion, fluency, vocabulary sophistication, and CEFR control have not been conflated.
+4. Confirm that every level claim in the rationale/evidence/blocker is supported by a concrete feature of the original writing.
+5. Only then set estimatedLevel and conservativeLevel. Do not change a level merely to be encouraging or severe; choose the level supported by this calibration review.`;
+
 // The single source of truth for Gemini correction instructions, so schema
 // and UI changes cannot silently drift the grading criteria. Composed as a
 // shared base (CEFR calibration, error/scoring/output rules) plus a
@@ -363,6 +380,7 @@ export function buildCorrectionSystemPrompt(
   taskType: TaskType,
   topicPrompt: string,
   overrides?: CorrectionPromptOverrides,
+  variant: CorrectionPromptVariant = "baseline",
 ): string {
   // The substitution runs on whichever text was chosen -- default or
   // admin-edited -- so an override author only needs to keep the token
@@ -383,7 +401,7 @@ export function buildCorrectionSystemPrompt(
 
   return `${basePrompt}
 
-${taskSpecificPrompt}`;
+${taskSpecificPrompt}${variant === "calibration-review" ? `\n\n${CALIBRATION_REVIEW_PROMPT}` : ""}`;
 }
 
 export interface CorrectionUserPromptParams {

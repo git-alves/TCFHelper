@@ -1,0 +1,14 @@
+[
+  {
+    "id": "replace-with-adjudicated-case-001",
+    "taskType": "TASK_2",
+    "topicPrompt": "Replace with the exact topic shown to the learner.",
+    "essay": "Replace with the original, uncorrected learner essay. Do not use a corrected version or a generated model answer.",
+    "feedbackLanguage": "English",
+    "expected": {
+      "conservativeLevel": "C1",
+      "estimatedLevel": "C2"
+    },
+    "notes": "Two qualified reviewers should independently set this label and resolve disagreements before this case becomes a benchmark. Do not put this template case into a real run."
+  }
+]

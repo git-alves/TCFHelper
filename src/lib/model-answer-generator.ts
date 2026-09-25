@@ -1,22 +1,17 @@
+import type { GenerateModelAnswerParams } from "@/lib/gemini";
 import {
-  GeminiNotConfiguredError,
-  GeminiRateLimitedError,
-  generateModelAnswer,
-  hasConfiguredGemini,
-  type GenerateModelAnswerParams,
-  type GeminiOverrides,
-} from "@/lib/gemini";
+  ExampleProviderNotConfiguredError,
+  ExampleProviderRateLimitedError,
+  type ExampleProvider,
+  type ExampleProviderId,
+  type ExampleProviderOverrides,
+} from "@/lib/example-provider";
 
-export type ModelAnswerProvider = "gemini";
+export type ModelAnswerProvider = ExampleProviderId;
 
 export class ModelAnswerNotConfiguredError extends Error {}
 export class ModelAnswerRateLimitedError extends Error {}
 export class ModelAnswerInvalidOutputError extends Error {}
-
-/** True when the configured Gemini model can be called. */
-export function hasConfiguredModelAnswerProvider(overrides?: GeminiOverrides) {
-  return hasConfiguredGemini(overrides);
-}
 
 // Free-tier models frequently miss an exact word target by a modest margin
 // even when explicitly instructed, so a hard cutoff at the task's boundary
@@ -39,18 +34,27 @@ function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
   return text;
 }
 
+/**
+ * Generates a length-validated example answer through the given
+ * ExampleProvider (see example-provider-registry.ts for how the caller
+ * resolves which one to use). The length-tolerance rule applies uniformly
+ * regardless of provider, so it stays here rather than duplicated in each
+ * adapter.
+ */
 export async function generatePreferredModelAnswer(
+  provider: ExampleProvider,
   params: GenerateModelAnswerParams,
-  overrides?: GeminiOverrides,
+  overrides?: ExampleProviderOverrides,
 ): Promise<{ text: string; provider: ModelAnswerProvider }> {
   try {
-    return { text: validateAnswerLength(await generateModelAnswer(params, overrides), params), provider: "gemini" };
+    const text = validateAnswerLength(await provider.generateExample(params, overrides), params);
+    return { text, provider: provider.id };
   } catch (error) {
-    if (error instanceof GeminiNotConfiguredError) {
-      throw new ModelAnswerNotConfiguredError("Gemini is not configured.");
+    if (error instanceof ExampleProviderNotConfiguredError) {
+      throw new ModelAnswerNotConfiguredError(error.message);
     }
-    if (error instanceof GeminiRateLimitedError) {
-      throw new ModelAnswerRateLimitedError("Gemini is rate limited.");
+    if (error instanceof ExampleProviderRateLimitedError) {
+      throw new ModelAnswerRateLimitedError(error.message);
     }
     throw error;
   }

@@ -83,6 +83,15 @@ describe("buildCorrectionSystemPrompt", () => {
     expect(prompt).toContain("occasional evidence still supports a C2 estimatedLevel");
   });
 
+  it("keeps calibration review as an opt-in variant for a controlled prompt comparison", () => {
+    const baseline = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.");
+    const reviewed = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.", undefined, "calibration-review");
+
+    expect(baseline).not.toContain("CALIBRATION REVIEW BEFORE FINALIZING");
+    expect(reviewed).toContain("CALIBRATION REVIEW BEFORE FINALIZING");
+    expect(reviewed).toContain("return only the requested JSON");
+  });
+
   describe("admin prompt overrides", () => {
     it("uses each override in place of its corresponding built-in default block", () => {
       const prompt = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.", {

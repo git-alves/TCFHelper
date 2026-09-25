@@ -25,9 +25,11 @@ const { getAppConfig, updateAppConfig, maskSecret, getAppConfigDisplay, DEFAULT_
 
 const EMPTY_ROW = {
   id: "singleton",
+  correctionProvider: null,
   correctionApiKey: null,
   correctionModel: null,
   correctionDailyLimit: null,
+  exampleProvider: null,
   exampleApiKey: null,
   exampleModel: null,
   exampleDailyLimit: null,
@@ -37,6 +39,9 @@ const EMPTY_ROW = {
 const originalGeminiApiKey = process.env.GEMINI_API_KEY;
 const originalGeminiModel = process.env.GEMINI_MODEL;
 const originalGeminiCorrectionModel = process.env.GEMINI_CORRECTION_MODEL;
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
+const originalOpenRouterCorrectionModel = process.env.OPENROUTER_CORRECTION_MODEL;
+const originalOpenRouterExampleModel = process.env.OPENROUTER_EXAMPLE_MODEL;
 
 beforeEach(() => {
   findUniqueMock.mockReset();
@@ -46,6 +51,9 @@ beforeEach(() => {
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.GEMINI_CORRECTION_MODEL;
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENROUTER_CORRECTION_MODEL;
+  delete process.env.OPENROUTER_EXAMPLE_MODEL;
 });
 
 afterAll(() => {
@@ -55,6 +63,12 @@ afterAll(() => {
   else process.env.GEMINI_MODEL = originalGeminiModel;
   if (originalGeminiCorrectionModel === undefined) delete process.env.GEMINI_CORRECTION_MODEL;
   else process.env.GEMINI_CORRECTION_MODEL = originalGeminiCorrectionModel;
+  if (originalOpenRouterApiKey === undefined) delete process.env.OPENROUTER_API_KEY;
+  else process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
+  if (originalOpenRouterCorrectionModel === undefined) delete process.env.OPENROUTER_CORRECTION_MODEL;
+  else process.env.OPENROUTER_CORRECTION_MODEL = originalOpenRouterCorrectionModel;
+  if (originalOpenRouterExampleModel === undefined) delete process.env.OPENROUTER_EXAMPLE_MODEL;
+  else process.env.OPENROUTER_EXAMPLE_MODEL = originalOpenRouterExampleModel;
 });
 
 describe("getAppConfig", () => {
@@ -62,9 +76,11 @@ describe("getAppConfig", () => {
     findUniqueMock.mockResolvedValue(null);
 
     await expect(getAppConfig()).resolves.toEqual({
+      correctionProvider: null,
       correctionApiKey: null,
       correctionModel: null,
       correctionDailyLimit: null,
+      exampleProvider: null,
       exampleApiKey: null,
       exampleModel: null,
       exampleDailyLimit: null,
@@ -74,15 +90,18 @@ describe("getAppConfig", () => {
   it("returns the stored row's fields", async () => {
     findUniqueMock.mockResolvedValue({
       ...EMPTY_ROW,
+      correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
       correctionDailyLimit: 250,
     });
 
     await expect(getAppConfig()).resolves.toEqual({
+      correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
       correctionDailyLimit: 250,
+      exampleProvider: null,
       exampleApiKey: null,
       exampleModel: null,
       exampleDailyLimit: null,
@@ -185,6 +204,7 @@ describe("getAppConfigDisplay", () => {
         dailyLimitIsDefault: true,
         requestsToday: 0,
       },
+      correctionProvider: "gemini",
       example: {
         apiKeySet: false,
         apiKeyMasked: null,
@@ -196,6 +216,7 @@ describe("getAppConfigDisplay", () => {
         dailyLimitIsDefault: true,
         requestsToday: 0,
       },
+      exampleProvider: "gemini",
     });
   });
 
@@ -246,5 +267,76 @@ describe("getAppConfigDisplay", () => {
 
     expect(display.correction.requestsToday).toBe(42);
     expect(display.example.requestsToday).toBe(7);
+  });
+
+  it("defaults an unset or unrecognized correction provider to gemini", async () => {
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: null });
+    expect((await getAppConfigDisplay()).correctionProvider).toBe("gemini");
+
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "anthropic" });
+    expect((await getAppConfigDisplay()).correctionProvider).toBe("gemini");
+  });
+
+  it("reports the OpenRouter env vars, not Gemini's, once openrouter is selected", async () => {
+    process.env.GEMINI_API_KEY = "gemini-env-key";
+    process.env.GEMINI_CORRECTION_MODEL = "gemini-custom-correction";
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    process.env.OPENROUTER_CORRECTION_MODEL = "qwen/qwen3-30b-a3b";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correctionProvider).toBe("openrouter");
+    expect(display.correction.apiKeyFromEnv).toBe(true);
+    expect(display.correction.modelDefault).toBe("qwen/qwen3-30b-a3b");
+  });
+
+  it("reports no default model for openrouter when OPENROUTER_CORRECTION_MODEL is unset", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correction.modelDefault).toBe("");
+  });
+
+  it("defaults an unset or unrecognized example provider to gemini", async () => {
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, exampleProvider: null });
+    expect((await getAppConfigDisplay()).exampleProvider).toBe("gemini");
+
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, exampleProvider: "anthropic" });
+    expect((await getAppConfigDisplay()).exampleProvider).toBe("gemini");
+  });
+
+  it("reports the OpenRouter env vars, not Gemini's, once openrouter is selected for examples", async () => {
+    process.env.GEMINI_API_KEY = "gemini-env-key";
+    process.env.GEMINI_MODEL = "gemini-custom-example";
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    process.env.OPENROUTER_EXAMPLE_MODEL = "qwen/qwen3-30b-a3b";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, exampleProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.exampleProvider).toBe("openrouter");
+    expect(display.example.apiKeyFromEnv).toBe(true);
+    expect(display.example.modelDefault).toBe("qwen/qwen3-30b-a3b");
+  });
+
+  it("reports no default model for openrouter when OPENROUTER_EXAMPLE_MODEL is unset", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, exampleProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.example.modelDefault).toBe("");
+  });
+
+  it("keeps correction and example provider selection independent", async () => {
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "openrouter", exampleProvider: "gemini" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correctionProvider).toBe("openrouter");
+    expect(display.exampleProvider).toBe("gemini");
   });
 });

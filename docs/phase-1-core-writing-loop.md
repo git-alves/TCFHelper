@@ -143,6 +143,12 @@ The API treats malformed input, an unknown/mismatched selected topic, a model re
 
 ## Validation plan and success metric
 
+The original 30-review viability gate below remains the broad Phase 1 check.
+It is insufficient for choosing a correction model at the B2/C1/C2
+boundaries, because it treats a one-band error as acceptable. Model selection,
+prompt calibration, an adjudicated reference set, and the stricter boundary
+metrics are defined in the [correction model evaluation specification](correction-model-evaluation.md).
+
 The phase passes only after an evaluator reviews a stratified sample of **30 successful live Gemini reviews** (10 per task; include below-range, in-range, and above-range responses and a range of learner proficiency). The baseline is unmeasured at the start of Phase 1; this review establishes it.
 
 For each review, a TCF-qualified reviewer—or two reviewers with disagreements adjudicated by one qualified reviewer—records whether:

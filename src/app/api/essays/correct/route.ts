@@ -4,16 +4,15 @@ import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
-import { getAppConfig } from "@/lib/app-config";
+import { getAppConfig, resolveCorrectionProviderId } from "@/lib/app-config";
+import { getCorrectionProvider } from "@/lib/correction-provider-registry";
 import {
-  GeminiCorrectionParseError,
-  GeminiNotConfiguredError,
-  GeminiRateLimitedError,
-  GeminiRequestError,
-  GeminiTransportError,
-  gradeEssayWithGemini,
-  hasConfiguredGemini,
-} from "@/lib/gemini";
+  CorrectionProviderNotConfiguredError,
+  CorrectionProviderParseError,
+  CorrectionProviderRateLimitedError,
+  CorrectionProviderRequestError,
+  CorrectionProviderTransportError,
+} from "@/lib/correction-provider";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { freshEssayFeedbackSchema, type EssayFeedback } from "@/lib/essay-feedback";
 import { buildCorrectionSystemPrompt, buildCorrectionUserPrompt } from "@/lib/essay-correction-prompt";
@@ -118,16 +117,16 @@ function minimumWordCountResponse(wordCount: number, minWords: number) {
 }
 
 function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode {
-  if (error instanceof GeminiNotConfiguredError) return "not_configured";
-  if (error instanceof GeminiRateLimitedError) return "rate_limited";
-  if (error instanceof GeminiCorrectionParseError) return "invalid_response";
-  if (error instanceof GeminiRequestError) return "upstream_http_error";
-  if (error instanceof GeminiTransportError) return "transport_error";
+  if (error instanceof CorrectionProviderNotConfiguredError) return "not_configured";
+  if (error instanceof CorrectionProviderRateLimitedError) return "rate_limited";
+  if (error instanceof CorrectionProviderParseError) return "invalid_response";
+  if (error instanceof CorrectionProviderRequestError) return "upstream_http_error";
+  if (error instanceof CorrectionProviderTransportError) return "transport_error";
   return "provider_unavailable";
 }
 
-function boundedGeminiHttpStatus(error: unknown): number | undefined {
-  if (!(error instanceof GeminiRequestError)) return undefined;
+function boundedCorrectionProviderHttpStatus(error: unknown): number | undefined {
+  if (!(error instanceof CorrectionProviderRequestError)) return undefined;
   return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
     ? error.status
     : undefined;
@@ -168,7 +167,7 @@ export async function POST(request: Request) {
 
   // This is intentionally before any topic lookup, durable claim, or quota
   // reservation. Short submissions cannot yield a useful assessment and
-  // must never consume a correction slot or send an avoidable Gemini request.
+  // must never consume a correction slot or send an avoidable provider request.
   if (wordCount < task.minWords) {
     return minimumWordCountResponse(wordCount, task.minWords);
   }
@@ -238,21 +237,23 @@ export async function POST(request: Request) {
   if (claim.kind === "existing") return duplicateCorrectionResponse(claim.essayId);
   if (claim.kind === "inProgress") return correctionInProgressResponse(claim.retryAt);
 
-  // Admin-panel overrides (see src/lib/app-config.ts), layered over the
-  // GEMINI_API_KEY/GEMINI_CORRECTION_MODEL env vars -- fetched once and
-  // reused for both the availability check below and the actual call.
+  // Admin-panel overrides (see src/lib/app-config.ts), layered over each
+  // provider's own env-var defaults -- fetched once and reused for both the
+  // availability check below and the actual call.
   const appConfig = await getAppConfig();
-  const geminiOverrides = { apiKey: appConfig.correctionApiKey, model: appConfig.correctionModel };
+  const providerId = resolveCorrectionProviderId(appConfig.correctionProvider);
+  const provider = getCorrectionProvider(providerId);
+  const providerOverrides = { apiKey: appConfig.correctionApiKey, model: appConfig.correctionModel };
 
   // Preserve duplicate/in-progress responses during an outage, but do not
   // reserve an unrefundable slot if this newly claimed request cannot reach
-  // Gemini. Release only this caller's lease so a later configured retry can
-  // claim it normally.
-  if (!hasConfiguredGemini(geminiOverrides)) {
+  // the configured provider. Release only this caller's lease so a later
+  // configured retry can claim it normally.
+  if (!provider.hasConfiguredCredentials(providerOverrides)) {
     await recordAdminEvent({
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: user.id,
-      provider: "gemini",
+      provider: providerId,
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -319,15 +320,15 @@ export async function POST(request: Request) {
   try {
     let rawFeedback: unknown;
     try {
-      rawFeedback = await gradeEssayWithGemini({ systemPrompt, userPrompt }, geminiOverrides);
+      rawFeedback = await provider.gradeEssay({ systemPrompt, userPrompt }, providerOverrides);
     } catch (error) {
       const reasonCode = classifyCorrectionProviderFailure(error);
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
-        provider: "gemini",
+        provider: providerId,
         reasonCode,
-        httpStatus: boundedGeminiHttpStatus(error) ?? 502,
+        httpStatus: boundedCorrectionProviderHttpStatus(error) ?? 502,
       });
       console.error("Essay correction provider failed", reasonCode);
       return NextResponse.json(
@@ -340,7 +341,7 @@ export async function POST(request: Request) {
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
-        provider: "gemini",
+        provider: providerId,
         reasonCode: "invalid_response",
         httpStatus: 502,
       });
