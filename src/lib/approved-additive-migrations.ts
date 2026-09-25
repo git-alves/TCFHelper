@@ -62,4 +62,14 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // key just means "use the built-in default" until an admin explicitly
   // overrides a correction prompt block from /admin/prompts.
   "20260924100000_add_prompt_override",
+  // A single nullable column on the existing AppConfig singleton, plus a
+  // widened AdminEvent closed-vocabulary check constraint (adds "openrouter"
+  // as an allowed provider). No existing row's meaning changes: a null
+  // correctionProvider still means "use Gemini", and every existing
+  // AdminEvent row still satisfies the constraint unchanged.
+  "20260925120000_add_correction_provider_selection",
+  // Same shape as above, for example generation: a single nullable
+  // AppConfig column plus a widened AdminEvent check constraint for
+  // EXAMPLE_PROVIDER_FAILED. No existing row's meaning changes.
+  "20260925130000_add_example_provider_selection",
 ]);

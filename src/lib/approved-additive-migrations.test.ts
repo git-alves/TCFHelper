@@ -90,6 +90,14 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260924100000_add_prompt_override");
   });
 
+  it("allows the additive correction-provider selection migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260925120000_add_correction_provider_selection");
+  });
+
+  it("allows the additive example-provider selection migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260925130000_add_example_provider_selection");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
