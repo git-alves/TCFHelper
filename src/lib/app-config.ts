@@ -8,6 +8,11 @@ import {
   isCorrectionProviderId,
   type CorrectionProviderId,
 } from "@/lib/correction-provider";
+import {
+  DEFAULT_EXAMPLE_PROVIDER,
+  isExampleProviderId,
+  type ExampleProviderId,
+} from "@/lib/example-provider";
 
 const CONFIG_ID = "singleton";
 
@@ -21,6 +26,7 @@ export interface AppConfigValue {
   correctionApiKey: string | null;
   correctionModel: string | null;
   correctionDailyLimit: number | null;
+  exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
   exampleDailyLimit: number | null;
@@ -31,6 +37,7 @@ const EMPTY_CONFIG: AppConfigValue = {
   correctionApiKey: null,
   correctionModel: null,
   correctionDailyLimit: null,
+  exampleProvider: null,
   exampleApiKey: null,
   exampleModel: null,
   exampleDailyLimit: null,
@@ -41,6 +48,7 @@ function toAppConfigValue(row: {
   correctionApiKey: string | null;
   correctionModel: string | null;
   correctionDailyLimit: number | null;
+  exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
   exampleDailyLimit: number | null;
@@ -50,6 +58,7 @@ function toAppConfigValue(row: {
     correctionApiKey: row.correctionApiKey,
     correctionModel: row.correctionModel,
     correctionDailyLimit: row.correctionDailyLimit,
+    exampleProvider: row.exampleProvider,
     exampleApiKey: row.exampleApiKey,
     exampleModel: row.exampleModel,
     exampleDailyLimit: row.exampleDailyLimit,
@@ -59,6 +68,11 @@ function toAppConfigValue(row: {
 /** Resolves a stored (possibly null/invalid) override to an actual provider id. */
 export function resolveCorrectionProviderId(value: string | null | undefined): CorrectionProviderId {
   return value && isCorrectionProviderId(value) ? value : DEFAULT_CORRECTION_PROVIDER;
+}
+
+/** Resolves a stored (possibly null/invalid) override to an actual provider id. */
+export function resolveExampleProviderId(value: string | null | undefined): ExampleProviderId {
+  return value && isExampleProviderId(value) ? value : DEFAULT_EXAMPLE_PROVIDER;
 }
 
 /** Never throws for a missing row: no admin override yet is a normal state. */
@@ -72,6 +86,7 @@ export interface AppConfigUpdateInput {
   correctionApiKey?: string | null;
   correctionModel?: string | null;
   correctionDailyLimit?: number | null;
+  exampleProvider?: string | null;
   exampleApiKey?: string | null;
   exampleModel?: string | null;
   exampleDailyLimit?: number | null;
@@ -93,6 +108,7 @@ export async function updateAppConfig(patch: AppConfigUpdateInput): Promise<AppC
     correctionApiKey: normalizeText(patch.correctionApiKey),
     correctionModel: normalizeText(patch.correctionModel),
     correctionDailyLimit: patch.correctionDailyLimit,
+    exampleProvider: normalizeText(patch.exampleProvider),
     exampleApiKey: normalizeText(patch.exampleApiKey),
     exampleModel: normalizeText(patch.exampleModel),
     exampleDailyLimit: patch.exampleDailyLimit,
@@ -132,13 +148,15 @@ export interface AppConfigDisplaySection {
 
 export interface AppConfigDisplay {
   correction: AppConfigDisplaySection;
-  // The resolved provider id (never null -- see resolveCorrectionProviderId)
-  // driving which env vars correction.apiKeyFromEnv/modelDefault above
-  // reflect. Kept as a sibling of `correction` rather than folded into
-  // AppConfigDisplaySection so that generic shape stays reusable for a
-  // section (example generation) that has no provider concept yet.
+  // The resolved provider id (never null -- see resolveCorrectionProviderId/
+  // resolveExampleProviderId) driving which env vars the matching section's
+  // apiKeyFromEnv/modelDefault above reflect. Kept as a sibling of its
+  // section rather than folded into AppConfigDisplaySection so that generic
+  // shape stays reusable regardless of whether a section has a provider
+  // concept.
   correctionProvider: CorrectionProviderId;
   example: AppConfigDisplaySection;
+  exampleProvider: ExampleProviderId;
 }
 
 /**
@@ -160,6 +178,14 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
       ? process.env.OPENROUTER_CORRECTION_MODEL?.trim() || ""
       : process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
 
+  const exampleProvider = resolveExampleProviderId(config.exampleProvider);
+  const exampleApiKeyEnvVar =
+    exampleProvider === "openrouter" ? process.env.OPENROUTER_API_KEY : process.env.GEMINI_API_KEY;
+  const exampleModelDefault =
+    exampleProvider === "openrouter"
+      ? process.env.OPENROUTER_EXAMPLE_MODEL?.trim() || ""
+      : process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+
   return {
     correction: {
       apiKeySet: Boolean(config.correctionApiKey),
@@ -176,13 +202,14 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
     example: {
       apiKeySet: Boolean(config.exampleApiKey),
       apiKeyMasked: maskSecret(config.exampleApiKey),
-      apiKeyFromEnv: !config.exampleApiKey && Boolean(process.env.GEMINI_API_KEY?.trim()),
+      apiKeyFromEnv: !config.exampleApiKey && Boolean(exampleApiKeyEnvVar?.trim()),
       model: config.exampleModel,
-      modelDefault: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+      modelDefault: exampleModelDefault,
       dailyLimit: config.exampleDailyLimit ?? DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
       dailyLimitDefault: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
       dailyLimitIsDefault: config.exampleDailyLimit === null,
       requestsToday: requestsToday.exampleRequestsToday,
     },
+    exampleProvider,
   };
 }

@@ -1,34 +1,13 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-const {
-  geminiMock,
-  GeminiRateLimitedErrorMock,
-  GeminiNotConfiguredErrorMock,
-} = vi.hoisted(() => {
-  class GeminiRateLimitedErrorMock extends Error {}
-  class GeminiNotConfiguredErrorMock extends Error {}
-  return {
-    geminiMock: vi.fn(),
-    GeminiRateLimitedErrorMock,
-    GeminiNotConfiguredErrorMock,
-  };
-});
-
-vi.mock("@/lib/gemini", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/gemini")>();
-  return {
-    ...actual,
-    generateModelAnswer: geminiMock,
-    GeminiRateLimitedError: GeminiRateLimitedErrorMock,
-    GeminiNotConfiguredError: GeminiNotConfiguredErrorMock,
-  };
-});
-
-import { GeminiRequestError } from "@/lib/gemini";
+import { describe, expect, it } from "vitest";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import {
+  ExampleProviderNotConfiguredError,
+  ExampleProviderRateLimitedError,
+  ExampleProviderRequestError,
+  type ExampleProvider,
+} from "@/lib/example-provider";
+import {
   generatePreferredModelAnswer,
-  hasConfiguredModelAnswerProvider,
   ModelAnswerInvalidOutputError,
   ModelAnswerNotConfiguredError,
   ModelAnswerRateLimitedError,
@@ -41,56 +20,77 @@ const params = {
   level: "B2" as const,
   topicPrompt: "Sujet",
 };
-const originalApiKey = process.env.GEMINI_API_KEY;
 
-beforeEach(() => {
-  geminiMock.mockReset();
-  geminiMock.mockResolvedValue(validAnswer);
-  process.env.GEMINI_API_KEY = "test-key";
-});
-
-afterEach(() => {
-  if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
-  else process.env.GEMINI_API_KEY = originalApiKey;
-});
+function stubProvider(
+  generateExample: (...args: Parameters<ExampleProvider["generateExample"]>) => ReturnType<ExampleProvider["generateExample"]>,
+): ExampleProvider {
+  return {
+    id: "gemini",
+    hasConfiguredCredentials: () => true,
+    generateExample,
+  };
+}
 
 describe("generatePreferredModelAnswer", () => {
-  it("uses Gemini and records Gemini as the sole provider", async () => {
-    await expect(generatePreferredModelAnswer(params)).resolves.toEqual({ text: validAnswer, provider: "gemini" });
-    expect(geminiMock).toHaveBeenCalledTimes(1);
+  it("uses the given provider and records its id", async () => {
+    const provider = stubProvider(async () => validAnswer);
+
+    await expect(generatePreferredModelAnswer(provider, params)).resolves.toEqual({
+      text: validAnswer,
+      provider: "gemini",
+    });
   });
 
-  it("reports whether the required Gemini credential is configured", () => {
-    expect(hasConfiguredModelAnswerProvider()).toBe(true);
-    delete process.env.GEMINI_API_KEY;
-    expect(hasConfiguredModelAnswerProvider()).toBe(false);
+  it("reports the resolved provider's own id, not a hardcoded one", async () => {
+    const provider: ExampleProvider = {
+      id: "openrouter",
+      hasConfiguredCredentials: () => true,
+      generateExample: async () => validAnswer,
+    };
+
+    await expect(generatePreferredModelAnswer(provider, params)).resolves.toEqual({
+      text: validAnswer,
+      provider: "openrouter",
+    });
   });
 
-  it("maps a missing Gemini configuration to the stable unavailable error", async () => {
-    geminiMock.mockRejectedValue(new GeminiNotConfiguredErrorMock("missing"));
+  it("maps a missing provider configuration to the stable unavailable error", async () => {
+    const provider = stubProvider(async () => {
+      throw new ExampleProviderNotConfiguredError("missing");
+    });
 
-    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerNotConfiguredError);
+    await expect(generatePreferredModelAnswer(provider, params)).rejects.toBeInstanceOf(
+      ModelAnswerNotConfiguredError,
+    );
   });
 
-  it("maps Gemini rate limiting to the stable retryable error", async () => {
-    geminiMock.mockRejectedValue(new GeminiRateLimitedErrorMock("limited"));
+  it("maps provider rate limiting to the stable retryable error", async () => {
+    const provider = stubProvider(async () => {
+      throw new ExampleProviderRateLimitedError("limited");
+    });
 
-    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerRateLimitedError);
+    await expect(generatePreferredModelAnswer(provider, params)).rejects.toBeInstanceOf(
+      ModelAnswerRateLimitedError,
+    );
   });
 
-  it("keeps an ordinary Gemini request failure distinct", async () => {
-    geminiMock.mockRejectedValue(new GeminiRequestError(400));
+  it("keeps an ordinary provider request failure distinct", async () => {
+    const provider = stubProvider(async () => {
+      throw new ExampleProviderRequestError(400);
+    });
 
-    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(GeminiRequestError);
+    await expect(generatePreferredModelAnswer(provider, params)).rejects.toBeInstanceOf(
+      ExampleProviderRequestError,
+    );
   });
 
   it("accepts an answer moderately outside the exact target range", async () => {
     // TASK_2 targets 120-150 words; a 100-word answer stays within the
     // deliberately tolerated 96-180 band.
     const closeEnoughAnswer = Array.from({ length: 100 }, (_, index) => `mot${index}`).join(" ");
-    geminiMock.mockResolvedValue(closeEnoughAnswer);
+    const provider = stubProvider(async () => closeEnoughAnswer);
 
-    await expect(generatePreferredModelAnswer(params)).resolves.toEqual({
+    await expect(generatePreferredModelAnswer(provider, params)).resolves.toEqual({
       text: closeEnoughAnswer,
       provider: "gemini",
     });
@@ -103,15 +103,20 @@ describe("generatePreferredModelAnswer", () => {
     };
     const atMinimum = Array.from({ length: 81 }, (_, index) => `mot${index}`).join(" ");
     const atMaximum = Array.from({ length: 178 }, (_, index) => `mot${index}`).join(" ");
-    geminiMock.mockResolvedValueOnce(atMinimum).mockResolvedValueOnce(atMaximum);
 
-    await expect(generatePreferredModelAnswer(nonRoundParams)).resolves.toEqual({ text: atMinimum, provider: "gemini" });
-    await expect(generatePreferredModelAnswer(nonRoundParams)).resolves.toEqual({ text: atMaximum, provider: "gemini" });
+    await expect(
+      generatePreferredModelAnswer(stubProvider(async () => atMinimum), nonRoundParams),
+    ).resolves.toEqual({ text: atMinimum, provider: "gemini" });
+    await expect(
+      generatePreferredModelAnswer(stubProvider(async () => atMaximum), nonRoundParams),
+    ).resolves.toEqual({ text: atMaximum, provider: "gemini" });
   });
 
-  it("rejects unusable Gemini output instead of filling the editor", async () => {
-    geminiMock.mockResolvedValue("trop court");
+  it("rejects unusable provider output instead of filling the editor", async () => {
+    const provider = stubProvider(async () => "trop court");
 
-    await expect(generatePreferredModelAnswer(params)).rejects.toBeInstanceOf(ModelAnswerInvalidOutputError);
+    await expect(generatePreferredModelAnswer(provider, params)).rejects.toBeInstanceOf(
+      ModelAnswerInvalidOutputError,
+    );
   });
 });

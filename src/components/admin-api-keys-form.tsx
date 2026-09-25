@@ -4,6 +4,7 @@ import { type FormEvent, useId, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AppConfigDisplay, AppConfigDisplaySection } from "@/lib/app-config";
 import { CORRECTION_PROVIDER_IDS, type CorrectionProviderId } from "@/lib/correction-provider";
+import { type ExampleProviderId } from "@/lib/example-provider";
 
 interface AdminApiKeysFormProps {
   initialDisplay: AppConfigDisplay;
@@ -16,7 +17,13 @@ interface SectionFormState {
   dailyLimitInput: string;
 }
 
-const CORRECTION_PROVIDER_LABELS: Record<CorrectionProviderId, string> = {
+// CorrectionProviderId and ExampleProviderId are the same "gemini" |
+// "openrouter" domain today (see correction-provider.ts / example-provider.ts);
+// the UI shares one dropdown implementation over that domain rather than
+// duplicating it per feature.
+type ProviderId = CorrectionProviderId & ExampleProviderId;
+
+const PROVIDER_LABELS: Record<ProviderId, string> = {
   gemini: "Gemini Direct",
   openrouter: "OpenRouter",
 };
@@ -93,8 +100,7 @@ function AiSettingsSection({
   state: SectionFormState;
   onChange: (next: SectionFormState) => void;
   apiKeyEnvVarName: string;
-  /** Only the correction section has a provider choice today. */
-  provider?: { value: CorrectionProviderId; onChange: (next: CorrectionProviderId) => void };
+  provider?: { value: ProviderId; onChange: (next: ProviderId) => void };
 }) {
   const apiKeyId = useId();
   const providerId = useId();
@@ -118,17 +124,17 @@ function AiSettingsSection({
           <select
             id={providerId}
             value={provider.value}
-            onChange={(event) => provider.onChange(event.target.value as CorrectionProviderId)}
+            onChange={(event) => provider.onChange(event.target.value as ProviderId)}
             className={INPUT_CLASSES}
           >
             {CORRECTION_PROVIDER_IDS.map((id) => (
               <option key={id} value={id}>
-                {CORRECTION_PROVIDER_LABELS[id]}
+                {PROVIDER_LABELS[id]}
               </option>
             ))}
           </select>
           <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            Which backend grades essays. The API key and model below apply to whichever provider is selected here.
+            Which backend to use. The API key and model below apply to whichever provider is selected here.
           </p>
         </div>
       )}
@@ -215,12 +221,14 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
   const [correctionProvider, setCorrectionProvider] = useState<CorrectionProviderId>(
     initialDisplay.correctionProvider,
   );
+  const [exampleProvider, setExampleProvider] = useState<ExampleProviderId>(initialDisplay.exampleProvider);
   const [correction, setCorrection] = useState<SectionFormState>(() => sectionStateFromDisplay(initialDisplay.correction));
   const [example, setExample] = useState<SectionFormState>(() => sectionStateFromDisplay(initialDisplay.example));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedJustNow, setSavedJustNow] = useState(false);
   const correctionApiKeyEnvVarName = correctionProvider === "openrouter" ? "OPENROUTER_API_KEY" : "GEMINI_API_KEY";
+  const exampleApiKeyEnvVarName = exampleProvider === "openrouter" ? "OPENROUTER_API_KEY" : "GEMINI_API_KEY";
 
   const correctionDailyLimit = useMemo(() => parseDailyLimitInput(correction.dailyLimitInput), [correction.dailyLimitInput]);
   const exampleDailyLimit = useMemo(() => parseDailyLimitInput(example.dailyLimitInput), [example.dailyLimitInput]);
@@ -238,6 +246,7 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
         correctionProvider,
         correctionModel: correction.model.trim(),
         correctionDailyLimit,
+        exampleProvider,
         exampleModel: example.model.trim(),
         exampleDailyLimit,
       };
@@ -260,6 +269,7 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
 
       setDisplay(payload);
       setCorrectionProvider(payload.correctionProvider);
+      setExampleProvider(payload.exampleProvider);
       setCorrection(sectionStateFromDisplay(payload.correction));
       setExample(sectionStateFromDisplay(payload.example));
       setSavedJustNow(true);
@@ -288,7 +298,8 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
         section={display.example}
         state={example}
         onChange={setExample}
-        apiKeyEnvVarName="GEMINI_API_KEY"
+        apiKeyEnvVarName={exampleApiKeyEnvVarName}
+        provider={{ value: exampleProvider, onChange: setExampleProvider }}
       />
 
       <div className="flex items-center gap-3">

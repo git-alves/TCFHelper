@@ -42,6 +42,7 @@ const DISPLAY = {
     dailyLimitIsDefault: true,
     requestsToday: 3,
   },
+  exampleProvider: "gemini",
 };
 
 beforeEach(() => {
@@ -201,5 +202,41 @@ describe("PUT /api/admin/api-keys", () => {
 
     expect(response.status).toBe(200);
     expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionProvider: null });
+  });
+
+  it("accepts a recognized example provider id", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ exampleProvider: "openrouter" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ exampleProvider: "openrouter" });
+  });
+
+  it("rejects an unrecognized example provider id", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ exampleProvider: "anthropic" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateAppConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a null example provider to reset it to the default", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ exampleProvider: null }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ exampleProvider: null });
   });
 });

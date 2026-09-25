@@ -57,14 +57,15 @@ against adjudicated writing samples before they affect learners.
      Defaults to a free-tier Flash-Lite model; check
      [ai.google.dev/gemini-api/docs/models](https://ai.google.dev/gemini-api/docs/models)
      for the current lineup, since free-tier names are retired over time.
-   - `OPENROUTER_API_KEY` / `OPENROUTER_CORRECTION_MODEL` (optional): an
-     alternative correction provider -- [OpenRouter](https://openrouter.ai)'s
+   - `OPENROUTER_API_KEY` / `OPENROUTER_CORRECTION_MODEL` / `OPENROUTER_EXAMPLE_MODEL`
+     (optional): an alternative provider -- [OpenRouter](https://openrouter.ai)'s
      unified, OpenAI-compatible gateway in front of many models (Gemini, GPT,
-     Claude, Qwen, etc). Only used once "OpenRouter" is selected as the essay
-     correction AI Provider from `/admin/api-keys`; the native Gemini
-     integration above stays the default. Unlike Gemini, OpenRouter has no
-     built-in default model, so `OPENROUTER_CORRECTION_MODEL` (or the admin
-     panel's model field) must be set before this provider works.
+     Claude, Qwen, etc). Only used once "OpenRouter" is selected as the AI
+     Provider for essay correction and/or example generation independently
+     from `/admin/api-keys`; the native Gemini integration above stays the
+     default for both. Unlike Gemini, OpenRouter has no built-in default
+     model, so the matching model env var (or the admin panel's model field)
+     must be set before that provider works.
    - `DEEPL_API_KEY` (optional): a [DeepL API Free](https://www.deepl.com/pro-api)
      key (ends in `:fx`), used server-side for live draft translation. Free
      covers 500,000 characters/month, no billing details required. If unset,
@@ -669,7 +670,7 @@ Either way, set these environment variables on the Vercel project (with
 `CLERK_WEBHOOK_SIGNING_SECRET`, `SECURITY_TELEMETRY_HMAC_SECRET`, `NEXT_PUBLIC_CLERK_SIGN_IN_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_URL`, `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL`,
 `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL`, `GEMINI_API_KEY`,
-`GEMINI_CORRECTION_MODEL`, `OPENROUTER_API_KEY` (optional), `OPENROUTER_CORRECTION_MODEL` (optional), `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
+`GEMINI_CORRECTION_MODEL`, `OPENROUTER_API_KEY` (optional), `OPENROUTER_CORRECTION_MODEL` (optional), `OPENROUTER_EXAMPLE_MODEL` (optional), `DEEPL_API_KEY`, `STRIPE_SECRET_KEY`,
 `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, `NEXT_PUBLIC_APP_URL`,
 `CRON_SECRET` (Production scope only -- required for the admin-event
 retention and HubSpot support-sync retry crons to authenticate; see

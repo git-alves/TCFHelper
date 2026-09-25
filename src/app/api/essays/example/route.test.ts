@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GeminiRequestError, GeminiTransportError } from "@/lib/gemini";
+import {
+  ExampleProviderRequestError,
+  ExampleProviderTransportError,
+  type ExampleProvider,
+} from "@/lib/example-provider";
 
 const {
   getCurrentActivatedAppUserMock,
@@ -12,7 +16,8 @@ const {
   releaseExampleGenerationLeaseMock,
   refundExampleGenerationLeaseMock,
   generatePreferredModelAnswerMock,
-  hasConfiguredModelAnswerProviderMock,
+  hasConfiguredCredentialsMock,
+  getExampleProviderMock,
   getAppConfigMock,
   getPromptOverridesMock,
   ModelAnswerNotConfiguredErrorMock,
@@ -38,7 +43,8 @@ const {
     releaseExampleGenerationLeaseMock: vi.fn(),
     refundExampleGenerationLeaseMock: vi.fn(),
     generatePreferredModelAnswerMock: vi.fn(),
-    hasConfiguredModelAnswerProviderMock: vi.fn(),
+    hasConfiguredCredentialsMock: vi.fn(),
+    getExampleProviderMock: vi.fn(),
     getAppConfigMock: vi.fn(),
     getPromptOverridesMock: vi.fn(),
     ModelAnswerNotConfiguredErrorMock,
@@ -55,7 +61,13 @@ vi.mock("@/lib/activated-app-user", () => ({
   getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock } } }));
-vi.mock("@/lib/app-config", () => ({ getAppConfig: getAppConfigMock }));
+vi.mock("@/lib/app-config", () => ({
+  getAppConfig: getAppConfigMock,
+  // A tiny stand-in for the real app-config.ts resolver (kept out of this
+  // mock's reach otherwise): defaults an unset/unrecognized value to
+  // "gemini", exactly like DEFAULT_EXAMPLE_PROVIDER.
+  resolveExampleProviderId: (value: string | null | undefined) => (value === "openrouter" ? "openrouter" : "gemini"),
+}));
 vi.mock("@/lib/prompt-overrides", () => ({
   getPromptOverrides: getPromptOverridesMock,
   toExamplePromptOverrides: (values: Record<string, string | null>) => ({
@@ -76,9 +88,11 @@ vi.mock("@/lib/example-answer-cache", () => ({
   releaseExampleGenerationLease: releaseExampleGenerationLeaseMock,
   refundExampleGenerationLease: refundExampleGenerationLeaseMock,
 }));
+vi.mock("@/lib/example-provider-registry", () => ({
+  getExampleProvider: getExampleProviderMock,
+}));
 vi.mock("@/lib/model-answer-generator", () => ({
   generatePreferredModelAnswer: generatePreferredModelAnswerMock,
-  hasConfiguredModelAnswerProvider: hasConfiguredModelAnswerProviderMock,
   ModelAnswerNotConfiguredError: ModelAnswerNotConfiguredErrorMock,
   ModelAnswerRateLimitedError: ModelAnswerRateLimitedErrorMock,
   ModelAnswerInvalidOutputError: ModelAnswerInvalidOutputErrorMock,
@@ -88,6 +102,10 @@ vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock })
 const { POST } = await import("./route");
 
 const LOCAL_USER_ID = "cuid_local_user_1";
+
+function stubProvider(id: "gemini" | "openrouter" = "gemini"): ExampleProvider {
+  return { id, hasConfiguredCredentials: hasConfiguredCredentialsMock, generateExample: vi.fn() };
+}
 
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
@@ -100,7 +118,8 @@ beforeEach(() => {
   releaseExampleGenerationLeaseMock.mockReset();
   refundExampleGenerationLeaseMock.mockReset();
   generatePreferredModelAnswerMock.mockReset();
-  hasConfiguredModelAnswerProviderMock.mockReset();
+  hasConfiguredCredentialsMock.mockReset();
+  getExampleProviderMock.mockReset();
   getAppConfigMock.mockReset();
   getPromptOverridesMock.mockReset();
   recordAdminEventMock.mockReset();
@@ -112,10 +131,13 @@ beforeEach(() => {
   cacheExampleMock.mockResolvedValue({ content: "Un exemple de réponse." });
   releaseExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   refundExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
-  hasConfiguredModelAnswerProviderMock.mockReturnValue(true);
+  hasConfiguredCredentialsMock.mockReturnValue(true);
+  getExampleProviderMock.mockImplementation((id: "gemini" | "openrouter") => stubProvider(id));
   getAppConfigMock.mockResolvedValue({
+    correctionProvider: null,
     correctionApiKey: null,
     correctionModel: null,
+    exampleProvider: null,
     exampleApiKey: null,
     exampleModel: null,
   });
@@ -193,6 +215,7 @@ describe("POST /api/essays/example", () => {
 
     expect(response.status).toBe(200);
     expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "gemini" }),
       expect.objectContaining({ topicPrompt: "Écrivez à votre voisin pour décrire votre quartier.", level: "C1" }),
       { apiKey: null, model: null },
     );
@@ -219,6 +242,7 @@ describe("POST /api/essays/example", () => {
 
     expect(response.status).toBe(200);
     expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "gemini" }),
       expect.objectContaining({ topicPrompt: "Écrivez à votre voisin pour décrire votre quartier.", level: "C1" }),
       { apiKey: null, model: null },
     );
@@ -290,7 +314,7 @@ describe("POST /api/essays/example", () => {
     const response = await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
 
     expect(response.status).toBe(200);
-    const [requestParams] = generatePreferredModelAnswerMock.mock.calls[0];
+    const [, requestParams] = generatePreferredModelAnswerMock.mock.calls[0];
     expect(requestParams.promptOverrides).toEqual({
       task1Structure: null,
       task2Structure: "CUSTOM TASK 2 STRUCTURE.",
@@ -394,7 +418,7 @@ describe("POST /api/essays/example", () => {
   });
 
   it("does not reserve a fresh call when no free provider is configured", async () => {
-    hasConfiguredModelAnswerProviderMock.mockReturnValue(false);
+    hasConfiguredCredentialsMock.mockReturnValue(false);
 
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
@@ -422,7 +446,7 @@ describe("POST /api/essays/example", () => {
     expect(refundExampleGenerationLeaseMock).not.toHaveBeenCalled();
   });
 
-  it("returns stable errors and refunds the slot when Gemini cannot serve a request", async () => {
+  it("returns stable errors and refunds the slot when the provider cannot serve a request", async () => {
     generatePreferredModelAnswerMock.mockRejectedValue(new ModelAnswerRateLimitedErrorMock("limited"));
     const limited = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
     expect(limited.status).toBe(429);
@@ -450,6 +474,50 @@ describe("POST /api/essays/example", () => {
     });
   });
 
+  it("resolves and calls the OpenRouter adapter when AppConfig.exampleProvider is openrouter", async () => {
+    getAppConfigMock.mockResolvedValue({
+      correctionProvider: null,
+      correctionApiKey: null,
+      correctionModel: null,
+      exampleProvider: "openrouter",
+      exampleApiKey: "sk-or-key",
+      exampleModel: "qwen/qwen3-30b-a3b",
+    });
+
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+    expect(response.status).toBe(200);
+    expect(getExampleProviderMock).toHaveBeenCalledWith("openrouter");
+    expect(generatePreferredModelAnswerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "openrouter" }),
+      expect.any(Object),
+      { apiKey: "sk-or-key", model: "qwen/qwen3-30b-a3b" },
+    );
+  });
+
+  it("records the openrouter provider id on an admin event when it fails", async () => {
+    getAppConfigMock.mockResolvedValue({
+      correctionProvider: null,
+      correctionApiKey: null,
+      correctionModel: null,
+      exampleProvider: "openrouter",
+      exampleApiKey: null,
+      exampleModel: null,
+    });
+    hasConfiguredCredentialsMock.mockReturnValue(false);
+
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+    expect(response.status).toBe(503);
+    expect(recordAdminEventMock).toHaveBeenCalledWith({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: LOCAL_USER_ID,
+      provider: "openrouter",
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
+  });
+
   describe("failure log classification", () => {
     let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
@@ -461,12 +529,12 @@ describe("POST /api/essays/example", () => {
       consoleErrorSpy.mockRestore();
     });
 
-    it("logs a fixed status-based label for a real GeminiRequestError", async () => {
-      // GeminiRequestError takes only a status — there is no message
-      // parameter to construct a sentinel with; see gemini.test.ts for the
-      // fetch-level proof that an upstream error payload never survives
-      // into this error at all.
-      generatePreferredModelAnswerMock.mockRejectedValue(new GeminiRequestError(400));
+    it("logs a fixed status-based label for a real ExampleProviderRequestError", async () => {
+      // ExampleProviderRequestError takes only a status — there is no
+      // message parameter to construct a sentinel with; see
+      // openrouter-correction-provider.test.ts for the fetch-level proof
+      // that an upstream error payload never survives into this error at all.
+      generatePreferredModelAnswerMock.mockRejectedValue(new ExampleProviderRequestError(400));
 
       const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
@@ -490,8 +558,8 @@ describe("POST /api/essays/example", () => {
       expect(consoleErrorSpy).toHaveBeenCalledWith("Example generation failed:", "invalid_response");
     });
 
-    it("distinguishes a Gemini transport failure from a status-based one, so a network outage stays diagnosable", async () => {
-      generatePreferredModelAnswerMock.mockRejectedValue(new GeminiTransportError());
+    it("distinguishes a provider transport failure from a status-based one, so a network outage stays diagnosable", async () => {
+      generatePreferredModelAnswerMock.mockRejectedValue(new ExampleProviderTransportError());
 
       const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 

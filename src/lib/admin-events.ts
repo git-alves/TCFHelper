@@ -346,7 +346,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
       );
     case "EXAMPLE_PROVIDER_FAILED":
       return (
-        input.provider === "gemini" &&
+        (input.provider === "gemini" || input.provider === "openrouter") &&
         input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
