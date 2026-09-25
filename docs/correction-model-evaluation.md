@@ -78,9 +78,11 @@ npm run eval:corrections -- \
 
 `--use-active-prompt-overrides` reads only the live prompt-override configuration and writes its SHA-256 fingerprint to the report, so “baseline” is auditable as the actual learner prompt. If the evaluator must run without database access, use `--prompt-overrides /secure/path/overrides.json` with an exported correction override snapshot; its fingerprint is recorded instead. With neither option, the report explicitly records that it used built-in defaults.
 
-Gemini candidates use `GEMINI_API_KEY`; OpenRouter candidates use `OPENROUTER_API_KEY`. The report exposes exact secure-level accuracy, invalid responses, under/over-classifications, per-run results, an unambiguous modal result, and the full confusion matrix, including direct `C2 -> C1` and `C1 -> B2` counts. Failed or malformed calls remain in the primary accuracy denominator; valid-response accuracy is shown separately as a diagnostic.
+That override fingerprint alone only proves what was *provided*, not what a model actually *saw*: it stays identical across a code change to the built-in default prompt or a `--prompt` variant's addendum text, and it doesn't vary per case even though the topic and feedback language are interpolated into the prompt per case. The report also includes `systemPromptFingerprints`, a SHA-256 hash of the exact rendered system prompt sent for each case -- proof of the actual rubric text, independent of where it came from.
 
-Run each case at least three times if the provider is non-deterministic. Report both the per-run result and the modal result; a model that varies by a CEFR band is not suitable merely because one run looks good. Keep failed structured responses in the denominator.
+Gemini candidates use `GEMINI_API_KEY`; OpenRouter candidates use `OPENROUTER_API_KEY`. The report exposes exact secure-level accuracy, invalid responses, under/over-classifications, per-run results, a modal result, and the full confusion matrix, including direct `C2 -> C1` and `C1 -> B2` counts. Failed or malformed calls remain in the primary accuracy denominator; valid-response accuracy is shown separately as a diagnostic.
+
+Run each case at least three times if the provider is non-deterministic, via `--repeat`. Report both the per-run result and the modal result; a model that varies by a CEFR band is not suitable merely because one run looks good. The modal result requires a strict majority of *all* repeats, not just of the ones that returned valid feedback -- one successful call among mostly-failed repeats is reported invalid rather than a misleadingly confident 100% modal match. Keep failed structured responses in the denominator.
 
 ### Scorecard and release gate
 

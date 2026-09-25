@@ -77,6 +77,36 @@ describe("summarizeCorrectionEvaluation", () => {
       [{ caseId: "secure-b2", feedback: feedback("C1") }],
     ]);
 
-    expect(modal).toEqual([{ caseId: "secure-b2", error: "Repeated calls have no unique modal CEFR result." }]);
+    expect(modal).toEqual([
+      { caseId: "secure-b2", error: "No CEFR result was returned by a strict majority of repeated calls." },
+    ]);
+  });
+
+  it("treats one valid result among mostly-failed repeats as invalid, not a confident 100% modal match", () => {
+    const feedback = {
+      cefr: { conservativeLevel: "B2" as const, estimatedLevel: "B2" as const, confidence: "High" as const, rationale: "x", evidence: "x", blocker: "x" },
+    };
+    const modal = modalCorrectionEvaluationOutputs([cases[0]], [
+      [{ caseId: "secure-b2", feedback }],
+      [{ caseId: "secure-b2", error: "upstream_http_error" }],
+      [{ caseId: "secure-b2", error: "transport_error" }],
+    ]);
+
+    expect(modal).toEqual([
+      { caseId: "secure-b2", error: "No CEFR result was returned by a strict majority of repeated calls." },
+    ]);
+  });
+
+  it("still accepts a genuine strict majority even with one failed repeat", () => {
+    const feedback = {
+      cefr: { conservativeLevel: "B2" as const, estimatedLevel: "B2" as const, confidence: "High" as const, rationale: "x", evidence: "x", blocker: "x" },
+    };
+    const modal = modalCorrectionEvaluationOutputs([cases[0]], [
+      [{ caseId: "secure-b2", feedback }],
+      [{ caseId: "secure-b2", feedback }],
+      [{ caseId: "secure-b2", error: "transport_error" }],
+    ]);
+
+    expect(modal).toEqual([{ caseId: "secure-b2", feedback }]);
   });
 });

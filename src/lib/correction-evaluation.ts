@@ -84,14 +84,21 @@ export interface CorrectionEvaluationOutput {
 }
 
 /**
- * Returns one CEFR result per case from repeated provider calls. Ties are
- * deliberately invalid rather than arbitrarily resolved: unstable CEFR
- * classification is a reliability failure that a model comparison must show.
+ * Returns one CEFR result per case from repeated provider calls. A result
+ * must be backed by a strict majority of ALL repeats -- not just of the
+ * ones that returned valid feedback -- otherwise it is reported invalid.
+ * Counting only among valid votes would let e.g. 1 successful call plus 2
+ * failed ones out of 3 repeats report a misleadingly confident 100% "modal"
+ * result despite the provider failing most of the time; requiring a true
+ * majority of all repeats also subsumes the tie case (two candidates can
+ * never both hold a strict majority), so unstable CEFR classification is
+ * caught the same way a mostly-failing provider is.
  */
 export function modalCorrectionEvaluationOutputs(
   cases: readonly CorrectionEvaluationCase[],
   runs: ReadonlyArray<readonly CorrectionEvaluationOutput[]>,
 ): CorrectionEvaluationOutput[] {
+  const totalRuns = runs.length;
   return cases.map((evaluationCase) => {
     const votes = new Map<string, { count: number; output: CorrectionEvaluationOutput }>();
     for (const run of runs) {
@@ -106,8 +113,11 @@ export function modalCorrectionEvaluationOutputs(
     if (ranked.length === 0) {
       return { caseId: evaluationCase.id, error: "All repeated provider calls failed or returned invalid feedback." };
     }
-    if (ranked.length > 1 && ranked[0].count === ranked[1].count) {
-      return { caseId: evaluationCase.id, error: "Repeated calls have no unique modal CEFR result." };
+    if (ranked[0].count * 2 <= totalRuns) {
+      return {
+        caseId: evaluationCase.id,
+        error: "No CEFR result was returned by a strict majority of repeated calls.",
+      };
     }
     return ranked[0].output;
   });

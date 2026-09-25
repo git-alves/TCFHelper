@@ -156,6 +156,17 @@ async function runCandidate(
   }
 
   const outputs: CorrectionEvaluationOutput[] = [];
+  // A hash of the exact rendered system prompt sent for each case -- not
+  // just the admin-override inputs (see fingerprintPromptOverrides above).
+  // The override fingerprint alone can't prove which rubric text a model
+  // actually saw: it stays identical across a code change to the built-in
+  // default prompt or to a promptVariant's addendum text, and it doesn't
+  // vary per case even though topicPrompt/feedbackLanguage are interpolated
+  // into the prompt per case. Hashing the rendered text itself is
+  // deterministic given (case, promptVariant, promptSnapshot) -- identical
+  // on every repeat and for every candidate -- so it is computed once here
+  // rather than duplicated per repeat.
+  const systemPromptFingerprints: Array<{ caseId: string; sha256: string }> = [];
   for (const evaluationCase of cases) {
     const task = TASK_INSTRUCTIONS[evaluationCase.taskType];
     const systemPrompt = buildCorrectionSystemPrompt(
@@ -165,6 +176,10 @@ async function runCandidate(
       promptSnapshot.overrides,
       promptVariant,
     );
+    systemPromptFingerprints.push({
+      caseId: evaluationCase.id,
+      sha256: createHash("sha256").update(systemPrompt).digest("hex"),
+    });
     const userPrompt = buildCorrectionUserPrompt({
       task,
       resolvedTopicPrompt: evaluationCase.topicPrompt,
@@ -186,6 +201,7 @@ async function runCandidate(
 
   return {
     outputs,
+    systemPromptFingerprints,
     summary: summarizeCorrectionEvaluation(cases, outputs),
     cases: cases.map((evaluationCase) => {
       const output = outputs.find((item) => item.caseId === evaluationCase.id);
@@ -222,6 +238,14 @@ async function main() {
         model: candidate.model,
         promptVariant,
         promptOverrides: { source: promptSnapshot.source, sha256: promptSnapshot.fingerprint },
+        // Identical for every run of this candidate+promptVariant (prompt
+        // construction has no randomness), so taken from the first run
+        // rather than recomputed per repeat. Proves exactly which rendered
+        // rubric text -- built-in defaults, an admin override, and the
+        // promptVariant addendum, per case -- actually produced this report,
+        // independent of promptOverrides.sha256 above (which only covers the
+        // override inputs, not the effective prompt).
+        systemPromptFingerprints: runs[0].systemPromptFingerprints,
         runs: runs.map((run, index) => ({ run: index + 1, summary: run.summary, cases: run.cases })),
         modal: {
           summary: summarizeCorrectionEvaluation(cases, modal),
