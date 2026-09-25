@@ -69,12 +69,16 @@ npm run eval:corrections -- \
   --dataset /secure/path/correction-eval.json \
   --candidate gemini:gemini-3.5-flash-lite \
   --candidate openrouter:openai/gpt-5-mini \
+  --use-active-prompt-overrides \
   --prompt baseline \
   --prompt calibration-review \
+  --repeat 3 \
   --output /secure/path/correction-eval-report.json
 ```
 
-Gemini candidates use `GEMINI_API_KEY`; OpenRouter candidates use `OPENROUTER_API_KEY`. The report exposes exact secure-level accuracy, invalid responses, under/over-classifications, and the full confusion matrix, including direct `C2 -> C1` and `C1 -> B2` counts.
+`--use-active-prompt-overrides` reads only the live prompt-override configuration and writes its SHA-256 fingerprint to the report, so “baseline” is auditable as the actual learner prompt. If the evaluator must run without database access, use `--prompt-overrides /secure/path/overrides.json` with an exported correction override snapshot; its fingerprint is recorded instead. With neither option, the report explicitly records that it used built-in defaults.
+
+Gemini candidates use `GEMINI_API_KEY`; OpenRouter candidates use `OPENROUTER_API_KEY`. The report exposes exact secure-level accuracy, invalid responses, under/over-classifications, per-run results, an unambiguous modal result, and the full confusion matrix, including direct `C2 -> C1` and `C1 -> B2` counts. Failed or malformed calls remain in the primary accuracy denominator; valid-response accuracy is shown separately as a diagnostic.
 
 Run each case at least three times if the provider is non-deterministic. Report both the per-run result and the modal result; a model that varies by a CEFR band is not suitable merely because one run looks good. Keep failed structured responses in the denominator.
 

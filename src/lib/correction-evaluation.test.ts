@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   cefrLevelDistance,
+  correctionPromptOverridesFingerprint,
+  modalCorrectionEvaluationOutputs,
   parseCorrectionEvaluationCases,
+  parseCorrectionPromptOverrides,
   summarizeCorrectionEvaluation,
   type CorrectionEvaluationCase,
 } from "./correction-evaluation";
@@ -38,7 +41,8 @@ describe("summarizeCorrectionEvaluation", () => {
 
     expect(summary.validResponses).toBe(0);
     expect(summary.invalidResponses).toBe(4);
-    expect(summary.conservativeAccuracy).toBeNull();
+    expect(summary.conservativeAccuracy).toBe(0);
+    expect(summary.validResponseConservativeAccuracy).toBeNull();
   });
 
   it("orders CEFR levels by proficiency, not alphabetically", () => {
@@ -53,5 +57,26 @@ describe("summarizeCorrectionEvaluation", () => {
         { ...cases[0] },
       ]),
     ).toThrow("Duplicate correction evaluation case id: secure-b2");
+  });
+
+  it("records an equivalent prompt snapshot identically and rejects unknown prompt inputs", () => {
+    const overrides = parseCorrectionPromptOverrides({ base: "  CUSTOM {{feedbackLanguage}}  ", task1: null });
+
+    expect(correctionPromptOverridesFingerprint(overrides)).toBe(
+      correctionPromptOverridesFingerprint({ base: "CUSTOM {{feedbackLanguage}}", task1: null }),
+    );
+    expect(() => parseCorrectionPromptOverrides({ base: "valid", surprise: "ignored" })).toThrow();
+  });
+
+  it("treats an unstable repeated CEFR result as invalid instead of choosing a level arbitrarily", () => {
+    const feedback = (conservativeLevel: "B2" | "C1") => ({
+      cefr: { conservativeLevel, estimatedLevel: conservativeLevel, confidence: "High" as const, rationale: "x", evidence: "x", blocker: "x" },
+    });
+    const modal = modalCorrectionEvaluationOutputs([cases[0]], [
+      [{ caseId: "secure-b2", feedback: feedback("B2") }],
+      [{ caseId: "secure-b2", feedback: feedback("C1") }],
+    ]);
+
+    expect(modal).toEqual([{ caseId: "secure-b2", error: "Repeated calls have no unique modal CEFR result." }]);
   });
 });

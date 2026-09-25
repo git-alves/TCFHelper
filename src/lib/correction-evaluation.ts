@@ -1,4 +1,5 @@
 import { CEFR_LEVELS, type EssayFeedback } from "@/lib/essay-feedback";
+import type { CorrectionPromptOverrides } from "@/lib/essay-correction-prompt";
 import { z } from "zod";
 
 export type CefrLevel = (typeof CEFR_LEVELS)[number];
@@ -20,6 +21,36 @@ export interface CorrectionEvaluationCase {
   expected: CorrectionEvaluationExpectedResult;
   /** Short human context, never sent to a model. */
   notes?: string;
+}
+
+const correctionPromptOverridesSchema = z
+  .object({
+    base: z.string().nullable().optional(),
+    task1: z.string().nullable().optional(),
+    task2: z.string().nullable().optional(),
+    task3Documents: z.string().nullable().optional(),
+    task3Documentless: z.string().nullable().optional(),
+  })
+  .strict();
+
+/**
+ * Parses a correction-prompt snapshot supplied to the evaluator. Keeping the
+ * snapshot explicit makes a report reproducible even after an admin edits a
+ * prompt block; unknown keys fail rather than being quietly ignored.
+ */
+export function parseCorrectionPromptOverrides(value: unknown): CorrectionPromptOverrides {
+  return correctionPromptOverridesSchema.parse(value);
+}
+
+/** A deterministic record of the exact correction-prompt override inputs. */
+export function correctionPromptOverridesFingerprint(overrides: CorrectionPromptOverrides): string {
+  return JSON.stringify({
+    base: overrides.base?.trim() || null,
+    task1: overrides.task1?.trim() || null,
+    task2: overrides.task2?.trim() || null,
+    task3Documents: overrides.task3Documents?.trim() || null,
+    task3Documentless: overrides.task3Documentless?.trim() || null,
+  });
 }
 
 const correctionEvaluationCaseSchema = z.object({
@@ -52,12 +83,45 @@ export interface CorrectionEvaluationOutput {
   error?: string;
 }
 
+/**
+ * Returns one CEFR result per case from repeated provider calls. Ties are
+ * deliberately invalid rather than arbitrarily resolved: unstable CEFR
+ * classification is a reliability failure that a model comparison must show.
+ */
+export function modalCorrectionEvaluationOutputs(
+  cases: readonly CorrectionEvaluationCase[],
+  runs: ReadonlyArray<readonly CorrectionEvaluationOutput[]>,
+): CorrectionEvaluationOutput[] {
+  return cases.map((evaluationCase) => {
+    const votes = new Map<string, { count: number; output: CorrectionEvaluationOutput }>();
+    for (const run of runs) {
+      const output = run.find((item) => item.caseId === evaluationCase.id);
+      if (!output?.feedback) continue;
+      const key = `${output.feedback.cefr.conservativeLevel}|${output.feedback.cefr.estimatedLevel}`;
+      const vote = votes.get(key);
+      if (vote) vote.count += 1;
+      else votes.set(key, { count: 1, output });
+    }
+    const ranked = [...votes.values()].sort((left, right) => right.count - left.count);
+    if (ranked.length === 0) {
+      return { caseId: evaluationCase.id, error: "All repeated provider calls failed or returned invalid feedback." };
+    }
+    if (ranked.length > 1 && ranked[0].count === ranked[1].count) {
+      return { caseId: evaluationCase.id, error: "Repeated calls have no unique modal CEFR result." };
+    }
+    return ranked[0].output;
+  });
+}
+
 export interface CorrectionEvaluationSummary {
   totalCases: number;
   validResponses: number;
   invalidResponses: number;
   exactConservativeMatches: number;
+  /** Exact secure-level accuracy, with every attempted case in the denominator. */
   conservativeAccuracy: number | null;
+  /** Diagnostic accuracy only among syntactically valid provider responses. */
+  validResponseConservativeAccuracy: number | null;
   withinOneBand: number;
   withinOneBandRate: number | null;
   underClassifications: number;
@@ -134,9 +198,14 @@ export function summarizeCorrectionEvaluation(
     validResponses,
     invalidResponses: cases.length - validResponses,
     exactConservativeMatches,
-    conservativeAccuracy: validResponses ? exactConservativeMatches / validResponses : null,
+    // A malformed/failed response is not an ungraded case: a candidate that
+    // cannot return usable feedback is unsuitable even if every surviving
+    // response is perfectly calibrated. Keep valid-response accuracy too,
+    // but never use it as the release metric.
+    conservativeAccuracy: cases.length ? exactConservativeMatches / cases.length : null,
+    validResponseConservativeAccuracy: validResponses ? exactConservativeMatches / validResponses : null,
     withinOneBand,
-    withinOneBandRate: validResponses ? withinOneBand / validResponses : null,
+    withinOneBandRate: cases.length ? withinOneBand / cases.length : null,
     underClassifications,
     overClassifications,
     estimatedExactMatches,
