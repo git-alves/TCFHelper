@@ -177,6 +177,45 @@ describe("recordAdminEvent", () => {
     expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
   });
 
+  it("persists a correction-provider failure for the openrouter adapter", async () => {
+    await recordAdminEvent(
+      {
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: USER_ID,
+        provider: "openrouter",
+        reasonCode: "not_configured",
+        httpStatus: 503,
+      },
+      new Date("2020-08-11T12:00:00.000Z"),
+    );
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      create: expect.objectContaining({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        provider: "openrouter",
+        reasonCode: "not_configured",
+      }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    });
+  });
+
+  it("rejects the openrouter provider under EXAMPLE_PROVIDER_FAILED -- example generation stays Gemini-only", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: USER_ID,
+      provider: "openrouter" as never,
+      reasonCode: "not_configured",
+      httpStatus: 503,
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
+
   it("rejects a closed value used under the wrong event type", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
 

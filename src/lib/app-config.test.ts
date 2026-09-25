@@ -25,6 +25,7 @@ const { getAppConfig, updateAppConfig, maskSecret, getAppConfigDisplay, DEFAULT_
 
 const EMPTY_ROW = {
   id: "singleton",
+  correctionProvider: null,
   correctionApiKey: null,
   correctionModel: null,
   correctionDailyLimit: null,
@@ -37,6 +38,8 @@ const EMPTY_ROW = {
 const originalGeminiApiKey = process.env.GEMINI_API_KEY;
 const originalGeminiModel = process.env.GEMINI_MODEL;
 const originalGeminiCorrectionModel = process.env.GEMINI_CORRECTION_MODEL;
+const originalOpenRouterApiKey = process.env.OPENROUTER_API_KEY;
+const originalOpenRouterCorrectionModel = process.env.OPENROUTER_CORRECTION_MODEL;
 
 beforeEach(() => {
   findUniqueMock.mockReset();
@@ -46,6 +49,8 @@ beforeEach(() => {
   delete process.env.GEMINI_API_KEY;
   delete process.env.GEMINI_MODEL;
   delete process.env.GEMINI_CORRECTION_MODEL;
+  delete process.env.OPENROUTER_API_KEY;
+  delete process.env.OPENROUTER_CORRECTION_MODEL;
 });
 
 afterAll(() => {
@@ -55,6 +60,10 @@ afterAll(() => {
   else process.env.GEMINI_MODEL = originalGeminiModel;
   if (originalGeminiCorrectionModel === undefined) delete process.env.GEMINI_CORRECTION_MODEL;
   else process.env.GEMINI_CORRECTION_MODEL = originalGeminiCorrectionModel;
+  if (originalOpenRouterApiKey === undefined) delete process.env.OPENROUTER_API_KEY;
+  else process.env.OPENROUTER_API_KEY = originalOpenRouterApiKey;
+  if (originalOpenRouterCorrectionModel === undefined) delete process.env.OPENROUTER_CORRECTION_MODEL;
+  else process.env.OPENROUTER_CORRECTION_MODEL = originalOpenRouterCorrectionModel;
 });
 
 describe("getAppConfig", () => {
@@ -62,6 +71,7 @@ describe("getAppConfig", () => {
     findUniqueMock.mockResolvedValue(null);
 
     await expect(getAppConfig()).resolves.toEqual({
+      correctionProvider: null,
       correctionApiKey: null,
       correctionModel: null,
       correctionDailyLimit: null,
@@ -74,12 +84,14 @@ describe("getAppConfig", () => {
   it("returns the stored row's fields", async () => {
     findUniqueMock.mockResolvedValue({
       ...EMPTY_ROW,
+      correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
       correctionDailyLimit: 250,
     });
 
     await expect(getAppConfig()).resolves.toEqual({
+      correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
       correctionDailyLimit: 250,
@@ -185,6 +197,7 @@ describe("getAppConfigDisplay", () => {
         dailyLimitIsDefault: true,
         requestsToday: 0,
       },
+      correctionProvider: "gemini",
       example: {
         apiKeySet: false,
         apiKeyMasked: null,
@@ -246,5 +259,36 @@ describe("getAppConfigDisplay", () => {
 
     expect(display.correction.requestsToday).toBe(42);
     expect(display.example.requestsToday).toBe(7);
+  });
+
+  it("defaults an unset or unrecognized correction provider to gemini", async () => {
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: null });
+    expect((await getAppConfigDisplay()).correctionProvider).toBe("gemini");
+
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "anthropic" });
+    expect((await getAppConfigDisplay()).correctionProvider).toBe("gemini");
+  });
+
+  it("reports the OpenRouter env vars, not Gemini's, once openrouter is selected", async () => {
+    process.env.GEMINI_API_KEY = "gemini-env-key";
+    process.env.GEMINI_CORRECTION_MODEL = "gemini-custom-correction";
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    process.env.OPENROUTER_CORRECTION_MODEL = "qwen/qwen3-30b-a3b";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correctionProvider).toBe("openrouter");
+    expect(display.correction.apiKeyFromEnv).toBe(true);
+    expect(display.correction.modelDefault).toBe("qwen/qwen3-30b-a3b");
+  });
+
+  it("reports no default model for openrouter when OPENROUTER_CORRECTION_MODEL is unset", async () => {
+    process.env.OPENROUTER_API_KEY = "openrouter-env-key";
+    findUniqueMock.mockResolvedValue({ ...EMPTY_ROW, correctionProvider: "openrouter" });
+
+    const display = await getAppConfigDisplay();
+
+    expect(display.correction.modelDefault).toBe("");
   });
 });

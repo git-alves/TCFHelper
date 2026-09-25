@@ -3,6 +3,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_GEMINI_CORRECTION_MODEL, DEFAULT_GEMINI_MODEL } from "@/lib/gemini";
 import { getGeminiRequestsToday } from "@/lib/admin-overview";
+import {
+  DEFAULT_CORRECTION_PROVIDER,
+  isCorrectionProviderId,
+  type CorrectionProviderId,
+} from "@/lib/correction-provider";
 
 const CONFIG_ID = "singleton";
 
@@ -12,6 +17,7 @@ const CONFIG_ID = "singleton";
 export const DEFAULT_GEMINI_DAILY_REQUEST_LIMIT = 1000;
 
 export interface AppConfigValue {
+  correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
   correctionDailyLimit: number | null;
@@ -21,6 +27,7 @@ export interface AppConfigValue {
 }
 
 const EMPTY_CONFIG: AppConfigValue = {
+  correctionProvider: null,
   correctionApiKey: null,
   correctionModel: null,
   correctionDailyLimit: null,
@@ -30,6 +37,7 @@ const EMPTY_CONFIG: AppConfigValue = {
 };
 
 function toAppConfigValue(row: {
+  correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
   correctionDailyLimit: number | null;
@@ -38,6 +46,7 @@ function toAppConfigValue(row: {
   exampleDailyLimit: number | null;
 }): AppConfigValue {
   return {
+    correctionProvider: row.correctionProvider,
     correctionApiKey: row.correctionApiKey,
     correctionModel: row.correctionModel,
     correctionDailyLimit: row.correctionDailyLimit,
@@ -47,6 +56,11 @@ function toAppConfigValue(row: {
   };
 }
 
+/** Resolves a stored (possibly null/invalid) override to an actual provider id. */
+export function resolveCorrectionProviderId(value: string | null | undefined): CorrectionProviderId {
+  return value && isCorrectionProviderId(value) ? value : DEFAULT_CORRECTION_PROVIDER;
+}
+
 /** Never throws for a missing row: no admin override yet is a normal state. */
 export async function getAppConfig(): Promise<AppConfigValue> {
   const row = await prisma.appConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -54,6 +68,7 @@ export async function getAppConfig(): Promise<AppConfigValue> {
 }
 
 export interface AppConfigUpdateInput {
+  correctionProvider?: string | null;
   correctionApiKey?: string | null;
   correctionModel?: string | null;
   correctionDailyLimit?: number | null;
@@ -74,6 +89,7 @@ function normalizeText(value: string | null | undefined): string | null | undefi
  */
 export async function updateAppConfig(patch: AppConfigUpdateInput): Promise<AppConfigValue> {
   const normalized: AppConfigUpdateInput = {
+    correctionProvider: normalizeText(patch.correctionProvider),
     correctionApiKey: normalizeText(patch.correctionApiKey),
     correctionModel: normalizeText(patch.correctionModel),
     correctionDailyLimit: patch.correctionDailyLimit,
@@ -116,6 +132,12 @@ export interface AppConfigDisplaySection {
 
 export interface AppConfigDisplay {
   correction: AppConfigDisplaySection;
+  // The resolved provider id (never null -- see resolveCorrectionProviderId)
+  // driving which env vars correction.apiKeyFromEnv/modelDefault above
+  // reflect. Kept as a sibling of `correction` rather than folded into
+  // AppConfigDisplaySection so that generic shape stays reusable for a
+  // section (example generation) that has no provider concept yet.
+  correctionProvider: CorrectionProviderId;
   example: AppConfigDisplaySection;
 }
 
@@ -127,19 +149,30 @@ export interface AppConfigDisplay {
  */
 export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
   const [config, requestsToday] = await Promise.all([getAppConfig(), getGeminiRequestsToday()]);
+  const correctionProvider = resolveCorrectionProviderId(config.correctionProvider);
+  // OpenRouter fronts hundreds of models with no single sane default (unlike
+  // Gemini's fixed free-tier default below) -- an admin on this provider
+  // must set a model, from the panel or OPENROUTER_CORRECTION_MODEL.
+  const correctionApiKeyEnvVar =
+    correctionProvider === "openrouter" ? process.env.OPENROUTER_API_KEY : process.env.GEMINI_API_KEY;
+  const correctionModelDefault =
+    correctionProvider === "openrouter"
+      ? process.env.OPENROUTER_CORRECTION_MODEL?.trim() || ""
+      : process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
 
   return {
     correction: {
       apiKeySet: Boolean(config.correctionApiKey),
       apiKeyMasked: maskSecret(config.correctionApiKey),
-      apiKeyFromEnv: !config.correctionApiKey && Boolean(process.env.GEMINI_API_KEY?.trim()),
+      apiKeyFromEnv: !config.correctionApiKey && Boolean(correctionApiKeyEnvVar?.trim()),
       model: config.correctionModel,
-      modelDefault: process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL,
+      modelDefault: correctionModelDefault,
       dailyLimit: config.correctionDailyLimit ?? DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
       dailyLimitDefault: DEFAULT_GEMINI_DAILY_REQUEST_LIMIT,
       dailyLimitIsDefault: config.correctionDailyLimit === null,
       requestsToday: requestsToday.correctionRequestsToday,
     },
+    correctionProvider,
     example: {
       apiKeySet: Boolean(config.exampleApiKey),
       apiKeyMasked: maskSecret(config.exampleApiKey),

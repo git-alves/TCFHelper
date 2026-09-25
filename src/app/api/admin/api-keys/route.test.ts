@@ -21,6 +21,7 @@ const { GET, PUT } = await import("./route");
 
 const ADMIN = { id: "cuid_admin_1", isAdmin: true };
 const DISPLAY = {
+  correctionProvider: "gemini",
   correction: {
     apiKeySet: false,
     apiKeyMasked: null,
@@ -164,5 +165,41 @@ describe("PUT /api/admin/api-keys", () => {
     );
 
     expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionApiKey: "" });
+  });
+
+  it("accepts a recognized correction provider id", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ correctionProvider: "openrouter" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionProvider: "openrouter" });
+  });
+
+  it("rejects an unrecognized correction provider id", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ correctionProvider: "anthropic" }),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(updateAppConfigMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts a null correction provider to reset it to the default", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/api-keys", {
+        method: "PUT",
+        body: JSON.stringify({ correctionProvider: null }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionProvider: null });
   });
 });

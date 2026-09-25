@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { adminJsonResponse, adminNotFoundResponse, getAdminApiUser } from "@/lib/admin-api";
 import { getAppConfigDisplay, updateAppConfig } from "@/lib/app-config";
+import { CORRECTION_PROVIDER_IDS } from "@/lib/correction-provider";
 
 // A generous ceiling, not a real format constraint: provider keys and model
 // names have no fixed shape worth validating beyond "not absurdly long".
@@ -9,9 +10,14 @@ const MAX_DAILY_LIMIT = 1_000_000;
 
 const textFieldSchema = z.string().max(MAX_FIELD_LENGTH).nullable().optional();
 const limitFieldSchema = z.number().int().min(1).max(MAX_DAILY_LIMIT).nullable().optional();
+// Unlike the free-text fields above, the provider is a closed set: it
+// selects which CorrectionProvider adapter (correction-provider.ts) actually
+// runs, so an unrecognized value must be rejected here rather than stored.
+const correctionProviderFieldSchema = z.enum(CORRECTION_PROVIDER_IDS).nullable().optional();
 
 const requestSchema = z
   .object({
+    correctionProvider: correctionProviderFieldSchema,
     correctionApiKey: textFieldSchema,
     correctionModel: textFieldSchema,
     correctionDailyLimit: limitFieldSchema,

@@ -588,6 +588,14 @@ model ClerkWebhookEvent {
 /// introducing separate encryption-key management for a single admin field.
 model AppConfig {
   id                   String   @id @default("singleton")
+  // Which CorrectionProvider (src/lib/correction-provider.ts) grades an
+  // essay -- "gemini" or "openrouter" today. Null falls back to
+  // DEFAULT_CORRECTION_PROVIDER ("gemini"), so an existing deployment with
+  // no row here keeps behaving exactly as before. Deliberately plain TEXT,
+  // not a native Postgres enum: the app-level CORRECTION_PROVIDER_IDS union
+  // is the sole source of truth, so a future adapter never needs a schema
+  // migration here, only an application-code addition.
+  correctionProvider   String?
   correctionApiKey     String?
   correctionModel      String?
   exampleApiKey        String?
