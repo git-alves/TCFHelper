@@ -79,4 +79,9 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // "invalid_response" itself stays valid in AdminEvent_reasonCode_check so
   // an already-stored row using it still reads back fine.
   "20260928120000_add_correction_json_error_classification",
+  // A single nullable, length-bounded AdminEvent column plus a widened
+  // closedShape check constraint requiring it null on every branch except
+  // CORRECTION_PROVIDER_FAILED/EXAMPLE_PROVIDER_FAILED. No existing row's
+  // meaning changes: every existing row already has this column null.
+  "20260928130000_add_admin_event_model",
 ]);

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { gradeEssayWithGeminiMock, hasConfiguredGeminiMock } = vi.hoisted(() => ({
   gradeEssayWithGeminiMock: vi.fn(),
@@ -30,9 +30,17 @@ const {
 } = await import("@/lib/correction-provider");
 const { geminiCorrectionProvider } = await import("./gemini-correction-provider");
 
+const originalCorrectionModel = process.env.GEMINI_CORRECTION_MODEL;
+
 beforeEach(() => {
   gradeEssayWithGeminiMock.mockReset();
   hasConfiguredGeminiMock.mockReset();
+  delete process.env.GEMINI_CORRECTION_MODEL;
+});
+
+afterEach(() => {
+  if (originalCorrectionModel === undefined) delete process.env.GEMINI_CORRECTION_MODEL;
+  else process.env.GEMINI_CORRECTION_MODEL = originalCorrectionModel;
 });
 
 describe("geminiCorrectionProvider", () => {
@@ -90,5 +98,23 @@ describe("geminiCorrectionProvider", () => {
     await expect(
       geminiCorrectionProvider.gradeEssay({ systemPrompt: "s", userPrompt: "u" }),
     ).rejects.toBe(unknownError);
+  });
+
+  describe("resolveModel", () => {
+    it("prefers an explicit override over the env var and the built-in default", () => {
+      process.env.GEMINI_CORRECTION_MODEL = "gemini-env-model";
+      expect(geminiCorrectionProvider.resolveModel({ model: "gemini-override-model" })).toBe(
+        "gemini-override-model",
+      );
+    });
+
+    it("falls back to GEMINI_CORRECTION_MODEL when no override is given", () => {
+      process.env.GEMINI_CORRECTION_MODEL = "gemini-env-model";
+      expect(geminiCorrectionProvider.resolveModel()).toBe("gemini-env-model");
+    });
+
+    it("falls back to the built-in default when nothing else is set -- never null, unlike OpenRouter", () => {
+      expect(geminiCorrectionProvider.resolveModel()).toBe("gemini-3.5-flash-lite");
+    });
   });
 });

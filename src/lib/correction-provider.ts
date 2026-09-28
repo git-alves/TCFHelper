@@ -122,4 +122,14 @@ export interface CorrectionProvider {
    * any structured-output constraint the provider itself applied.
    */
   gradeEssay(params: GradeEssayParams, overrides?: CorrectionProviderOverrides): Promise<unknown>;
+  /**
+   * The model string this provider would actually use for a call with the
+   * given overrides (the admin's override, or this adapter's own env-var/
+   * built-in default), or null if none is configured. Used only for
+   * admin-log provenance (see AdminEvent.model in admin-events.ts) so a
+   * CORRECTION_PROVIDER_FAILED row can be tied to the exact candidate model
+   * that produced it -- never derived from a provider's response or a
+   * learner's essay.
+   */
+  resolveModel(overrides?: CorrectionProviderOverrides): string | null;
 }

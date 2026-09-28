@@ -17,6 +17,7 @@ const {
   refundExampleGenerationLeaseMock,
   generatePreferredModelAnswerMock,
   hasConfiguredCredentialsMock,
+  resolveModelMock,
   getExampleProviderMock,
   getAppConfigMock,
   getPromptOverridesMock,
@@ -46,6 +47,7 @@ const {
     refundExampleGenerationLeaseMock: vi.fn(),
     generatePreferredModelAnswerMock: vi.fn(),
     hasConfiguredCredentialsMock: vi.fn(),
+    resolveModelMock: vi.fn(),
     getExampleProviderMock: vi.fn(),
     getAppConfigMock: vi.fn(),
     getPromptOverridesMock: vi.fn(),
@@ -106,7 +108,12 @@ const { POST } = await import("./route");
 const LOCAL_USER_ID = "cuid_local_user_1";
 
 function stubProvider(id: "gemini" | "openrouter" = "gemini"): ExampleProvider {
-  return { id, hasConfiguredCredentials: hasConfiguredCredentialsMock, generateExample: vi.fn() };
+  return {
+    id,
+    hasConfiguredCredentials: hasConfiguredCredentialsMock,
+    generateExample: vi.fn(),
+    resolveModel: resolveModelMock,
+  };
 }
 
 beforeEach(() => {
@@ -121,6 +128,7 @@ beforeEach(() => {
   refundExampleGenerationLeaseMock.mockReset();
   generatePreferredModelAnswerMock.mockReset();
   hasConfiguredCredentialsMock.mockReset();
+  resolveModelMock.mockReset();
   getExampleProviderMock.mockReset();
   getAppConfigMock.mockReset();
   getPromptOverridesMock.mockReset();
@@ -134,6 +142,7 @@ beforeEach(() => {
   releaseExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   refundExampleGenerationLeaseMock.mockResolvedValue({ count: 1 });
   hasConfiguredCredentialsMock.mockReturnValue(true);
+  resolveModelMock.mockReturnValue("gemini-3.5-flash");
   getExampleProviderMock.mockImplementation((id: "gemini" | "openrouter") => stubProvider(id));
   getAppConfigMock.mockResolvedValue({
     correctionProvider: null,
@@ -430,6 +439,7 @@ describe("POST /api/essays/example", () => {
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
+      model: "gemini-3.5-flash",
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -464,6 +474,7 @@ describe("POST /api/essays/example", () => {
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
+      model: "gemini-3.5-flash",
       reasonCode: "rate_limited",
       httpStatus: 429,
     });
@@ -471,6 +482,7 @@ describe("POST /api/essays/example", () => {
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
+      model: "gemini-3.5-flash",
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -536,6 +548,9 @@ describe("POST /api/essays/example", () => {
       exampleModel: null,
     });
     hasConfiguredCredentialsMock.mockReturnValue(false);
+    // A genuinely unconfigured OpenRouter provider (no model set at all)
+    // has nothing for resolveModel to report.
+    resolveModelMock.mockReturnValue(null);
 
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
 
@@ -575,6 +590,7 @@ describe("POST /api/essays/example", () => {
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: LOCAL_USER_ID,
         provider: "gemini",
+        model: "gemini-3.5-flash",
         reasonCode: "upstream_http_error",
         httpStatus: 400,
       });

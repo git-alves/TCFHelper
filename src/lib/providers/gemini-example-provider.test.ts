@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { generateModelAnswerMock, hasConfiguredGeminiMock } = vi.hoisted(() => ({
   generateModelAnswerMock: vi.fn(),
@@ -35,9 +35,17 @@ const params = {
   topicPrompt: "Sujet",
 };
 
+const originalModel = process.env.GEMINI_MODEL;
+
 beforeEach(() => {
   generateModelAnswerMock.mockReset();
   hasConfiguredGeminiMock.mockReset();
+  delete process.env.GEMINI_MODEL;
+});
+
+afterEach(() => {
+  if (originalModel === undefined) delete process.env.GEMINI_MODEL;
+  else process.env.GEMINI_MODEL = originalModel;
 });
 
 describe("geminiExampleProvider", () => {
@@ -82,5 +90,23 @@ describe("geminiExampleProvider", () => {
     generateModelAnswerMock.mockRejectedValue(unknownError);
 
     await expect(geminiExampleProvider.generateExample(params)).rejects.toBe(unknownError);
+  });
+
+  describe("resolveModel", () => {
+    it("prefers an explicit override over the env var and the built-in default", () => {
+      process.env.GEMINI_MODEL = "gemini-env-model";
+      expect(geminiExampleProvider.resolveModel({ model: "gemini-override-model" })).toBe(
+        "gemini-override-model",
+      );
+    });
+
+    it("falls back to GEMINI_MODEL when no override is given", () => {
+      process.env.GEMINI_MODEL = "gemini-env-model";
+      expect(geminiExampleProvider.resolveModel()).toBe("gemini-env-model");
+    });
+
+    it("falls back to the built-in default when nothing else is set -- never null, unlike OpenRouter", () => {
+      expect(geminiExampleProvider.resolveModel()).toBe("gemini-3.5-flash");
+    });
   });
 });

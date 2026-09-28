@@ -57,10 +57,13 @@ vi.mock("@/lib/admin-events", () => ({
     "transport_error",
     "upstream_http_error",
     "invalid_response",
+    "format_unsupported",
+    "invalid_json",
+    "schema_invalid",
     "fallback_circuit_open",
     "provider_unavailable",
   ],
-  ADMIN_EVENT_PROVIDERS: ["gemini", "deepl", "unofficial", "deepl_or_unofficial"],
+  ADMIN_EVENT_PROVIDERS: ["gemini", "openrouter", "deepl", "unofficial", "deepl_or_unofficial", "hunspell"],
   ADMIN_EVENT_QUOTA_WINDOWS: ["minute", "day", "month"],
   getAdminEventRetentionCutoff: (now: Date) => new Date(now.getTime() - 30 * 24 * 60 * 60 * 1_000),
   formatAdminEventMessage: formatMessageMock,
@@ -92,6 +95,7 @@ function record(overrides: Record<string, unknown> = {}) {
     essayId: null,
     accessCodeId: null,
     provider: null,
+    model: null,
     reasonCode: "minute_request_limit",
     httpStatus: null,
     quotaWindow: "minute",
@@ -244,6 +248,7 @@ describe("getAdminEventLogPage", () => {
         essayId: "raw essay text",
         accessCodeId: "TCF-PRO-2026",
         provider: "https://provider.example/secret",
+        model: "x".repeat(201),
         reasonCode: "raw upstream exception",
         httpStatus: 999,
         quotaWindow: "forever",
@@ -265,6 +270,7 @@ describe("getAdminEventLogPage", () => {
       essayId: null,
       accessCodeId: null,
       provider: null,
+      model: null,
       reasonCode: null,
       httpStatus: null,
       quotaWindow: null,
@@ -274,9 +280,30 @@ describe("getAdminEventLogPage", () => {
     });
     expect(JSON.stringify(event)).not.toContain("raw");
     expect(JSON.stringify(event)).not.toContain("TCF-PRO-2026");
+    expect(JSON.stringify(event)).not.toContain("xxx");
     expect(formatMessageMock).toHaveBeenCalledWith(
       expect.objectContaining({ eventType: "UNKNOWN_EVENT", provider: null, reasonCode: null }),
     );
+  });
+
+  it("passes a well-formed model string through, so a correction/example provider failure can be tied to the exact candidate", async () => {
+    countMock.mockResolvedValue(1);
+    eventFindManyMock.mockResolvedValue([
+      record({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        provider: "openrouter",
+        model: "qwen/qwen3.8-27b:free",
+        reasonCode: "rate_limited",
+        httpStatus: 429,
+        quotaWindow: null,
+        usageValue: null,
+        quotaLimit: null,
+      }),
+    ]);
+
+    const page = await getAdminEventLogPage(parseAdminEventLogQuery({ range: "today" }, NOW), NOW);
+
+    expect(page.events[0]).toMatchObject({ provider: "openrouter", model: "qwen/qwen3.8-27b:free" });
   });
 
   it("returns only the safe authentication summary, never fingerprint or raw network data", async () => {

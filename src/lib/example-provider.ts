@@ -68,4 +68,14 @@ export interface ExampleProvider {
    * of provider).
    */
   generateExample(params: GenerateModelAnswerParams, overrides?: ExampleProviderOverrides): Promise<string>;
+  /**
+   * The model string this provider would actually use for a call with the
+   * given overrides (the admin's override, or this adapter's own env-var/
+   * built-in default), or null if none is configured. Used only for
+   * admin-log provenance (see AdminEvent.model in admin-events.ts) so an
+   * EXAMPLE_PROVIDER_FAILED row can be tied to the exact candidate model
+   * that produced it -- never derived from a provider's response or a
+   * learner's essay.
+   */
+  resolveModel(overrides?: ExampleProviderOverrides): string | null;
 }

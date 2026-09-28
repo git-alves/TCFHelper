@@ -256,6 +256,13 @@ export async function POST(request: Request) {
   const providerId = resolveCorrectionProviderId(appConfig.correctionProvider);
   const provider = getCorrectionProvider(providerId);
   const providerOverrides = { apiKey: appConfig.correctionApiKey, model: appConfig.correctionModel };
+  // Recorded on every CORRECTION_PROVIDER_FAILED event below so a failure
+  // can be tied to the exact candidate model that produced it, not just the
+  // provider -- otherwise switching models on /admin/api-keys while testing
+  // makes a schema_invalid/rate-limit failure ambiguous after the fact. Null
+  // only when nothing is configured at all (e.g. an OpenRouter provider with
+  // no model set yet).
+  const resolvedModel = provider.resolveModel(providerOverrides) ?? undefined;
 
   // Preserve duplicate/in-progress responses during an outage, but do not
   // reserve an unrefundable slot if this newly claimed request cannot reach
@@ -266,6 +273,7 @@ export async function POST(request: Request) {
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: user.id,
       provider: providerId,
+      model: resolvedModel,
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -339,6 +347,7 @@ export async function POST(request: Request) {
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
         provider: providerId,
+        model: resolvedModel,
         reasonCode,
         httpStatus: boundedCorrectionProviderHttpStatus(error) ?? 502,
       });
@@ -359,6 +368,7 @@ export async function POST(request: Request) {
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
         provider: providerId,
+        model: resolvedModel,
         reasonCode: "schema_invalid",
         httpStatus: 502,
       });
