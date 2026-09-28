@@ -8,8 +8,8 @@ import {
   hasConfiguredGemini,
 } from "@/lib/gemini";
 import {
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -41,7 +41,14 @@ export const geminiCorrectionProvider: CorrectionProvider = {
         throw new CorrectionProviderRateLimitedError(error.message);
       }
       if (error instanceof GeminiCorrectionParseError) {
-        throw new CorrectionProviderParseError();
+        // Gemini's own responseSchema/responseMimeType:"application/json"
+        // enforcement means it essentially never just ignores the
+        // structured-output request and returns prose the way an
+        // OpenRouter-routed model without native support might -- an
+        // unparseable body here is a malformed/truncated JSON attempt, not
+        // a "didn't try" case, so this always maps to the more specific
+        // invalid-JSON classification, never format-unsupported.
+        throw new CorrectionProviderInvalidJsonError();
       }
       if (error instanceof GeminiRequestError) {
         throw new CorrectionProviderRequestError(error.status);

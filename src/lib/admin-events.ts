@@ -52,6 +52,14 @@ export const ADMIN_EVENT_REASON_CODES = [
   "transport_error",
   "upstream_http_error",
   "invalid_response",
+  // Correction-specific refinements of "invalid_response": whether the
+  // provider's content didn't even look like an attempted JSON
+  // object/array (format_unsupported), looked like one but failed to
+  // parse (invalid_json), or parsed but didn't match the production
+  // feedback schema (schema_invalid). See correction-provider.ts.
+  "format_unsupported",
+  "invalid_json",
+  "schema_invalid",
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
@@ -337,7 +345,9 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
             "rate_limited",
             "transport_error",
             "upstream_http_error",
-            "invalid_response",
+            "format_unsupported",
+            "invalid_json",
+            "schema_invalid",
             "provider_unavailable",
           ] as const,
           input.reasonCode,

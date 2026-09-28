@@ -61,10 +61,53 @@ export class CorrectionProviderTransportError extends Error {
   }
 }
 
-/** The provider returned a 2xx response, but its body wasn't usable feedback JSON. */
-export class CorrectionProviderParseError extends Error {
+/**
+ * The provider returned a 2xx response, but its content didn't even look
+ * like an attempted JSON object/array (e.g. plain prose) -- the model most
+ * likely doesn't honor (or wasn't given) the requested structured-output
+ * format, as opposed to attempting JSON and getting it wrong. Distinguished
+ * from CorrectionProviderInvalidJsonError so a log can tell "this model is
+ * incompatible with structured output" apart from "this model attempted
+ * JSON but produced something malformed."
+ */
+export class CorrectionProviderFormatUnsupportedError extends Error {
+  constructor() {
+    super("Correction provider did not return a structured JSON response.");
+  }
+}
+
+/** The provider's content looked like an attempted JSON object/array, but failed to parse. */
+export class CorrectionProviderInvalidJsonError extends Error {
   constructor() {
     super("Correction provider's response was not valid JSON.");
+  }
+}
+
+/**
+ * Cheap heuristic shared by every JSON-parsing adapter: does this content
+ * even look like an attempted JSON object/array? Never inspects anything
+ * beyond the first non-whitespace character, so it can't echo any of the
+ * provider's actual content into a log or an error.
+ */
+export function looksLikeJson(content: string): boolean {
+  const firstChar = content.trimStart().charAt(0);
+  return firstChar === "{" || firstChar === "[";
+}
+
+/**
+ * Throws CorrectionProviderFormatUnsupportedError when `content` doesn't
+ * even look like an attempted JSON object/array, or CorrectionProviderInvalidJsonError
+ * when it does but still fails to parse. Shared by every adapter that grades
+ * by parsing a raw text response as JSON.
+ */
+export function parseCorrectionJson(content: string): unknown {
+  if (!looksLikeJson(content)) {
+    throw new CorrectionProviderFormatUnsupportedError();
+  }
+  try {
+    return JSON.parse(content);
+  } catch {
+    throw new CorrectionProviderInvalidJsonError();
   }
 }
 
