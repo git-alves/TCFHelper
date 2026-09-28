@@ -7,8 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { getAppConfig, resolveCorrectionProviderId } from "@/lib/app-config";
 import { getCorrectionProvider } from "@/lib/correction-provider-registry";
 import {
+  CorrectionProviderFormatUnsupportedError,
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -119,7 +120,12 @@ function minimumWordCountResponse(wordCount: number, minWords: number) {
 function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode {
   if (error instanceof CorrectionProviderNotConfiguredError) return "not_configured";
   if (error instanceof CorrectionProviderRateLimitedError) return "rate_limited";
-  if (error instanceof CorrectionProviderParseError) return "invalid_response";
+  // Distinguishes "the model didn't even attempt structured output" from
+  // "it attempted JSON but produced something malformed" -- lumping both
+  // into one generic reasonCode made it impossible to tell a genuinely
+  // incompatible model apart from a transient/one-off malformed response.
+  if (error instanceof CorrectionProviderFormatUnsupportedError) return "format_unsupported";
+  if (error instanceof CorrectionProviderInvalidJsonError) return "invalid_json";
   if (error instanceof CorrectionProviderRequestError) return "upstream_http_error";
   if (error instanceof CorrectionProviderTransportError) return "transport_error";
   return "provider_unavailable";
@@ -344,11 +350,16 @@ export async function POST(request: Request) {
     }
     const parsedFeedback = freshEssayFeedbackSchema.safeParse(rawFeedback);
     if (!parsedFeedback.success) {
+      // Distinct from format_unsupported/invalid_json above: the provider
+      // did return parseable JSON, so it did attempt (and its transport
+      // honored) structured output -- it just doesn't match the production
+      // feedback schema (missing/wrong-typed fields, an unexpected CEFR
+      // enum value, etc.).
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
         provider: providerId,
-        reasonCode: "invalid_response",
+        reasonCode: "schema_invalid",
         httpStatus: 502,
       });
       return NextResponse.json(

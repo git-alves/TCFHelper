@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CorrectionProviderFormatUnsupportedError,
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -506,7 +507,7 @@ describe("POST /api/essays/correct", () => {
     expect(releaseCorrectionClaimMock).not.toHaveBeenCalled();
   });
 
-  it("counts a provider call even when its response cannot be parsed", async () => {
+  it("counts a provider call even when its response doesn't match the feedback schema", async () => {
     gradeEssayMock.mockResolvedValue({ invalid: true });
 
     const response = await post({
@@ -521,7 +522,7 @@ describe("POST /api/essays/correct", () => {
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
-      reasonCode: "invalid_response",
+      reasonCode: "schema_invalid",
       httpStatus: 502,
     });
   });
@@ -984,10 +985,16 @@ describe("POST /api/essays/correct", () => {
         expect.objectContaining({ reasonCode: "not_configured" }),
       );
 
-      gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderParseError());
+      gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderFormatUnsupportedError());
       await post({ taskType: "TASK_1", topicId: "topic_1", content: VALID_TASK_1_CONTENT });
       expect(recordAdminEventMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({ reasonCode: "invalid_response" }),
+        expect.objectContaining({ reasonCode: "format_unsupported" }),
+      );
+
+      gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderInvalidJsonError());
+      await post({ taskType: "TASK_1", topicId: "topic_1", content: VALID_TASK_1_CONTENT });
+      expect(recordAdminEventMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reasonCode: "invalid_json" }),
       );
 
       gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderRequestError(502));

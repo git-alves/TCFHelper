@@ -72,4 +72,11 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // AppConfig column plus a widened AdminEvent check constraint for
   // EXAMPLE_PROVIDER_FAILED. No existing row's meaning changes.
   "20260925130000_add_example_provider_selection",
+  // Widens the same AdminEvent closed-vocabulary check constraints to add
+  // three new reasonCode values (format_unsupported/invalid_json/
+  // schema_invalid) for CORRECTION_PROVIDER_FAILED, replacing the old
+  // generic "invalid_response" there. No existing row's meaning changes --
+  // "invalid_response" itself stays valid in AdminEvent_reasonCode_check so
+  // an already-stored row using it still reads back fine.
+  "20260928120000_add_correction_json_error_classification",
 ]);

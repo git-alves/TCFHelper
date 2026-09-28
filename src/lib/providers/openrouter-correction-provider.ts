@@ -2,10 +2,10 @@ import { z } from "zod";
 import { freshEssayFeedbackSchema } from "@/lib/essay-feedback";
 import {
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
+  parseCorrectionJson,
   type CorrectionProvider,
   type CorrectionProviderOverrides,
 } from "@/lib/correction-provider";
@@ -84,10 +84,6 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
       throw error;
     }
 
-    try {
-      return JSON.parse(content);
-    } catch {
-      throw new CorrectionProviderParseError();
-    }
+    return parseCorrectionJson(content);
   },
 };

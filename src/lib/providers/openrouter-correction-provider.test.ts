@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  CorrectionProviderFormatUnsupportedError,
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -87,16 +88,28 @@ describe("openRouterCorrectionProvider.gradeEssay", () => {
     ).resolves.toEqual({ correctedText: "Bonjour." });
   });
 
-  it("throws CorrectionProviderParseError when the content isn't valid JSON", async () => {
+  it("throws CorrectionProviderFormatUnsupportedError when the content doesn't even look like JSON", async () => {
     mockFetchOnce({
       status: 200,
       ok: true,
-      json: async () => ({ choices: [{ message: { content: "not json" } }] }),
+      json: async () => ({ choices: [{ message: { content: "Sure, here is my assessment: ..." } }] }),
     });
 
     await expect(
       openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" }),
-    ).rejects.toBeInstanceOf(CorrectionProviderParseError);
+    ).rejects.toBeInstanceOf(CorrectionProviderFormatUnsupportedError);
+  });
+
+  it("throws CorrectionProviderInvalidJsonError when the content looks like JSON but fails to parse", async () => {
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: '{"correctedText": "Bonjour.",' } }] }),
+    });
+
+    await expect(
+      openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" }),
+    ).rejects.toBeInstanceOf(CorrectionProviderInvalidJsonError);
   });
 
   it("throws CorrectionProviderRateLimitedError on 429", async () => {

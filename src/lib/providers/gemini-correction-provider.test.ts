@@ -22,8 +22,8 @@ const {
   GeminiTransportError,
 } = await import("@/lib/gemini");
 const {
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
-  CorrectionProviderParseError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -58,7 +58,11 @@ describe("geminiCorrectionProvider", () => {
   it.each([
     [new GeminiNotConfiguredError("x"), CorrectionProviderNotConfiguredError],
     [new GeminiRateLimitedError("x"), CorrectionProviderRateLimitedError],
-    [new GeminiCorrectionParseError(), CorrectionProviderParseError],
+    // Always the more specific invalid-JSON classification, never
+    // format-unsupported: Gemini's own responseSchema/responseMimeType
+    // enforcement means an unparseable body is a malformed/truncated JSON
+    // attempt, not a "didn't try" case (see gemini-correction-provider.ts).
+    [new GeminiCorrectionParseError(), CorrectionProviderInvalidJsonError],
     [new GeminiTransportError(), CorrectionProviderTransportError],
   ])("translates %s into the provider-agnostic error type", async (thrown, expectedType) => {
     gradeEssayWithGeminiMock.mockRejectedValue(thrown);

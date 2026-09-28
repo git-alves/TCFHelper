@@ -200,6 +200,48 @@ describe("recordAdminEvent", () => {
     });
   });
 
+  it.each(["format_unsupported", "invalid_json", "schema_invalid"] as const)(
+    "persists a correction-provider failure with the %s reason code",
+    async (reasonCode) => {
+      await recordAdminEvent(
+        {
+          eventType: "CORRECTION_PROVIDER_FAILED",
+          userId: USER_ID,
+          provider: "openrouter",
+          reasonCode,
+          httpStatus: 502,
+        },
+        new Date("2020-08-11T12:00:00.000Z"),
+      );
+
+      expect(upsertMock).toHaveBeenCalledWith({
+        where: { dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/) },
+        create: expect.objectContaining({
+          eventType: "CORRECTION_PROVIDER_FAILED",
+          provider: "openrouter",
+          reasonCode,
+        }),
+        update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+      });
+    },
+  );
+
+  it("rejects the retired invalid_response reason code under CORRECTION_PROVIDER_FAILED -- callers now use a more specific one", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "CORRECTION_PROVIDER_FAILED",
+      userId: USER_ID,
+      provider: "openrouter",
+      reasonCode: "invalid_response" as never,
+      httpStatus: 502,
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
+
   it("persists an example-provider failure for the openrouter adapter", async () => {
     await recordAdminEvent(
       {
