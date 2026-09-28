@@ -251,18 +251,13 @@ function migrateLegacyStoredFields(
   };
 }
 
+type HistoryItemRecord = Prisma.EssayGetPayload<{ select: typeof historyItemSelect }>;
+
 /**
  * A small, intentionally text-free dashboard list. The full original text and
  * model feedback are fetched only by the owner-scoped detail read below.
  */
-async function getCorrections(userId: string, limit?: number): Promise<CorrectionHistoryItem[]> {
-  const essays = await prisma.essay.findMany({
-    where: submittedCorrectionWhere(userId),
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    ...(limit === undefined ? {} : { take: limit }),
-    select: historyItemSelect,
-  });
-
+function toHistoryItems(essays: readonly HistoryItemRecord[]): CorrectionHistoryItem[] {
   return essays.flatMap((essay) => {
     if (!essay.feedback) return [];
 
@@ -282,16 +277,49 @@ async function getCorrections(userId: string, limit?: number): Promise<Correctio
 }
 
 export async function getRecentCorrections(userId: string, limit = 5): Promise<CorrectionHistoryItem[]> {
-  return getCorrections(userId, limit);
+  const essays = await prisma.essay.findMany({
+    where: submittedCorrectionWhere(userId),
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit,
+    select: historyItemSelect,
+  });
+  return toHistoryItems(essays);
+}
+
+// A learner's history can grow well past what's reasonable to render as one
+// page of server HTML, so the dashboard history view is paginated like the
+// admin users/event-log lists (see getAdminUsersPage/getAdminEventLogPage)
+// rather than rendering every owner-visible record at once.
+export const CORRECTION_HISTORY_PAGE_SIZE = 10;
+
+export interface CorrectionHistoryPage {
+  items: CorrectionHistoryItem[];
+  total: number;
+  page: number;
+  pageCount: number;
 }
 
 /**
- * The first history slice intentionally renders all owner-visible records as
- * server HTML. A future cursor page can be added without changing the detail
- * ownership rule or exposing full essay text in the dashboard list.
+ * `page` is clamped into [1, pageCount] rather than trusted as-is, so an
+ * out-of-range or stale ?page= value (e.g. from a bookmark taken before
+ * older corrections were deleted) still renders the nearest real page
+ * instead of an empty one.
  */
-export async function getCorrectionHistory(userId: string): Promise<CorrectionHistoryItem[]> {
-  return getCorrections(userId);
+export async function getCorrectionHistoryPage(userId: string, page: number): Promise<CorrectionHistoryPage> {
+  const where = submittedCorrectionWhere(userId);
+  const total = await prisma.essay.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / CORRECTION_HISTORY_PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), pageCount);
+
+  const essays = await prisma.essay.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: (currentPage - 1) * CORRECTION_HISTORY_PAGE_SIZE,
+    take: CORRECTION_HISTORY_PAGE_SIZE,
+    select: historyItemSelect,
+  });
+
+  return { items: toHistoryItems(essays), total, page: currentPage, pageCount };
 }
 
 /**

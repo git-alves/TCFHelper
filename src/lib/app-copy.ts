@@ -232,6 +232,10 @@ export interface AppCopy {
     deleteCorrectionConfirm: string;
     deleteCorrectionError: string;
     deleteCorrectionSuccess: string;
+    paginationPrevious: string;
+    paginationNext: string;
+    paginationPageOf: (values: { page: number; pageCount: number }) => string;
+    paginationShowingRange: (values: { start: number; end: number; total: number }) => string;
   };
   settings: {
     title: string;
@@ -763,6 +767,10 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Delete",
       deleteCorrectionError: "Couldn't delete this correction. Please try again.",
       deleteCorrectionSuccess: "Correction deleted.",
+      paginationPrevious: "Previous",
+      paginationNext: "Next",
+      paginationPageOf: ({ page, pageCount }) => `Page ${page} of ${pageCount}`,
+      paginationShowingRange: ({ start, end, total }) => `Showing ${start}–${end} of ${total}`,
     },
     settings: {
       title: "Settings",
@@ -1443,6 +1451,10 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Supprimer",
       deleteCorrectionError: "Impossible de supprimer cette correction. Veuillez réessayer.",
       deleteCorrectionSuccess: "Correction supprimée.",
+      paginationPrevious: "Précédent",
+      paginationNext: "Suivant",
+      paginationPageOf: ({ page, pageCount }) => `Page ${page} sur ${pageCount}`,
+      paginationShowingRange: ({ start, end, total }) => `Éléments ${start} à ${end} sur ${total}`,
     },
     settings: {
       title: "Paramètres",
@@ -2133,6 +2145,10 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Eliminar",
       deleteCorrectionError: "No se pudo eliminar esta corrección. Inténtalo de nuevo.",
       deleteCorrectionSuccess: "Corrección eliminada.",
+      paginationPrevious: "Anterior",
+      paginationNext: "Siguiente",
+      paginationPageOf: ({ page, pageCount }) => `Página ${page} de ${pageCount}`,
+      paginationShowingRange: ({ start, end, total }) => `Mostrando ${start}–${end} de ${total}`,
     },
     settings: {
       title: "Configuración",
@@ -2822,6 +2838,10 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Excluir",
       deleteCorrectionError: "Não foi possível excluir esta correção. Tente novamente.",
       deleteCorrectionSuccess: "Correção excluída.",
+      paginationPrevious: "Anterior",
+      paginationNext: "Próximo",
+      paginationPageOf: ({ page, pageCount }) => `Página ${page} de ${pageCount}`,
+      paginationShowingRange: ({ start, end, total }) => `Mostrando ${start}–${end} de ${total}`,
     },
     settings: {
       title: "Configurações",

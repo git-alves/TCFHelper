@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { findFirstMock, findManyMock, deleteManyMock } = vi.hoisted(() => ({
+const { findFirstMock, findManyMock, deleteManyMock, countMock } = vi.hoisted(() => ({
   findFirstMock: vi.fn(),
   findManyMock: vi.fn(),
   deleteManyMock: vi.fn(),
+  countMock: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { essay: { findFirst: findFirstMock, findMany: findManyMock, deleteMany: deleteManyMock } },
+  prisma: {
+    essay: { findFirst: findFirstMock, findMany: findManyMock, deleteMany: deleteManyMock, count: countMock },
+  },
 }));
 
 import { EssayStatus } from "@prisma/client";
 import {
+  CORRECTION_HISTORY_PAGE_SIZE,
   deleteCorrectionForUser,
   getCorrectionForUser,
+  getCorrectionHistoryPage,
   getRecentCorrections,
   parseStoredEssayFeedback,
 } from "./correction-history";
@@ -75,6 +80,7 @@ beforeEach(() => {
   findFirstMock.mockReset();
   findManyMock.mockReset();
   deleteManyMock.mockReset();
+  countMock.mockReset();
 });
 
 describe("parseStoredEssayFeedback", () => {
@@ -262,6 +268,76 @@ describe("getRecentCorrections", () => {
         select: expect.not.objectContaining({ content: expect.anything() }),
       }),
     );
+  });
+});
+
+function essayRecord(id: string) {
+  return {
+    id,
+    taskType: "TASK_2",
+    wordCount: 140,
+    createdAt: new Date("2026-08-07T12:00:00.000Z"),
+    topic: { title: "Forum post" },
+    feedback: {
+      level: "B2",
+      meetsWordCount: true,
+      createdAt: new Date("2026-08-07T12:00:01.000Z"),
+    },
+  };
+}
+
+describe("getCorrectionHistoryPage", () => {
+  it("paginates with skip/take derived from the requested page and the fixed page size", async () => {
+    countMock.mockResolvedValue(25);
+    findManyMock.mockResolvedValue([essayRecord("essay_11")]);
+
+    const page = await getCorrectionHistoryPage("learner_1", 2);
+
+    expect(countMock).toHaveBeenCalledWith({
+      where: { userId: "learner_1", status: EssayStatus.SUBMITTED, feedback: { is: {} } },
+    });
+    expect(findManyMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "learner_1", status: EssayStatus.SUBMITTED, feedback: { is: {} } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        skip: CORRECTION_HISTORY_PAGE_SIZE,
+        take: CORRECTION_HISTORY_PAGE_SIZE,
+      }),
+    );
+    expect(page).toMatchObject({ total: 25, page: 2, pageCount: 3 });
+    expect(page.items).toEqual([expect.objectContaining({ id: "essay_11" })]);
+  });
+
+  it("clamps a page beyond the last real page down to it, instead of rendering empty", async () => {
+    countMock.mockResolvedValue(5);
+    findManyMock.mockResolvedValue([essayRecord("essay_1")]);
+
+    const page = await getCorrectionHistoryPage("learner_1", 99);
+
+    expect(page.page).toBe(1);
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: CORRECTION_HISTORY_PAGE_SIZE }));
+  });
+
+  it("clamps a page below 1 up to 1, so a malformed or bookmarked ?page= never goes negative", async () => {
+    countMock.mockResolvedValue(5);
+    findManyMock.mockResolvedValue([]);
+
+    const page = await getCorrectionHistoryPage("learner_1", 0);
+
+    expect(page.page).toBe(1);
+    expect(findManyMock).toHaveBeenCalledWith(expect.objectContaining({ skip: 0 }));
+  });
+
+  it("reports a single page for a learner with no correction history yet, rather than zero pages", async () => {
+    countMock.mockResolvedValue(0);
+    findManyMock.mockResolvedValue([]);
+
+    await expect(getCorrectionHistoryPage("learner_1", 1)).resolves.toMatchObject({
+      total: 0,
+      page: 1,
+      pageCount: 1,
+      items: [],
+    });
   });
 });
 
