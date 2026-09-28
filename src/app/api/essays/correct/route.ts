@@ -126,6 +126,12 @@ function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode
 }
 
 function boundedCorrectionProviderHttpStatus(error: unknown): number | undefined {
+  // A CorrectionProviderRateLimitedError is only ever thrown when the
+  // provider itself returned 429 (see gemini.ts and openrouter-client.ts) --
+  // unlike CorrectionProviderRequestError, it carries no `status` field, so
+  // this admin-log status was previously always forced to the 502 fallback
+  // below for a rate limit, masking the real upstream status.
+  if (error instanceof CorrectionProviderRateLimitedError) return 429;
   if (!(error instanceof CorrectionProviderRequestError)) return undefined;
   return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
     ? error.status

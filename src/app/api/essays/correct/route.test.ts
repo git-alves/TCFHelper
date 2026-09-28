@@ -963,13 +963,17 @@ describe("POST /api/essays/correct", () => {
         content: VALID_TASK_1_CONTENT,
       });
 
+      // The learner-facing response stays a generic 502 (unlike the example
+      // route, this route doesn't special-case a rate limit into its own
+      // learner-facing status) -- but the admin log now records the real
+      // upstream 429 instead of masking it behind the 502 fallback.
       expect(response.status).toBe(502);
       expect(recordAdminEventMock).toHaveBeenCalledWith({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: LOCAL_USER_ID,
         provider: "gemini",
         reasonCode: "rate_limited",
-        httpStatus: 502,
+        httpStatus: 429,
       });
     });
 
