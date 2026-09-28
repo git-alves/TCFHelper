@@ -40,6 +40,7 @@ function contextItems(event: AdminEventLogItem) {
   if (event.essayId) items.push({ label: "Essay", value: event.essayId });
   if (event.accessCodeId) items.push({ label: "Access-code record", value: event.accessCodeId });
   if (event.provider) items.push({ label: "Provider", value: event.provider });
+  if (event.model) items.push({ label: "Model", value: event.model });
   if (event.reasonCode) items.push({ label: "Reason", value: event.reasonCode.replaceAll("_", " ") });
   if (event.httpStatus !== null) items.push({ label: "HTTP", value: String(event.httpStatus) });
   if (event.quotaWindow) {

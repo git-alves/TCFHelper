@@ -19,6 +19,7 @@ describe("AdminEventLogTable", () => {
             essayId: "essay_1",
             accessCodeId: null,
             provider: "gemini",
+            model: "gemini-3.5-flash-lite",
             reasonCode: "upstream_http_error",
             httpStatus: 503,
             quotaWindow: null,
@@ -37,6 +38,7 @@ describe("AdminEventLogTable", () => {
     expect(markup).toContain("4 occurrences since");
     expect(markup).toContain('href="/admin/users/user_1"');
     expect(markup).toContain("upstream http error");
+    expect(markup).toContain("gemini-3.5-flash-lite");
   });
 
   it("does not invent a raw-message or metadata column", () => {
@@ -54,6 +56,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: "access_code_row_1",
             provider: null,
+            model: null,
             reasonCode: "minute_request_limit",
             httpStatus: null,
             quotaWindow: "minute",
@@ -87,6 +90,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: null,
             provider: null,
+            model: null,
             reasonCode: null,
             httpStatus: null,
             quotaWindow: null,
@@ -108,6 +112,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: null,
             provider: null,
+            model: null,
             reasonCode: null,
             httpStatus: null,
             quotaWindow: null,
@@ -148,6 +153,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: null,
             provider: null,
+            model: null,
             reasonCode: null,
             httpStatus: null,
             quotaWindow: null,
@@ -181,6 +187,7 @@ describe("AdminEventLogTable", () => {
             essayId: null,
             accessCodeId: null,
             provider: null,
+            model: null,
             reasonCode: null,
             httpStatus: null,
             quotaWindow: null,

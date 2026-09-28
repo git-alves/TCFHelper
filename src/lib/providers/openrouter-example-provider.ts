@@ -69,4 +69,8 @@ export const openRouterExampleProvider: ExampleProvider = {
       throw error;
     }
   },
+
+  resolveModel(overrides) {
+    return resolveModel(overrides) || null;
+  },
 };

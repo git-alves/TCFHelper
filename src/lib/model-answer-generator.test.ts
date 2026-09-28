@@ -28,6 +28,7 @@ function stubProvider(
     id: "gemini",
     hasConfiguredCredentials: () => true,
     generateExample,
+    resolveModel: () => "gemini-3.5-flash",
   };
 }
 
@@ -46,6 +47,7 @@ describe("generatePreferredModelAnswer", () => {
       id: "openrouter",
       hasConfiguredCredentials: () => true,
       generateExample: async () => validAnswer,
+      resolveModel: () => "qwen/qwen3-30b-a3b",
     };
 
     await expect(generatePreferredModelAnswer(provider, params)).resolves.toEqual({

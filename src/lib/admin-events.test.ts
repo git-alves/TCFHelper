@@ -200,6 +200,79 @@ describe("recordAdminEvent", () => {
     });
   });
 
+  it("persists the resolved model and folds it into the searchText, so a candidate model is findable by name", async () => {
+    await recordAdminEvent(
+      {
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        userId: USER_ID,
+        provider: "openrouter",
+        model: "qwen/qwen3.8-27b:free",
+        reasonCode: "rate_limited",
+        httpStatus: 429,
+      },
+      new Date("2020-08-11T12:00:00.000Z"),
+    );
+
+    expect(upsertMock).toHaveBeenCalledWith({
+      where: { dedupeKey: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      create: expect.objectContaining({
+        model: "qwen/qwen3.8-27b:free",
+        searchText: "essay correction generation provider ai failed rate limited qwen/qwen3.8-27b:free",
+      }),
+      update: expect.objectContaining({ occurrenceCount: { increment: 1 } }),
+    });
+  });
+
+  it("uses distinct coalescing keys for different models, so switching candidates never hides behind an earlier one's occurrenceCount", async () => {
+    const now = new Date("2020-08-11T12:00:00.000Z");
+    const base = {
+      eventType: "CORRECTION_PROVIDER_FAILED" as const,
+      userId: USER_ID,
+      provider: "openrouter" as const,
+      reasonCode: "rate_limited" as const,
+      httpStatus: 429,
+    };
+
+    await recordAdminEvent({ ...base, model: "candidate-a" }, now);
+    await recordAdminEvent({ ...base, model: "candidate-b" }, now);
+
+    const dedupeKeys = upsertMock.mock.calls.map((call) => call[0].where.dedupeKey);
+    expect(dedupeKeys[0]).not.toBe(dedupeKeys[1]);
+  });
+
+  it("rejects an oversized model string instead of persisting it", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "CORRECTION_PROVIDER_FAILED",
+      userId: USER_ID,
+      provider: "openrouter",
+      model: "x".repeat(201),
+      reasonCode: "rate_limited",
+      httpStatus: 429,
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
+
+  it("rejects a model on an event type that carries no provider provenance", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "ACCESS_CODE_REJECTED",
+      userId: USER_ID,
+      reasonCode: "invalid_or_spent",
+      httpStatus: 400,
+      model: "gemini-3.5-flash-lite" as never,
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
+
   it.each(["format_unsupported", "invalid_json", "schema_invalid"] as const)(
     "persists a correction-provider failure with the %s reason code",
     async (reasonCode) => {

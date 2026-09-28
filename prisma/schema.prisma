@@ -430,6 +430,15 @@ model AdminEvent {
   essayId               String?
   accessCodeId          String?
   provider              String?
+  // The resolved model string a CORRECTION_PROVIDER_FAILED/EXAMPLE_PROVIDER_FAILED
+  // event was attempted against -- admin-configured (AppConfig.correctionModel/
+  // exampleModel or an env var default), resolved via CorrectionProvider/
+  // ExampleProvider.resolveModel, never derived from a provider's response
+  // or a learner's essay. Deliberately not part of the exact-enum closed
+  // vocabulary the other fields on this row use (an unbounded catalog of
+  // model names isn't enumerable), so it is only length-bounded rather than
+  // exactly matched -- see AdminEvent_model_check.
+  model                 String?
   reasonCode            String?
   httpStatus            Int?
   quotaWindow           String?

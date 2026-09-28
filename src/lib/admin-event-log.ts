@@ -268,6 +268,7 @@ const ADMIN_EVENT_SELECT = {
   essayId: true,
   accessCodeId: true,
   provider: true,
+  model: true,
   reasonCode: true,
   httpStatus: true,
   quotaWindow: true,
@@ -297,6 +298,14 @@ function safeOpaqueId(value: string | null) {
 
 function safeHttpStatus(value: number | null) {
   return value !== null && Number.isInteger(value) && value >= 100 && value <= 599 ? value : null;
+}
+
+// Mirrors AdminEvent_model_check -- not a closed enum (an unbounded catalog
+// of provider model names isn't enumerable), so this is a bounds check
+// rather than an isKnownValue membership check.
+const MAX_MODEL_LENGTH = 200;
+function safeModel(value: string | null) {
+  return typeof value === "string" && value.length >= 1 && value.length <= MAX_MODEL_LENGTH ? value : null;
 }
 
 function safeOccurrenceCount(value: number) {
@@ -388,6 +397,7 @@ export type AdminEventLogItem = {
   essayId: string | null;
   accessCodeId: string | null;
   provider: string | null;
+  model: string | null;
   reasonCode: string | null;
   httpStatus: number | null;
   quotaWindow: string | null;
@@ -447,6 +457,7 @@ function serializeAdminEvent(record: AdminEventRecord, emailByUserId: ReadonlyMa
     essayId: safeOpaqueId(record.essayId),
     accessCodeId: safeOpaqueId(record.accessCodeId),
     provider,
+    model: safeModel(record.model),
     reasonCode,
     httpStatus: safeHttpStatus(record.httpStatus),
     quotaWindow: quota.quotaWindow,
@@ -514,6 +525,7 @@ async function adminEventWhere(query: AdminEventLogQuery, now: Date): Promise<Pr
       { eventType: { contains: query.q, mode: "insensitive" } },
       { reasonCode: { contains: query.q, mode: "insensitive" } },
       { provider: { contains: query.q, mode: "insensitive" } },
+      { model: { contains: query.q, mode: "insensitive" } },
       { userId: { contains: query.q, mode: "insensitive" } },
       { essayId: { contains: query.q, mode: "insensitive" } },
       { accessCodeId: { contains: query.q, mode: "insensitive" } },

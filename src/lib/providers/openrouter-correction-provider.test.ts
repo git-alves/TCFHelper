@@ -171,3 +171,19 @@ describe("openRouterCorrectionProvider.gradeEssay", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("openRouterCorrectionProvider.resolveModel", () => {
+  it("prefers an explicit override over the env var", () => {
+    process.env.OPENROUTER_CORRECTION_MODEL = "qwen/qwen3-30b-a3b";
+    expect(openRouterCorrectionProvider.resolveModel({ model: "openai/gpt-5-mini" })).toBe("openai/gpt-5-mini");
+  });
+
+  it("falls back to OPENROUTER_CORRECTION_MODEL when no override is given", () => {
+    process.env.OPENROUTER_CORRECTION_MODEL = "qwen/qwen3-30b-a3b";
+    expect(openRouterCorrectionProvider.resolveModel()).toBe("qwen/qwen3-30b-a3b");
+  });
+
+  it("returns null when nothing is configured -- unlike Gemini, there is no built-in default", () => {
+    expect(openRouterCorrectionProvider.resolveModel()).toBeNull();
+  });
+});

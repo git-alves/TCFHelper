@@ -1,4 +1,5 @@
 import {
+  DEFAULT_GEMINI_CORRECTION_MODEL,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
   GeminiRateLimitedError,
@@ -58,5 +59,13 @@ export const geminiCorrectionProvider: CorrectionProvider = {
       }
       throw error;
     }
+  },
+
+  resolveModel(overrides) {
+    // Mirrors gradeEssayWithGemini's own resolution (see gemini.ts) --
+    // duplicated rather than imported since gemini.ts has no exported
+    // resolver for it, and this is the one place outside that module that
+    // needs to know the answer without also making a request.
+    return overrides?.model?.trim() || process.env.GEMINI_CORRECTION_MODEL?.trim() || DEFAULT_GEMINI_CORRECTION_MODEL;
   },
 };

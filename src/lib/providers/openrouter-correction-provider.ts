@@ -86,4 +86,8 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
 
     return parseCorrectionJson(content);
   },
+
+  resolveModel(overrides) {
+    return resolveModel(overrides) || null;
+  },
 };

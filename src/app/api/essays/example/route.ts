@@ -129,6 +129,10 @@ export async function POST(request: Request) {
   const exampleProviderId = resolveExampleProviderId(appConfig.exampleProvider);
   const exampleProvider = getExampleProvider(exampleProviderId);
   const exampleOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
+  // Recorded on every EXAMPLE_PROVIDER_FAILED event below so a failure can
+  // be tied to the exact candidate model that produced it, not just the
+  // provider -- see the matching comment in correct/route.ts.
+  const resolvedModel = exampleProvider.resolveModel(exampleOverrides) ?? undefined;
 
   // Loaded before the cache lookup, and folded into the cache key below, so
   // an admin edit to a prompt block (/admin/prompts) -- or switching the
@@ -163,6 +167,7 @@ export async function POST(request: Request) {
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
       provider: exampleProviderId,
+      model: resolvedModel,
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -294,6 +299,7 @@ export async function POST(request: Request) {
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
         provider: exampleProviderId,
+        model: resolvedModel,
         reasonCode: "not_configured",
         httpStatus: 503,
       });
@@ -308,6 +314,7 @@ export async function POST(request: Request) {
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
         provider: exampleProviderId,
+        model: resolvedModel,
         reasonCode: "rate_limited",
         httpStatus: 429,
       });
@@ -328,6 +335,7 @@ export async function POST(request: Request) {
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
       provider: exampleProviderId,
+      model: resolvedModel,
       reasonCode,
       httpStatus: boundedExampleProviderHttpStatus(error) ?? 502,
     });

@@ -102,6 +102,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260928120000_add_correction_json_error_classification");
   });
 
+  it("allows the additive AdminEvent.model migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20260928130000_add_admin_event_model");
+  });
+
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });

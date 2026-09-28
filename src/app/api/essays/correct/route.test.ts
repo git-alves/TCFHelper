@@ -17,6 +17,7 @@ const {
   essayCreateMock,
   gradeEssayMock,
   hasConfiguredCredentialsMock,
+  resolveModelMock,
   getCorrectionProviderMock,
   getAppConfigMock,
   getPromptOverridesMock,
@@ -36,6 +37,7 @@ const {
     essayCreateMock: vi.fn(),
     gradeEssayMock: vi.fn(),
     hasConfiguredCredentialsMock: vi.fn(),
+    resolveModelMock: vi.fn(),
     getCorrectionProviderMock: vi.fn(),
     getAppConfigMock: vi.fn(),
     getPromptOverridesMock: vi.fn(),
@@ -120,7 +122,12 @@ const VALID_TASK_2_CONTENT = Array.from({ length: 120 }, (_, index) => `mot${ind
 const VALID_TASK_3_CONTENT = Array.from({ length: 120 }, (_, index) => `mot${index + 1}`).join(" ");
 
 function stubProvider(id: "gemini" | "openrouter" = "gemini"): CorrectionProvider {
-  return { id, hasConfiguredCredentials: hasConfiguredCredentialsMock, gradeEssay: gradeEssayMock };
+  return {
+    id,
+    hasConfiguredCredentials: hasConfiguredCredentialsMock,
+    gradeEssay: gradeEssayMock,
+    resolveModel: resolveModelMock,
+  };
 }
 
 beforeEach(() => {
@@ -130,6 +137,7 @@ beforeEach(() => {
   essayCreateMock.mockReset();
   gradeEssayMock.mockReset();
   hasConfiguredCredentialsMock.mockReset();
+  resolveModelMock.mockReset();
   getCorrectionProviderMock.mockReset();
   getAppConfigMock.mockReset();
   getPromptOverridesMock.mockReset();
@@ -140,6 +148,7 @@ beforeEach(() => {
   recordAdminEventMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   hasConfiguredCredentialsMock.mockReturnValue(true);
+  resolveModelMock.mockReturnValue("gemini-3.5-flash-lite");
   getCorrectionProviderMock.mockImplementation((id: "gemini" | "openrouter") => stubProvider(id));
   getAppConfigMock.mockResolvedValue({
     correctionProvider: null,
@@ -451,6 +460,7 @@ describe("POST /api/essays/correct", () => {
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
+      model: "gemini-3.5-flash-lite",
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -522,6 +532,7 @@ describe("POST /api/essays/correct", () => {
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: LOCAL_USER_ID,
       provider: "gemini",
+      model: "gemini-3.5-flash-lite",
       reasonCode: "schema_invalid",
       httpStatus: 502,
     });
@@ -949,6 +960,7 @@ describe("POST /api/essays/correct", () => {
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: LOCAL_USER_ID,
         provider: "gemini",
+        model: "gemini-3.5-flash-lite",
         reasonCode: "provider_unavailable",
         httpStatus: 502,
       });
@@ -973,6 +985,7 @@ describe("POST /api/essays/correct", () => {
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: LOCAL_USER_ID,
         provider: "gemini",
+        model: "gemini-3.5-flash-lite",
         reasonCode: "rate_limited",
         httpStatus: 429,
       });
@@ -1097,6 +1110,9 @@ describe("POST /api/essays/correct", () => {
       exampleModel: null,
     });
     hasConfiguredCredentialsMock.mockReturnValue(false);
+    // A genuinely unconfigured OpenRouter provider (no model set at all)
+    // has nothing for resolveModel to report.
+    resolveModelMock.mockReturnValue(null);
 
     const response = await post({
       taskType: "TASK_1",

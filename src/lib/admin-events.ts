@@ -177,7 +177,13 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
  * These fields intentionally exclude free-form text and JSON. Their values
  * are closed strings supplied by route-level classifiers, never by a request
  * body or upstream error. `accessCodeId` is the internal row id, never the
- * bearer code itself.
+ * bearer code itself. `model` is the one deliberate exception: it's still
+ * never a request body or upstream error/output, only ever the
+ * admin-configured model string a CorrectionProvider/ExampleProvider
+ * resolved (see resolveModel on each), but an unbounded catalog of model
+ * names isn't a closed enum the way the others are, so it is only
+ * length-bounded (see isOptionalModel) rather than matched against a fixed
+ * set.
  */
 export type AdminEventInput = {
   eventType: AdminEventType;
@@ -185,6 +191,7 @@ export type AdminEventInput = {
   essayId?: string;
   accessCodeId?: string;
   provider?: AdminEventProvider;
+  model?: string;
   reasonCode?: AdminEventReasonCode;
   httpStatus?: number;
   quotaWindow?: AdminEventQuotaWindow;
@@ -203,6 +210,7 @@ const ADMIN_EVENT_INPUT_KEYS = new Set<keyof AdminEventInput>([
   "essayId",
   "accessCodeId",
   "provider",
+  "model",
   "reasonCode",
   "httpStatus",
   "quotaWindow",
@@ -214,6 +222,11 @@ const ADMIN_EVENT_INPUT_KEYS = new Set<keyof AdminEventInput>([
   "distinctIpCount",
   "securityWindowMinutes",
 ]);
+
+// Generous relative to any real model slug (e.g. "openrouter/qwen/qwen3.8-27b:free"),
+// matching AdminEvent_model_check -- not a real format constraint, just a
+// sanity ceiling.
+const MAX_MODEL_LENGTH = 200;
 
 /** All referenced product rows use Prisma's opaque CUID format. */
 const OPAQUE_ROW_ID_PATTERN = /^c[a-z0-9]{24}$/;
@@ -251,6 +264,14 @@ function isOptionalHttpStatus(value: unknown): value is number | undefined {
   return value === undefined || (typeof value === "number" && Number.isInteger(value) && value >= 100 && value <= 599);
 }
 
+function isOptionalModel(value: unknown): value is string | undefined {
+  return value === undefined || (typeof value === "string" && value.length >= 1 && value.length <= MAX_MODEL_LENGTH);
+}
+
+function hasNoModel(input: AdminEventInput) {
+  return input.model === undefined;
+}
+
 function hasNoQuotaSnapshot(input: AdminEventInput) {
   return input.quotaWindow === undefined && input.usageValue === undefined && input.quotaLimit === undefined;
 }
@@ -278,6 +299,7 @@ function hasNoLegacyContext(input: AdminEventInput) {
     input.essayId === undefined &&
     input.accessCodeId === undefined &&
     input.provider === undefined &&
+    hasNoModel(input) &&
     input.reasonCode === undefined &&
     input.httpStatus === undefined &&
     hasNoQuotaSnapshot(input)
@@ -293,6 +315,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         input.httpStatus === 200 &&
         input.accessCodeId !== undefined &&
         input.provider === undefined &&
+        hasNoModel(input) &&
         input.reasonCode === undefined &&
         hasNoQuotaSnapshot(input) &&
         hasNoAuthenticationContext(input)
@@ -302,6 +325,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         input.accessCodeId === undefined &&
         input.httpStatus === 400 &&
         input.provider === undefined &&
+        hasNoModel(input) &&
         input.reasonCode === "invalid_or_spent" &&
         hasNoQuotaSnapshot(input) &&
         hasNoAuthenticationContext(input)
@@ -310,6 +334,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
       return (
         input.httpStatus === 429 &&
         input.provider === undefined &&
+        hasNoModel(input) &&
         (
           ((input.reasonCode === "minute_request_limit" || input.reasonCode === "minute_character_limit") &&
             hasQuotaSnapshot(input, "minute")) ||
@@ -321,6 +346,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
       return (
         input.httpStatus === 429 &&
         input.provider === undefined &&
+        hasNoModel(input) &&
         ((input.reasonCode === "cooldown" && hasNoQuotaSnapshot(input)) ||
           (input.reasonCode === "daily_limit" && hasQuotaSnapshot(input, "day"))) &&
         hasNoAuthenticationContext(input)
@@ -329,6 +355,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
       return (
         input.httpStatus === 429 &&
         input.provider === undefined &&
+        hasNoModel(input) &&
         input.reasonCode === "daily_limit" &&
         hasQuotaSnapshot(input, "day") &&
         hasNoAuthenticationContext(input)
@@ -376,6 +403,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
     case "TRANSLATION_PROVIDER_FAILED":
       return (
         input.provider !== undefined &&
+        hasNoModel(input) &&
         input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode !== undefined &&
@@ -385,6 +413,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
     case "SPELL_CHECK_FAILED":
       return (
         input.provider === "hunspell" &&
+        hasNoModel(input) &&
         input.httpStatus !== undefined &&
         hasNoQuotaSnapshot(input) &&
         input.reasonCode === "provider_unavailable" &&
@@ -437,6 +466,7 @@ function isValidAdminEventInput(input: unknown): input is AdminEventInput {
     isOptionalOpaqueRowId(candidate.essayId) &&
     isOptionalOpaqueRowId(candidate.accessCodeId) &&
     (candidate.provider === undefined || isMember(ADMIN_EVENT_PROVIDERS, candidate.provider)) &&
+    isOptionalModel(candidate.model) &&
     (candidate.reasonCode === undefined || isMember(ADMIN_EVENT_REASON_CODES, candidate.reasonCode)) &&
     isOptionalHttpStatus(candidate.httpStatus) &&
     (candidate.quotaWindow === undefined || isMember(ADMIN_EVENT_QUOTA_WINDOWS, candidate.quotaWindow)) &&
@@ -472,6 +502,7 @@ function snapshotAdminEventInput(input: unknown): Readonly<AdminEventInput> | nu
       essayId: candidate.essayId,
       accessCodeId: candidate.accessCodeId,
       provider: candidate.provider,
+      model: candidate.model,
       reasonCode: candidate.reasonCode,
       httpStatus: candidate.httpStatus,
       quotaWindow: candidate.quotaWindow,
@@ -520,6 +551,12 @@ function dedupeKeyFor(input: AdminEventInput, now: Date, windowMs: number) {
         input.essayId ?? "",
         input.accessCodeId ?? "",
         input.provider ?? "",
+        // Folded into the coalescing key so two runs against different
+        // models within the same coalesce window (e.g. testing candidate A,
+        // then switching to candidate B and hitting the same failure) never
+        // merge into one row's occurrenceCount -- that would silently hide
+        // the second candidate's failure behind the first's.
+        input.model ?? "",
         input.reasonCode ?? "",
         String(input.httpStatus ?? ""),
         input.quotaWindow ?? "",
@@ -569,11 +606,16 @@ function eventData(input: AdminEventInput, now: Date) {
     severity: definition.severity,
     module: definition.module,
     eventType: input.eventType,
-    searchText: [definition.searchText, input.reasonCode?.replaceAll("_", " ")].filter(Boolean).join(" "),
+    // Order must match AdminEvent_closedShape_check's searchText formula
+    // exactly: prefix, then reasonCode, then model.
+    searchText: [definition.searchText, input.reasonCode?.replaceAll("_", " "), input.model]
+      .filter(Boolean)
+      .join(" "),
     userId: input.userId ?? null,
     essayId: input.essayId ?? null,
     accessCodeId: input.accessCodeId ?? null,
     provider: input.provider ?? null,
+    model: input.model ?? null,
     reasonCode: input.reasonCode ?? null,
     httpStatus: input.httpStatus ?? null,
     quotaWindow: input.quotaWindow ?? null,
