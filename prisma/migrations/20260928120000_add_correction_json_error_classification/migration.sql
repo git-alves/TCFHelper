@@ -3,11 +3,16 @@
 -- "invalid_response" reasonCode: "format_unsupported" (the provider's
 -- content didn't even look like an attempted JSON object/array),
 -- "invalid_json" (it did, but failed to parse), or "schema_invalid" (valid
--- JSON, wrong shape). "invalid_response" itself stays in
--- AdminEvent_reasonCode_check only so an already-stored row using it still
--- reads back fine -- CORRECTION_PROVIDER_FAILED's own closedShape clause no
--- longer accepts it for a new row, since every call site that used to write
--- it now writes one of the three more specific values instead.
+-- JSON, wrong shape). No call site writes "invalid_response" for
+-- CORRECTION_PROVIDER_FAILED anymore, but it stays in that branch's
+-- reasonCode IN-list (not just in AdminEvent_reasonCode_check) alongside the
+-- three new values: a Postgres CHECK constraint validates every existing row
+-- in the table at ALTER TABLE time, not just future writes, so dropping it
+-- from this branch would reject the ALTER TABLE outright the moment a
+-- pre-existing CORRECTION_PROVIDER_FAILED/invalid_response row is present
+-- (error 23514) -- which is exactly what happened the first time this
+-- migration shipped. Kept accepted here for existing rows only; new code
+-- never writes it again.
 ALTER TABLE "AdminEvent"
     DROP CONSTRAINT "AdminEvent_reasonCode_check",
     DROP CONSTRAINT "AdminEvent_closedShape_check";
@@ -86,7 +91,7 @@ ALTER TABLE "AdminEvent"
                     "severity" = 'ERROR' AND "module" = 'ESSAY_SERVICE' AND
                     "userId" IS NOT NULL AND "essayId" IS NULL AND "accessCodeId" IS NULL AND
                     "provider" IN ('gemini', 'openrouter') AND "reasonCode" IN (
-                        'not_configured', 'rate_limited', 'transport_error', 'upstream_http_error', 'format_unsupported', 'invalid_json', 'schema_invalid', 'provider_unavailable'
+                        'not_configured', 'rate_limited', 'transport_error', 'upstream_http_error', 'invalid_response', 'format_unsupported', 'invalid_json', 'schema_invalid', 'provider_unavailable'
                     ) AND "httpStatus" IS NOT NULL AND "quotaWindow" IS NULL AND "usageValue" IS NULL AND "quotaLimit" IS NULL AND
                     "dedupeKey" IS NOT NULL AND
                     "searchText" = ('essay correction generation provider ai failed ' || REPLACE("reasonCode", '_', ' '))

@@ -82,7 +82,7 @@ ALTER TABLE "AdminEvent"
                     "severity" = 'ERROR' AND "module" = 'ESSAY_SERVICE' AND
                     "userId" IS NOT NULL AND "essayId" IS NULL AND "accessCodeId" IS NULL AND
                     "provider" IN ('gemini', 'openrouter') AND "reasonCode" IN (
-                        'not_configured', 'rate_limited', 'transport_error', 'upstream_http_error', 'format_unsupported', 'invalid_json', 'schema_invalid', 'provider_unavailable'
+                        'not_configured', 'rate_limited', 'transport_error', 'upstream_http_error', 'invalid_response', 'format_unsupported', 'invalid_json', 'schema_invalid', 'provider_unavailable'
                     ) AND "httpStatus" IS NOT NULL AND "quotaWindow" IS NULL AND "usageValue" IS NULL AND "quotaLimit" IS NULL AND
                     "dedupeKey" IS NOT NULL AND
                     "searchText" = ('essay correction generation provider ai failed ' || REPLACE("reasonCode", '_', ' ') || CASE WHEN "model" IS NOT NULL THEN ' ' || "model" ELSE '' END)
