@@ -431,7 +431,14 @@ function ExampleLevelMenuButton({
         disabled={disabled || isGenerating}
         className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-400 dark:hover:bg-amber-950/30"
       >
-        <Lightbulb aria-hidden="true" className="h-4 w-4" />
+        {isGenerating ? (
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-amber-600 border-t-transparent dark:border-amber-400"
+          />
+        ) : (
+          <Lightbulb aria-hidden="true" className="h-4 w-4" />
+        )}
         {isGenerating ? generatingLabel : generateLabel} <span aria-hidden="true">▾</span>
       </button>
       {isOpen && (
