@@ -1,7 +1,9 @@
 import { createElement, type ComponentProps } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import { APP_COPY } from "@/lib/app-copy";
+
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }) }));
 import type { CorrectionHistoryItem } from "@/lib/correction-history";
 import {
   CorrectionHistoryEmpty,

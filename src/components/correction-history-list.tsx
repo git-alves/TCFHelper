@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type Ref } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import type { AppCopy } from "@/lib/app-copy";
@@ -46,6 +47,7 @@ export function CorrectionHistoryList({ items }: Pick<CorrectionHistoryListConte
 // Exported for static component tests. Server pages must render the wrapper
 // above so copy functions are obtained on the client rather than serialized.
 export function CorrectionHistoryListContent({ items, locale, copy }: CorrectionHistoryListContentProps) {
+  const router = useRouter();
   const [visibleItems, setVisibleItems] = useState(items);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -116,6 +118,13 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
     } catch {
       setDeleteStatus("error");
     } finally {
+      // Reconciles this page's total/pageCount with actual server state
+      // regardless of outcome, the same way admin-support-delete-button.tsx
+      // does -- a reported failure doesn't guarantee the server-side delete
+      // didn't still complete, and the optimistic removal above only ever
+      // updates this page's local array, never the server-computed
+      // "Page X of Y" text.
+      router.refresh();
       setDeletingId(null);
     }
   }
