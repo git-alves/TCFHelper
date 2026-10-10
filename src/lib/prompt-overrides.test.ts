@@ -132,21 +132,12 @@ describe("toCorrectionPromptOverrides", () => {
 });
 
 describe("toExamplePromptOverrides", () => {
-  it("maps every stored key to its buildExamplePrompt field, grouping levels by task", () => {
+  it("maps every stored key to its buildExamplePrompt field", () => {
     const mapped = toExamplePromptOverrides(
       blankValues({
         exampleTask1Structure: "s1",
         exampleTask2Structure: "s2",
         exampleTask3Structure: "s3",
-        exampleTask1LevelB2: "1b2",
-        exampleTask1LevelC1: "1c1",
-        exampleTask1LevelC2: "1c2",
-        exampleTask2LevelB2: "2b2",
-        exampleTask2LevelC1: "2c1",
-        exampleTask2LevelC2: "2c2",
-        exampleTask3LevelB2: "3b2",
-        exampleTask3LevelC1: "3c1",
-        exampleTask3LevelC2: "3c2",
       }),
     );
 
@@ -154,17 +145,14 @@ describe("toExamplePromptOverrides", () => {
       task1Structure: "s1",
       task2Structure: "s2",
       task3Structure: "s3",
-      task1Levels: { B2: "1b2", C1: "1c1", C2: "1c2" },
-      task2Levels: { B2: "2b2", C1: "2c1", C2: "2c2" },
-      task3Levels: { B2: "3b2", C1: "3c1", C2: "3c2" },
     });
   });
 });
 
 describe("examplePromptOverridesFingerprint", () => {
-  it("differs when a level-description override changes, so a stale cache entry can be detected", () => {
+  it("differs when a structure override changes, so a stale cache entry can be detected", () => {
     const before = toExamplePromptOverrides(blankValues());
-    const after = toExamplePromptOverrides(blankValues({ exampleTask2LevelB2: "EDITED LEVEL." }));
+    const after = toExamplePromptOverrides(blankValues({ exampleTask2Structure: "EDITED STRUCTURE." }));
 
     expect(examplePromptOverridesFingerprint(after)).not.toBe(examplePromptOverridesFingerprint(before));
   });
@@ -173,6 +161,12 @@ describe("examplePromptOverridesFingerprint", () => {
     const overrides = toExamplePromptOverrides(blankValues({ exampleTask1Structure: "s1" }));
 
     expect(examplePromptOverridesFingerprint(overrides)).toBe(examplePromptOverridesFingerprint(overrides));
+  });
+});
+
+describe("PROMPT_OVERRIDE_KEYS", () => {
+  it("has no per-level example override, so the shared criteria sheet stays the only level definition", () => {
+    expect(PROMPT_OVERRIDE_KEYS.filter((key) => /Level|B2|C1|C2/.test(key))).toEqual([]);
   });
 });
 

@@ -10,8 +10,9 @@
 // Wording is grounded in the CEFR (Common European Framework, 2001) scales for
 // written production, range, vocabulary, grammatical accuracy, spelling,
 // flexibility, precision, coherence and cohesion -- paraphrased, not quoted,
-// and kept task-agnostic. The per-task emphasis for Tache 1/2/3 lives with
-// each task's own rubric and example structure.
+// and kept task-agnostic. What a task requires (its purpose, format and
+// structure) lives with each task's own rubric and example structure and makes
+// no claim about any CEFR level; cefr-level-criteria.test.ts enforces that.
 //
 // This sheet defines the levels only. HOW MUCH evidence the grader needs
 // before awarding one (sustained control, the "lower level when mixed" rule,
@@ -28,6 +29,7 @@ export interface LevelCriteria {
   /** One-line picture of the level. */
   summary: string;
   taskAndStructure: string;
+  argumentation: string;
   rangeAndPrecision: string;
   vocabularyControl: string;
   grammarAndSpelling: string;
@@ -40,6 +42,7 @@ export interface LevelCriteria {
 // Display order and labels of the aspects, shared by both renderers.
 const ASPECTS: ReadonlyArray<readonly [Exclude<keyof LevelCriteria, "summary" | "caution">, string]> = [
   ["taskAndStructure", "Task and structure"],
+  ["argumentation", "Argumentation (where the task asks for it)"],
   ["rangeAndPrecision", "Range and precision"],
   ["vocabularyControl", "Vocabulary control"],
   ["grammarAndSpelling", "Grammar and spelling"],
@@ -53,6 +56,8 @@ export const CEFR_LEVEL_CRITERIA: Record<CriteriaSheetLevel, LevelCriteria> = {
       "clear, detailed, coherent writing that develops and justifies its points; errors occur but do not obscure meaning.",
     taskAndStructure:
       "Communicates clearly and in reasonable detail; develops and justifies ideas with relevant detail and examples; can synthesise and evaluate information or arguments; organises a coherent text suited to the task.",
+    argumentation:
+      "A clear position with understandable reasons; arguments sufficiently developed and logically connected; a generally clear comparison of viewpoints; relevant examples or explanations. Arguments may still be relatively straightforward.",
     rangeAndPrecision:
       "A good range of language for the topic -- enough to describe, give a viewpoint and argue without visibly searching for words; can vary wording to avoid frequent repetition, though gaps may still force circumlocution.",
     vocabularyControl:
@@ -68,6 +73,8 @@ export const CEFR_LEVEL_CRITERIA: Record<CriteriaSheetLevel, LevelCriteria> = {
       "well-structured, fluent writing on complex subjects that expresses ideas precisely and without visible restriction; errors are rare and hard to spot.",
     taskAndStructure:
       "Clear, detailed, well-structured text on complex subjects; highlights the salient points; supports a viewpoint at some length with secondary arguments, justifications and relevant examples, and reaches an appropriate conclusion.",
+    argumentation:
+      "Well-developed, logically connected arguments; clear synthesis of the viewpoints and precise comparison; effective justification; relevant qualification and nuance, acknowledging limits or opposing considerations.",
     rangeAndPrecision:
       "Selects the appropriate formulation from a broad repertoire to say what is meant without restriction, with little visible searching or avoidance; qualifies opinions and statements precisely (certainty and doubt, confidence and mistrust); expresses ideas precisely rather than merely correctly.",
     vocabularyControl:
@@ -83,6 +90,8 @@ export const CEFR_LEVEL_CRITERIA: Record<CriteriaSheetLevel, LevelCriteria> = {
       "elaborate, limpid and fluent writing in an effective style, with a structure that helps the reader see the key points and precise control of fine shades of meaning.",
     taskAndStructure:
       "Elaborate, clear and fluent text in an appropriate, effective style, with a logical structure that helps the reader notice the important points; for argumentative tasks, a complex issue is posed and weighed critically.",
+    argumentation:
+      "Exceptionally controlled argumentation: precise synthesis, subtle distinctions and nuanced evaluation; a highly controlled argument structure; counterarguments handled naturally and qualification applied precisely.",
     rangeAndPrecision:
       "Exhaustive, reliable command of a very wide range of language, with precise control of nuance and intent: fine shades of meaning are expressed through a wide range of modalising devices (for example degree adverbs and restrictive clauses), meaning can be emphasised, distinguished or disambiguated, with complex structures used naturally, without sounding forced. Shows no sign of having to restrict what is meant.",
     vocabularyControl:

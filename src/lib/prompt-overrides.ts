@@ -10,11 +10,8 @@ import {
 } from "@/lib/essay-correction-prompt";
 import {
   DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE,
-  DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS,
-  DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS,
   DEFAULT_TASK_THREE_STRUCTURE,
   DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
-  DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS,
   type ExamplePromptOverrides,
 } from "@/lib/gemini";
 
@@ -32,15 +29,6 @@ export const PROMPT_OVERRIDE_KEYS = [
   "exampleTask1Structure",
   "exampleTask2Structure",
   "exampleTask3Structure",
-  "exampleTask1LevelB2",
-  "exampleTask1LevelC1",
-  "exampleTask1LevelC2",
-  "exampleTask2LevelB2",
-  "exampleTask2LevelC1",
-  "exampleTask2LevelC2",
-  "exampleTask3LevelB2",
-  "exampleTask3LevelC1",
-  "exampleTask3LevelC2",
 ] as const;
 
 export type PromptOverrideKey = (typeof PROMPT_OVERRIDE_KEYS)[number];
@@ -54,15 +42,6 @@ export const PROMPT_OVERRIDE_DEFAULTS: Record<PromptOverrideKey, string> = {
   exampleTask1Structure: DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE,
   exampleTask2Structure: DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
   exampleTask3Structure: DEFAULT_TASK_THREE_STRUCTURE,
-  exampleTask1LevelB2: DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS.B2,
-  exampleTask1LevelC1: DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS.C1,
-  exampleTask1LevelC2: DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS.C2,
-  exampleTask2LevelB2: DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS.B2,
-  exampleTask2LevelC1: DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS.C1,
-  exampleTask2LevelC2: DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS.C2,
-  exampleTask3LevelB2: DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS.B2,
-  exampleTask3LevelC1: DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS.C1,
-  exampleTask3LevelC2: DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS.C2,
 };
 
 // Grouped visually by the "correction"/"example" key prefix into two
@@ -77,15 +56,6 @@ export const PROMPT_OVERRIDE_LABELS: Record<PromptOverrideKey, string> = {
   exampleTask1Structure: "Tache 1 structure",
   exampleTask2Structure: "Tache 2 structure",
   exampleTask3Structure: "Tache 3 structure (with source documents)",
-  exampleTask1LevelB2: "Tache 1, B2 level description",
-  exampleTask1LevelC1: "Tache 1, C1 level description",
-  exampleTask1LevelC2: "Tache 1, C2 level description",
-  exampleTask2LevelB2: "Tache 2, B2 level description",
-  exampleTask2LevelC1: "Tache 2, C1 level description",
-  exampleTask2LevelC2: "Tache 2, C2 level description",
-  exampleTask3LevelB2: "Tache 3, B2 level description",
-  exampleTask3LevelC1: "Tache 3, C1 level description",
-  exampleTask3LevelC2: "Tache 3, C2 level description",
 };
 
 export type PromptOverrideValues = Record<PromptOverrideKey, string | null>;
@@ -142,9 +112,6 @@ export function toExamplePromptOverrides(values: PromptOverrideValues): ExampleP
     task1Structure: values.exampleTask1Structure,
     task2Structure: values.exampleTask2Structure,
     task3Structure: values.exampleTask3Structure,
-    task1Levels: { B2: values.exampleTask1LevelB2, C1: values.exampleTask1LevelC1, C2: values.exampleTask1LevelC2 },
-    task2Levels: { B2: values.exampleTask2LevelB2, C1: values.exampleTask2LevelC1, C2: values.exampleTask2LevelC2 },
-    task3Levels: { B2: values.exampleTask3LevelB2, C1: values.exampleTask3LevelC1, C2: values.exampleTask3LevelC2 },
   };
 }
 

@@ -5,8 +5,19 @@ import {
   renderGeneratorLevelCriteria,
   renderGraderLevelCriteria,
 } from "./cefr-level-criteria";
-import { DEFAULT_CORRECTION_BASE_PROMPT, buildCorrectionSystemPrompt } from "./essay-correction-prompt";
-import { buildExamplePrompt } from "./gemini";
+import {
+  DEFAULT_CORRECTION_BASE_PROMPT,
+  DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT,
+  DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT,
+  DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS,
+  buildCorrectionSystemPrompt,
+} from "./essay-correction-prompt";
+import {
+  DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE,
+  DEFAULT_TASK_THREE_STRUCTURE,
+  DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
+  buildExamplePrompt,
+} from "./gemini";
 import { TASK_INSTRUCTIONS } from "./tcf-tasks";
 
 const DEFINITION_FIELDS = [
@@ -92,5 +103,62 @@ describe("shared B2/C1/C2 criteria sheet", () => {
   it("asks both sides to judge a feature only where the task offers an opportunity", () => {
     expect(renderGraderLevelCriteria()).toContain("only where the task gives the writer a reasonable opportunity");
     expect(renderGeneratorLevelCriteria("C2")).toContain("where the topic gives a natural opportunity");
+  });
+
+  describe("task requirements make no level claims (the sheet is the only level definition)", () => {
+    // "For C1: look for ..." / "For C2, expect ..." / "For B2: require ..." define a level;
+    // "For B2: identify what prevents C1" is a blocker instruction and is allowed.
+    const DEFINITION_LINE = /\bFor (B2|C1|C2)[:,]? (look|expect|require)/;
+    const LEVEL_LANGUAGE = /\b(A1|A2|B1|B2|C1|C2)\b|CEFR|near-complete|native/i;
+
+    it.each([
+      ["Tache 1 example structure", DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE],
+      ["Tache 2 example structure", DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE],
+      ["Tache 3 example structure", DEFAULT_TASK_THREE_STRUCTURE],
+      ["Tache 1 instructions", TASK_INSTRUCTIONS.TASK_1.description],
+      ["Tache 2 instructions", TASK_INSTRUCTIONS.TASK_2.description],
+      ["Tache 3 instructions", TASK_INSTRUCTIONS.TASK_3.description],
+    ])("%s says nothing about any CEFR level", (_name, text) => {
+      expect(text).not.toMatch(LEVEL_LANGUAGE);
+    });
+
+    it.each([
+      ["Tache 1", DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_1],
+      ["Tache 2", DEFAULT_TASK_SPECIFIC_CORRECTION_PROMPTS.TASK_2],
+      ["Tache 3 with documents", DEFAULT_TASK_3_DOCUMENTS_CORRECTION_PROMPT],
+      ["Tache 3 without documents", DEFAULT_TASK_3_DOCUMENTLESS_CORRECTION_PROMPT],
+    ])("the %s grader block defines no level of its own", (_name, block) => {
+      // Naming a level in a blocker or decision rule is fine ("when the student
+      // is B2, name what prevents C1"); defining what a level looks like is the
+      // sheet's job alone.
+      expect(block).not.toMatch(DEFINITION_LINE);
+      expect(block).not.toMatch(/near-complete/i);
+    });
+
+    it.each(CRITERIA_SHEET_LEVELS.flatMap((level) => (["TASK_1", "TASK_2", "TASK_3"] as const).map((task) => [level, task] as const)))(
+      "gives the %s generator prompt (%s) exactly one level definition",
+      (level, taskType) => {
+        const prompt = examplePromptFor(level, taskType);
+        const sheetBlock = renderGeneratorLevelCriteria(level);
+
+        expect(prompt.split(sheetBlock)).toHaveLength(2);
+        // Take the sheet out: the only level mention left is the one-line
+        // reference to the requested level, never a second description.
+        const rest = prompt.replace(sheetBlock, "");
+        expect(rest.match(/\b(A1|A2|B1|B2|C1|C2)\b/g)).toEqual([level]);
+        expect(rest).not.toMatch(/near-complete/i);
+      },
+    );
+
+    it.each(["TASK_1", "TASK_2", "TASK_3"] as const)(
+      "keeps the whole default grader prompt (%s) free of a competing level definition",
+      (taskType) => {
+        const prompt = buildCorrectionSystemPrompt("English", taskType, "Écrivez à votre voisin.");
+
+        expect(prompt).not.toMatch(/near-complete/i);
+        expect(prompt).not.toMatch(DEFINITION_LINE);
+        expect(prompt.split("LEVEL CRITERIA (the same definitions")).toHaveLength(2);
+      },
+    );
   });
 });

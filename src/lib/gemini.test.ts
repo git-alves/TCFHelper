@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CEFR_LEVEL_CRITERIA } from "@/lib/cefr-level-criteria";
 import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import {
-  DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS,
   DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
@@ -53,7 +53,7 @@ function mockFetchOnce(response: Partial<Response> & { json?: () => Promise<unkn
 }
 
 describe("buildExamplePrompt", () => {
-  it("uses the default structure and level description when no overrides are given", () => {
+  it("uses the default structure when no overrides are given", () => {
     const prompt = buildExamplePrompt(params);
 
     expect(prompt).toContain(DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE);
@@ -62,21 +62,17 @@ describe("buildExamplePrompt", () => {
   it("uses an override in place of its corresponding built-in default block", () => {
     const prompt = buildExamplePrompt({
       ...params,
-      promptOverrides: {
-        task2Structure: "CUSTOM TASK 2 STRUCTURE.",
-        task2Levels: { C1: "CUSTOM TASK 2 C1 LEVEL." },
-      },
+      promptOverrides: { task2Structure: "CUSTOM TASK 2 STRUCTURE." },
     });
 
     expect(prompt).toContain("CUSTOM TASK 2 STRUCTURE.");
-    expect(prompt).toContain("CUSTOM TASK 2 C1 LEVEL.");
     expect(prompt).not.toContain(DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE);
   });
 
-  it("falls back to the built-in default for a level left null/blank", () => {
+  it("falls back to the built-in default for a block left null/blank", () => {
     const prompt = buildExamplePrompt({
       ...params,
-      promptOverrides: { task2Levels: { C1: "   " } },
+      promptOverrides: { task2Structure: "   " },
     });
 
     expect(prompt).toBe(buildExamplePrompt(params));
@@ -85,21 +81,10 @@ describe("buildExamplePrompt", () => {
   it("never lets one task's override leak into another task's prompt", () => {
     const prompt = buildExamplePrompt({
       ...TASK_ONE_PARAMS,
-      promptOverrides: { task2Structure: "CUSTOM TASK 2 STRUCTURE.", task2Levels: { C1: "CUSTOM TASK 2 C1 LEVEL." } },
+      promptOverrides: { task2Structure: "CUSTOM TASK 2 STRUCTURE." },
     });
 
     expect(prompt).not.toContain("CUSTOM TASK 2 STRUCTURE.");
-    expect(prompt).not.toContain("CUSTOM TASK 2 C1 LEVEL.");
-  });
-
-  it("picks the override for the requested level only, leaving other levels at their default", () => {
-    const promptC1 = buildExamplePrompt({
-      ...TASK_ONE_PARAMS,
-      promptOverrides: { task1Levels: { C2: "CUSTOM TASK 1 C2 LEVEL." } },
-    });
-
-    expect(promptC1).toContain(DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS.C1);
-    expect(promptC1).not.toContain("CUSTOM TASK 1 C2 LEVEL.");
   });
 });
 
@@ -316,7 +301,7 @@ describe("generateModelAnswer", () => {
     expect(promptText).not.toContain("not counted");
   });
 
-  it("uses Task-1-specific structure and level-calibrated guidance", async () => {
+  it("uses Task-1-specific structure and the shared level criteria", async () => {
     mockFetchOnce({
       ok: true,
       status: 200,
@@ -335,12 +320,12 @@ describe("generateModelAnswer", () => {
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
     expect(promptText).toContain("addressed directly to the recipient described in the topic");
-    expect(promptText).toContain("exceptionally precise, natural, flexible, and nuanced communication");
+    expect(promptText).toContain(CEFR_LEVEL_CRITERIA.C2.rangeAndPrecision);
     // Not the task-agnostic fallback previously shared by every task.
     expect(promptText).not.toContain("a highly nuanced, idiomatic response with sophisticated structure");
   });
 
-  it("uses Task-2-specific structure (multi-reader format, narrative plus commentary) and level-calibrated guidance", async () => {
+  it("uses Task-2-specific structure (multi-reader format, narrative plus commentary) and the shared level criteria", async () => {
     mockFetchOnce({
       ok: true,
       status: 200,
@@ -354,12 +339,12 @@ describe("generateModelAnswer", () => {
     const promptText = String(body.contents[0].parts[0].text);
     expect(promptText).toContain("several or general readers");
     expect(promptText).toContain("Recount the experience or event the topic describes");
-    expect(promptText).toContain("a fluent narrative with flexible, natural cohesion between the account and the commentary");
+    expect(promptText).toContain(CEFR_LEVEL_CRITERIA.C1.cohesion);
     // Not the task-agnostic fallback previously shared by every task.
     expect(promptText).not.toContain("a fluent, well-structured response with effective connectors");
   });
 
-  it("uses Task-3-specific, level-calibrated guidance instead of generic level prose", async () => {
+  it("uses Task-3-specific structure and the shared level criteria", async () => {
     mockFetchOnce({
       ok: true,
       status: 200,
@@ -377,7 +362,7 @@ describe("generateModelAnswer", () => {
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
-    expect(promptText).toContain("exceptionally sophisticated and controlled argumentation");
+    expect(promptText).toContain(CEFR_LEVEL_CRITERIA.C2.argumentation);
     // Not the task-agnostic fallback previously shared by every task.
     expect(promptText).not.toContain("a highly nuanced, idiomatic response with sophisticated structure");
   });

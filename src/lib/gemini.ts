@@ -91,9 +91,6 @@ export interface ExamplePromptOverrides {
   task1Structure?: string | null;
   task2Structure?: string | null;
   task3Structure?: string | null;
-  task1Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
-  task2Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
-  task3Levels?: Partial<Record<ExampleCefrLevel, string | null>>;
 }
 
 export interface GenerateModelAnswerParams {
@@ -110,40 +107,10 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
 
-// Mirrors the CEFR bands the correction prompt (essay-correction-prompt.ts)
-// grades Tache 1 against, phrased as writing instructions instead of grading
-// criteria, so the study example and the grading rubric never drift apart.
-// Admin-editable individually per level from /admin/prompts; this is only
-// ever the built-in fallback.
-export const DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
-  B2: "clear and reasonably detailed communication, appropriate organization, sufficient vocabulary, and generally controlled grammar -- describing or explaining the required information without excessive ambiguity.",
-  C1: "consistently precise communication, strong control of register, flexible vocabulary, and sophisticated organization where appropriate, communicating detailed information naturally and efficiently.",
-  C2: "exceptionally precise, natural, flexible, and nuanced communication with near-complete control of grammar, vocabulary, syntax, and register -- without resorting to unnecessarily literary or sophisticated language.",
-};
-
-// Mirrors the CEFR bands the correction prompt grades Tache 2 against.
-// Admin-editable individually per level from /admin/prompts; this is only
-// ever the built-in fallback.
-export const DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
-  B2: "a clear narrative with generally well-connected commentary, reasonably developed opinions or arguments, appropriate connectors, and register suited to the stated objective.",
-  C1: "a fluent narrative with flexible, natural cohesion between the account and the commentary, precise and varied vocabulary, effective paragraph organization, and well-justified opinions or arguments.",
-  C2: "a highly natural, nuanced narrative and commentary with sophisticated cohesion, subtle control of tone and register, and near-complete linguistic control.",
-};
-
-// Mirrors the CEFR bands the correction prompt (ARGUMENTATIVE QUALITY)
-// grades Tache 3 against. The fixed structure below (title/summary/opinion,
-// including the argument-against and nuance) stays the same at every level
-// -- real Tache 3 responses at B2 still need to compare viewpoints and argue
-// a position -- but how sophisticated that execution should be does vary,
-// which is what this supplies instead of the generic, task-agnostic
-// LEVEL_DESCRIPTIONS fallback. Admin-editable individually per level from
-// /admin/prompts; this is only ever the built-in fallback.
-export const DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS: Record<ExampleCefrLevel, string> = {
-  B2: "a clear position with understandable reasons, sufficiently developed arguments, logically connected ideas, a generally clear comparison of viewpoints, and a coherent overall structure. Arguments may still be relatively straightforward.",
-  C1: "well-developed and logically connected arguments, clear synthesis of the viewpoints, precise comparison, effective justification, relevant qualification and nuance, strong cohesion, precise vocabulary, and controlled complex syntax.",
-  C2: "exceptionally sophisticated and controlled argumentation: precise synthesis, subtle distinctions, nuanced evaluation, natural handling of counterarguments, precise qualification, flexible and sophisticated cohesion, and very high linguistic accuracy -- functional and sustained, not just decorative vocabulary or long sentences.",
-};
-
+// What each level looks like is defined once, in cefr-level-criteria.ts, which
+// the correction prompt renders as well. The task blocks below describe only
+// what a task requires (format, purpose, structure) and deliberately say
+// nothing about any CEFR level, so there is exactly one level definition.
 // Admin-editable as a whole block from /admin/prompts; this is only ever
 // the built-in fallback.
 export const DEFAULT_TASK_ONE_EXAMPLE_STRUCTURE =
@@ -208,12 +175,6 @@ export function buildExamplePrompt({
         : isTaskThree
           ? promptOverrides?.task3Structure?.trim() || DEFAULT_TASK_THREE_STRUCTURE
           : "";
-  const levelDescription =
-    taskType === "TASK_1"
-      ? promptOverrides?.task1Levels?.[level]?.trim() || DEFAULT_TASK_ONE_LEVEL_DESCRIPTIONS[level]
-      : taskType === "TASK_2"
-        ? promptOverrides?.task2Levels?.[level]?.trim() || DEFAULT_TASK_TWO_LEVEL_DESCRIPTIONS[level]
-        : promptOverrides?.task3Levels?.[level]?.trim() || DEFAULT_TASK_THREE_LEVEL_DESCRIPTIONS[level];
   const outputFormatNote = isTaskThree
     ? ", formatted exactly as described above"
     : taskType === "TASK_2"
@@ -229,7 +190,7 @@ export function buildExamplePrompt({
     (structuralNote ? `${structuralNote}\n` : "") +
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
-    `authentically demonstrate CEFR level ${level}: ${levelDescription}\n` +
+    `authentically demonstrate CEFR level ${level}.\n` +
     `${renderGeneratorLevelCriteria(level)}\n` +
     "Stay within the required word range. Return only the French response text itself" +
     outputFormatNote +

@@ -78,9 +78,6 @@ vi.mock("@/lib/prompt-overrides", () => ({
     task1Structure: values.exampleTask1Structure,
     task2Structure: values.exampleTask2Structure,
     task3Structure: values.exampleTask3Structure,
-    task1Levels: { B2: values.exampleTask1LevelB2, C1: values.exampleTask1LevelC1, C2: values.exampleTask1LevelC2 },
-    task2Levels: { B2: values.exampleTask2LevelB2, C1: values.exampleTask2LevelC1, C2: values.exampleTask2LevelC2 },
-    task3Levels: { B2: values.exampleTask3LevelB2, C1: values.exampleTask3LevelC1, C2: values.exampleTask3LevelC2 },
   }),
   examplePromptOverridesFingerprint: (overrides: unknown) => JSON.stringify(overrides),
 }));
@@ -311,15 +308,6 @@ describe("POST /api/essays/example", () => {
       exampleTask1Structure: null,
       exampleTask2Structure: "CUSTOM TASK 2 STRUCTURE.",
       exampleTask3Structure: null,
-      exampleTask1LevelB2: null,
-      exampleTask1LevelC1: null,
-      exampleTask1LevelC2: null,
-      exampleTask2LevelB2: "CUSTOM TASK 2 B2 LEVEL.",
-      exampleTask2LevelC1: null,
-      exampleTask2LevelC2: null,
-      exampleTask3LevelB2: null,
-      exampleTask3LevelC1: null,
-      exampleTask3LevelC2: null,
     });
 
     const response = await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
@@ -330,9 +318,6 @@ describe("POST /api/essays/example", () => {
       task1Structure: null,
       task2Structure: "CUSTOM TASK 2 STRUCTURE.",
       task3Structure: null,
-      task1Levels: { B2: null, C1: null, C2: null },
-      task2Levels: { B2: "CUSTOM TASK 2 B2 LEVEL.", C1: null, C2: null },
-      task3Levels: { B2: null, C1: null, C2: null },
     });
   });
 
@@ -341,15 +326,6 @@ describe("POST /api/essays/example", () => {
       exampleTask1Structure: null,
       exampleTask2Structure: null,
       exampleTask3Structure: null,
-      exampleTask1LevelB2: null,
-      exampleTask1LevelC1: null,
-      exampleTask1LevelC2: null,
-      exampleTask2LevelB2: null,
-      exampleTask2LevelC1: null,
-      exampleTask2LevelC2: null,
-      exampleTask3LevelB2: null,
-      exampleTask3LevelC1: null,
-      exampleTask3LevelC2: null,
     };
 
     // First request: no admin override yet -- this is what would have
@@ -357,12 +333,12 @@ describe("POST /api/essays/example", () => {
     await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
     const [, , fingerprintBeforeEdit] = hashExampleTopicMock.mock.calls[0];
 
-    // An admin then edits the Tache 2 B2 level description from
+    // An admin then edits the Tache 2 structure from
     // /admin/prompts. The same learner, task, level, and topic must now
     // compute a *different* cache key -- reusing the old cached answer
     // (generated under the old wording) here would be exactly the bug this
     // guards against.
-    getPromptOverridesMock.mockResolvedValue({ ...DEFAULT_OVERRIDES, exampleTask2LevelB2: "EDITED LEVEL." });
+    getPromptOverridesMock.mockResolvedValue({ ...DEFAULT_OVERRIDES, exampleTask2Structure: "EDITED STRUCTURE." });
     await post({ taskType: "TASK_2", level: "B2", topicPrompt: "Le télétravail est-il bénéfique ?" });
     const [, , fingerprintAfterEdit] = hashExampleTopicMock.mock.calls[1];
 

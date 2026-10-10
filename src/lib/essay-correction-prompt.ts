@@ -164,13 +164,9 @@ Before assessing language level, determine whether the student actually complete
 
 CONTENT / PRAGMATICS should receive significant weight. A linguistically sophisticated text that fails to complete the task must NOT receive a very high Content / Pragmatics score. Conversely, successful task completion must NOT automatically imply a high CEFR level.
 
-CEFR-SPECIFIC TACHE 1 GUIDANCE
+APPLYING THE LEVEL CRITERIA TO TACHE 1
 
-For B2: look for clear and reasonably detailed communication, appropriate organization, sufficient vocabulary, generally controlled grammar, and ability to explain or describe information without excessive ambiguity.
-
-For C1: require consistently precise communication, strong control of register, flexible vocabulary, sophisticated organization where appropriate, and the ability to communicate detailed information naturally and efficiently.
-
-For C2: require exceptionally precise, natural, flexible, and nuanced communication with near-complete control of grammar, vocabulary, syntax, and register.
+Judge the level criteria above through what Tache 1 asks for: communicating the required information clearly, precisely and in the right register for the recipient.
 
 Do not require unnecessarily literary or sophisticated language.
 
@@ -209,11 +205,7 @@ Evaluate whether the student consistently adapts language to the context. Consid
 
 COHESION AND DEVELOPMENT
 
-For B2, expect: clear progression; logical linking; reasonably developed ideas; appropriate connectors; sufficient explanation.
-
-For C1, expect: flexible and natural cohesion; precise relationships between ideas; effective paragraph organization; varied and controlled sentence structures; greater nuance; fewer repetitive structures.
-
-For C2, expect: highly natural cohesion; very precise relationships between ideas; flexible organization; subtle control of tone and meaning; near-complete linguistic control.
+Apply the cohesion, task-and-structure and register criteria above to how the response moves from the account into the commentary: its organisation and connectors should carry the reader naturally from what happened to what the writer makes of it, without repetitive structures.
 
 CEFR BLOCKERS
 
@@ -229,11 +221,7 @@ Do not confuse: task completion; writing fluency; lexical sophistication; gramma
 // -- only what counts as "the viewpoints being argued about" differs.
 const TASK_THREE_ARGUMENT_GUIDANCE = `ARGUMENTATIVE QUALITY
 
-For B2: expect the student to express a clear position, provide understandable reasons, develop arguments sufficiently, connect ideas logically, compare viewpoints in a generally clear manner, use relevant examples or explanations, and maintain a coherent overall structure. Arguments may still be relatively straightforward.
-
-For C1: require well-developed and logically connected arguments; clear synthesis of the viewpoints; precise comparison; effective justification; greater flexibility in argument structure; relevant qualification and nuance; ability to acknowledge limitations or opposing considerations; strong cohesion; precise vocabulary; controlled complex syntax.
-
-For C2: require exceptionally sophisticated and controlled argumentation. Look for: precise synthesis; subtle distinctions; nuanced evaluation; highly controlled argument structure; natural handling of counterarguments; precise qualification; flexible and sophisticated cohesion; very high linguistic accuracy; natural and appropriate register.
+Assess the argumentation criteria above -- a clear position, developed and connected arguments, synthesis and comparison of viewpoints, qualification and counterarguments -- at the level each CEFR level describes. Do not equate the presence of connectors with real argumentation.
 
 Do NOT award C2 merely because the student uses sophisticated vocabulary, writes long sentences, uses many connectors, uses phrases such as "neanmoins", "cependant", "en revanche", "dans la mesure ou", or writes a long essay. The sophistication must be functional, accurate, controlled, and sustained.`;
 
