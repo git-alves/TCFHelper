@@ -65,12 +65,17 @@ describe("shared B2/C1/C2 criteria sheet", () => {
     },
   );
 
-  it("only describes the requested level to the generator", () => {
-    const b2Prompt = examplePromptFor("B2", "TASK_2");
+  it.each(CRITERIA_SHEET_LEVELS)("only describes %s to the generator, never either other level", (level) => {
+    const prompt = examplePromptFor(level, "TASK_2");
 
-    expect(b2Prompt).toContain(CEFR_LEVEL_CRITERIA.B2.rangeAndPrecision);
-    expect(b2Prompt).not.toContain(CEFR_LEVEL_CRITERIA.C1.rangeAndPrecision);
-    expect(b2Prompt).not.toContain(CEFR_LEVEL_CRITERIA.C2.rangeAndPrecision);
+    for (const other of CRITERIA_SHEET_LEVELS.filter((candidate) => candidate !== level)) {
+      expect(prompt).not.toContain(CEFR_LEVEL_CRITERIA[other].summary);
+      for (const field of DEFINITION_FIELDS) {
+        expect(prompt, `${other}.${field}`).not.toContain(CEFR_LEVEL_CRITERIA[other][field]);
+      }
+      const caution = CEFR_LEVEL_CRITERIA[other].caution;
+      if (caution) expect(prompt).not.toContain(caution);
+    }
   });
 
   it("keeps C2 framed as quality of control, and the C1/C2 contrast observable", () => {
