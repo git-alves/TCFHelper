@@ -379,6 +379,7 @@ export interface AppCopy {
       correctingStatus: string;
       genericCorrectionError: string;
       alreadyCorrected: string;
+      alreadyCorrectedFormattingNote: string;
       correctionInProgress: string;
       exampleLevelLabel: string;
       generateExample: string;
@@ -937,6 +938,8 @@ export const APP_COPY = {
         genericCorrectionError: "Something went wrong.",
         alreadyCorrected:
           "This version has already been corrected. Edit your response or exam prompt to request a new correction.",
+        alreadyCorrectedFormattingNote:
+          "Differences in spacing alone don't count as a new version, so the correction you see is for the text exactly as you first submitted it.",
         correctionInProgress:
           "A correction for this exact response is already in progress. Wait for it to finish or edit the response or exam prompt before requesting another one.",
         exampleLevelLabel: "Target level",
@@ -1626,6 +1629,8 @@ export const APP_COPY = {
         genericCorrectionError: "Une erreur s’est produite.",
         alreadyCorrected:
           "Cette version a déjà été corrigée. Modifiez votre réponse ou votre consigne d’examen pour demander une nouvelle correction.",
+        alreadyCorrectedFormattingNote:
+          "Les simples différences d’espacement ne comptent pas comme une nouvelle version : la correction affichée concerne le texte tel que vous l’avez soumis la première fois.",
         correctionInProgress:
           "Une correction de cette réponse exacte est déjà en cours. Attendez sa fin ou modifiez la réponse ou la consigne d’examen avant d’en demander une autre.",
         exampleLevelLabel: "Niveau visé",
@@ -2319,6 +2324,8 @@ export const APP_COPY = {
         genericCorrectionError: "Algo salió mal.",
         alreadyCorrected:
           "Esta versión ya se ha corregido. Modifica tu respuesta o consigna de examen para solicitar una nueva corrección.",
+        alreadyCorrectedFormattingNote:
+          "Las diferencias de espaciado por sí solas no cuentan como una versión nueva, así que la corrección que ves corresponde al texto tal como lo enviaste la primera vez.",
         correctionInProgress:
           "Ya hay una corrección de esta respuesta exacta en curso. Espera a que termine o modifica la respuesta o la consigna de examen antes de solicitar otra.",
         exampleLevelLabel: "Nivel objetivo",
@@ -3012,6 +3019,8 @@ export const APP_COPY = {
         genericCorrectionError: "Algo deu errado.",
         alreadyCorrected:
           "Esta versão já foi corrigida. Edite sua resposta ou enunciado de exame para solicitar uma nova correção.",
+        alreadyCorrectedFormattingNote:
+          "Diferenças apenas de espaçamento não contam como uma nova versão, então a correção exibida é a do texto exatamente como você o enviou da primeira vez.",
         correctionInProgress:
           "Já existe uma correção desta resposta exata em andamento. Aguarde a conclusão ou edite a resposta ou o enunciado de exame antes de solicitar outra.",
         exampleLevelLabel: "Nível desejado",

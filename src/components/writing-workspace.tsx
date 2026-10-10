@@ -782,6 +782,15 @@ export function WritingWorkspace() {
   // draft and topic exactly to the assessed version, the saved feedback is
   // current again and a duplicate correction stays disabled.
   const feedbackIsStale = Boolean(feedback && !isCurrentDraftAlreadyCorrected);
+  // A formatting-only edit (spaces, line breaks, quote style) deliberately
+  // maps to the same correction key as the assessed draft. The result's
+  // error offsets index the text that was actually graded, so it is always
+  // rendered against that stored text -- never the edited draft -- and the
+  // learner is told so. The server-duplicate path (no in-memory feedback)
+  // links to the stored essay, whose text the client never saw.
+  const showFormattingReuseNote =
+    isCurrentDraftAlreadyCorrected &&
+    (content !== submittedCorrectionText || existingCorrectionEssayId !== null);
 
   useEffect(() => {
     if (topicMode !== "custom") return;
@@ -2382,6 +2391,7 @@ export function WritingWorkspace() {
                 className="text-sm text-zinc-600 dark:text-zinc-300"
               >
                 {copy.workspace.editor.alreadyCorrected}
+                {showFormattingReuseNote && ` ${copy.workspace.editor.alreadyCorrectedFormattingNote}`}
               </p>
             )}
             {isGeneratingExample && (
