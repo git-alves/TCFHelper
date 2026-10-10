@@ -4,6 +4,16 @@
 
 **Job to be done** — When I know that one **part of a TCF writing task** is holding me back — for example, a salutation, an opening, a synthesis of source ideas, or a counterargument — help me practise that exact part through small, connected activities that gradually remove support, so I can use it independently in a real TCF response.
 
+## Update — shortened session (three stages)
+
+The six-stage path below proved too long for one sitting. A session now walks through **three** stages, defined once in `src/lib/practice-session-stages.ts` (`PRACTICE_SESSION_STAGES`): **Recognize → Develop → Produce**. Read every "six-stage" statement in the rest of this document as "the session stages".
+
+- The question bank is unchanged. Complete, Transform, and Organize exercises stay authored but are never served; widening the session again is a one-line change to `PRACTICE_SESSION_STAGES`.
+- A `task + part + level` path is startable when it has at least one reviewed variant for every session stage. It no longer needs variants for the unused stages.
+- The progress ledger validates new sessions against the session stages. A session created under the six-stage sequence stays completable on the server, but a browser-saved six-exercise session is discarded rather than resumed.
+- The per-exercise "how did this feel?" rating is a single optional rating on the completion screen. It is not stored with the resumable snapshot.
+- The "Now / Next" stage banner is removed; the progress steps already show where the learner is.
+
 ## Goals / non-goals
 
 ### Goals

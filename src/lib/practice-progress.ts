@@ -2,13 +2,13 @@ import "server-only";
 
 import { PracticeCompletionMethod, type PracticeLevel as DatabasePracticeLevel, type TaskType } from "@prisma/client";
 import {
-  PRACTICE_EXERCISE_SEQUENCE,
   getPracticeExercises,
   getPracticeTopic,
   hasCompletePracticePath,
   type PracticeExercise,
   type PracticeLevel,
 } from "@/lib/practice-curriculum";
+import { PRACTICE_SESSION_STAGES } from "@/lib/practice-session-stages";
 import { prisma } from "@/lib/prisma";
 
 export type PracticeCompletionMethodInput = "correct" | "self-review" | "revealed";
@@ -36,7 +36,7 @@ const COMPLETION_METHODS: Readonly<Record<PracticeCompletionMethodInput, Practic
 function sessionExercisesAreValid(input: PracticeSessionInput): boolean {
   const topic = getPracticeTopic(input.task, input.skillId);
   if (!topic || !hasCompletePracticePath(input.task, input.level, input.skillId)) return false;
-  if (input.exerciseIds.length !== PRACTICE_EXERCISE_SEQUENCE.length) return false;
+  if (input.exerciseIds.length !== PRACTICE_SESSION_STAGES.length) return false;
   if (new Set(input.exerciseIds).size !== input.exerciseIds.length) return false;
 
   const exercisesById = new Map(
@@ -45,12 +45,15 @@ function sessionExercisesAreValid(input: PracticeSessionInput): boolean {
 
   return input.exerciseIds.every((id, index) => {
     const exercise = exercisesById.get(id);
-    return exercise?.exerciseType === PRACTICE_EXERCISE_SEQUENCE[index];
+    return exercise?.exerciseType === PRACTICE_SESSION_STAGES[index];
   });
 }
 
 function getSnapshotExerciseIds(value: unknown): readonly string[] | null {
-  if (!Array.isArray(value) || value.length !== PRACTICE_EXERCISE_SEQUENCE.length) return null;
+  // Length is deliberately not checked against the current stage list: a
+  // session created before the sequence was shortened was validated when it
+  // was created and must stay completable.
+  if (!Array.isArray(value) || value.length === 0) return null;
   if (!value.every((id) => typeof id === "string") || new Set(value).size !== value.length) return null;
   return value;
 }

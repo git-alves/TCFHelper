@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  PRACTICE_EXERCISE_SEQUENCE,
   PRACTICE_EXERCISES,
   PRACTICE_LEVELS,
   PRACTICE_TOPICS,
@@ -10,6 +9,7 @@ import {
   getPracticeTopics,
   hasCompletePracticePath,
 } from "./practice-curriculum";
+import { PRACTICE_SESSION_STAGES } from "./practice-session-stages";
 
 describe("practice curriculum", () => {
   it("keeps each task's topic menu specific to its writing purpose", () => {
@@ -196,10 +196,10 @@ describe("practice curriculum", () => {
     }
   });
 
-  it("makes every curated topic cover the fixed scaffold and allow reviewed variants per stage", () => {
+  it("makes every curated topic cover each session stage and allow reviewed variants per stage", () => {
     // Derive the paths from the bank rather than carrying a hand-maintained
-    // list. A future author cannot accidentally add an incomplete or wrongly
-    // ordered task/level/skill path without this test exercising it.
+    // list. Only the session stages are required: exercises authored for the
+    // other stages stay in the bank but never gate a path's availability.
     const selections = new Map(
       PRACTICE_EXERCISES.map((exercise) => [
         `${exercise.task}/${exercise.level}/${exercise.skill}`,
@@ -210,16 +210,31 @@ describe("practice curriculum", () => {
 
     for (const [path, { task, level, skill }] of selections) {
       const exercises = getPracticeExercises(task, level, skill);
-      expect(new Set(exercises.map((exercise) => exercise.exerciseType)), path).toEqual(
-        new Set(PRACTICE_EXERCISE_SEQUENCE),
-      );
-      expect(new Set(exercises.map((exercise) => exercise.sequenceOrder)), path).toEqual(new Set([1, 2, 3, 4, 5, 6]));
+      expect(hasCompletePracticePath(task, level, skill), path).toBe(true);
 
-      for (const [index, stage] of PRACTICE_EXERCISE_SEQUENCE.entries()) {
-        const stageVariants = exercises.filter((exercise) => exercise.sequenceOrder === index + 1);
+      for (const stage of PRACTICE_SESSION_STAGES) {
+        const stageVariants = exercises.filter((exercise) => exercise.exerciseType === stage);
         expect(stageVariants.length, `${path}/${stage}`).toBeGreaterThanOrEqual(2);
-        expect(stageVariants.every((exercise) => exercise.exerciseType === stage), `${path}/${stage}`).toBe(true);
       }
+    }
+  });
+
+  it("keeps the unused authored stages in the bank instead of deleting them", () => {
+    const unusedStages = ["complete", "transform", "organize"] as const;
+    for (const stage of unusedStages) {
+      expect(PRACTICE_SESSION_STAGES).not.toContain(stage);
+      expect(PRACTICE_EXERCISES.some((exercise) => exercise.exerciseType === stage), stage).toBe(true);
+    }
+  });
+
+  it("keeps each authored stage's variants on one stage type and sequence slot", () => {
+    const slotTypes = new Map<string, Set<string>>();
+    for (const exercise of PRACTICE_EXERCISES) {
+      const key = `${exercise.task}/${exercise.level}/${exercise.skill}/${exercise.sequenceOrder}`;
+      slotTypes.set(key, (slotTypes.get(key) ?? new Set()).add(exercise.exerciseType));
+    }
+    for (const [slot, types] of slotTypes) {
+      expect(types.size, slot).toBe(1);
     }
   });
 

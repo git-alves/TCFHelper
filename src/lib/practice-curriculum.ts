@@ -1,4 +1,5 @@
 import type { TaskType } from "@prisma/client";
+import { PRACTICE_SESSION_STAGES } from "./practice-session-stages";
 import { TASK_1_C2_EXERCISES } from "./practice-task1-c2-exercises";
 import { TASK_3_B2_EXERCISES } from "./practice-task3-b2-exercises";
 import { TASK_3_C1_EXERCISES } from "./practice-task3-c1-exercises";
@@ -16,6 +17,7 @@ export type PracticeLevel = "B2" | "C1" | "C2";
 export const PRACTICE_LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
 
 export type PracticeExerciseType = "recognize" | "complete" | "transform" | "organize" | "develop" | "produce";
+/** Every stage the bank authors exercises for; a session uses only PRACTICE_SESSION_STAGES. */
 export const PRACTICE_EXERCISE_SEQUENCE: readonly PracticeExerciseType[] = [
   "recognize",
   "complete",
@@ -124,7 +126,7 @@ export const PRACTICE_TOPICS: readonly PracticeTopic[] = [
 ];
 
 /**
- * Initial reviewed sequences. The six entries in each sequence deliberately
+ * Initial reviewed sequences. The six authored stages in each sequence deliberately
  * reuse one communicative situation and decrease support at every step.
  */
 export const PRACTICE_EXERCISES: readonly PracticeExercise[] = [
@@ -1007,21 +1009,22 @@ export function getPracticeTopics(task: TaskType, level?: PracticeLevel): readon
 
   // The curriculum taxonomy remains visible to authors at every level; the
   // learner-facing selector only exposes a topic after its complete reviewed
-  // six-stage set has been added to the bank for that exact task and level.
+  // exercises for every session stage exist in the bank for that exact task and level.
   return topicsForTask.filter((topic) => hasCompletePracticePath(task, level, topic.id));
 }
 
 /**
  * A part stays in the task blueprint at every level. This predicate controls
- * only whether its fixed, reviewed six-stage path is ready to start.
+ * only whether reviewed exercises exist for every session stage (see
+ * PRACTICE_SESSION_STAGES) so its path is ready to start.
  */
 export function hasCompletePracticePath(task: TaskType, level: PracticeLevel, skill: string): boolean {
-  const coveredOrders = new Set(
+  const coveredStages = new Set(
     PRACTICE_EXERCISES.filter(
       (exercise) => exercise.task === task && exercise.level === level && exercise.skill === skill,
-    ).map((exercise) => exercise.sequenceOrder),
+    ).map((exercise) => exercise.exerciseType),
   );
-  return coveredOrders.size === PRACTICE_EXERCISE_SEQUENCE.length;
+  return PRACTICE_SESSION_STAGES.every((stage) => coveredStages.has(stage));
 }
 
 /**

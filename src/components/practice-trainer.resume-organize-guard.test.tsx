@@ -27,6 +27,10 @@ vi.mock("next/navigation", () => ({
 
 const copy = getAppCopy("en").practice;
 
+// The shortened product sequence has no Organize stage; widen it explicitly so
+// the still-supported organize resume guard stays covered.
+const ALL_AUTHORED_STAGES = ["recognize", "complete", "transform", "organize", "develop", "produce"] as const;
+
 const ORGANIZE_CORRECT_ORDER = ["First sentence.", "Second sentence.", "Third sentence.", "Fourth sentence."];
 
 const curriculum: CuratedPracticeCurriculum = {
@@ -169,7 +173,6 @@ beforeEach(() => {
     ordering: ORGANIZE_CORRECT_ORDER,
     checkState: null,
     completionMethods: [],
-    difficultyRatings: [],
   };
   window.localStorage.setItem(ACTIVE_PRACTICE_SESSION_STORAGE_KEY, JSON.stringify(preSolvedSession));
 });
@@ -204,7 +207,7 @@ describe("PracticeTrainer: resuming a pre-solved saved organize session", () => 
     act(() => {
       root.render(
         <AppLocaleProvider initialLocale="en">
-          <PracticeTrainer curriculum={curriculum} />
+          <PracticeTrainer curriculum={curriculum} stages={ALL_AUTHORED_STAGES} />
         </AppLocaleProvider>,
       );
     });

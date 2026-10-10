@@ -31,6 +31,10 @@ vi.mock("next/navigation", () => ({
 
 const copy = getAppCopy("en").practice;
 
+// Organize is not in the default session sequence; widen it for this
+// still-supported stage.
+const ALL_AUTHORED_STAGES = ["recognize", "complete", "transform", "organize", "develop", "produce"] as const;
+
 const ORGANIZE_ORDER = ["First sentence.", "Second sentence.", "Third sentence.", "Fourth sentence."];
 
 const LONG_LABEL_SKILL_ID = "skill-long-label";
@@ -219,7 +223,6 @@ describe("Organize stage reorder controls on narrow screens", () => {
       ordering: [...ORGANIZE_ORDER].reverse(),
       checkState: null,
       completionMethods: [],
-      difficultyRatings: [],
     };
     window.localStorage.setItem(ACTIVE_PRACTICE_SESSION_STORAGE_KEY, JSON.stringify(session));
   });
@@ -228,7 +231,7 @@ describe("Organize stage reorder controls on narrow screens", () => {
     act(() => {
       root.render(
         <AppLocaleProvider initialLocale="en">
-          <PracticeTrainer curriculum={curriculum} />
+          <PracticeTrainer curriculum={curriculum} stages={ALL_AUTHORED_STAGES} />
         </AppLocaleProvider>,
       );
     });
