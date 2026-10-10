@@ -1,5 +1,6 @@
 import type { TaskType } from "@prisma/client";
 import type { TaskDefinition } from "@/lib/tcf-tasks";
+import { renderGraderLevelCriteria } from "@/lib/cefr-level-criteria";
 import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 
 // The token an admin-edited base prompt (see prompt-overrides.ts) must keep
@@ -73,26 +74,7 @@ Distinguish between what the student can produce occasionally (bounds estimatedL
 
 If the evidence is between two CEFR levels, set conservativeLevel to the LOWER level unless the higher level is clearly and consistently demonstrated. For example: mixed B2/C1 evidence -> conservativeLevel B2; mixed C1/C2 evidence -> conservativeLevel C1.
 
-conservativeLevel B2 should demonstrate sustained ability to:
-- communicate clearly;
-- develop and justify ideas;
-- connect arguments;
-- use a reasonably broad vocabulary;
-- use a range of grammatical structures;
-- maintain generally good control despite some errors;
-- organize a coherent text appropriate to the task.
-
-conservativeLevel C1 should demonstrate sustained evidence of:
-- greater precision;
-- lexical flexibility and range;
-- strong grammatical control;
-- varied and controlled syntax;
-- sophisticated cohesion;
-- appropriate register;
-- nuanced argumentation where relevant;
-- ability to express ideas precisely rather than merely correctly.
-
-C2 is a matter of quality of control, not difficulty of vocabulary -- never define it as merely "C1, but more sophisticated," and never infer it from vocabulary complexity alone. Look for evidence such as: precise control of nuance and intent; complex structures used naturally, without sounding forced; the ability to vary register and construction as the situation calls for; highly flexible cohesion; the absence of errors that undermine naturalness; the ability to express abstract relationships and subtle distinctions precisely.
+${renderGraderLevelCriteria()}
 
 This evidence does not need to be present in every sentence -- a C2 text can and should still contain simple sentences. Do not require the entire text to sound sophisticated throughout in order to recognize C2-level control where it is demonstrated.
 
