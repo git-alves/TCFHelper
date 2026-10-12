@@ -42,7 +42,7 @@ flowchart TD
   E --> F[Welcome]
   D -- Yes --> G[Dashboard]
   F --> G
-  G --> H[Train: a six-stage task part]
+  G --> H[Train: a three-stage task part]
   G --> I[Simulate: full TCF task]
   H --> G
   I --> J[Choose task]
@@ -257,7 +257,7 @@ flowchart LR
   B -->|Build one skill| C[Train]
   B -->|Practise a full response| D[Simulate]
   C --> E[Choose task → level → part]
-  E --> F[Six-stage session]
+  E --> F[Three-stage session]
   D --> G[Task → topic]
   G --> H[Write]
   H --> I[Optional writing aids]
