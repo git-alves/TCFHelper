@@ -61,7 +61,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear" | "correct";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type TimedTaskStatus = "running" | "paused" | "expired";
@@ -1566,7 +1566,10 @@ export function WritingWorkspace() {
     return () => registerWalkthroughScript(null);
   }, [registerWalkthroughScript]);
 
-  async function handleCorrect() {
+  // `skipConfirmation` is for the confirmed re-entry and the modal's Retry:
+  // the learner already agreed to spend this correction, and a retry after a
+  // failure should not ask again.
+  async function handleCorrect({ skipConfirmation = false }: { skipConfirmation?: boolean } = {}) {
     const attempt = getCorrectAttemptOutcome({
       taskType,
       activeTopicPrompt,
@@ -1593,6 +1596,13 @@ export function WritingWorkspace() {
     }
     setShowMinimumWordWarning(false);
     setShowNotFrenchWarning(false);
+
+    // Only a request that would actually be sent (and spend quota) asks for
+    // confirmation; the free local rejections above never interrupt.
+    if (!skipConfirmation) {
+      setPendingSwitch({ kind: "correct", run: () => void handleCorrect({ skipConfirmation: true }) });
+      return;
+    }
     const requestKey = attempt.correctionRequestKey;
 
     const correctionLocale = locale;
@@ -2277,7 +2287,7 @@ export function WritingWorkspace() {
                 <button
                   type="button"
                   data-walkthrough="correct-button"
-                  onClick={handleCorrect}
+                  onClick={() => void handleCorrect()}
                   disabled={
                     !activeTopicPrompt ||
                     isCorrecting ||
@@ -2507,14 +2517,14 @@ export function WritingWorkspace() {
           isStale={feedbackIsStale}
           copy={copy}
           onClose={closeCorrectionModal}
-          onRetry={() => void handleCorrect()}
+          onRetry={() => void handleCorrect({ skipConfirmation: true })}
           suppressFocusTrap={isWalkthroughCorrectionPreview}
         />
       )}
 
       <ConfirmDialog
         open={pendingSwitch !== null}
-        title={copy.workspace.dialog.title}
+        title={pendingSwitch?.kind === "correct" ? copy.workspace.dialog.correctTitle : copy.workspace.dialog.title}
         description={
           pendingSwitch?.kind === "task"
             ? copy.workspace.dialog.taskSwitchDescription
@@ -2528,14 +2538,18 @@ export function WritingWorkspace() {
                     ? copy.workspace.dialog.adminSwitchDescription
                     : pendingSwitch?.kind === "clear"
                       ? copy.workspace.dialog.clearDraftDescription
-                      : ""
+                      : pendingSwitch?.kind === "correct"
+                        ? copy.workspace.dialog.correctDescription
+                        : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"
             ? copy.workspace.dialog.exampleOverwriteConfirm
             : pendingSwitch?.kind === "clear"
               ? copy.workspace.dialog.clearDraftConfirm
-              : copy.workspace.dialog.confirm
+              : pendingSwitch?.kind === "correct"
+                ? copy.workspace.dialog.correctConfirm
+                : copy.workspace.dialog.confirm
         }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {

@@ -121,7 +121,7 @@ function minimumWordCountResponse(wordCount: number, minWords: number) {
 function notFrenchTextResponse(reason: "script" | "language") {
   return NextResponse.json(
     {
-      error: "This text was not recognized as French. Write your response in French to get a correction.",
+      error: "We could not confidently recognize this text as French. Write your response in French to get a correction.",
       code: "NOT_FRENCH_TEXT",
       reason,
     },

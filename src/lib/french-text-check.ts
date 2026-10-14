@@ -7,8 +7,9 @@
  * It is deliberately a coarse gate for "this is not even French" -- English,
  * another language, another script, keyboard mashing -- not a quality check.
  * A weak, error-filled French draft must still pass so the model can correct
- * it. Function words are the signal because they make up a large, stable
- * share of any real French text and survive spelling and grammar mistakes.
+ * it, so the check only blocks what is clearly not French. Function words are
+ * the signal because they make up a large, stable share of any real French
+ * text and survive spelling and grammar mistakes.
  */
 export type FrenchTextCheck =
   | { ok: true }
@@ -18,15 +19,20 @@ export type FrenchTextCheck =
 // attempted; below this the text is mostly another script (Cyrillic, CJK,
 // Arabic, ...) or has no letters at all.
 const MIN_LATIN_LETTER_SHARE = 0.8;
-// A French essay is typically 35-50% function words; a weak one still sits
-// well above this. Other languages score far below it on the French list.
-const MIN_FRENCH_WORD_SHARE = 0.15;
-// Real French uses many different function words; repeating one or two
-// ("le le le le") must not pass.
-const MIN_DISTINCT_FRENCH_WORDS = 5;
-// French must beat the strongest competing language by this factor, because
-// Spanish, Portuguese and Italian share words such as "de", "la" and "que".
-const FRENCH_LEAD_FACTOR = 1.3;
+// Below this share of French function words the text has essentially no
+// French in it. A real attempt, however error-filled, sits far above: even
+// the weakest sample here is over 0.4. Gibberish, keyboard mashing and
+// another language sit near zero.
+const MIN_FRENCH_WORD_SHARE = 0.05;
+// Real French uses several different function words; one repeated word
+// ("le le le") must not pass.
+const MIN_DISTINCT_FRENCH_WORDS = 3;
+// Another language only counts as "dominant" when it is this common in the
+// text AND clearly outweighs French. Spanish, Portuguese and Italian share
+// words such as "de", "la" and "que" with French, so a draft that merely
+// mixes in a learner's native language is not rejected.
+const MIN_DOMINANT_COMPETITOR_SHARE = 0.2;
+const COMPETITOR_DOMINANCE_FACTOR = 1.3;
 
 // Elided clitics are split off as their own token ("l'école" -> "l'" +
 // "école"), which is how they appear in the lists below.
@@ -62,6 +68,10 @@ const COMPETING_LANGUAGE_WORDS: Record<string, Set<string>> = {
     "di", "e", "il", "che", "la", "un", "una", "per", "non", "con", "sono", "del", "della", "le", "in", "è",
     "lo", "gli", "ma", "più", "io", "mi", "ti", "ci", "questo", "questa", "anche", "come", "dei", "delle",
   ]),
+  dutch: new Set([
+    "de", "het", "een", "en", "van", "ik", "te", "dat", "die", "niet", "zijn", "op", "aan", "met", "voor",
+    "ook", "maar", "om", "ze", "wat", "je", "we", "hij", "dit", "was", "heb", "bij", "naar", "geen", "wij",
+  ]),
   german: new Set([
     "der", "die", "das", "und", "ist", "nicht", "ich", "ein", "eine", "zu", "mit", "auf", "für", "von",
     "den", "dem", "sich", "auch", "es", "sie", "wir", "er", "aber", "oder", "wie", "wird", "sind", "im",
@@ -86,26 +96,75 @@ function share(tokens: string[], words: ReadonlySet<string>): number {
   return hits / tokens.length;
 }
 
-export function checkFrenchText(text: string): FrenchTextCheck {
-  const letters = text.match(/\p{L}/gu) ?? [];
-  if (letters.length === 0) return { ok: false, reason: "script" };
+/** The numbers behind a verdict, for diagnosing a false positive. Contains no text. */
+export interface FrenchTextMeasurement {
+  result: FrenchTextCheck;
+  letterCount: number;
+  latinLetterShare: number;
+  tokenCount: number;
+  frenchShare: number;
+  distinctFrenchWords: number;
+  strongestCompetitor: string | null;
+  strongestCompetitorShare: number;
+}
 
+export function measureFrenchText(rawText: string): FrenchTextMeasurement {
+  // Some sources (macOS, PDFs, certain keyboards) store "é" as "e" plus a
+  // combining accent. Letter matching would then stop mid-word and lose
+  // accented function words such as "très", "à" and "été".
+  const text = rawText.normalize("NFC");
+  const letters = text.match(/\p{L}/gu) ?? [];
   const latinLetters = text.match(/\p{Script=Latin}/gu) ?? [];
-  if (latinLetters.length / letters.length < MIN_LATIN_LETTER_SHARE) {
-    return { ok: false, reason: "script" };
+  const latinLetterShare = letters.length === 0 ? 0 : latinLetters.length / letters.length;
+  const base = {
+    letterCount: letters.length,
+    latinLetterShare,
+    tokenCount: 0,
+    frenchShare: 0,
+    distinctFrenchWords: 0,
+    strongestCompetitor: null,
+    strongestCompetitorShare: 0,
+  };
+
+  if (letters.length === 0 || latinLetterShare < MIN_LATIN_LETTER_SHARE) {
+    return { ...base, result: { ok: false, reason: "script" } };
   }
 
   const tokens = tokenize(text);
   const frenchShare = share(tokens, FRENCH_WORDS);
   const distinctFrenchWords = new Set(tokens.filter((token) => FRENCH_WORDS.has(token))).size;
-  const strongestCompetitorShare = Math.max(
-    ...Object.values(COMPETING_LANGUAGE_WORDS).map((words) => share(tokens, words)),
-  );
+  let strongestCompetitor: string | null = null;
+  let strongestCompetitorShare = 0;
+  for (const [language, words] of Object.entries(COMPETING_LANGUAGE_WORDS)) {
+    const languageShare = share(tokens, words);
+    if (languageShare > strongestCompetitorShare) {
+      strongestCompetitor = language;
+      strongestCompetitorShare = languageShare;
+    }
+  }
 
-  const looksFrench =
-    frenchShare >= MIN_FRENCH_WORD_SHARE &&
-    distinctFrenchWords >= MIN_DISTINCT_FRENCH_WORDS &&
-    frenchShare >= strongestCompetitorShare * FRENCH_LEAD_FACTOR;
+  // Deliberately conservative: rejecting a genuine French attempt costs the
+  // learner far more than letting an uncertain Latin-script draft through.
+  // Only text with almost no French, or in which another language clearly
+  // dominates French, is blocked.
+  const hasAlmostNoFrench =
+    frenchShare < MIN_FRENCH_WORD_SHARE || distinctFrenchWords < MIN_DISTINCT_FRENCH_WORDS;
+  const anotherLanguageDominates =
+    strongestCompetitorShare >= MIN_DOMINANT_COMPETITOR_SHARE &&
+    strongestCompetitorShare > frenchShare * COMPETITOR_DOMINANCE_FACTOR;
+  const looksFrench = !hasAlmostNoFrench && !anotherLanguageDominates;
 
-  return looksFrench ? { ok: true } : { ok: false, reason: "language" };
+  return {
+    ...base,
+    tokenCount: tokens.length,
+    frenchShare,
+    distinctFrenchWords,
+    strongestCompetitor,
+    strongestCompetitorShare,
+    result: looksFrench ? { ok: true } : { ok: false, reason: "language" },
+  };
+}
+
+export function checkFrenchText(text: string): FrenchTextCheck {
+  return measureFrenchText(text).result;
 }

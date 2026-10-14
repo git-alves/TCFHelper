@@ -106,7 +106,42 @@ function buttonWithText(text: string) {
   return [...document.querySelectorAll("button")].find((candidate) => candidate.textContent?.trim() === text);
 }
 
+// "Correct" asks for confirmation before spending a correction; this clicks
+// through it the way a learner who meant to correct would.
+async function clickCorrectAndConfirm() {
+  const copy = getAppCopy("en");
+  await act(async () => {
+    buttonWithText(copy.workspace.editor.correct)!.click();
+  });
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('[role="alertdialog"] button:last-child')!.click();
+  });
+}
+
 describe("WritingWorkspace: non-French drafts", () => {
+  it("waits for confirmation before sending a valid draft for correction", async () => {
+    const copy = getAppCopy("en");
+    await reachReadyState();
+    typeIntoEditor(FRENCH_DRAFT);
+
+    await act(async () => {
+      buttonWithText(copy.workspace.editor.correct)!.click();
+    });
+
+    expect(correctCalls).toBe(0);
+    const dialog = document.querySelector('[role="alertdialog"]');
+    expect(dialog?.textContent).toContain(copy.workspace.dialog.correctTitle);
+    expect(dialog?.textContent).toContain(copy.workspace.dialog.correctDescription);
+
+    await act(async () => {
+      dialog!.querySelector<HTMLButtonElement>("button")!.click();
+    });
+    expect(correctCalls).toBe(0);
+
+    await clickCorrectAndConfirm();
+    expect(correctCalls).toBe(1);
+  });
+
   it("explains the problem and sends nothing when the draft is not French", async () => {
     const copy = getAppCopy("en");
     await reachReadyState();
@@ -134,9 +169,7 @@ describe("WritingWorkspace: non-French drafts", () => {
     typeIntoEditor(FRENCH_DRAFT);
     expect(container.textContent).not.toContain(copy.workspace.editor.notFrenchText);
 
-    await act(async () => {
-      buttonWithText(copy.workspace.editor.correct)!.click();
-    });
+    await clickCorrectAndConfirm();
     expect(correctCalls).toBe(1);
     expect(container.textContent).not.toContain(copy.workspace.editor.notFrenchText);
   });
@@ -152,9 +185,7 @@ describe("WritingWorkspace: non-French drafts", () => {
     await reachReadyState();
 
     typeIntoEditor(FRENCH_DRAFT);
-    await act(async () => {
-      buttonWithText(copy.workspace.editor.correct)!.click();
-    });
+    await clickCorrectAndConfirm();
 
     expect(correctCalls).toBe(1);
     expect(container.textContent).toContain(copy.workspace.editor.notFrenchText);
