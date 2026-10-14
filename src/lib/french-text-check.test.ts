@@ -55,6 +55,20 @@ const FRENCH_MIXED_WITH_PORTUGUESE =
   "très importante et je veux aussi trabalhar avec des personnes qui parlent français parce que je gosto de cette langue. " +
   "Nous avons déjà une reunião la semaine prochaine et je pense que tout va bien se passer.";
 
+const DUTCH =
+  "Ik schrijf u om te klagen over de service die ik afgelopen weekend in uw restaurant heb gekregen. Het eten was koud en de ober " +
+  "was erg onbeleefd tegen ons, wat we niet hadden verwacht van een plek met zo'n goede reputatie. Ik wil graag mijn geld terug.";
+
+// Builds a Latin-script text of exactly `total` tokens, with `counts` of each
+// listed word and the rest filler that is in no language's list, so the
+// shares are exact and the thresholds can be probed at their edges.
+function textWith(total: number, counts: Record<string, number>): string {
+  const words: string[] = [];
+  for (const [word, count] of Object.entries(counts)) words.push(...Array(count).fill(word));
+  while (words.length < total) words.push("xyzzy");
+  return words.join(" ");
+}
+
 describe("checkFrenchText", () => {
   it.each([
     ["a formal letter", FRENCH_FORMAL_LETTER],
@@ -75,6 +89,7 @@ describe("checkFrenchText", () => {
     ["Portuguese", PORTUGUESE],
     ["Italian", ITALIAN],
     ["German", GERMAN],
+    ["Dutch", DUTCH],
   ])("rejects %s as the wrong language", (_label, text) => {
     expect(checkFrenchText(text)).toEqual({ ok: false, reason: "language" });
   });
@@ -112,5 +127,70 @@ describe("checkFrenchText", () => {
   it("accepts French that quotes a short English phrase", () => {
     const quoted = `${FRENCH_ARGUMENTATIVE} Comme on dit en anglais : "work from home".`;
     expect(checkFrenchText(quoted)).toEqual({ ok: true });
+  });
+});
+
+// The thresholds are the whole policy: the gate is deliberately conservative,
+// so each edge is pinned. A "cleanup" that tightens one would start rejecting
+// genuine learner French and must fail here first.
+describe("checkFrenchText thresholds", () => {
+  // French function words used below, all in the French list and in no
+  // competing list: les, des, dans, pour, avec, sans.
+  const FRENCH_MARKERS = ["les", "des", "dans", "pour", "avec", "sans"];
+
+  describe("almost no French (under 5% of tokens, or under 3 distinct markers)", () => {
+    it("allows exactly 5% French words when they include 3 distinct markers", () => {
+      // 5/100 = 0.05 is not below the threshold.
+      expect(checkFrenchText(textWith(100, { les: 2, des: 2, dans: 1 }))).toEqual({ ok: true });
+    });
+
+    it("rejects just under 5% French words", () => {
+      expect(checkFrenchText(textWith(100, { les: 2, des: 1, dans: 1 }))).toEqual({ ok: false, reason: "language" });
+    });
+
+    it("rejects 2 distinct markers even at 5%: that is too little variety to be French", () => {
+      expect(checkFrenchText(textWith(100, { les: 3, des: 2 }))).toEqual({ ok: false, reason: "language" });
+    });
+
+    it("allows exactly 3 distinct markers once the share is above 5%", () => {
+      expect(checkFrenchText(textWith(100, { les: 4, des: 3, dans: 2 }))).toEqual({ ok: true });
+    });
+
+    it("rejects 2 distinct markers repeated far past 5%, which is filler rather than French", () => {
+      expect(checkFrenchText(textWith(100, { les: 20, des: 20 }))).toEqual({ ok: false, reason: "language" });
+    });
+
+    it("rejects low density together with fewer than 3 distinct markers", () => {
+      expect(checkFrenchText(textWith(100, { les: 1 }))).toEqual({ ok: false, reason: "language" });
+    });
+  });
+
+  describe("another language clearly dominating", () => {
+    // 10 French words across 5 markers is a 0.10 share, enough to pass on its own.
+    const french = { les: 2, des: 2, dans: 2, pour: 2, avec: 2 };
+
+    it("rejects a competitor at exactly 20% that outweighs French by more than 1.3x", () => {
+      expect(checkFrenchText(textWith(100, { ...french, the: 20 }))).toEqual({ ok: false, reason: "language" });
+    });
+
+    it("allows a competitor just under 20%, however large the ratio", () => {
+      expect(checkFrenchText(textWith(100, { ...french, the: 19 }))).toEqual({ ok: true });
+    });
+
+    it("allows a competitor at exactly 1.3x the French share, and rejects just above it", () => {
+      const strongFrench = { les: 4, des: 4, dans: 4, pour: 4, avec: 4 }; // 0.20
+      expect(checkFrenchText(textWith(100, { ...strongFrench, the: 26 }))).toEqual({ ok: true }); // 0.26 = 0.20 x 1.3
+      expect(checkFrenchText(textWith(100, { ...strongFrench, the: 27 }))).toEqual({ ok: false, reason: "language" });
+    });
+
+    it("allows French that merely shares function words with Spanish, Portuguese or Italian", () => {
+      const shared = { de: 10, la: 8, que: 4, en: 4, un: 4, les: 4, des: 4, pour: 4, dans: 4 };
+      expect(checkFrenchText(textWith(100, shared))).toEqual({ ok: true });
+    });
+  });
+
+  it("does not hard-block on the markers list alone: every listed marker is accepted as French evidence", () => {
+    const text = textWith(100, Object.fromEntries(FRENCH_MARKERS.map((word) => [word, 3])));
+    expect(checkFrenchText(text)).toEqual({ ok: true });
   });
 });

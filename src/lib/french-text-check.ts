@@ -68,6 +68,10 @@ const COMPETING_LANGUAGE_WORDS: Record<string, Set<string>> = {
     "di", "e", "il", "che", "la", "un", "una", "per", "non", "con", "sono", "del", "della", "le", "in", "è",
     "lo", "gli", "ma", "più", "io", "mi", "ti", "ci", "questo", "questa", "anche", "come", "dei", "delle",
   ]),
+  dutch: new Set([
+    "de", "het", "een", "en", "van", "ik", "te", "dat", "die", "niet", "zijn", "op", "aan", "met", "voor",
+    "ook", "maar", "om", "ze", "wat", "je", "we", "hij", "dit", "was", "heb", "bij", "naar", "geen", "wij",
+  ]),
   german: new Set([
     "der", "die", "das", "und", "ist", "nicht", "ich", "ein", "eine", "zu", "mit", "auf", "für", "von",
     "den", "dem", "sich", "auch", "es", "sie", "wir", "er", "aber", "oder", "wie", "wird", "sind", "im",
