@@ -191,4 +191,40 @@ describe("WritingWorkspace: formatting-only edit after a correction", () => {
     expect(buttonWithText(copy.workspace.editor.correct)!.disabled).toBe(false);
     expect(container.textContent).not.toContain(copy.workspace.editor.alreadyCorrectedFormattingNote);
   });
+
+  it("warns that a comma-only edit is almost identical and will use another correction", async () => {
+    const copy = getAppCopy("en");
+    await reachReadyState();
+
+    typeIntoEditor(submitted);
+    await clickCorrectAndConfirm();
+    expect(correctCalls).toBe(1);
+
+    // Punctuation is part of the correction key, so this is a new correction...
+    typeIntoEditor(submitted.replace("mot20 mot21", "mot20, mot21"));
+    expect(buttonWithText(copy.workspace.editor.correct)!.disabled).toBe(false);
+    await act(async () => {
+      buttonWithText(copy.workspace.editor.correct)!.click();
+    });
+
+    // ...so the learner is told it costs another one before it is sent.
+    expect(container.textContent).toContain(copy.workspace.dialog.correctNearIdenticalDescription);
+    expect(correctCalls).toBe(1);
+  });
+
+  it("asks the plain question when the new draft is a substantial rewrite", async () => {
+    const copy = getAppCopy("en");
+    await reachReadyState();
+
+    typeIntoEditor(submitted);
+    await clickCorrectAndConfirm();
+
+    typeIntoEditor(`${words.slice(0, 30).join(" ")} ${FRENCH_TAIL} ${FRENCH_TAIL}`);
+    await act(async () => {
+      buttonWithText(copy.workspace.editor.correct)!.click();
+    });
+
+    expect(container.textContent).toContain(copy.workspace.dialog.correctDescription);
+    expect(container.textContent).not.toContain(copy.workspace.dialog.correctNearIdenticalDescription);
+  });
 });

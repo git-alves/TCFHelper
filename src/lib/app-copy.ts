@@ -565,6 +565,7 @@ export interface AppCopy {
       clearDraftConfirm: string;
       correctTitle: string;
       correctDescription: string;
+      correctNearIdenticalDescription: string;
       correctConfirm: string;
       confirm: string;
       cancel: string;
@@ -1260,6 +1261,8 @@ export const APP_COPY = {
         correctTitle: "Correct this response?",
         correctDescription:
           "This sends your response for correction and uses one of your daily corrections.",
+        correctNearIdenticalDescription:
+          "This draft is almost identical to one you already corrected. Sending it again will use another daily correction, and the result may differ slightly.",
         correctConfirm: "Send for correction",
         confirm: "Discard and switch",
         cancel: "Keep working",
@@ -1963,6 +1966,8 @@ export const APP_COPY = {
         correctTitle: "Corriger cette réponse ?",
         correctDescription:
           "Votre réponse sera envoyée pour correction et comptera dans vos corrections quotidiennes.",
+        correctNearIdenticalDescription:
+          "Ce brouillon est presque identique à un texte que vous avez déjà fait corriger. Le renvoyer utilisera une autre correction quotidienne, et le résultat peut légèrement différer.",
         correctConfirm: "Envoyer pour correction",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
@@ -2664,6 +2669,8 @@ export const APP_COPY = {
         correctTitle: "¿Corregir esta respuesta?",
         correctDescription:
           "Tu respuesta se enviará para su corrección y usará una de tus correcciones diarias.",
+        correctNearIdenticalDescription:
+          "Este borrador es casi idéntico a uno que ya has corregido. Volver a enviarlo usará otra corrección diaria y el resultado puede variar ligeramente.",
         correctConfirm: "Enviar a corregir",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
@@ -3364,6 +3371,8 @@ export const APP_COPY = {
         correctTitle: "Corrigir esta resposta?",
         correctDescription:
           "Sua resposta será enviada para correção e usará uma das suas correções diárias.",
+        correctNearIdenticalDescription:
+          "Este rascunho é quase idêntico a um que você já corrigiu. Enviá-lo de novo usará outra correção diária, e o resultado pode variar um pouco.",
         correctConfirm: "Enviar para correção",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
