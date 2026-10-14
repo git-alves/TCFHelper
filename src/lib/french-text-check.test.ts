@@ -43,6 +43,18 @@ const GERMAN =
   "Ich schreibe Ihnen, um mich über den Service zu beschweren, den ich letztes Wochenende in Ihrem Restaurant erhalten habe. " +
   "Das Essen war kalt und der Kellner war sehr unhöflich zu uns, was wir von einem Lokal mit einem so guten Ruf nicht erwartet hatten.";
 
+const FRENCH_WITH_NAMES_AND_URLS =
+  "Bonjour Madame Dupont, je m'appelle Giovanni Bartolomeo et je travaille chez Zanetti Consulting à Montréal. " +
+  "Vous pouvez consulter notre projet sur https://www.zanetti-consulting.example/projets/2024 ou écrire à giovanni@zanetti.example. " +
+  "Nous avons rencontré Pedro Álvarez et Chiara Rossi la semaine dernière pour discuter du contrat avec la société Nakamura.";
+
+// A Portuguese speaker writing French: many Portuguese words slip in, but the
+// text is still an attempt at French and must reach the corrector.
+const FRENCH_MIXED_WITH_PORTUGUESE =
+  "Bonjour, je suis muito content de vous écrire para parler de mon projet. Je vais travailler dans une empresa que est " +
+  "très importante et je veux aussi trabalhar avec des personnes qui parlent français parce que je gosto de cette langue. " +
+  "Nous avons déjà une reunião la semaine prochaine et je pense que tout va bien se passer.";
+
 describe("checkFrenchText", () => {
   it.each([
     ["a formal letter", FRENCH_FORMAL_LETTER],
@@ -51,6 +63,8 @@ describe("checkFrenchText", () => {
     ["French typed without accents", FRENCH_WITHOUT_ACCENTS],
     ["French with a typographic apostrophe", FRENCH_FORMAL_LETTER.replaceAll("'", "’")],
     ["French in capitals", FRENCH_FORMAL_LETTER.toUpperCase()],
+    ["French full of names, a URL and an email address", FRENCH_WITH_NAMES_AND_URLS],
+    ["French with many words from the learner's native language", FRENCH_MIXED_WITH_PORTUGUESE],
   ])("accepts %s", (_label, text) => {
     expect(checkFrenchText(text)).toEqual({ ok: true });
   });
