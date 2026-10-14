@@ -117,9 +117,20 @@ const feedback = {
 };
 
 const LOCAL_USER_ID = "cuid_local_user_1";
-const VALID_TASK_1_CONTENT = Array.from({ length: 60 }, (_, index) => `mot${index + 1}`).join(" ");
-const VALID_TASK_2_CONTENT = Array.from({ length: 120 }, (_, index) => `mot${index + 1}`).join(" ");
-const VALID_TASK_3_CONTENT = Array.from({ length: 120 }, (_, index) => `mot${index + 1}`).join(" ");
+// Real French, repeated to an exact word count: the route refuses text that
+// is not recognizably French, so placeholder tokens like "mot1 mot2" no longer
+// reach the corrector.
+const FRENCH_SENTENCE =
+  "Je vous écris pour vous parler de mon quartier, qui est très agréable et dans lequel il y a beaucoup de commerces.";
+
+function frenchWords(count: number): string {
+  const words = FRENCH_SENTENCE.split(" ");
+  return Array.from({ length: count }, (_, index) => words[index % words.length]).join(" ");
+}
+
+const VALID_TASK_1_CONTENT = frenchWords(60);
+const VALID_TASK_2_CONTENT = frenchWords(120);
+const VALID_TASK_3_CONTENT = frenchWords(120);
 
 function stubProvider(id: "gemini" | "openrouter" = "gemini"): CorrectionProvider {
   return {
@@ -252,10 +263,29 @@ describe("POST /api/essays/correct", () => {
     const response = await post({
       taskType: "TASK_1",
       topicPrompt: "Écrivez à votre voisin.",
-      content: Array.from({ length: 59 }, (_, index) => `mot${index + 1}`).join(" "),
+      content: frenchWords(59),
     });
 
     expect(response.status).toBe(422);
+    expect(claimCorrectionMock).not.toHaveBeenCalled();
+    expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
+    expect(gradeEssayMock).not.toHaveBeenCalled();
+    expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["English", Array.from({ length: 12 }, () => "I am writing to complain about the service that I received at your restaurant.").join(" "), "language"],
+    ["another script", Array.from({ length: 12 }, () => "Я пишу вам, чтобы пожаловаться на обслуживание в вашем ресторане.").join(" "), "script"],
+    ["placeholder tokens", Array.from({ length: 60 }, (_, index) => `mot${index + 1}`).join(" "), "language"],
+  ])("rejects %s text before consuming correction resources", async (_label, content, reason) => {
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content,
+    });
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ code: "NOT_FRENCH_TEXT", reason });
     expect(claimCorrectionMock).not.toHaveBeenCalled();
     expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
     expect(gradeEssayMock).not.toHaveBeenCalled();

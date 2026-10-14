@@ -120,10 +120,17 @@ const { getCorrectionForUser } = await import("@/lib/correction-history");
 const TOPIC = "Écrivez à votre voisin.";
 const ERROR_WORD = "mot50";
 
-// 62 words (just above the Task 1 minimum, so gluing two still passes it) with a doubled space early in the text, so
-// every offset after it differs from the single-spaced version, and one
-// error well after it.
-const words = Array.from({ length: 62 }, (_, index) => `mot${index + 1}`);
+// Numbered words make each position addressable; the French tail keeps the
+// whole text recognizably French, which the route requires before grading.
+// There is a doubled space early in the text, so every offset after it differs
+// from the single-spaced version, and one error well after it.
+const FRENCH_TAIL =
+  "Je vous écris pour vous parler de mon quartier, qui est très agréable et dans lequel il y a beaucoup de commerces. " +
+  "Nous avons des parcs pour les enfants et les personnes qui aiment se promener avec leurs amis après le travail.";
+const words = [
+  ...Array.from({ length: 62 }, (_, index) => `mot${index + 1}`),
+  ...FRENCH_TAIL.split(" "),
+];
 const submitted = `${words.slice(0, 9).join(" ")}  ${words.slice(9).join(" ")}`;
 const retyped = submitted.replace("  ", " ");
 const errorStart = submitted.indexOf(ERROR_WORD);

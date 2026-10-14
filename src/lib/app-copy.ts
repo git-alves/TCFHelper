@@ -378,6 +378,7 @@ export interface AppCopy {
       correcting: string;
       correctingStatus: string;
       genericCorrectionError: string;
+      notFrenchText: string;
       alreadyCorrected: string;
       alreadyCorrectedFormattingNote: string;
       correctionInProgress: string;
@@ -936,6 +937,8 @@ export const APP_COPY = {
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
+        notFrenchText:
+          "We couldn’t recognize this text as French, so it wasn’t corrected. Write your response in French and check for unusual characters, then try again.",
         alreadyCorrected:
           "This version has already been corrected. Edit your response or exam prompt to request a new correction.",
         alreadyCorrectedFormattingNote:
@@ -1627,6 +1630,8 @@ export const APP_COPY = {
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
+        notFrenchText:
+          "Nous n’avons pas reconnu ce texte comme du français, il n’a donc pas été corrigé. Rédigez votre réponse en français et vérifiez qu’il n’y a pas de caractères inhabituels, puis réessayez.",
         alreadyCorrected:
           "Cette version a déjà été corrigée. Modifiez votre réponse ou votre consigne d’examen pour demander une nouvelle correction.",
         alreadyCorrectedFormattingNote:
@@ -2322,6 +2327,8 @@ export const APP_COPY = {
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
+        notFrenchText:
+          "No hemos reconocido este texto como francés, así que no se ha corregido. Escribe tu respuesta en francés y revisa que no haya caracteres inusuales; luego inténtalo de nuevo.",
         alreadyCorrected:
           "Esta versión ya se ha corregido. Modifica tu respuesta o consigna de examen para solicitar una nueva corrección.",
         alreadyCorrectedFormattingNote:
@@ -3017,6 +3024,8 @@ export const APP_COPY = {
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
+        notFrenchText:
+          "Não reconhecemos este texto como francês, então ele não foi corrigido. Escreva sua resposta em francês e verifique se não há caracteres incomuns; depois tente novamente.",
         alreadyCorrected:
           "Esta versão já foi corrigida. Edite sua resposta ou enunciado de exame para solicitar uma nova correção.",
         alreadyCorrectedFormattingNote:
