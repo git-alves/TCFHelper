@@ -37,6 +37,7 @@ import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
 import { checkFrenchText } from "@/lib/french-text-check";
+import { isNearIdenticalDraft } from "@/lib/near-identical-draft";
 import { computeTranslationDelta } from "@/lib/translation-delta";
 import {
   TIMED_TASK_PLANS,
@@ -61,7 +62,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear" | "correct";
+type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type TimedTaskStatus = "running" | "paused" | "expired";
@@ -651,6 +652,9 @@ export function WritingWorkspace() {
   // workspace distinguish an unchanged successful correction from a failed
   // request, and makes an edit-and-revert behave truthfully.
   const [lastSuccessfulCorrectionKey, setLastSuccessfulCorrectionKey] = useState<string | null>(null);
+  // The draft text behind lastSuccessfulCorrectionKey, kept only to tell the
+  // learner when a new request is a tiny edit of it (see isNearIdenticalDraft).
+  const [lastCorrectedText, setLastCorrectedText] = useState<string | null>(null);
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [correctionModalState, setCorrectionModalState] = useState<CorrectionModalState>("loading");
   const [correctionModalSession, setCorrectionModalSession] = useState(0);
@@ -1064,6 +1068,7 @@ export function WritingWorkspace() {
     setFeedback(null);
     setFeedbackLocale(null);
     setLastSuccessfulCorrectionKey(null);
+    setLastCorrectedText(null);
     setCorrectionModalOpen(false);
     setIsWalkthroughCorrectionPreview(false);
     setCorrectionModalState("loading");
@@ -1600,7 +1605,14 @@ export function WritingWorkspace() {
     // Only a request that would actually be sent (and spend quota) asks for
     // confirmation; the free local rejections above never interrupt.
     if (!skipConfirmation) {
-      setPendingSwitch({ kind: "correct", run: () => void handleCorrect({ skipConfirmation: true }) });
+      // A punctuation or one-letter fix is a different correction key, so it
+      // is allowed -- but it costs another daily correction, which is worth
+      // saying when the draft is nearly the one already assessed.
+      const isNearIdentical = lastCorrectedText !== null && isNearIdenticalDraft(lastCorrectedText, content);
+      setPendingSwitch({
+        kind: isNearIdentical ? "correctNearIdentical" : "correct",
+        run: () => void handleCorrect({ skipConfirmation: true }),
+      });
       return;
     }
     const requestKey = attempt.correctionRequestKey;
@@ -1650,6 +1662,7 @@ export function WritingWorkspace() {
           (data as { code?: unknown }).code === "CORRECTION_ALREADY_EXISTS"
         ) {
           setLastSuccessfulCorrectionKey(requestKey);
+          setLastCorrectedText(submittedText);
           const essayId = (data as { essayId?: unknown }).essayId;
           setExistingCorrectionEssayId(typeof essayId === "string" ? essayId : null);
           setCorrectionModalOpen(false);
@@ -1696,6 +1709,7 @@ export function WritingWorkspace() {
       setCorrectionEssayId(correction.essayId);
       setFeedbackLocale(correctionLocale);
       setLastSuccessfulCorrectionKey(requestKey);
+      setLastCorrectedText(submittedText);
       setCorrectionModalState("result");
     } catch {
       if (requestId === correctionRequestId.current) {
@@ -2524,7 +2538,11 @@ export function WritingWorkspace() {
 
       <ConfirmDialog
         open={pendingSwitch !== null}
-        title={pendingSwitch?.kind === "correct" ? copy.workspace.dialog.correctTitle : copy.workspace.dialog.title}
+        title={
+          pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
+            ? copy.workspace.dialog.correctTitle
+            : copy.workspace.dialog.title
+        }
         description={
           pendingSwitch?.kind === "task"
             ? copy.workspace.dialog.taskSwitchDescription
@@ -2540,14 +2558,16 @@ export function WritingWorkspace() {
                       ? copy.workspace.dialog.clearDraftDescription
                       : pendingSwitch?.kind === "correct"
                         ? copy.workspace.dialog.correctDescription
-                        : ""
+                        : pendingSwitch?.kind === "correctNearIdentical"
+                          ? copy.workspace.dialog.correctNearIdenticalDescription
+                          : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "example"
             ? copy.workspace.dialog.exampleOverwriteConfirm
             : pendingSwitch?.kind === "clear"
               ? copy.workspace.dialog.clearDraftConfirm
-              : pendingSwitch?.kind === "correct"
+              : pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
                 ? copy.workspace.dialog.correctConfirm
                 : copy.workspace.dialog.confirm
         }
