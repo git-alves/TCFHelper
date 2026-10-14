@@ -1,22 +1,31 @@
 /**
  * Read-only: replays every stored essay through the French check and prints
- * how many it would now reject. Each stored essay was accepted before the gate
- * existed, so every rejection is a false positive -- this measures the real
- * rate on actual learners, which invented samples cannot.
+ * how many it would now reject. This is the *potential block rate*, not the
+ * false-positive rate: an essay accepted before the gate existed may still be
+ * genuinely non-French or arbitrary text. To get a false-positive rate,
+ * manually classify a privacy-safe subset of the rejected essays (legitimate
+ * French / mixed / non-French); false positives are the legitimate French
+ * drafts blocked, divided by all legitimate French drafts reviewed.
  *
- * The output holds counts, essay ids and numeric scores. It never prints or
- * writes essay text. It only runs `findMany`; nothing is modified.
+ * By default the report is aggregate only: counts and rates by task type,
+ * stored level and rejection reason. It never prints or writes essay text, and
+ * it does not print essay ids, because ids are linkable records that are easy
+ * to paste into tickets or chat. Pass --show-ids only when someone with
+ * production-data access needs to investigate a specific essay; that adds the
+ * id and numeric scores (still no text) of each rejected essay.
  *
- * Usage: npm run check:french-replay            (summary + rejected ids)
- *        npm run check:french-replay -- --counts (summary without the id list)
+ * It only runs `findMany`; nothing is modified.
+ *
+ * Usage: npm run check:french-replay                (aggregate report)
+ *        npm run check:french-replay -- --show-ids  (adds rejected ids + scores)
  */
 import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
-import { createFrenchReplay } from "../src/lib/french-text-replay";
+import { createFrenchReplay, formatReplayReport } from "../src/lib/french-text-replay";
 
 const BATCH_SIZE = 200;
-const countsOnly = process.argv.includes("--counts");
+const showIds = process.argv.includes("--show-ids");
 
 async function main() {
   const prisma = new PrismaClient();
@@ -53,7 +62,7 @@ async function main() {
   }
 
   const summary = replay.summary();
-  console.log(JSON.stringify(countsOnly ? { ...summary, rejections: undefined } : summary, null, 2));
+  console.log(formatReplayReport(summary, { showIds }));
 }
 
 main().catch((error) => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createFrenchReplay, type ReplayEssay } from "./french-text-replay";
+import { createFrenchReplay, formatReplayReport, type ReplayEssay } from "./french-text-replay";
 
 const FRENCH =
   "Je vous écris pour vous parler de mon quartier, qui est très agréable et dans lequel il y a beaucoup de commerces et de parcs.";
@@ -19,8 +19,8 @@ describe("createFrenchReplay", () => {
     const summary = replay.summary();
 
     expect(summary.total).toBe(3);
-    expect(summary.rejected).toBe(1);
-    expect(summary.rejectionRate).toBeCloseTo(0.333, 3);
+    expect(summary.potentialBlocks).toBe(1);
+    expect(summary.potentialBlockRate).toBeCloseTo(0.333, 3);
     expect(summary.byReason).toEqual({ script: 0, language: 1 });
     expect(summary.byTaskType).toEqual({ TASK_1: { total: 1, rejected: 0 }, TASK_2: { total: 2, rejected: 1 } });
     expect(summary.byLevel).toEqual({
@@ -56,6 +56,38 @@ describe("createFrenchReplay", () => {
   });
 
   it("reports a zero rate for an empty replay", () => {
-    expect(createFrenchReplay().summary()).toMatchObject({ total: 0, rejected: 0, rejectionRate: 0 });
+    expect(createFrenchReplay().summary()).toMatchObject({ total: 0, potentialBlocks: 0, potentialBlockRate: 0 });
+  });
+
+  it("labels the rate as a potential block rate, never a false-positive rate", () => {
+    const summary = createFrenchReplay().summary();
+
+    expect(summary.metric).toBe("historical potential block rate (not a false-positive rate)");
+    expect(Object.keys(summary).join(" ")).not.toMatch(/falsePositive/i);
+  });
+});
+
+describe("formatReplayReport", () => {
+  function replayWithOneBlock() {
+    const replay = createFrenchReplay();
+    replay.add(essay("essay-123", ENGLISH));
+    replay.add(essay("essay-456", FRENCH));
+    return replay.summary();
+  }
+
+  it("is aggregate-only by default: no essay ids and no per-essay records", () => {
+    const report = formatReplayReport(replayWithOneBlock(), { showIds: false });
+
+    expect(report).not.toContain("essay-123");
+    expect(report).not.toContain("rejections");
+    expect(JSON.parse(report)).toMatchObject({ total: 2, potentialBlocks: 1, potentialBlockRate: 0.5 });
+  });
+
+  it("includes the ids and scores of blocked essays only when asked", () => {
+    const report = formatReplayReport(replayWithOneBlock(), { showIds: true });
+
+    expect(report).toContain("essay-123");
+    expect(report).not.toContain("essay-456");
+    expect(report).not.toContain("neighbourhood");
   });
 });

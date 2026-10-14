@@ -2,11 +2,13 @@ import { measureFrenchText } from "@/lib/french-text-check";
 
 /**
  * Replays already-accepted submissions through the French check to measure
- * its false-positive rate. Every stored essay was accepted before the gate
- * existed, so any essay it would now reject is a false positive by
- * construction -- a measured rate on real learners instead of on invented
- * samples. The summary carries counts, ids and numeric scores only; it never
- * contains submitted text.
+ * its potential block rate on real learners. This is NOT the false-positive
+ * rate: some stored essays may genuinely be non-French or arbitrary text. The
+ * rejected sample is a candidate list for a privacy-safe manual review, and
+ * only the legitimate French drafts that were blocked, divided by all
+ * legitimate French drafts reviewed, give a false-positive rate. The summary
+ * carries counts and numeric scores (plus ids, which the script only prints on
+ * request); it never contains submitted text.
  */
 export interface ReplayEssay {
   id: string;
@@ -36,12 +38,16 @@ export interface ReplayRejection {
 }
 
 export interface ReplaySummary {
+  /** Reminds every reader of the printed report what the rate means. */
+  metric: "historical potential block rate (not a false-positive rate)";
   total: number;
-  rejected: number;
-  rejectionRate: number;
+  /** Stored essays the check would now block; not confirmed false positives. */
+  potentialBlocks: number;
+  potentialBlockRate: number;
   byReason: Record<"script" | "language", number>;
   byTaskType: Record<string, Tally>;
   byLevel: Record<string, Tally>;
+  /** Linkable ids and scores; the script prints this only with --show-ids. */
   rejections: ReplayRejection[];
 }
 
@@ -83,9 +89,10 @@ export function createFrenchReplay() {
     },
     summary(): ReplaySummary {
       return {
+        metric: "historical potential block rate (not a false-positive rate)",
         total,
-        rejected: rejections.length,
-        rejectionRate: total === 0 ? 0 : round(rejections.length / total),
+        potentialBlocks: rejections.length,
+        potentialBlockRate: total === 0 ? 0 : round(rejections.length / total),
         byReason: { ...byReason },
         byTaskType: Object.fromEntries(tallies.taskType),
         byLevel: Object.fromEntries(tallies.level),
@@ -93,6 +100,14 @@ export function createFrenchReplay() {
       };
     },
   };
+}
+
+/**
+ * What the script prints. Aggregate-only unless ids are explicitly requested,
+ * because essay ids are linkable records that are easy to paste into tickets.
+ */
+export function formatReplayReport(summary: ReplaySummary, { showIds }: { showIds: boolean }): string {
+  return JSON.stringify(showIds ? summary : { ...summary, rejections: undefined }, null, 2);
 }
 
 function round(value: number): number {
