@@ -563,6 +563,9 @@ export interface AppCopy {
       exampleOverwriteConfirm: string;
       clearDraftDescription: string;
       clearDraftConfirm: string;
+      correctTitle: string;
+      correctDescription: string;
+      correctConfirm: string;
       confirm: string;
       cancel: string;
     };
@@ -1254,6 +1257,10 @@ export const APP_COPY = {
         exampleOverwriteConfirm: "Replace draft",
         clearDraftDescription: "Clearing will discard your current draft and feedback.",
         clearDraftConfirm: "Clear text",
+        correctTitle: "Correct this response?",
+        correctDescription:
+          "This sends your response for correction and uses one of your daily corrections.",
+        correctConfirm: "Send for correction",
         confirm: "Discard and switch",
         cancel: "Keep working",
       },
@@ -1953,6 +1960,10 @@ export const APP_COPY = {
         exampleOverwriteConfirm: "Remplacer le brouillon",
         clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
         clearDraftConfirm: "Effacer le texte",
+        correctTitle: "Corriger cette réponse ?",
+        correctDescription:
+          "Votre réponse sera envoyée pour correction et comptera dans vos corrections quotidiennes.",
+        correctConfirm: "Envoyer pour correction",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
       },
@@ -2650,6 +2661,10 @@ export const APP_COPY = {
         exampleOverwriteConfirm: "Reemplazar borrador",
         clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
         clearDraftConfirm: "Borrar texto",
+        correctTitle: "¿Corregir esta respuesta?",
+        correctDescription:
+          "Tu respuesta se enviará para su corrección y usará una de tus correcciones diarias.",
+        correctConfirm: "Enviar a corregir",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
       },
@@ -3346,6 +3361,10 @@ export const APP_COPY = {
         exampleOverwriteConfirm: "Substituir rascunho",
         clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",
         clearDraftConfirm: "Limpar texto",
+        correctTitle: "Corrigir esta resposta?",
+        correctDescription:
+          "Sua resposta será enviada para correção e usará uma das suas correções diárias.",
+        correctConfirm: "Enviar para correção",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
       },

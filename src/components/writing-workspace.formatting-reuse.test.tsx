@@ -143,15 +143,25 @@ function buttonWithText(text: string) {
   return [...document.querySelectorAll("button")].find((candidate) => candidate.textContent?.trim() === text);
 }
 
+// "Correct" asks for confirmation before spending a correction; this clicks
+// through it the way a learner who meant to correct would.
+async function clickCorrectAndConfirm() {
+  const copy = getAppCopy("en");
+  await act(async () => {
+    buttonWithText(copy.workspace.editor.correct)!.click();
+  });
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('[role="alertdialog"] button:last-child')!.click();
+  });
+}
+
 describe("WritingWorkspace: formatting-only edit after a correction", () => {
   it("keeps the correction, explains the reuse, and shows the graded text with its highlight intact", async () => {
     const copy = getAppCopy("en");
     await reachReadyState();
 
     typeIntoEditor(submitted);
-    await act(async () => {
-      buttonWithText(copy.workspace.editor.correct)!.click();
-    });
+    await clickCorrectAndConfirm();
     expect(correctCalls).toBe(1);
 
     // The learner tidies the doubled space. No new grading is offered...
@@ -174,9 +184,7 @@ describe("WritingWorkspace: formatting-only edit after a correction", () => {
     await reachReadyState();
 
     typeIntoEditor(submitted);
-    await act(async () => {
-      buttonWithText(copy.workspace.editor.correct)!.click();
-    });
+    await clickCorrectAndConfirm();
 
     typeIntoEditor(retyped.replace("mot3 mot4", "mot3mot4"));
 
