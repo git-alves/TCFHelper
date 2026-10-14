@@ -96,25 +96,52 @@ function share(tokens: string[], words: ReadonlySet<string>): number {
   return hits / tokens.length;
 }
 
-export function checkFrenchText(rawText: string): FrenchTextCheck {
+/** The numbers behind a verdict, for diagnosing a false positive. Contains no text. */
+export interface FrenchTextMeasurement {
+  result: FrenchTextCheck;
+  letterCount: number;
+  latinLetterShare: number;
+  tokenCount: number;
+  frenchShare: number;
+  distinctFrenchWords: number;
+  strongestCompetitor: string | null;
+  strongestCompetitorShare: number;
+}
+
+export function measureFrenchText(rawText: string): FrenchTextMeasurement {
   // Some sources (macOS, PDFs, certain keyboards) store "é" as "e" plus a
   // combining accent. Letter matching would then stop mid-word and lose
   // accented function words such as "très", "à" and "été".
   const text = rawText.normalize("NFC");
   const letters = text.match(/\p{L}/gu) ?? [];
-  if (letters.length === 0) return { ok: false, reason: "script" };
-
   const latinLetters = text.match(/\p{Script=Latin}/gu) ?? [];
-  if (latinLetters.length / letters.length < MIN_LATIN_LETTER_SHARE) {
-    return { ok: false, reason: "script" };
+  const latinLetterShare = letters.length === 0 ? 0 : latinLetters.length / letters.length;
+  const base = {
+    letterCount: letters.length,
+    latinLetterShare,
+    tokenCount: 0,
+    frenchShare: 0,
+    distinctFrenchWords: 0,
+    strongestCompetitor: null,
+    strongestCompetitorShare: 0,
+  };
+
+  if (letters.length === 0 || latinLetterShare < MIN_LATIN_LETTER_SHARE) {
+    return { ...base, result: { ok: false, reason: "script" } };
   }
 
   const tokens = tokenize(text);
   const frenchShare = share(tokens, FRENCH_WORDS);
   const distinctFrenchWords = new Set(tokens.filter((token) => FRENCH_WORDS.has(token))).size;
-  const strongestCompetitorShare = Math.max(
-    ...Object.values(COMPETING_LANGUAGE_WORDS).map((words) => share(tokens, words)),
-  );
+  let strongestCompetitor: string | null = null;
+  let strongestCompetitorShare = 0;
+  for (const [language, words] of Object.entries(COMPETING_LANGUAGE_WORDS)) {
+    const languageShare = share(tokens, words);
+    if (languageShare > strongestCompetitorShare) {
+      strongestCompetitor = language;
+      strongestCompetitorShare = languageShare;
+    }
+  }
 
   // Deliberately conservative: rejecting a genuine French attempt costs the
   // learner far more than letting an uncertain Latin-script draft through.
@@ -127,5 +154,17 @@ export function checkFrenchText(rawText: string): FrenchTextCheck {
     strongestCompetitorShare > frenchShare * COMPETITOR_DOMINANCE_FACTOR;
   const looksFrench = !hasAlmostNoFrench && !anotherLanguageDominates;
 
-  return looksFrench ? { ok: true } : { ok: false, reason: "language" };
+  return {
+    ...base,
+    tokenCount: tokens.length,
+    frenchShare,
+    distinctFrenchWords,
+    strongestCompetitor,
+    strongestCompetitorShare,
+    result: looksFrench ? { ok: true } : { ok: false, reason: "language" },
+  };
+}
+
+export function checkFrenchText(text: string): FrenchTextCheck {
+  return measureFrenchText(text).result;
 }
