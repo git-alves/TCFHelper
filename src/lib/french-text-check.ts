@@ -96,7 +96,11 @@ function share(tokens: string[], words: ReadonlySet<string>): number {
   return hits / tokens.length;
 }
 
-export function checkFrenchText(text: string): FrenchTextCheck {
+export function checkFrenchText(rawText: string): FrenchTextCheck {
+  // Some sources (macOS, PDFs, certain keyboards) store "é" as "e" plus a
+  // combining accent. Letter matching would then stop mid-word and lose
+  // accented function words such as "très", "à" and "été".
+  const text = rawText.normalize("NFC");
   const letters = text.match(/\p{L}/gu) ?? [];
   if (letters.length === 0) return { ok: false, reason: "script" };
 

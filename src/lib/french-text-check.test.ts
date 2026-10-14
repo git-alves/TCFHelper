@@ -130,6 +130,67 @@ describe("checkFrenchText", () => {
   });
 });
 
+// Typical beginner drafts, written to look like real A1-B1 learner output:
+// phonetic spelling, no accents, chat style, native-language slips. A learner
+// who makes many errors is still writing French, so every one of these must
+// reach the corrector. The two near-total Spanish/Portuguese drafts at the end
+// are the only things that should be turned away.
+const BEGINNER_FRENCH: Record<string, string> = {
+  "phonetic spelling without accents":
+    "Bonjour mon ami. Je sui tre content parske je vai a la mezon de mon frer. Il abite a Paris avek sa famy. Nou alon mange dan un restoran tre bon. Le repa etè delisieu. Je vou ecri pour dir que je voudre venir voir vou la semen prochen si vou voulé bien. Merci buku et a bientot mon ami.",
+  "short repetitive sentences":
+    "Je m'appelle Ana. J'ai vingt ans. J'habite à Lisbonne. J'aime le football. J'aime la musique. J'aime les films. Je travaille dans un bureau. Mon travail est difficile. Ma famille est grande. Mon père est médecin. Ma mère est professeur. J'ai un frère et une soeur. Nous aimons voyager. Je veux visiter la France. Je parle un peu français.",
+  "lowercase chat style without punctuation":
+    "salut marie ca va moi ca va bien merci je voulai te dire que je suis a paris depuis lundi et que je vais rester jusqua samedi tu es libre ce week end on peut aller manger ensemble ou aller au cinema je connai un bon restoran pres de la gare dis moi si tu veu venir et on se retrouve la bas a huit heure",
+  "English words mixed in":
+    "Bonjour Marie, je suis very happy de te écrire. Hier I went au cinéma avec mes friends et nous avons watched un film. The movie était long mais the actors sont bons. Je voudrais que tu come avec nous next week parce que there is un autre film et I think tu vas aimer it. Let me know si tu peux venir.",
+  "note-style list with almost no function words":
+    "Télétravail: avantages: flexibilité, gain de temps, économies de transport, autonomie, concentration. Inconvénients: isolement, manque de communication, difficulté de séparation vie privée vie professionnelle, sédentarité. Exemple: entreprise Google, Microsoft, Amazon. Conclusion: solution hybride, deux jours bureau, trois jours maison, productivité, bien-être.",
+  "short draft with wrong agreements and gender":
+    "Bonjour, je suis Pedro. Je habite en Brasil. Je aime la France parce que le fromage et le vin sont bon. Je voudrai visiter Paris, la Tour Eiffel et le Louvre. Je étudie le français depuis deux ans, mais c'est difficile pour moi. J'espère parler mieux bientôt. Merci pour votre aide et à bientôt.",
+  "French quoting English sources":
+    "Dans le document 1, l'auteur dit que \"remote work increases productivity and reduces stress for employees\". Dans le document 2, par contre, on lit que \"working from home creates isolation and weakens teams\". Je pense que les deux opinions sont vraies, mais il faut trouver un équilibre entre les deux.",
+};
+
+const NEARLY_ALL_SPANISH =
+  "Hola Marie, yo estoy muy contento de escribirte. Ayer yo fui al cine con mis amigos y nosotros vimos una película muy interesante. La película era larga pero los actores son buenos. Yo quiero que tú vienes con nosotros la semana próxima porque hay otra película y yo pienso que tú vas a gustar. Dime si puedes venir.";
+const NEARLY_ALL_PORTUGUESE =
+  "Bonjour Maria, eu estou muito feliz de te escrever. Ontem eu fui ao cinéma com meus amigos e nós vimos um filme muito interessante. O filme era longo mas os atores são bons. Eu quero que tu vens com nós na semana que vem porque tem outro filme e eu acho que tu vais gostar. Me diz se tu podes vir.";
+
+describe("checkFrenchText with beginner drafts", () => {
+  it.each(Object.entries(BEGINNER_FRENCH))("accepts %s", (_label, text) => {
+    expect(checkFrenchText(text)).toEqual({ ok: true });
+  });
+
+  it("accepts the same drafts typed in capitals", () => {
+    for (const text of Object.values(BEGINNER_FRENCH)) {
+      expect(checkFrenchText(text.toUpperCase())).toEqual({ ok: true });
+    }
+  });
+
+  it("turns away drafts that are almost entirely Spanish or Portuguese", () => {
+    expect(checkFrenchText(NEARLY_ALL_SPANISH)).toEqual({ ok: false, reason: "language" });
+    expect(checkFrenchText(NEARLY_ALL_PORTUGUESE)).toEqual({ ok: false, reason: "language" });
+  });
+});
+
+describe("checkFrenchText Unicode handling", () => {
+  // The only French evidence here is accented words, which a decomposed
+  // "e" + combining accent would split apart.
+  const accentedEvidenceOnly = textWith(100, { "à": 2, "très": 2, "été": 1 });
+
+  it("accepts the same text whether accents are precomposed or decomposed", () => {
+    expect(checkFrenchText(accentedEvidenceOnly.normalize("NFC"))).toEqual({ ok: true });
+    expect(checkFrenchText(accentedEvidenceOnly.normalize("NFD"))).toEqual({ ok: true });
+  });
+
+  it("accepts decomposed accents in full beginner and formal drafts", () => {
+    for (const text of [...Object.values(BEGINNER_FRENCH), FRENCH_FORMAL_LETTER, FRENCH_ARGUMENTATIVE]) {
+      expect(checkFrenchText(text.normalize("NFD"))).toEqual({ ok: true });
+    }
+  });
+});
+
 // The thresholds are the whole policy: the gate is deliberately conservative,
 // so each edge is pinned. A "cleanup" that tightens one would start rejecting
 // genuine learner French and must fail here first.
