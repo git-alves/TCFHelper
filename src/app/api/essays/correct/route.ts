@@ -28,6 +28,7 @@ import {
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { reserveCorrectionUsage } from "@/lib/correction-usage";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
+import { checkFrenchText } from "@/lib/french-text-check";
 
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([
@@ -117,6 +118,17 @@ function minimumWordCountResponse(wordCount: number, minWords: number) {
   );
 }
 
+function notFrenchTextResponse(reason: "script" | "language") {
+  return NextResponse.json(
+    {
+      error: "This text was not recognized as French. Write your response in French to get a correction.",
+      code: "NOT_FRENCH_TEXT",
+      reason,
+    },
+    { status: 422, headers: NO_STORE_HEADERS },
+  );
+}
+
 function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode {
   if (error instanceof CorrectionProviderNotConfiguredError) return "not_configured";
   if (error instanceof CorrectionProviderRateLimitedError) return "rate_limited";
@@ -182,6 +194,15 @@ export async function POST(request: Request) {
   // must never consume a correction slot or send an avoidable provider request.
   if (wordCount < task.minWords) {
     return minimumWordCountResponse(wordCount, task.minWords);
+  }
+
+  // Same reasoning as the word-count gate: text that is not French cannot be
+  // meaningfully corrected, so it must not reach the claim, the quota, or the
+  // provider. This keeps the endpoint from being used as a free general-
+  // purpose text processor.
+  const frenchCheck = checkFrenchText(content);
+  if (!frenchCheck.ok) {
+    return notFrenchTextResponse(frenchCheck.reason);
   }
 
   let resolvedTopicId: string | null = null;

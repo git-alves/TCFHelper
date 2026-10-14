@@ -36,6 +36,7 @@ import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspac
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
+import { checkFrenchText } from "@/lib/french-text-check";
 import { computeTranslationDelta } from "@/lib/translation-delta";
 import {
   TIMED_TASK_PLANS,
@@ -607,6 +608,9 @@ export function WritingWorkspace() {
   // Only surfaced after the learner actually tries to correct while short --
   // not shown proactively while they're still typing.
   const [showMinimumWordWarning, setShowMinimumWordWarning] = useState(false);
+  // Set when the draft is not recognizably French, either by the same check
+  // run locally before sending or by the server refusing it (NOT_FRENCH_TEXT).
+  const [showNotFrenchWarning, setShowNotFrenchWarning] = useState(false);
 
   // useSyncExternalStore serves the same defaults during SSR and hydration,
   // then reads the browser preference after hydration without a mismatched
@@ -1028,6 +1032,7 @@ export function WritingWorkspace() {
     setContent(value);
     setHasCorrectionError(false);
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
     // Keep a server-returned history ID while the learner experiments with a
     // revision. The link itself is rendered only when the current key matches
     // again, so edit-and-revert restores the useful route to the saved review.
@@ -1068,6 +1073,7 @@ export function WritingWorkspace() {
     setSubmittedCorrectionText("");
     setHasCorrectionError(false);
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
     setExampleError(null);
     setExampleNeedsTopic(false);
     cancelPendingTranslation();
@@ -1570,6 +1576,7 @@ export function WritingWorkspace() {
       isCorrectionInProgressElsewhere,
       isCurrentDraftAlreadyCorrected,
       wordCount,
+      isLikelyFrench: checkFrenchText(content).ok,
       correctionRequestKey,
     });
 
@@ -1580,7 +1587,12 @@ export function WritingWorkspace() {
       setShowMinimumWordWarning(true);
       return;
     }
+    if (attempt.kind === "notFrench") {
+      setShowNotFrenchWarning(true);
+      return;
+    }
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
     const requestKey = attempt.correctionRequestKey;
 
     const correctionLocale = locale;
@@ -1646,6 +1658,19 @@ export function WritingWorkspace() {
             key: requestKey,
             retryAt: resolveInProgressRetryAt(retryAt),
           });
+          setCorrectionModalOpen(false);
+          return;
+        }
+        if (
+          requestId === correctionRequestId.current &&
+          data &&
+          typeof data === "object" &&
+          (data as { code?: unknown }).code === "NOT_FRENCH_TEXT"
+        ) {
+          // The local check passed but the server's did not (it is the
+          // authority). Show the same inline message instead of the generic
+          // failure modal -- there is nothing to retry.
+          setShowNotFrenchWarning(true);
           setCorrectionModalOpen(false);
           return;
         }
@@ -2365,6 +2390,11 @@ export function WritingWorkspace() {
             {hasCorrectionError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
                 {copy.workspace.editor.genericCorrectionError}
+              </p>
+            )}
+            {showNotFrenchWarning && (
+              <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">
+                {copy.workspace.editor.notFrenchText}
               </p>
             )}
             {showMinimumWordWarning && isBelowMinimumWordCount && task && (

@@ -25,7 +25,15 @@ vi.mock("next/navigation", () => ({
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const ERROR_WORD = "mot50";
-const words = Array.from({ length: 62 }, (_, index) => `mot${index + 1}`);
+// Numbered words make each position addressable; the French tail keeps the
+// text recognizably French, which the correction flow checks before sending.
+const FRENCH_TAIL =
+  "Je vous écris pour vous parler de mon quartier, qui est très agréable et dans lequel il y a beaucoup de commerces. " +
+  "Nous avons des parcs pour les enfants et les personnes qui aiment se promener avec leurs amis après le travail.";
+const words = [
+  ...Array.from({ length: 62 }, (_, index) => `mot${index + 1}`),
+  ...FRENCH_TAIL.split(" "),
+];
 const submitted = `${words.slice(0, 9).join(" ")}  ${words.slice(9).join(" ")}`;
 const retyped = submitted.replace("  ", " ");
 const errorStart = submitted.indexOf(ERROR_WORD);
