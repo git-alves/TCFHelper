@@ -383,6 +383,9 @@ export interface AppCopy {
       generateExample: string;
       generatingExample: string;
       generatingExampleStatus: string;
+      exampleHeading: (values: { level: string }) => string;
+      exampleCopy: string;
+      exampleDismiss: string;
       exampleRateLimitedError: string;
       exampleDailyLimitError: string;
       exampleUnavailableError: string;
@@ -556,8 +559,6 @@ export interface AppCopy {
       topicSwitchDescription: string;
       dashboardSwitchDescription: string;
       adminSwitchDescription: string;
-      exampleOverwriteDescription: string;
-      exampleOverwriteConfirm: string;
       clearDraftDescription: string;
       clearDraftConfirm: string;
       confirm: string;
@@ -941,6 +942,9 @@ export const APP_COPY = {
         generateExample: "Generate example",
         generatingExample: "Generating…",
         generatingExampleStatus: "Generating an example response. This can take a moment.",
+        exampleHeading: ({ level }) => `Example response (${level})`,
+        exampleCopy: "Copy example",
+        exampleDismiss: "Close example",
         exampleRateLimitedError: "The example generator is busy. Please try again shortly.",
         exampleDailyLimitError: "You've reached today's example limit. Please try again tomorrow.",
         exampleUnavailableError: "The example generator isn't available right now.",
@@ -1242,8 +1246,6 @@ export const APP_COPY = {
         dashboardSwitchDescription: "Going to the dashboard will discard your current exam prompt, draft, and feedback.",
         adminSwitchDescription: "Going to Admin will discard your current exam prompt, draft, and feedback.",
         topicSwitchDescription: "Switching exam prompts will discard your current prompt, draft, and feedback.",
-        exampleOverwriteDescription: "Generating an example will replace your current draft.",
-        exampleOverwriteConfirm: "Replace draft",
         clearDraftDescription: "Clearing will discard your current draft and feedback.",
         clearDraftConfirm: "Clear text",
         confirm: "Discard and switch",
@@ -1629,6 +1631,9 @@ export const APP_COPY = {
         generateExample: "Générer un exemple",
         generatingExample: "Génération en cours…",
         generatingExampleStatus: "Génération d’un exemple de réponse. Cela peut prendre un instant.",
+        exampleHeading: ({ level }) => `Exemple de réponse (${level})`,
+        exampleCopy: "Copier l’exemple",
+        exampleDismiss: "Fermer l’exemple",
         exampleRateLimitedError: "Le générateur d’exemples est occupé. Réessayez dans un instant.",
         exampleDailyLimitError: "Vous avez atteint la limite d’exemples pour aujourd’hui. Réessayez demain.",
         exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
@@ -1936,8 +1941,6 @@ export const APP_COPY = {
           "Accéder au tableau de bord supprimera votre consigne, brouillon et commentaires actuels.",
         adminSwitchDescription: "Accéder à l’administration supprimera votre consigne, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de consigne supprimera votre consigne, brouillon et commentaires actuels.",
-        exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
-        exampleOverwriteConfirm: "Remplacer le brouillon",
         clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
         clearDraftConfirm: "Effacer le texte",
         confirm: "Supprimer et changer",
@@ -2321,6 +2324,9 @@ export const APP_COPY = {
         generateExample: "Generar ejemplo",
         generatingExample: "Generando…",
         generatingExampleStatus: "Generando una respuesta de ejemplo. Esto puede tardar un momento.",
+        exampleHeading: ({ level }) => `Respuesta de ejemplo (${level})`,
+        exampleCopy: "Copiar ejemplo",
+        exampleDismiss: "Cerrar ejemplo",
         exampleRateLimitedError: "El generador de ejemplos está ocupado. Inténtalo de nuevo en un momento.",
         exampleDailyLimitError: "Has alcanzado el límite de ejemplos de hoy. Inténtalo de nuevo mañana.",
         exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
@@ -2628,8 +2634,6 @@ export const APP_COPY = {
           "Al ir al panel se descartarán la consigna, el borrador y los comentarios actuales.",
         adminSwitchDescription: "Al ir a Administración se descartarán la consigna, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de consigna se descartarán la consigna, el borrador y los comentarios actuales.",
-        exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
-        exampleOverwriteConfirm: "Reemplazar borrador",
         clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
         clearDraftConfirm: "Borrar texto",
         confirm: "Descartar y cambiar",
@@ -3013,6 +3017,9 @@ export const APP_COPY = {
         generateExample: "Gerar exemplo",
         generatingExample: "Gerando…",
         generatingExampleStatus: "Gerando uma resposta de exemplo. Isso pode levar um momento.",
+        exampleHeading: ({ level }) => `Resposta de exemplo (${level})`,
+        exampleCopy: "Copiar exemplo",
+        exampleDismiss: "Fechar exemplo",
         exampleRateLimitedError: "O gerador de exemplos está ocupado. Tente novamente em instantes.",
         exampleDailyLimitError: "Você atingiu o limite de exemplos de hoje. Tente novamente amanhã.",
         exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
@@ -3319,8 +3326,6 @@ export const APP_COPY = {
         dashboardSwitchDescription: "Ir para o Dashboard descartará o enunciado, o rascunho e os comentários atuais.",
         adminSwitchDescription: "Ir para a administração descartará o enunciado, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de enunciado descartará o enunciado, o rascunho e os comentários atuais.",
-        exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
-        exampleOverwriteConfirm: "Substituir rascunho",
         clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",
         clearDraftConfirm: "Limpar texto",
         confirm: "Descartar e trocar",
