@@ -15,6 +15,7 @@ import {
   SpellCheck2,
   Tag,
   Trash2,
+  X,
 } from "lucide-react";
 import type { TaskType } from "@prisma/client";
 import type { EssayFeedback } from "@/lib/essay-feedback";
@@ -62,7 +63,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "example" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
+type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type TimedTaskStatus = "running" | "paused" | "expired";
@@ -642,6 +643,12 @@ export function WritingWorkspace() {
   const [spellCheckStatus, setSpellCheckStatus] = useState<LanguageCheckStatus>("idle");
   const [isGeneratingExample, setIsGeneratingExample] = useState(false);
   const [exampleError, setExampleError] = useState<ExampleErrorKind | null>(null);
+  // A generated model answer lives in its own card below the toolbar and never
+  // touches the draft, so the learner's writing, the translation panel and the
+  // example are three independent pieces of UI state.
+  const [example, setExample] = useState<{ text: string; level: ExampleLevel } | null>(null);
+  const [exampleCopyStatus, setExampleCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const exampleCopyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exampleNeedsTopic, setExampleNeedsTopic] = useState(false);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const copyStatusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -886,6 +893,7 @@ export function WritingWorkspace() {
   useEffect(() => {
     return () => {
       if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
+      if (exampleCopyStatusTimeoutRef.current) clearTimeout(exampleCopyStatusTimeoutRef.current);
       exampleAbortController.current?.abort();
       translationAbortController.current?.abort();
     };
@@ -1208,6 +1216,15 @@ export function WritingWorkspace() {
     setExampleError(null);
   }
 
+  // Drops the card and anything still generating for it. Used where the
+  // task or topic changes, since an example is only valid for the prompt it
+  // was generated for -- not when the learner merely edits or clears the draft.
+  function clearExample() {
+    cancelPendingExampleRequest();
+    setExample(null);
+    setExampleCopyStatus("idle");
+  }
+
   function cancelPendingTopicRequests() {
     cancelPendingRecentTopicRequest();
     cancelPendingExampleRequest();
@@ -1253,6 +1270,7 @@ export function WritingWorkspace() {
       "task",
       () => {
         cancelPendingTopicRequests();
+        clearExample();
         cancelPendingCorrection();
         setTaskType(next);
         setTopicMode(null);
@@ -1327,6 +1345,7 @@ export function WritingWorkspace() {
       "topic",
       () => {
         cancelPendingTopicRequests();
+        clearExample();
         setRecentTopicError(null);
         setRecentTopic(null);
         setCustomTopic("");
@@ -1363,7 +1382,7 @@ export function WritingWorkspace() {
   }
 
   async function fetchRecentTopic(currentTaskType: TaskType) {
-    cancelPendingExampleRequest();
+    clearExample();
     const requestId = ++recentTopicRequestId.current;
     setIsRecentTopicLoading(true);
     setRecentTopicError(null);
@@ -1543,6 +1562,7 @@ export function WritingWorkspace() {
     // would repopulate the topic (and wipe whatever the learner has done
     // since) into a workspace the tour has already reset.
     cancelPendingRecentTopicRequest();
+    clearExample();
     setTaskType(null);
     setTopicMode(null);
     setRecentTopic(null);
@@ -1721,12 +1741,11 @@ export function WritingWorkspace() {
     }
   }
 
-  // A generated example replaces the whole draft, so an existing draft
-  // needs the same explicit confirmation as a destructive task/topic switch
-  // before it is overwritten. The level is an explicit parameter, not read
-  // from `exampleLevel` state, since the caller (the level menu) persists a
-  // freshly-picked level and requests generation in the same handler --
-  // reading state instead would race the not-yet-applied render.
+  // A generated example only replaces the previous example card, never the
+  // draft. The level is an explicit parameter, not read from state, since
+  // the caller (the level menu) persists a freshly-picked level and requests
+  // generation in the same handler -- reading state instead would race the
+  // not-yet-applied render.
   function requestGenerateExample(level: ExampleLevel) {
     if (!taskType || isTopicLoading || isCorrecting || isGeneratingExample) return;
 
@@ -1741,12 +1760,6 @@ export function WritingWorkspace() {
     }
 
     setExampleNeedsTopic(false);
-
-    if (content.trim()) {
-      setPendingSwitch({ kind: "example", run: () => void generateExample(level) });
-      return;
-    }
-
     void generateExample(level);
   }
 
@@ -1796,7 +1809,8 @@ export function WritingWorkspace() {
 
       const data: { text: string } = await res.json();
       if (requestId !== exampleRequestId.current) return;
-      applyDraftContent(data.text);
+      setExample({ text: data.text, level });
+      setExampleCopyStatus("idle");
     } catch (error) {
       if (requestId === exampleRequestId.current && !(error instanceof Error && error.name === "AbortError")) {
         setExampleError("generic");
@@ -1821,6 +1835,20 @@ export function WritingWorkspace() {
 
     if (copyStatusTimeoutRef.current) clearTimeout(copyStatusTimeoutRef.current);
     copyStatusTimeoutRef.current = setTimeout(() => setCopyStatus("idle"), 2000);
+  }
+
+  async function handleCopyExample() {
+    if (!example) return;
+
+    try {
+      await navigator.clipboard.writeText(example.text);
+      setExampleCopyStatus("copied");
+    } catch {
+      setExampleCopyStatus("failed");
+    }
+
+    if (exampleCopyStatusTimeoutRef.current) clearTimeout(exampleCopyStatusTimeoutRef.current);
+    exampleCopyStatusTimeoutRef.current = setTimeout(() => setExampleCopyStatus("idle"), 2000);
   }
 
   function handleClearDraft() {
@@ -2278,24 +2306,80 @@ export function WritingWorkspace() {
             <label htmlFor="essay-content" className="sr-only">
               {copy.workspace.editor.responseLabel}
             </label>
-            <GrammarCheckedEditor
-              id="essay-content"
-              dataWalkthrough="editor"
-              value={content}
-              onChange={(next) => {
-                cancelPendingTopicRequests();
-                applyDraftContent(next);
-              }}
-              placeholder={copy.workspace.editor.frenchResponsePlaceholder}
-              rows={14}
-              maxLength={20000}
-              disabled={isCorrecting || isTopicLoading || isGeneratingExample}
-              ariaDescribedBy="word-count"
-              className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
-              copy={copy.workspace.spellCheck}
-              enabled={isSpellCheckActive}
-              onStatusChange={setSpellCheckStatus}
-            />
+            <div
+              data-layout={isTranslationVisible ? "split" : "single"}
+              className={
+                isTranslationVisible ? "grid grid-cols-1 gap-4 lg:grid-cols-2" : "flex flex-col"
+              }
+            >
+              <div className="min-w-0">
+                <GrammarCheckedEditor
+                  id="essay-content"
+                  dataWalkthrough="editor"
+                  value={content}
+                  onChange={(next) => {
+                    cancelPendingRecentTopicRequest();
+                    applyDraftContent(next);
+                  }}
+                  placeholder={copy.workspace.editor.frenchResponsePlaceholder}
+                  rows={14}
+                  maxLength={20000}
+                  disabled={isCorrecting || isTopicLoading}
+                  ariaDescribedBy="word-count"
+                  className="min-h-72 w-full rounded-xl border border-black/[.2] bg-black/[.02] px-4 py-3 outline-none transition-colors placeholder:font-medium placeholder:text-zinc-600 focus:border-violet-600 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.25] dark:bg-white/[.03] dark:focus:border-violet-400 dark:placeholder:text-zinc-400"
+                  copy={copy.workspace.spellCheck}
+                  enabled={isSpellCheckActive}
+                  onStatusChange={setSpellCheckStatus}
+                />
+              </div>
+              {isTranslationVisible && (
+                <section
+                  className="flex min-w-0 flex-col gap-2 lg:h-0 lg:min-h-full"
+                  aria-labelledby="translation-heading"
+                >
+                  <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-black/[.15] bg-black/[.02] dark:border-white/[.2] dark:bg-white/[.03]">
+                    <div className="flex items-center justify-between gap-4 border-b border-black/[.1] px-4 py-2 dark:border-white/[.12]">
+                      <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                        {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
+                      </h2>
+                      {isTranslating && !isDraftTooLongToTranslate && (
+                        <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">
+                          {copy.workspace.translation.inProgress}
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      role="status"
+                      aria-live="polite"
+                      className="min-h-16 flex-1 overflow-auto whitespace-pre-wrap break-words px-4 py-3 text-sm text-zinc-700 dark:text-zinc-300"
+                    >
+                      {isDraftTooLongToTranslate ? "" : visibleTranslation}
+                    </div>
+                  </div>
+                  {locale !== "fr" && visibleTranslation && translationProvider && (
+                    <TranslationProviderNotice
+                      provider={translationProvider}
+                      unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
+                    />
+                  )}
+                  {isDraftTooLongToTranslate ? (
+                    <p className="text-sm text-amber-600 dark:text-amber-400">
+                      {copy.workspace.translation.tooLong({
+                        maxCharacters: new Intl.NumberFormat(APP_LOCALE_INTL_TAGS[locale]).format(
+                          TRANSLATABLE_MAX_CHARS,
+                        ),
+                      })}
+                    </p>
+                  ) : (
+                    visibleTranslationErrorMessage && (
+                      <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                        {visibleTranslationErrorMessage}
+                      </p>
+                    )
+                  )}
+                </section>
+              )}
+            </div>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
                 <button
@@ -2469,50 +2553,64 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.exampleNeedsTopicWarning}
               </p>
             )}
-          </section>
-
-          {isTranslationVisible && (
-            <section className="flex flex-col gap-2" aria-labelledby="translation-heading">
-              <div className="flex items-center justify-between gap-4">
-                <h2 id="translation-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.translation.heading({ language: APP_LOCALE_LABELS[locale] })}
-                </h2>
-                {isTranslating && !isDraftTooLongToTranslate && (
-                  <span className="shrink-0 text-sm text-zinc-500 dark:text-zinc-400">
-                    {copy.workspace.translation.inProgress}
-                  </span>
-                )}
-              </div>
-              <div
-                role="status"
-                aria-live="polite"
-                className="min-h-16 w-full whitespace-pre-wrap break-words rounded-xl border border-black/[.15] bg-black/[.02] px-4 py-3 text-sm text-zinc-700 dark:border-white/[.2] dark:bg-white/[.03] dark:text-zinc-300"
+            {(isGeneratingExample || example) && (
+              <section
+                aria-labelledby="example-heading"
+                className="mt-2 flex flex-col overflow-hidden rounded-xl border border-violet-500/30 bg-violet-500/[.04] dark:border-violet-400/35 dark:bg-violet-400/[.06]"
               >
-                {isDraftTooLongToTranslate ? "" : visibleTranslation}
-              </div>
-              {locale !== "fr" && visibleTranslation && translationProvider && (
-                <TranslationProviderNotice
-                  provider={translationProvider}
-                  unofficialFallbackNotice={copy.workspace.translation.unofficialFallbackNotice}
-                />
-              )}
-              {isDraftTooLongToTranslate ? (
-                <p className="text-sm text-amber-600 dark:text-amber-400">
-                  {copy.workspace.translation.tooLong({
-                    maxCharacters: new Intl.NumberFormat(APP_LOCALE_INTL_TAGS[locale]).format(
-                      TRANSLATABLE_MAX_CHARS,
-                    ),
-                  })}
-                </p>
-              ) : (
-                visibleTranslationErrorMessage && (
-                  <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                    {visibleTranslationErrorMessage}
+                <div className="flex items-center justify-between gap-3 border-b border-violet-500/20 px-4 py-2 dark:border-violet-400/20">
+                  <h2 id="example-heading" className="text-sm font-medium text-violet-800 dark:text-violet-200">
+                    {example && !isGeneratingExample
+                      ? copy.workspace.editor.exampleHeading({ level: example.level })
+                      : copy.workspace.editor.generatingExample}
+                  </h2>
+                  {example && !isGeneratingExample && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={handleCopyExample}
+                        aria-label={
+                          exampleCopyStatus === "copied"
+                            ? copy.workspace.editor.copied
+                            : exampleCopyStatus === "failed"
+                              ? copy.workspace.editor.copyFailed
+                              : copy.workspace.editor.exampleCopy
+                        }
+                        title={copy.workspace.editor.exampleCopy}
+                        className="rounded-full p-1.5 text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                      >
+                        {exampleCopyStatus === "copied" ? (
+                          <CheckCircle2 aria-hidden="true" className="h-4 w-4" />
+                        ) : (
+                          <CopyIcon aria-hidden="true" className="h-4 w-4" />
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearExample}
+                        aria-label={copy.workspace.editor.exampleDismiss}
+                        title={copy.workspace.editor.exampleDismiss}
+                        className="rounded-full p-1.5 text-violet-800 transition-colors hover:bg-violet-500/[.12] dark:text-violet-200 dark:hover:bg-violet-400/[.16]"
+                      >
+                        <X aria-hidden="true" className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {example && !isGeneratingExample ? (
+                  <p lang="fr" className="whitespace-pre-wrap break-words px-4 py-3 text-sm leading-6">
+                    {example.text}
                   </p>
-                )
-              )}
-            </section>
-          )}
+                ) : (
+                  <div aria-hidden="true" className="flex animate-pulse flex-col gap-2 px-4 py-4">
+                    <div className="h-3 w-11/12 rounded bg-violet-500/15" />
+                    <div className="h-3 w-full rounded bg-violet-500/15" />
+                    <div className="h-3 w-2/3 rounded bg-violet-500/15" />
+                  </div>
+                )}
+              </section>
+            )}
+          </section>
 
         </>
       )}
@@ -2548,28 +2646,24 @@ export function WritingWorkspace() {
             ? copy.workspace.dialog.taskSwitchDescription
             : pendingSwitch?.kind === "topic"
               ? copy.workspace.dialog.topicSwitchDescription
-              : pendingSwitch?.kind === "example"
-                ? copy.workspace.dialog.exampleOverwriteDescription
-                : pendingSwitch?.kind === "dashboard"
-                  ? copy.workspace.dialog.dashboardSwitchDescription
-                  : pendingSwitch?.kind === "admin"
-                    ? copy.workspace.dialog.adminSwitchDescription
-                    : pendingSwitch?.kind === "clear"
-                      ? copy.workspace.dialog.clearDraftDescription
-                      : pendingSwitch?.kind === "correct"
-                        ? copy.workspace.dialog.correctDescription
-                        : pendingSwitch?.kind === "correctNearIdentical"
-                          ? copy.workspace.dialog.correctNearIdenticalDescription
-                          : ""
+              : pendingSwitch?.kind === "dashboard"
+                ? copy.workspace.dialog.dashboardSwitchDescription
+                : pendingSwitch?.kind === "admin"
+                  ? copy.workspace.dialog.adminSwitchDescription
+                  : pendingSwitch?.kind === "clear"
+                    ? copy.workspace.dialog.clearDraftDescription
+                    : pendingSwitch?.kind === "correct"
+                      ? copy.workspace.dialog.correctDescription
+                      : pendingSwitch?.kind === "correctNearIdentical"
+                        ? copy.workspace.dialog.correctNearIdenticalDescription
+                        : ""
         }
         confirmLabel={
-          pendingSwitch?.kind === "example"
-            ? copy.workspace.dialog.exampleOverwriteConfirm
-            : pendingSwitch?.kind === "clear"
-              ? copy.workspace.dialog.clearDraftConfirm
-              : pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
-                ? copy.workspace.dialog.correctConfirm
-                : copy.workspace.dialog.confirm
+          pendingSwitch?.kind === "clear"
+            ? copy.workspace.dialog.clearDraftConfirm
+            : pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
+              ? copy.workspace.dialog.correctConfirm
+              : copy.workspace.dialog.confirm
         }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {

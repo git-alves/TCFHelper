@@ -115,7 +115,6 @@ export interface AppCopy {
     changePartConfirmKeep: string;
     sequenceDescription: (values: { count: number }) => string;
     progress: (values: { step: number; total: number }) => string;
-    stageMap: (values: { current: string; next: string | null }) => string;
     attentionLabel: string;
     selectAnswer: string;
     selectOrder: string;
@@ -386,6 +385,9 @@ export interface AppCopy {
       generateExample: string;
       generatingExample: string;
       generatingExampleStatus: string;
+      exampleHeading: (values: { level: string }) => string;
+      exampleCopy: string;
+      exampleDismiss: string;
       exampleRateLimitedError: string;
       exampleDailyLimitError: string;
       exampleUnavailableError: string;
@@ -559,8 +561,6 @@ export interface AppCopy {
       topicSwitchDescription: string;
       dashboardSwitchDescription: string;
       adminSwitchDescription: string;
-      exampleOverwriteDescription: string;
-      exampleOverwriteConfirm: string;
       clearDraftDescription: string;
       clearDraftConfirm: string;
       correctTitle: string;
@@ -632,7 +632,7 @@ export const APP_COPY = {
       previewEyebrow: "Your practice plan",
       previewTitle: ({ part }) => `Practise: ${part}`,
       previewOutcomeLabel: "By the end, you will be able to:",
-      previewStagesLabel: "Your six stages",
+      previewStagesLabel: "Your three stages",
       resumeEyebrow: "Saved on this device",
       resumeTitle: ({ part }) => `Resume: ${part}`,
       resumeDescription: ({ step, total }) => `Continue at step ${step} of ${total}.`,
@@ -653,7 +653,6 @@ export const APP_COPY = {
       changePartConfirmKeep: "Keep this draft and stay",
       sequenceDescription: ({ count }) => `This practice set contains ${count} reviewed exercises in a guided progression.`,
       progress: ({ step, total }) => `Step ${step} of ${total}`,
-      stageMap: ({ current, next }) => (next ? `Now: ${current}. Next: ${next}.` : `Now: ${current}. This is your final stage.`),
       attentionLabel: "Focus point:",
       selectAnswer: "Choose your answer",
       selectOrder: "Choose the most logical order",
@@ -692,7 +691,7 @@ export const APP_COPY = {
       verify: "Check",
       revealAnswer: "Show the answer",
       retryHint: "You can edit your response and try again as many times as you need.",
-      difficultyPrompt: "Optional: how did this exercise feel?",
+      difficultyPrompt: "Optional: how did this session feel?",
       difficultyTooEasy: "Too easy",
       difficultyAppropriate: "Appropriate",
       difficultyTooHard: "Too hard",
@@ -851,8 +850,8 @@ export const APP_COPY = {
       practiceIntroBody: "This page is not an exam simulation. Choose one task part to practise in a progressive, curated sequence before you write a full TCF response.",
       practicePartsTitle: "The parts stay the same; the level changes the demand",
       practicePartsBody: "Each task has a fixed numbered structure. B2, C1 and C2 practise the same part, but with increasingly independent, precise and nuanced language. Only reviewed paths can be started.",
-      practiceStagesTitle: "Six stages, from recognition to independent writing",
-      practiceStagesBody: "Every part follows the same fixed plan: Recognise, Complete, Transform, Organise, Develop, then Produce. Each stage removes a little more support, so you finish able to write it yourself. When you are ready, open Simulate to apply what you trained in a complete TCF response.",
+      practiceStagesTitle: "Three stages, from recognition to independent writing",
+      practiceStagesBody: "Every part follows the same fixed plan: Recognise, Develop, then Produce. Each stage removes a little more support, so you finish able to write it yourself. When you are ready, open Simulate to apply what you trained in a complete TCF response.",
       taskPickerTitle: "Choose a task",
       taskPickerBody:
         "TCF written expression has three task types: Tâche 1 (communicate effectively in a short message, for the right reader and in the right register), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
@@ -953,6 +952,9 @@ export const APP_COPY = {
         generateExample: "Generate example",
         generatingExample: "Generating…",
         generatingExampleStatus: "Generating an example response. This can take a moment.",
+        exampleHeading: ({ level }) => `Example response (${level})`,
+        exampleCopy: "Copy example",
+        exampleDismiss: "Close example",
         exampleRateLimitedError: "The example generator is busy. Please try again shortly.",
         exampleDailyLimitError: "You've reached today's example limit. Please try again tomorrow.",
         exampleUnavailableError: "The example generator isn't available right now.",
@@ -1254,8 +1256,6 @@ export const APP_COPY = {
         dashboardSwitchDescription: "Going to the dashboard will discard your current exam prompt, draft, and feedback.",
         adminSwitchDescription: "Going to Admin will discard your current exam prompt, draft, and feedback.",
         topicSwitchDescription: "Switching exam prompts will discard your current prompt, draft, and feedback.",
-        exampleOverwriteDescription: "Generating an example will replace your current draft.",
-        exampleOverwriteConfirm: "Replace draft",
         clearDraftDescription: "Clearing will discard your current draft and feedback.",
         clearDraftConfirm: "Clear text",
         correctTitle: "Correct this response?",
@@ -1324,7 +1324,7 @@ export const APP_COPY = {
       previewEyebrow: "Votre plan d’entraînement",
       previewTitle: ({ part }) => `Entraîner : ${part}`,
       previewOutcomeLabel: "À la fin, vous saurez :",
-      previewStagesLabel: "Vos six étapes",
+      previewStagesLabel: "Vos trois étapes",
       resumeEyebrow: "Enregistré sur cet appareil",
       resumeTitle: ({ part }) => `Reprendre : ${part}`,
       resumeDescription: ({ step, total }) => `Reprenez à l’étape ${step} sur ${total}.`,
@@ -1345,7 +1345,6 @@ export const APP_COPY = {
       changePartConfirmKeep: "Garder ce brouillon et rester",
       sequenceDescription: ({ count }) => `Cette série contient ${count} exercices validés dans une progression guidée.`,
       progress: ({ step, total }) => `Étape ${step} sur ${total}`,
-      stageMap: ({ current, next }) => (next ? `En cours : ${current}. Prochaine étape : ${next}.` : `En cours : ${current}. C’est votre dernière étape.`),
       attentionLabel: "Point d’attention :",
       selectAnswer: "Choisissez votre réponse",
       selectOrder: "Choisissez l’ordre le plus logique",
@@ -1384,7 +1383,7 @@ export const APP_COPY = {
       verify: "Vérifier",
       revealAnswer: "Voir la réponse",
       retryHint: "Vous pouvez modifier votre réponse autant de fois que nécessaire.",
-      difficultyPrompt: "Facultatif : comment avez-vous trouvé cet exercice ?",
+      difficultyPrompt: "Facultatif : comment avez-vous trouvé cette séance ?",
       difficultyTooEasy: "Trop facile",
       difficultyAppropriate: "Adapté",
       difficultyTooHard: "Trop difficile",
@@ -1547,8 +1546,8 @@ export const APP_COPY = {
       practiceIntroBody: "Cette page n’est pas une simulation d’examen. Choisissez une partie de la tâche et travaillez-la dans une séquence progressive et validée avant de rédiger une réponse TCF complète.",
       practicePartsTitle: "Les parties restent les mêmes ; le niveau fait évoluer l’exigence",
       practicePartsBody: "Chaque tâche suit une structure numérotée fixe. B2, C1 et C2 entraînent la même partie avec une langue de plus en plus autonome, précise et nuancée. Seules les séquences validées peuvent être commencées.",
-      practiceStagesTitle: "Six étapes, de la reconnaissance à la rédaction autonome",
-      practiceStagesBody: "Chaque partie suit le même plan fixe : Reconnaître, Compléter, Transformer, Organiser, Développer, puis Produire. Chaque étape retire un peu plus de soutien, pour que vous terminiez capable de l'écrire seul·e. Lorsque vous êtes prêt·e, ouvrez Simulation pour réutiliser ce que vous avez travaillé dans une réponse TCF complète.",
+      practiceStagesTitle: "Trois étapes, de la reconnaissance à la rédaction autonome",
+      practiceStagesBody: "Chaque partie suit le même plan fixe : Reconnaître, Développer, puis Produire. Chaque étape retire un peu plus de soutien, pour que vous terminiez capable de l'écrire seul·e. Lorsque vous êtes prêt·e, ouvrez Simulation pour réutiliser ce que vous avez travaillé dans une réponse TCF complète.",
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
         "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (communiquer efficacement dans un message court, au bon destinataire et dans le registre adapté), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
@@ -1652,6 +1651,9 @@ export const APP_COPY = {
         generateExample: "Générer un exemple",
         generatingExample: "Génération en cours…",
         generatingExampleStatus: "Génération d’un exemple de réponse. Cela peut prendre un instant.",
+        exampleHeading: ({ level }) => `Exemple de réponse (${level})`,
+        exampleCopy: "Copier l’exemple",
+        exampleDismiss: "Fermer l’exemple",
         exampleRateLimitedError: "Le générateur d’exemples est occupé. Réessayez dans un instant.",
         exampleDailyLimitError: "Vous avez atteint la limite d’exemples pour aujourd’hui. Réessayez demain.",
         exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
@@ -1959,8 +1961,6 @@ export const APP_COPY = {
           "Accéder au tableau de bord supprimera votre consigne, brouillon et commentaires actuels.",
         adminSwitchDescription: "Accéder à l’administration supprimera votre consigne, brouillon et commentaires actuels.",
         topicSwitchDescription: "Changer de consigne supprimera votre consigne, brouillon et commentaires actuels.",
-        exampleOverwriteDescription: "Générer un exemple remplacera votre brouillon actuel.",
-        exampleOverwriteConfirm: "Remplacer le brouillon",
         clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
         clearDraftConfirm: "Effacer le texte",
         correctTitle: "Corriger cette réponse ?",
@@ -2029,7 +2029,7 @@ export const APP_COPY = {
       previewEyebrow: "Tu plan de práctica",
       previewTitle: ({ part }) => `Practicar: ${part}`,
       previewOutcomeLabel: "Al final podrás:",
-      previewStagesLabel: "Tus seis etapas",
+      previewStagesLabel: "Tus tres etapas",
       resumeEyebrow: "Guardado en este dispositivo",
       resumeTitle: ({ part }) => `Reanudar: ${part}`,
       resumeDescription: ({ step, total }) => `Continúa en el paso ${step} de ${total}.`,
@@ -2050,7 +2050,6 @@ export const APP_COPY = {
       changePartConfirmKeep: "Conservar este borrador y quedarme",
       sequenceDescription: ({ count }) => `Esta práctica contiene ${count} ejercicios revisados en una progresión guiada.`,
       progress: ({ step, total }) => `Paso ${step} de ${total}`,
-      stageMap: ({ current, next }) => (next ? `Ahora: ${current}. Siguiente: ${next}.` : `Ahora: ${current}. Esta es tu última etapa.`),
       attentionLabel: "Punto de atención:",
       selectAnswer: "Elige tu respuesta",
       selectOrder: "Elige el orden más lógico",
@@ -2089,7 +2088,7 @@ export const APP_COPY = {
       verify: "Comprobar",
       revealAnswer: "Ver la respuesta",
       retryHint: "Puedes modificar tu respuesta e intentarlo tantas veces como necesites.",
-      difficultyPrompt: "Opcional: ¿cómo te resultó este ejercicio?",
+      difficultyPrompt: "Opcional: ¿cómo te resultó esta sesión?",
       difficultyTooEasy: "Demasiado fácil",
       difficultyAppropriate: "Adecuado",
       difficultyTooHard: "Demasiado difícil",
@@ -2250,8 +2249,8 @@ export const APP_COPY = {
       practiceIntroBody: "Esta página no es una simulación de examen. Elige una parte de la tarea y practícala en una secuencia progresiva y revisada antes de escribir una respuesta TCF completa.",
       practicePartsTitle: "Las partes son las mismas; el nivel cambia la exigencia",
       practicePartsBody: "Cada tarea tiene una estructura numerada fija. B2, C1 y C2 practican la misma parte con un lenguaje cada vez más autónomo, preciso y matizado. Solo se pueden iniciar secuencias revisadas.",
-      practiceStagesTitle: "Seis etapas, del reconocimiento a la escritura autónoma",
-      practiceStagesBody: "Cada parte sigue el mismo plan fijo: Reconocer, Completar, Transformar, Organizar, Desarrollar y luego Producir. Cada etapa retira un poco más de ayuda, para que termines siendo capaz de escribirla tú mismo. Cuando estés listo, abre Simular para aplicar lo que practicaste en una respuesta TCF completa.",
+      practiceStagesTitle: "Tres etapas, del reconocimiento a la escritura autónoma",
+      practiceStagesBody: "Cada parte sigue el mismo plan fijo: Reconocer, Desarrollar y luego Producir. Cada etapa retira un poco más de ayuda, para que termines siendo capaz de escribirla tú mismo. Cuando estés listo, abre Simular para aplicar lo que practicaste en una respuesta TCF completa.",
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
         "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (comunicarse eficazmente en un mensaje breve, para el destinatario y el registro adecuados), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
@@ -2355,6 +2354,9 @@ export const APP_COPY = {
         generateExample: "Generar ejemplo",
         generatingExample: "Generando…",
         generatingExampleStatus: "Generando una respuesta de ejemplo. Esto puede tardar un momento.",
+        exampleHeading: ({ level }) => `Respuesta de ejemplo (${level})`,
+        exampleCopy: "Copiar ejemplo",
+        exampleDismiss: "Cerrar ejemplo",
         exampleRateLimitedError: "El generador de ejemplos está ocupado. Inténtalo de nuevo en un momento.",
         exampleDailyLimitError: "Has alcanzado el límite de ejemplos de hoy. Inténtalo de nuevo mañana.",
         exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
@@ -2662,8 +2664,6 @@ export const APP_COPY = {
           "Al ir al panel se descartarán la consigna, el borrador y los comentarios actuales.",
         adminSwitchDescription: "Al ir a Administración se descartarán la consigna, el borrador y los comentarios actuales.",
         topicSwitchDescription: "Al cambiar de consigna se descartarán la consigna, el borrador y los comentarios actuales.",
-        exampleOverwriteDescription: "Generar un ejemplo reemplazará tu borrador actual.",
-        exampleOverwriteConfirm: "Reemplazar borrador",
         clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
         clearDraftConfirm: "Borrar texto",
         correctTitle: "¿Corregir esta respuesta?",
@@ -2732,7 +2732,7 @@ export const APP_COPY = {
       previewEyebrow: "Seu plano de prática",
       previewTitle: ({ part }) => `Praticar: ${part}`,
       previewOutcomeLabel: "Ao final, você saberá:",
-      previewStagesLabel: "Suas seis etapas",
+      previewStagesLabel: "Suas três etapas",
       resumeEyebrow: "Salvo neste dispositivo",
       resumeTitle: ({ part }) => `Retomar: ${part}`,
       resumeDescription: ({ step, total }) => `Continue na etapa ${step} de ${total}.`,
@@ -2753,7 +2753,6 @@ export const APP_COPY = {
       changePartConfirmKeep: "Manter este rascunho e ficar",
       sequenceDescription: ({ count }) => `Esta prática contém ${count} exercícios revisados em uma progressão guiada.`,
       progress: ({ step, total }) => `Etapa ${step} de ${total}`,
-      stageMap: ({ current, next }) => (next ? `Agora: ${current}. Próxima: ${next}.` : `Agora: ${current}. Esta é sua última etapa.`),
       attentionLabel: "Ponto de atenção:",
       selectAnswer: "Escolha sua resposta",
       selectOrder: "Escolha a ordem mais lógica",
@@ -2792,7 +2791,7 @@ export const APP_COPY = {
       verify: "Verificar",
       revealAnswer: "Ver a resposta",
       retryHint: "Você pode modificar sua resposta e tentar novamente quantas vezes precisar.",
-      difficultyPrompt: "Opcional: como este exercício pareceu para você?",
+      difficultyPrompt: "Opcional: como esta sessão pareceu para você?",
       difficultyTooEasy: "Fácil demais",
       difficultyAppropriate: "Adequado",
       difficultyTooHard: "Difícil demais",
@@ -2953,8 +2952,8 @@ export const APP_COPY = {
       practiceIntroBody: "Esta página não é uma simulação de exame. Escolha uma parte da tarefa e pratique-a em uma sequência progressiva e revisada antes de escrever uma resposta TCF completa.",
       practicePartsTitle: "As partes são as mesmas; o nível muda a exigência",
       practicePartsBody: "Cada tarefa tem uma estrutura numerada fixa. B2, C1 e C2 praticam a mesma parte com uma linguagem cada vez mais autônoma, precisa e nuançada. Apenas sequências revisadas podem ser iniciadas.",
-      practiceStagesTitle: "Seis etapas, do reconhecimento à escrita autônoma",
-      practiceStagesBody: "Cada parte segue o mesmo plano fixo: Reconhecer, Completar, Transformar, Organizar, Desenvolver e depois Produzir. Cada etapa retira um pouco mais de apoio, para que você termine capaz de escrevê-la sozinho. Quando estiver pronto, abra Simular para aplicar o que treinou em uma resposta TCF completa.",
+      practiceStagesTitle: "Três etapas, do reconhecimento à escrita autônoma",
+      practiceStagesBody: "Cada parte segue o mesmo plano fixo: Reconhecer, Desenvolver e depois Produzir. Cada etapa retira um pouco mais de apoio, para que você termine capaz de escrevê-la sozinho. Quando estiver pronto, abra Simular para aplicar o que treinou em uma resposta TCF completa.",
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
         "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (comunicar-se com eficácia em uma mensagem curta, para o destinatário e o registro adequados), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
@@ -3058,6 +3057,9 @@ export const APP_COPY = {
         generateExample: "Gerar exemplo",
         generatingExample: "Gerando…",
         generatingExampleStatus: "Gerando uma resposta de exemplo. Isso pode levar um momento.",
+        exampleHeading: ({ level }) => `Resposta de exemplo (${level})`,
+        exampleCopy: "Copiar exemplo",
+        exampleDismiss: "Fechar exemplo",
         exampleRateLimitedError: "O gerador de exemplos está ocupado. Tente novamente em instantes.",
         exampleDailyLimitError: "Você atingiu o limite de exemplos de hoje. Tente novamente amanhã.",
         exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
@@ -3364,8 +3366,6 @@ export const APP_COPY = {
         dashboardSwitchDescription: "Ir para o Dashboard descartará o enunciado, o rascunho e os comentários atuais.",
         adminSwitchDescription: "Ir para a administração descartará o enunciado, o rascunho e os comentários atuais.",
         topicSwitchDescription: "Trocar de enunciado descartará o enunciado, o rascunho e os comentários atuais.",
-        exampleOverwriteDescription: "Gerar um exemplo substituirá seu rascunho atual.",
-        exampleOverwriteConfirm: "Substituir rascunho",
         clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",
         clearDraftConfirm: "Limpar texto",
         correctTitle: "Corrigir esta resposta?",

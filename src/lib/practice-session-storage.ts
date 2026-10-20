@@ -2,7 +2,6 @@ export const ACTIVE_PRACTICE_SESSION_STORAGE_KEY = "tcfhelper.practice.active-se
 
 export type StoredPracticeCheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
 export type StoredPracticeCompletionMethod = "correct" | "revealed" | "self-review";
-export type StoredPracticeDifficultyRating = "too-easy" | "appropriate" | "too-hard";
 
 /**
  * A deliberately local-only snapshot for resuming an unfinished practice
@@ -19,10 +18,9 @@ export interface StoredPracticeSession {
   ordering: readonly string[];
   checkState: StoredPracticeCheckState;
   completionMethods: readonly (readonly [string, StoredPracticeCompletionMethod])[];
-  difficultyRatings: readonly (readonly [string, StoredPracticeDifficultyRating])[];
   // Optional so saved sessions from before durable Dashboard activity remain
   // resumable. Once present, it prevents a browser refresh from creating a
-  // second server session for the same six exercises.
+  // second server session for the same exercises.
   progressSessionId?: string;
 }
 
@@ -32,15 +30,6 @@ function isCompletionMethodEntry(value: unknown): value is readonly [string, Sto
     value.length === 2 &&
     typeof value[0] === "string" &&
     (value[1] === "correct" || value[1] === "revealed" || value[1] === "self-review")
-  );
-}
-
-function isDifficultyRatingEntry(value: unknown): value is readonly [string, StoredPracticeDifficultyRating] {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === "string" &&
-    (value[1] === "too-easy" || value[1] === "appropriate" || value[1] === "too-hard")
   );
 }
 
@@ -68,8 +57,6 @@ function isStoredPracticeSession(value: unknown): value is StoredPracticeSession
       session.checkState === "self-review") &&
     Array.isArray(session.completionMethods) &&
     session.completionMethods.every(isCompletionMethodEntry) &&
-    Array.isArray(session.difficultyRatings) &&
-    session.difficultyRatings.every(isDifficultyRatingEntry) &&
     (session.progressSessionId === undefined || typeof session.progressSessionId === "string")
   );
 }

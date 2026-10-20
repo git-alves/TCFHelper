@@ -29,7 +29,7 @@ function toSkill(topic: PracticeTopic, level: "B2" | "C1" | "C2"): CuratedPracti
     label: topic.label,
     description: topic.description,
     learning_outcome: topic.learningGoal[level],
-    estimated_minutes: 20,
+    estimated_minutes: 10,
   };
 }
 
@@ -63,7 +63,7 @@ function toExercise(exercise: PracticeExercise): CuratedPracticeExercise {
 function getTrainerCurriculum(): CuratedPracticeCurriculum {
   return {
     // Every target level receives the same ordered task blueprint. A part's
-    // `is_available` flag records whether its reviewed six-stage path exists;
+    // `is_available` flag records whether its reviewed path for every session stage exists;
     // the UI never fills an unavailable path with generated content.
     skills: TASK_ORDER.flatMap((task) =>
       PRACTICE_LEVELS.flatMap((level) => getPracticeTopics(task).map((topic) => toSkill(topic, level))),

@@ -28,7 +28,6 @@ const session: StoredPracticeSession = {
   ordering: [],
   checkState: "try-again",
   completionMethods: [["recognize-1", "correct"]],
-  difficultyRatings: [["recognize-1", "appropriate"]],
 };
 
 describe("practice session storage", () => {
@@ -37,6 +36,16 @@ describe("practice session storage", () => {
 
     expect(saveStoredPracticeSession(storage, session)).toBe(true);
     expect(loadStoredPracticeSession(storage)).toEqual(session);
+  });
+
+  it("still loads a session saved before difficulty ratings moved to the end of the session", () => {
+    const storage = createStorage();
+    storage.setItem(
+      ACTIVE_PRACTICE_SESSION_STORAGE_KEY,
+      JSON.stringify({ ...session, difficultyRatings: [["recognize-1", "appropriate"]] }),
+    );
+
+    expect(loadStoredPracticeSession(storage)).toMatchObject({ skillId: session.skillId });
   });
 
   it("rejects stale or malformed stored values", () => {

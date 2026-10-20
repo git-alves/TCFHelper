@@ -282,7 +282,7 @@ model Feedback {
   createdAt      DateTime   @default(now())
 }
 
-/// A learner's run through one reviewed, six-stage Practice sequence. The
+/// A learner's run through one reviewed, three-stage Practice sequence (older rows may hold the former six-stage one). The
 /// selected exercise IDs are stored as a snapshot because a stage can have
 /// several editorial variants; completion writes are accepted only for this
 /// server-validated set, never for arbitrary browser-supplied IDs.
