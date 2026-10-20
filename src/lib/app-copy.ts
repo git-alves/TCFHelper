@@ -377,7 +377,9 @@ export interface AppCopy {
       correcting: string;
       correctingStatus: string;
       genericCorrectionError: string;
+      notFrenchText: string;
       alreadyCorrected: string;
+      alreadyCorrectedFormattingNote: string;
       correctionInProgress: string;
       exampleLevelLabel: string;
       generateExample: string;
@@ -561,6 +563,10 @@ export interface AppCopy {
       adminSwitchDescription: string;
       clearDraftDescription: string;
       clearDraftConfirm: string;
+      correctTitle: string;
+      correctDescription: string;
+      correctNearIdenticalDescription: string;
+      correctConfirm: string;
       confirm: string;
       cancel: string;
     };
@@ -934,8 +940,12 @@ export const APP_COPY = {
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
         genericCorrectionError: "Something went wrong.",
+        notFrenchText:
+          "We couldn’t confidently recognize this text as French, so it wasn’t corrected. Write your response in French and check for unusual characters, then try again.",
         alreadyCorrected:
           "This version has already been corrected. Edit your response or exam prompt to request a new correction.",
+        alreadyCorrectedFormattingNote:
+          "Differences in spacing alone don't count as a new version, so the correction you see is for the text exactly as you first submitted it.",
         correctionInProgress:
           "A correction for this exact response is already in progress. Wait for it to finish or edit the response or exam prompt before requesting another one.",
         exampleLevelLabel: "Target level",
@@ -1248,6 +1258,12 @@ export const APP_COPY = {
         topicSwitchDescription: "Switching exam prompts will discard your current prompt, draft, and feedback.",
         clearDraftDescription: "Clearing will discard your current draft and feedback.",
         clearDraftConfirm: "Clear text",
+        correctTitle: "Correct this response?",
+        correctDescription:
+          "This sends your response for correction and uses one of your daily corrections.",
+        correctNearIdenticalDescription:
+          "This draft is almost identical to one you already corrected. Sending it again will use another daily correction, and the result may differ slightly.",
+        correctConfirm: "Send for correction",
         confirm: "Discard and switch",
         cancel: "Keep working",
       },
@@ -1623,8 +1639,12 @@ export const APP_COPY = {
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
         genericCorrectionError: "Une erreur s’est produite.",
+        notFrenchText:
+          "Nous n’avons pas pu reconnaître avec certitude ce texte comme du français, il n’a donc pas été corrigé. Rédigez votre réponse en français et vérifiez qu’il n’y a pas de caractères inhabituels, puis réessayez.",
         alreadyCorrected:
           "Cette version a déjà été corrigée. Modifiez votre réponse ou votre consigne d’examen pour demander une nouvelle correction.",
+        alreadyCorrectedFormattingNote:
+          "Les simples différences d’espacement ne comptent pas comme une nouvelle version : la correction affichée concerne le texte tel que vous l’avez soumis la première fois.",
         correctionInProgress:
           "Une correction de cette réponse exacte est déjà en cours. Attendez sa fin ou modifiez la réponse ou la consigne d’examen avant d’en demander une autre.",
         exampleLevelLabel: "Niveau visé",
@@ -1943,6 +1963,12 @@ export const APP_COPY = {
         topicSwitchDescription: "Changer de consigne supprimera votre consigne, brouillon et commentaires actuels.",
         clearDraftDescription: "Effacer supprimera votre brouillon et vos commentaires actuels.",
         clearDraftConfirm: "Effacer le texte",
+        correctTitle: "Corriger cette réponse ?",
+        correctDescription:
+          "Votre réponse sera envoyée pour correction et comptera dans vos corrections quotidiennes.",
+        correctNearIdenticalDescription:
+          "Ce brouillon est presque identique à un texte que vous avez déjà fait corriger. Le renvoyer utilisera une autre correction quotidienne, et le résultat peut légèrement différer.",
+        correctConfirm: "Envoyer pour correction",
         confirm: "Supprimer et changer",
         cancel: "Continuer à travailler",
       },
@@ -2316,8 +2342,12 @@ export const APP_COPY = {
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
         genericCorrectionError: "Algo salió mal.",
+        notFrenchText:
+          "No hemos podido reconocer con seguridad este texto como francés, así que no se ha corregido. Escribe tu respuesta en francés y revisa que no haya caracteres inusuales; luego inténtalo de nuevo.",
         alreadyCorrected:
           "Esta versión ya se ha corregido. Modifica tu respuesta o consigna de examen para solicitar una nueva corrección.",
+        alreadyCorrectedFormattingNote:
+          "Las diferencias de espaciado por sí solas no cuentan como una versión nueva, así que la corrección que ves corresponde al texto tal como lo enviaste la primera vez.",
         correctionInProgress:
           "Ya hay una corrección de esta respuesta exacta en curso. Espera a que termine o modifica la respuesta o la consigna de examen antes de solicitar otra.",
         exampleLevelLabel: "Nivel objetivo",
@@ -2636,6 +2666,12 @@ export const APP_COPY = {
         topicSwitchDescription: "Al cambiar de consigna se descartarán la consigna, el borrador y los comentarios actuales.",
         clearDraftDescription: "Borrar descartará tu borrador y comentarios actuales.",
         clearDraftConfirm: "Borrar texto",
+        correctTitle: "¿Corregir esta respuesta?",
+        correctDescription:
+          "Tu respuesta se enviará para su corrección y usará una de tus correcciones diarias.",
+        correctNearIdenticalDescription:
+          "Este borrador es casi idéntico a uno que ya has corregido. Volver a enviarlo usará otra corrección diaria y el resultado puede variar ligeramente.",
+        correctConfirm: "Enviar a corregir",
         confirm: "Descartar y cambiar",
         cancel: "Seguir trabajando",
       },
@@ -3009,8 +3045,12 @@ export const APP_COPY = {
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
         genericCorrectionError: "Algo deu errado.",
+        notFrenchText:
+          "Não conseguimos reconhecer com segurança este texto como francês, então ele não foi corrigido. Escreva sua resposta em francês e verifique se não há caracteres incomuns; depois tente novamente.",
         alreadyCorrected:
           "Esta versão já foi corrigida. Edite sua resposta ou enunciado de exame para solicitar uma nova correção.",
+        alreadyCorrectedFormattingNote:
+          "Diferenças apenas de espaçamento não contam como uma nova versão, então a correção exibida é a do texto exatamente como você o enviou da primeira vez.",
         correctionInProgress:
           "Já existe uma correção desta resposta exata em andamento. Aguarde a conclusão ou edite a resposta ou o enunciado de exame antes de solicitar outra.",
         exampleLevelLabel: "Nível desejado",
@@ -3328,6 +3368,12 @@ export const APP_COPY = {
         topicSwitchDescription: "Trocar de enunciado descartará o enunciado, o rascunho e os comentários atuais.",
         clearDraftDescription: "Limpar descartará seu rascunho e comentários atuais.",
         clearDraftConfirm: "Limpar texto",
+        correctTitle: "Corrigir esta resposta?",
+        correctDescription:
+          "Sua resposta será enviada para correção e usará uma das suas correções diárias.",
+        correctNearIdenticalDescription:
+          "Este rascunho é quase idêntico a um que você já corrigiu. Enviá-lo de novo usará outra correção diária, e o resultado pode variar um pouco.",
+        correctConfirm: "Enviar para correção",
         confirm: "Descartar e trocar",
         cancel: "Continuar trabalhando",
       },

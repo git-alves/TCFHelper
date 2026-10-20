@@ -1,6 +1,7 @@
 import type { TaskType } from "@prisma/client";
 import { type TaskDefinition } from "@/lib/tcf-tasks";
 import { CEFR_CONFIDENCE_LEVELS, CEFR_LEVELS, ERROR_CATEGORIES } from "@/lib/essay-feedback";
+import { renderGeneratorLevelCriteria } from "@/lib/cefr-level-criteria";
 import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -18,7 +19,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-08-13";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-10-10";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -229,6 +230,7 @@ export function buildExamplePrompt({
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
     `authentically demonstrate CEFR level ${level}: ${levelDescription}\n` +
+    `${renderGeneratorLevelCriteria(level)}\n` +
     "Stay within the required word range. Return only the French response text itself" +
     outputFormatNote +
     ", no markdown formatting."

@@ -37,6 +37,8 @@ import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspac
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
+import { checkFrenchText } from "@/lib/french-text-check";
+import { isNearIdenticalDraft } from "@/lib/near-identical-draft";
 import { computeTranslationDelta } from "@/lib/translation-delta";
 import {
   TIMED_TASK_PLANS,
@@ -61,7 +63,7 @@ interface RecentExamTopic {
 
 type TopicMode = "recent" | "custom" | null;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
-type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear";
+type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
 type TimedTaskStatus = "running" | "paused" | "expired";
@@ -608,6 +610,9 @@ export function WritingWorkspace() {
   // Only surfaced after the learner actually tries to correct while short --
   // not shown proactively while they're still typing.
   const [showMinimumWordWarning, setShowMinimumWordWarning] = useState(false);
+  // Set when the draft is not recognizably French, either by the same check
+  // run locally before sending or by the server refusing it (NOT_FRENCH_TEXT).
+  const [showNotFrenchWarning, setShowNotFrenchWarning] = useState(false);
 
   // useSyncExternalStore serves the same defaults during SSR and hydration,
   // then reads the browser preference after hydration without a mismatched
@@ -654,6 +659,9 @@ export function WritingWorkspace() {
   // workspace distinguish an unchanged successful correction from a failed
   // request, and makes an edit-and-revert behave truthfully.
   const [lastSuccessfulCorrectionKey, setLastSuccessfulCorrectionKey] = useState<string | null>(null);
+  // The draft text behind lastSuccessfulCorrectionKey, kept only to tell the
+  // learner when a new request is a tiny edit of it (see isNearIdenticalDraft).
+  const [lastCorrectedText, setLastCorrectedText] = useState<string | null>(null);
   const [correctionModalOpen, setCorrectionModalOpen] = useState(false);
   const [correctionModalState, setCorrectionModalState] = useState<CorrectionModalState>("loading");
   const [correctionModalSession, setCorrectionModalSession] = useState(0);
@@ -789,6 +797,15 @@ export function WritingWorkspace() {
   // draft and topic exactly to the assessed version, the saved feedback is
   // current again and a duplicate correction stays disabled.
   const feedbackIsStale = Boolean(feedback && !isCurrentDraftAlreadyCorrected);
+  // A formatting-only edit (spaces, line breaks, quote style) deliberately
+  // maps to the same correction key as the assessed draft. The result's
+  // error offsets index the text that was actually graded, so it is always
+  // rendered against that stored text -- never the edited draft -- and the
+  // learner is told so. The server-duplicate path (no in-memory feedback)
+  // links to the stored essay, whose text the client never saw.
+  const showFormattingReuseNote =
+    isCurrentDraftAlreadyCorrected &&
+    (content !== submittedCorrectionText || existingCorrectionEssayId !== null);
 
   useEffect(() => {
     if (topicMode !== "custom") return;
@@ -1027,6 +1044,7 @@ export function WritingWorkspace() {
     setContent(value);
     setHasCorrectionError(false);
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
     // Keep a server-returned history ID while the learner experiments with a
     // revision. The link itself is rendered only when the current key matches
     // again, so edit-and-revert restores the useful route to the saved review.
@@ -1058,6 +1076,7 @@ export function WritingWorkspace() {
     setFeedback(null);
     setFeedbackLocale(null);
     setLastSuccessfulCorrectionKey(null);
+    setLastCorrectedText(null);
     setCorrectionModalOpen(false);
     setIsWalkthroughCorrectionPreview(false);
     setCorrectionModalState("loading");
@@ -1067,6 +1086,7 @@ export function WritingWorkspace() {
     setSubmittedCorrectionText("");
     setHasCorrectionError(false);
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
     setExampleError(null);
     setExampleNeedsTopic(false);
     cancelPendingTranslation();
@@ -1571,7 +1591,10 @@ export function WritingWorkspace() {
     return () => registerWalkthroughScript(null);
   }, [registerWalkthroughScript]);
 
-  async function handleCorrect() {
+  // `skipConfirmation` is for the confirmed re-entry and the modal's Retry:
+  // the learner already agreed to spend this correction, and a retry after a
+  // failure should not ask again.
+  async function handleCorrect({ skipConfirmation = false }: { skipConfirmation?: boolean } = {}) {
     const attempt = getCorrectAttemptOutcome({
       taskType,
       activeTopicPrompt,
@@ -1581,6 +1604,7 @@ export function WritingWorkspace() {
       isCorrectionInProgressElsewhere,
       isCurrentDraftAlreadyCorrected,
       wordCount,
+      isLikelyFrench: checkFrenchText(content).ok,
       correctionRequestKey,
     });
 
@@ -1591,7 +1615,26 @@ export function WritingWorkspace() {
       setShowMinimumWordWarning(true);
       return;
     }
+    if (attempt.kind === "notFrench") {
+      setShowNotFrenchWarning(true);
+      return;
+    }
     setShowMinimumWordWarning(false);
+    setShowNotFrenchWarning(false);
+
+    // Only a request that would actually be sent (and spend quota) asks for
+    // confirmation; the free local rejections above never interrupt.
+    if (!skipConfirmation) {
+      // A punctuation or one-letter fix is a different correction key, so it
+      // is allowed -- but it costs another daily correction, which is worth
+      // saying when the draft is nearly the one already assessed.
+      const isNearIdentical = lastCorrectedText !== null && isNearIdenticalDraft(lastCorrectedText, content);
+      setPendingSwitch({
+        kind: isNearIdentical ? "correctNearIdentical" : "correct",
+        run: () => void handleCorrect({ skipConfirmation: true }),
+      });
+      return;
+    }
     const requestKey = attempt.correctionRequestKey;
 
     const correctionLocale = locale;
@@ -1639,6 +1682,7 @@ export function WritingWorkspace() {
           (data as { code?: unknown }).code === "CORRECTION_ALREADY_EXISTS"
         ) {
           setLastSuccessfulCorrectionKey(requestKey);
+          setLastCorrectedText(submittedText);
           const essayId = (data as { essayId?: unknown }).essayId;
           setExistingCorrectionEssayId(typeof essayId === "string" ? essayId : null);
           setCorrectionModalOpen(false);
@@ -1660,6 +1704,19 @@ export function WritingWorkspace() {
           setCorrectionModalOpen(false);
           return;
         }
+        if (
+          requestId === correctionRequestId.current &&
+          data &&
+          typeof data === "object" &&
+          (data as { code?: unknown }).code === "NOT_FRENCH_TEXT"
+        ) {
+          // The local check passed but the server's did not (it is the
+          // authority). Show the same inline message instead of the generic
+          // failure modal -- there is nothing to retry.
+          setShowNotFrenchWarning(true);
+          setCorrectionModalOpen(false);
+          return;
+        }
         throw new Error("Correction request failed");
       }
 
@@ -1672,6 +1729,7 @@ export function WritingWorkspace() {
       setCorrectionEssayId(correction.essayId);
       setFeedbackLocale(correctionLocale);
       setLastSuccessfulCorrectionKey(requestKey);
+      setLastCorrectedText(submittedText);
       setCorrectionModalState("result");
     } catch {
       if (requestId === correctionRequestId.current) {
@@ -2327,7 +2385,7 @@ export function WritingWorkspace() {
                 <button
                   type="button"
                   data-walkthrough="correct-button"
-                  onClick={handleCorrect}
+                  onClick={() => void handleCorrect()}
                   disabled={
                     !activeTopicPrompt ||
                     isCorrecting ||
@@ -2442,6 +2500,11 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.genericCorrectionError}
               </p>
             )}
+            {showNotFrenchWarning && (
+              <p role="alert" className="text-sm text-amber-700 dark:text-amber-300">
+                {copy.workspace.editor.notFrenchText}
+              </p>
+            )}
             {showMinimumWordWarning && isBelowMinimumWordCount && task && (
               <p
                 id="minimum-word-count-note"
@@ -2466,6 +2529,7 @@ export function WritingWorkspace() {
                 className="text-sm text-zinc-600 dark:text-zinc-300"
               >
                 {copy.workspace.editor.alreadyCorrected}
+                {showFormattingReuseNote && ` ${copy.workspace.editor.alreadyCorrectedFormattingNote}`}
               </p>
             )}
             {isGeneratingExample && (
@@ -2565,14 +2629,18 @@ export function WritingWorkspace() {
           isStale={feedbackIsStale}
           copy={copy}
           onClose={closeCorrectionModal}
-          onRetry={() => void handleCorrect()}
+          onRetry={() => void handleCorrect({ skipConfirmation: true })}
           suppressFocusTrap={isWalkthroughCorrectionPreview}
         />
       )}
 
       <ConfirmDialog
         open={pendingSwitch !== null}
-        title={copy.workspace.dialog.title}
+        title={
+          pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
+            ? copy.workspace.dialog.correctTitle
+            : copy.workspace.dialog.title
+        }
         description={
           pendingSwitch?.kind === "task"
             ? copy.workspace.dialog.taskSwitchDescription
@@ -2584,12 +2652,18 @@ export function WritingWorkspace() {
                   ? copy.workspace.dialog.adminSwitchDescription
                   : pendingSwitch?.kind === "clear"
                     ? copy.workspace.dialog.clearDraftDescription
-                    : ""
+                    : pendingSwitch?.kind === "correct"
+                      ? copy.workspace.dialog.correctDescription
+                      : pendingSwitch?.kind === "correctNearIdentical"
+                        ? copy.workspace.dialog.correctNearIdenticalDescription
+                        : ""
         }
         confirmLabel={
           pendingSwitch?.kind === "clear"
             ? copy.workspace.dialog.clearDraftConfirm
-            : copy.workspace.dialog.confirm
+            : pendingSwitch?.kind === "correct" || pendingSwitch?.kind === "correctNearIdentical"
+              ? copy.workspace.dialog.correctConfirm
+              : copy.workspace.dialog.confirm
         }
         cancelLabel={copy.workspace.dialog.cancel}
         onConfirm={() => {

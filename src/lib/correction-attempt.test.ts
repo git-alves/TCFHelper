@@ -10,6 +10,7 @@ const baseInput: CorrectAttemptInput = {
   isCorrectionInProgressElsewhere: false,
   isCurrentDraftAlreadyCorrected: false,
   wordCount: 0,
+  isLikelyFrench: true,
   correctionRequestKey: null,
 };
 
@@ -30,6 +31,18 @@ describe("getCorrectAttemptOutcome", () => {
     expect(
       getCorrectAttemptOutcome({ ...baseInput, wordCount: 60, correctionRequestKey: "key" }),
     ).toEqual({ kind: "ready", correctionRequestKey: "key" });
+  });
+
+  it("refuses a long enough draft that is not French", () => {
+    expect(
+      getCorrectAttemptOutcome({ ...baseInput, wordCount: 60, isLikelyFrench: false, correctionRequestKey: "key" }),
+    ).toEqual({ kind: "notFrench" });
+  });
+
+  it("reports the minimum before the language, since language is unreliable on short text", () => {
+    expect(
+      getCorrectAttemptOutcome({ ...baseInput, wordCount: 10, isLikelyFrench: false, correctionRequestKey: "key" }),
+    ).toEqual({ kind: "belowMinimum" });
   });
 
   it("blocks when nothing is selected yet, regardless of word count", () => {
