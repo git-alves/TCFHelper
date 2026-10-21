@@ -876,7 +876,7 @@ export const APP_COPY = {
         "Your corrected text, an estimated CEFR level, and detailed comments open right here. The Overview, Compared, and Comments tabs break everything down.",
       exampleGenerateTitle: "Need inspiration?",
       exampleGenerateBody:
-        "Click Generate example, then pick a CEFR level — B2, C1, or C2 — to see a full model answer at that level. We won't generate one during the tour — try it any time.",
+        "Click Generate example, then pick a CEFR level — B2, C1, or C2 — for a full model answer. Your draft stays unchanged: the example opens in its own card below, with copy and close icons, and generating again replaces it. Nothing is generated during the tour.",
       editorCopyTitle: "Copy your text",
       editorCopyBody:
         "Copy sends your response to the clipboard, handy for pasting it into a document or an official practice test.",
@@ -884,7 +884,7 @@ export const APP_COPY = {
       editorClearBody: "Clear empties the response so you can start a fresh draft.",
       translationTitle: "Translate your response",
       translationBody:
-        "Show translation translates your response into your interface language, so you can check your meaning without leaving the page. It only translates on demand, and only whatever you've added since the last time, to save your translation quota.",
+        "Show translation translates your response into your interface language, side by side with your text on wide screens (below it on narrow ones). The button then reads Hide translation, or Update translation after you edit. It only translates on demand, and only whatever you've added since the last time, to save your translation quota.",
       navTitle: "Your progress",
       navBody: "Come back here any time to see your correction history and estimated level over time.",
       previewFeedback: {
@@ -1572,7 +1572,7 @@ export const APP_COPY = {
         "Votre texte corrigé, un niveau CECR estimé et des commentaires détaillés s’ouvrent ici même. Les onglets Aperçu, Comparaison et Commentaires détaillent tout.",
       exampleGenerateTitle: "Besoin d’inspiration ?",
       exampleGenerateBody:
-        "Cliquez sur Générer un exemple, puis choisissez un niveau CECR — B2, C1 ou C2 — pour voir une réponse modèle complète à ce niveau. Nous n’en générerons pas pendant la visite — essayez-le quand vous voulez.",
+        "Cliquez sur Générer un exemple, puis choisissez un niveau CECR — B2, C1 ou C2 — pour une réponse modèle complète. Votre brouillon reste intact : l’exemple s’ouvre dans sa propre carte en dessous, avec des icônes pour le copier ou le fermer, et un nouvel exemple le remplace. Rien n’est généré pendant la visite.",
       editorCopyTitle: "Copiez votre texte",
       editorCopyBody:
         "Copier envoie votre réponse dans le presse-papiers, pratique pour la coller dans un document ou un test blanc officiel.",
@@ -1580,7 +1580,7 @@ export const APP_COPY = {
       editorClearBody: "Effacer vide la réponse pour repartir d’une page blanche.",
       translationTitle: "Traduisez votre réponse",
       translationBody:
-        "Afficher la traduction traduit votre réponse dans la langue de l’interface, pour vérifier le sens sans quitter la page. Elle ne se lance qu’à la demande, et seulement pour ce que vous avez ajouté depuis la dernière fois, afin de préserver votre quota de traduction.",
+        "Afficher la traduction traduit votre réponse dans la langue de l’interface, à côté de votre texte sur grand écran (en dessous sur petit écran). Le bouton devient ensuite Masquer la traduction, ou Mettre à jour la traduction après une modification. Elle ne se lance qu’à la demande, et seulement pour ce que vous avez ajouté depuis la dernière fois, afin de préserver votre quota de traduction.",
       navTitle: "Votre progression",
       navBody: "Revenez ici à tout moment pour consulter votre historique de corrections et votre niveau estimé.",
       previewFeedback: {
@@ -2275,7 +2275,7 @@ export const APP_COPY = {
         "Tu texto corregido, un nivel MCER estimado y comentarios detallados se abren aquí mismo. Las pestañas Resumen, Comparación y Comentarios lo desglosan todo.",
       exampleGenerateTitle: "¿Necesitas inspiración?",
       exampleGenerateBody:
-        "Haz clic en Generar ejemplo y elige un nivel MCER — B2, C1 o C2 — para ver una respuesta modelo completa en ese nivel. No generaremos ninguna durante el recorrido — pruébalo cuando quieras.",
+        "Haz clic en Generar ejemplo y elige un nivel MCER — B2, C1 o C2 — para ver una respuesta modelo completa. Tu borrador no cambia: el ejemplo se abre en su propia tarjeta debajo, con iconos para copiarlo o cerrarlo, y generar otro lo reemplaza. Durante el recorrido no se genera nada.",
       editorCopyTitle: "Copia tu texto",
       editorCopyBody:
         "Copiar envía tu respuesta al portapapeles, útil para pegarla en un documento o en un examen de práctica oficial.",
@@ -2283,7 +2283,7 @@ export const APP_COPY = {
       editorClearBody: "Borrar vacía la respuesta para empezar un borrador nuevo.",
       translationTitle: "Traduce tu respuesta",
       translationBody:
-        "Mostrar traducción traduce tu respuesta a tu idioma de interfaz, para que puedas revisar el significado sin salir de la página. Solo traduce cuando lo pides, y solo lo que agregaste desde la última vez, para ahorrar tu cuota de traducción.",
+        "Mostrar traducción traduce tu respuesta a tu idioma de interfaz, junto a tu texto en pantallas anchas (debajo en pantallas estrechas). Después el botón pasa a ser Ocultar traducción, o Actualizar traducción tras editar. Solo traduce cuando lo pides, y solo lo que agregaste desde la última vez, para ahorrar tu cuota de traducción.",
       navTitle: "Tu progreso",
       navBody: "Vuelve aquí cuando quieras para ver tu historial de correcciones y tu nivel estimado.",
       previewFeedback: {
@@ -2978,7 +2978,7 @@ export const APP_COPY = {
         "Seu texto corrigido, um nível QECR estimado e feedback detalhado abrem bem aqui. As abas Visão geral, Comparação e Comentários detalham tudo.",
       exampleGenerateTitle: "Precisa de inspiração?",
       exampleGenerateBody:
-        "Clique em Gerar exemplo e escolha um nível QECR — B2, C1 ou C2 — para ver uma resposta modelo completa nesse nível. Não vamos gerar nenhuma durante o tour — experimente quando quiser.",
+        "Clique em Gerar exemplo e escolha um nível QECR — B2, C1 ou C2 — para ver uma resposta modelo completa. Seu rascunho não muda: o exemplo abre em um cartão próprio abaixo, com ícones para copiar ou fechar, e gerar outro o substitui. Nada é gerado durante o tour.",
       editorCopyTitle: "Copie seu texto",
       editorCopyBody:
         "Copiar envia sua resposta para a área de transferência, útil para colar em um documento ou em uma prova oficial de treino.",
@@ -2986,7 +2986,7 @@ export const APP_COPY = {
       editorClearBody: "Limpar esvazia a resposta para você começar um rascunho novo.",
       translationTitle: "Traduza sua resposta",
       translationBody:
-        "Mostrar tradução traduz sua resposta para o idioma da interface, para você conferir o sentido sem sair da página. Ela só traduz quando você pede, e só o que você adicionou desde a última vez, para economizar sua cota de tradução.",
+        "Mostrar tradução traduz sua resposta para o idioma da interface, ao lado do seu texto em telas largas (abaixo em telas estreitas). Depois o botão passa a ser Ocultar tradução, ou Atualizar tradução após editar. Ela só traduz quando você pede, e só o que você adicionou desde a última vez, para economizar sua cota de tradução.",
       navTitle: "Seu progresso",
       navBody: "Volte aqui quando quiser para ver seu histórico de correções e seu nível estimado.",
       previewFeedback: {
