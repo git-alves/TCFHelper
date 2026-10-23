@@ -104,6 +104,10 @@ describe("CorrectionHistoryList clear all", () => {
     await click("Clear all");
 
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain("Clear all correction history?");
+    const confirm = [...document.querySelectorAll('[role="alertdialog"] button')].find(
+      (button) => button.textContent === "Clear all",
+    );
+    expect(confirm?.className).toContain("bg-red-700");
     expect(fetchMock).not.toHaveBeenCalled();
 
     await clickInDialog("Cancel");

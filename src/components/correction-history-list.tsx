@@ -301,6 +301,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
             description={copy.dashboard.deleteCorrectionConfirmDescription}
             confirmLabel={copy.dashboard.deleteCorrectionConfirm}
             cancelLabel={copy.common.cancel}
+            destructive
             onConfirm={() => void handleConfirmDelete()}
             onCancel={() => setPendingDeleteId(null)}
           />
@@ -310,6 +311,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
             description={copy.dashboard.clearCorrectionHistoryConfirmDescription}
             confirmLabel={copy.dashboard.clearCorrectionHistoryConfirm}
             cancelLabel={copy.common.cancel}
+            destructive
             onConfirm={() => void handleConfirmClearAll()}
             onCancel={() => setIsClearConfirmOpen(false)}
           />

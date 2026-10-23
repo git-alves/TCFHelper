@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
   confirmLabel: string;
   cancelLabel: string;
   isConfirming?: boolean;
+  /** Styles the confirm action red for an irreversible, destructive choice. */
+  destructive?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -23,6 +25,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   isConfirming = false,
+  destructive = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -107,7 +110,11 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={isConfirming}
-            className="rounded-full bg-foreground px-4 py-1.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              destructive
+                ? "bg-red-700 text-white hover:bg-red-800 dark:bg-red-600 dark:hover:bg-red-500"
+                : "bg-foreground text-background hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            }`}
           >
             {confirmLabel}
           </button>
