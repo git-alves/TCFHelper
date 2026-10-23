@@ -151,6 +151,7 @@ export function PracticeProgressCardContent({ summary, copy }: PracticeProgressC
 
       <ConfirmDialog
         open={isConfirmOpen}
+        destructive
         title={dashboardCopy.clearPracticeProgressConfirmTitle}
         description={dashboardCopy.clearPracticeProgressConfirmDescription}
         confirmLabel={dashboardCopy.clearPracticeProgressConfirm}

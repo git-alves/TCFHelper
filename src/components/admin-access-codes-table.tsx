@@ -206,6 +206,7 @@ export function AdminAccessCodesTable({ accessCodes }: { accessCodes: AdminAcces
       )}
       <ConfirmDialog
         open={isConfirming}
+        destructive
         title={`Delete ${selectedDeletableIds.length === 1 ? "this access code" : `these ${selectedDeletableIds.length} access codes`}?`}
         description="Deleted codes are permanently removed and can never be redeemed. This cannot be undone."
         confirmLabel={isDeleting ? "Deleting…" : "Delete"}
