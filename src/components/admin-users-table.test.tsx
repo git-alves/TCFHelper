@@ -36,19 +36,22 @@ function renderUsers(users: AdminUserListItem[]) {
 }
 
 describe("AdminUsersTable", () => {
-  it("shows when each learner last signed in and was last active, in their own timezone", () => {
+  it("shows last sign-in and activity in UTC for every learner, whatever their own timezone", () => {
     const markup = renderUsers([
       user({
+        id: "user_sp",
         lastSignInAt: "2026-10-22T23:30:00.000Z",
         lastActiveAt: "2026-10-23T08:15:00.000Z",
         timezone: "America/Sao_Paulo",
       }),
+      user({ id: "user_tokyo", lastSignInAt: "2026-10-22T23:30:00.000Z", timezone: "Asia/Tokyo" }),
     ]);
 
-    expect(markup).toContain("Last sign-in");
-    expect(markup).toContain("Oct 22, 2026, 8:30 PM");
-    expect(markup).toContain("Active");
-    expect(markup).toContain("Oct 23, 2026, 5:15 AM");
+    expect(markup).toContain("Last sign-in (UTC)");
+    // Same instant, same text for both learners, regardless of zone.
+    expect(markup.match(/Oct 22, 2026, 11:30 PM/g)).toHaveLength(2);
+    expect(markup).toContain("Oct 23, 2026, 8:15 AM");
+    expect(markup).not.toContain("8:30 PM");
   });
 
   it("says plainly when no sign-in has been recorded yet instead of implying they never signed in", () => {
