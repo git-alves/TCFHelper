@@ -8,6 +8,7 @@ const {
   sessionFindManyMock,
   sessionFindFirstMock,
   sessionUpdateMock,
+  userUpdateManyMock,
   executeRawMock,
   recordAdminEventInTransactionMock,
   syncClerkUserFromWebhookMock,
@@ -19,6 +20,7 @@ const {
   sessionFindManyMock: vi.fn(),
   sessionFindFirstMock: vi.fn(),
   sessionUpdateMock: vi.fn(),
+  userUpdateManyMock: vi.fn(),
   executeRawMock: vi.fn(),
   recordAdminEventInTransactionMock: vi.fn(),
   syncClerkUserFromWebhookMock: vi.fn(),
@@ -77,6 +79,7 @@ beforeEach(() => {
   sessionFindManyMock.mockReset();
   sessionFindFirstMock.mockReset();
   sessionUpdateMock.mockReset();
+  userUpdateManyMock.mockReset();
   executeRawMock.mockReset();
   recordAdminEventInTransactionMock.mockReset();
   syncClerkUserFromWebhookMock.mockReset();
@@ -90,11 +93,12 @@ beforeEach(() => {
   sessionFindManyMock.mockResolvedValue([]);
   sessionFindFirstMock.mockResolvedValue(null);
   sessionUpdateMock.mockResolvedValue({ id: "c234567890123456789012345" });
+  userUpdateManyMock.mockResolvedValue({ count: 1 });
   executeRawMock.mockResolvedValue(undefined);
   recordAdminEventInTransactionMock.mockResolvedValue(undefined);
   transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
     callback({
-      user: { findUnique: userFindUniqueMock },
+      user: { findUnique: userFindUniqueMock, updateMany: userUpdateManyMock },
       authSecuritySession: {
         findUnique: sessionFindUniqueMock,
         create: sessionCreateMock,
@@ -243,10 +247,20 @@ describe("review-only sharing signal", () => {
     expect(JSON.stringify(recordAdminEventInTransactionMock.mock.calls)).not.toContain("203.0.113.9");
   });
 
+  it("records the sign-in time on the learner, only ever moving it forward", async () => {
+    await recordAuthSecuritySession(sessionInput(), NOW);
+
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: USER_ID, OR: [{ lastSignInAt: null }, { lastSignInAt: { lt: NOW } }] },
+      data: { lastSignInAt: NOW },
+    });
+  });
+
   it("deduplicates Clerk sessions by the HMACed session identifier", async () => {
     sessionFindUniqueMock.mockResolvedValue({ id: "c234567890123456789012345" });
 
     await expect(recordAuthSecuritySession(sessionInput(), NOW)).resolves.toEqual({ kind: "duplicate" });
+    expect(userUpdateManyMock).not.toHaveBeenCalled();
 
     expect(sessionCreateMock).not.toHaveBeenCalled();
     expect(recordAdminEventInTransactionMock).not.toHaveBeenCalled();

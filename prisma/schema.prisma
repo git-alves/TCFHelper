@@ -149,6 +149,12 @@ model User {
   // "active within the last couple of minutes" as online, so this is a
   // heartbeat, not literal real-time presence.
   lastActiveAt                DateTime?
+  // The most recent successful sign-in (a new Clerk session), recorded from
+  // the verified session.created webhook. Unlike lastActiveAt it only moves
+  // when the learner actually signs in, so a session that stays open for days
+  // keeps an old value here while lastActiveAt keeps advancing. Null means no
+  // sign-in has been recorded since this column shipped.
+  lastSignInAt                DateTime?
   // IANA zone name (e.g. "America/Sao_Paulo") reported by the learner's own
   // browser -- see TimezoneReporter. Null until their first visit after this
   // column shipped, so admin displays must fall back to UTC rather than

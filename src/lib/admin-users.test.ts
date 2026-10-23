@@ -32,6 +32,8 @@ function userRecord(overrides: {
   validityDays?: number | null;
   expiresAt?: Date | null;
   timezone?: string | null;
+  lastSignInAt?: Date | null;
+  lastActiveAt?: Date | null;
 }) {
   const hasRedemption =
     overrides.redeemedAt !== undefined || overrides.validityDays !== undefined || overrides.expiresAt !== undefined;
@@ -40,6 +42,8 @@ function userRecord(overrides: {
     email: "learner@example.com",
     name: null,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
+    lastSignInAt: overrides.lastSignInAt ?? null,
+    lastActiveAt: overrides.lastActiveAt ?? null,
     timezone: overrides.timezone ?? null,
     isAdmin: false,
     isBlocked: false,
@@ -237,6 +241,26 @@ describe("admin user list helpers", () => {
         correctionRequestsPerDay: null,
       }),
     ).toMatchObject({ translationRequestsPerMinute: 0 });
+  });
+
+  it("serializes the last sign-in and last activity, with null when none is recorded", async () => {
+    findManyMock.mockResolvedValue([
+      userRecord({
+        id: "user_seen",
+        lastSignInAt: new Date("2026-10-22T09:00:00.000Z"),
+        lastActiveAt: new Date("2026-10-23T10:30:00.000Z"),
+      }),
+      userRecord({ id: "user_unseen" }),
+    ]);
+
+    const page = await getAdminUsersPage({ query: "", status: "all", page: 1 });
+    const byId = Object.fromEntries(page.users.map((user) => [user.id, user]));
+
+    expect(byId.user_seen).toMatchObject({
+      lastSignInAt: "2026-10-22T09:00:00.000Z",
+      lastActiveAt: "2026-10-23T10:30:00.000Z",
+    });
+    expect(byId.user_unseen).toMatchObject({ lastSignInAt: null, lastActiveAt: null });
   });
 
   it("keeps activatedAt (historical) distinct from hasLiveAdmission (current) for an expired timed code", async () => {

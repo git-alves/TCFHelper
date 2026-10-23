@@ -21,6 +21,8 @@ export const ADMIN_USER_SELECT = {
   email: true,
   name: true,
   createdAt: true,
+  lastSignInAt: true,
+  lastActiveAt: true,
   timezone: true,
   isAdmin: true,
   isBlocked: true,
@@ -158,6 +160,11 @@ export type AdminUserListItem = {
   email: string;
   name: string | null;
   createdAt: string;
+  // Most recent recorded sign-in (a new session). Null until the first one is
+  // observed after this field shipped -- not "never signed in".
+  lastSignInAt: string | null;
+  // Most recent request from the learner, even within a long-lived session.
+  lastActiveAt: string | null;
   // IANA zone reported by the learner's own browser (see TimezoneReporter).
   // Null until their first visit after this column shipped -- admin displays
   // must fall back to UTC rather than assume every row has one.
@@ -196,6 +203,8 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
     email: record.email,
     name: record.name,
     createdAt: record.createdAt.toISOString(),
+    lastSignInAt: record.lastSignInAt?.toISOString() ?? null,
+    lastActiveAt: record.lastActiveAt?.toISOString() ?? null,
     timezone: record.timezone,
     isAdmin: record.isAdmin,
     isBlocked: record.isBlocked,

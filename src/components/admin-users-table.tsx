@@ -15,6 +15,14 @@ function formattedDate(value: string, timeZone: string | null) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: timeZone ?? "UTC" }).format(new Date(value));
 }
 
+function formattedDateTime(value: string, timeZone: string | null) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: timeZone ?? "UTC",
+  }).format(new Date(value));
+}
+
 function count(value: number) {
   return value.toLocaleString("en-US");
 }
@@ -22,12 +30,13 @@ function count(value: number) {
 export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps) {
   return (
     <div className="overflow-x-auto rounded-xl border border-black/[.1] dark:border-white/[.15]">
-      <table className="min-w-[900px] w-full border-collapse text-left text-sm">
+      <table className="min-w-[1000px] w-full border-collapse text-left text-sm">
         <caption className="sr-only">Registered learners and their current usage</caption>
         <thead className="border-b border-black/[.1] bg-black/[.025] text-xs uppercase tracking-wide text-zinc-600 dark:border-white/[.15] dark:bg-white/[.04] dark:text-zinc-400">
           <tr>
             <th scope="col" className="px-4 py-3 font-medium">Learner</th>
             <th scope="col" className="px-4 py-3 font-medium">Joined</th>
+            <th scope="col" className="px-4 py-3 font-medium">Last sign-in</th>
             <th scope="col" className="px-4 py-3 font-medium">Access</th>
             <th scope="col" className="px-4 py-3 font-medium">Current usage</th>
             <th scope="col" className="px-4 py-3 font-medium"><span className="sr-only">Actions</span></th>
@@ -59,6 +68,20 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-4 text-zinc-600 dark:text-zinc-400">{formattedDate(user.createdAt, user.timezone)}</td>
+                <td className="whitespace-nowrap px-4 py-4 text-xs leading-5 text-zinc-700 dark:text-zinc-300">
+                  <p>
+                    {user.lastSignInAt ? (
+                      <time dateTime={user.lastSignInAt}>{formattedDateTime(user.lastSignInAt, user.timezone)}</time>
+                    ) : (
+                      <span className="text-zinc-500 dark:text-zinc-400">Not recorded yet</span>
+                    )}
+                  </p>
+                  {user.lastActiveAt && (
+                    <p className="text-zinc-500 dark:text-zinc-400">
+                      Active <time dateTime={user.lastActiveAt}>{formattedDateTime(user.lastActiveAt, user.timezone)}</time>
+                    </p>
+                  )}
+                </td>
                 <td className="px-4 py-4">
                   <AdminUserAccountStatus
                     userId={user.id}

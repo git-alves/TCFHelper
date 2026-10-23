@@ -63,6 +63,8 @@ describe("GET /api/admin/users/export", () => {
           email: "learner@example.com",
           name: "Learner, One",
           createdAt: "2026-08-01T00:00:00.000Z",
+          lastSignInAt: "2026-10-22T09:00:00.000Z",
+          lastActiveAt: null,
           isAdmin: false,
           isBlocked: true,
           activatedAt: "2026-08-02T00:00:00.000Z",
@@ -83,9 +85,9 @@ describe("GET /api/admin/users/export", () => {
     expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="users.csv"');
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(body).toContain(
-      "Email,Name,Joined at,Activated at,Admin,Blocked,Translation chars (month),Example generations (day),Corrections (day)\r\n",
+      "Email,Name,Joined at,Last sign-in at,Last active at,Activated at,Admin,Blocked,Translation chars (month),Example generations (day),Corrections (day)\r\n",
     );
-    expect(body).toContain('learner@example.com,"Learner, One",2026-08-01T00:00:00.000Z');
+    expect(body).toContain('learner@example.com,"Learner, One",2026-08-01T00:00:00.000Z,2026-10-22T09:00:00.000Z,,2026-08-02T00:00:00.000Z');
     expect(body).toContain("no,yes,4200,3,1\r\n");
   });
 

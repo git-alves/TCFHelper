@@ -109,4 +109,8 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
   it("does not retain the removed topic-image migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).not.toContain("20260804160000_add_generated_topic_image");
   });
+
+  it("allows the additive last-sign-in column migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261023120000_add_user_last_sign_in");
+  });
 });

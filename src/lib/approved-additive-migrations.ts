@@ -84,4 +84,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // CORRECTION_PROVIDER_FAILED/EXAMPLE_PROVIDER_FAILED. No existing row's
   // meaning changes: every existing row already has this column null.
   "20260928130000_add_admin_event_model",
+  // A single nullable User column recording the last sign-in. No existing
+  // row's meaning changes: null means "no sign-in recorded yet", which is true
+  // of every existing row.
+  "20261023120000_add_user_last_sign_in",
 ]);

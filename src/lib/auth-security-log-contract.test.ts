@@ -50,7 +50,7 @@ describe("verified session to owner-log contract", () => {
     });
     transactionMock.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
       callback({
-        user: { findUnique: vi.fn().mockResolvedValue({ id: USER_ID }) },
+        user: { findUnique: vi.fn().mockResolvedValue({ id: USER_ID }), updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
         authSecuritySession: {
           findUnique: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({ id: "c345678901234567890123456" }),
