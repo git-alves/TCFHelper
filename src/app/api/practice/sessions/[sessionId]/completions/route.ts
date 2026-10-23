@@ -9,7 +9,7 @@ const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 const requestSchema = z
   .object({
     exerciseId: z.string().min(1).max(160),
-    completionMethod: z.enum(["correct", "self-review", "revealed"]),
+    completionMethod: z.enum(["self-review", "revealed"]),
   })
   .strict();
 

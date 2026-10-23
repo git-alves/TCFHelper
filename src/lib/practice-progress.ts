@@ -1,87 +1,61 @@
 import "server-only";
 
 import { PracticeCompletionMethod, type PracticeLevel as DatabasePracticeLevel, type TaskType } from "@prisma/client";
-import {
-  getPracticeExercises,
-  getPracticeTopic,
-  hasCompletePracticePath,
-  type PracticeExercise,
-  type PracticeLevel,
-} from "@/lib/practice-curriculum";
-import { PRACTICE_SESSION_STAGES } from "@/lib/practice-session-stages";
+import { getSectionedPracticeExercise, type PracticeLevel } from "@/lib/sectioned-practice";
 import { prisma } from "@/lib/prisma";
 
-export type PracticeCompletionMethodInput = "correct" | "self-review" | "revealed";
+/**
+ * "self-review": the learner wrote every section before comparing it with the
+ * model answer. "revealed": they looked at a model answer for a section they
+ * had left empty.
+ */
+export type PracticeCompletionMethodInput = "self-review" | "revealed";
 
 export interface PracticeSessionInput {
   task: TaskType;
   level: PracticeLevel;
-  skillId: string;
-  exerciseIds: readonly string[];
+  exerciseId: string;
 }
 
 export interface PracticeProgressSummary {
   completedExercises: number;
   completedIndependently: number;
   completedWithHelp: number;
-  completedTaskParts: number;
 }
 
+// Sectioned exercises reuse the durable ledger that the earlier part-by-part
+// trainer wrote, so the Dashboard counts both without a migration. Rows from
+// the earlier trainer keep their own skillId; these all share this one.
+const SECTIONED_SKILL_ID = "sectioned";
+const SECTIONED_EXERCISE_TYPE = "sectioned";
+
 const COMPLETION_METHODS: Readonly<Record<PracticeCompletionMethodInput, PracticeCompletionMethod>> = {
-  correct: PracticeCompletionMethod.CORRECT,
   "self-review": PracticeCompletionMethod.SELF_REVIEW,
   revealed: PracticeCompletionMethod.REVEALED,
 };
 
-function sessionExercisesAreValid(input: PracticeSessionInput): boolean {
-  const topic = getPracticeTopic(input.task, input.skillId);
-  if (!topic || !hasCompletePracticePath(input.task, input.level, input.skillId)) return false;
-  if (input.exerciseIds.length !== PRACTICE_SESSION_STAGES.length) return false;
-  if (new Set(input.exerciseIds).size !== input.exerciseIds.length) return false;
-
-  const exercisesById = new Map(
-    getPracticeExercises(input.task, input.level, input.skillId).map((exercise) => [exercise.id, exercise]),
-  );
-
-  return input.exerciseIds.every((id, index) => {
-    const exercise = exercisesById.get(id);
-    return exercise?.exerciseType === PRACTICE_SESSION_STAGES[index];
-  });
-}
-
 function getSnapshotExerciseIds(value: unknown): readonly string[] | null {
-  // Length is deliberately not checked against the current stage list: a
-  // session created before the sequence was shortened was validated when it
-  // was created and must stay completable.
   if (!Array.isArray(value) || value.length === 0) return null;
-  if (!value.every((id) => typeof id === "string") || new Set(value).size !== value.length) return null;
+  if (!value.every((id) => typeof id === "string")) return null;
   return value;
 }
 
-function isCompletionMethodValidForExercise(
-  method: PracticeCompletionMethodInput,
-  exercise: PracticeExercise,
-): boolean {
-  const isOpenWriting = exercise.exerciseType === "develop" || exercise.exerciseType === "produce";
-  return isOpenWriting ? method === "self-review" : method === "correct" || method === "revealed";
-}
-
 /**
- * Creates the durable companion to a browser-resumable Practice session. The
- * exercise IDs are validated against the reviewed question bank before they
- * are stored, so later completion writes cannot turn this into a generic
- * client-controlled activity log.
+ * Creates the durable companion to a browser-held Practice attempt. The
+ * exercise must exist in the reviewed bank for exactly this task and level,
+ * so completion writes cannot turn this into a generic activity log.
  */
 export async function createPracticeSession(userId: string, input: PracticeSessionInput): Promise<{ id: string } | null> {
-  if (!sessionExercisesAreValid(input)) return null;
+  const exercise = getSectionedPracticeExercise(input.exerciseId);
+  if (!exercise || exercise.task !== input.task || exercise.level !== input.level) return null;
 
   return prisma.practiceSession.create({
     data: {
       userId,
       taskType: input.task,
       targetLevel: input.level as DatabasePracticeLevel,
-      skillId: input.skillId,
-      exerciseIds: [...input.exerciseIds],
+      skillId: SECTIONED_SKILL_ID,
+      exerciseIds: [input.exerciseId],
     },
     select: { id: true },
   });
@@ -93,9 +67,9 @@ export type RecordPracticeCompletionResult =
   | { kind: "invalid" };
 
 /**
- * Records a completion at most once per session/exercise. We retain the
- * first method rather than updating it: a reviewed answer should never later
- * appear as independent work merely because the browser retried a request.
+ * Records a completion at most once per session/exercise. We retain the first
+ * method rather than updating it: a revealed answer should never later appear
+ * as independent work merely because the browser retried a request.
  */
 export async function recordPracticeCompletion(
   userId: string,
@@ -105,17 +79,14 @@ export async function recordPracticeCompletion(
 ): Promise<RecordPracticeCompletionResult> {
   const session = await prisma.practiceSession.findFirst({
     where: { id: sessionId, userId },
-    select: { id: true, taskType: true, targetLevel: true, skillId: true, exerciseIds: true },
+    select: { id: true, skillId: true, exerciseIds: true },
   });
   if (!session) return { kind: "not-found" };
 
   const snapshotExerciseIds = getSnapshotExerciseIds(session.exerciseIds);
-  if (!snapshotExerciseIds || !snapshotExerciseIds.includes(exerciseId)) return { kind: "invalid" };
-
-  const exercise = getPracticeExercises(session.taskType, session.targetLevel, session.skillId).find(
-    (candidate) => candidate.id === exerciseId,
-  );
-  if (!exercise || !isCompletionMethodValidForExercise(completionMethod, exercise)) return { kind: "invalid" };
+  if (session.skillId !== SECTIONED_SKILL_ID || !snapshotExerciseIds?.includes(exerciseId)) {
+    return { kind: "invalid" };
+  }
 
   return prisma.$transaction(async (tx) => {
     await tx.practiceExerciseCompletion.upsert({
@@ -123,7 +94,7 @@ export async function recordPracticeCompletion(
       create: {
         sessionId: session.id,
         exerciseId,
-        exerciseType: exercise.exerciseType,
+        exerciseType: SECTIONED_EXERCISE_TYPE,
         completionMethod: COMPLETION_METHODS[completionMethod],
       },
       // Idempotency must preserve the original method (especially REVEALED),
@@ -156,24 +127,16 @@ export async function clearPracticeProgress(userId: string): Promise<void> {
 
 /** Dashboard-safe aggregate: no answers, exercise prompts, or free writing. */
 export async function getPracticeProgressSummary(userId: string): Promise<PracticeProgressSummary> {
-  const [groups, completedSessions] = await Promise.all([
-    prisma.practiceExerciseCompletion.groupBy({
-      by: ["completionMethod"],
-      where: { session: { userId } },
-      _count: { _all: true },
-    }),
-    prisma.practiceSession.findMany({
-      where: { userId, completedAt: { not: null } },
-      // The part itself is stable across target levels. Replaying it, or
-      // training it again at C1 after B2, remains one task part trained.
-      distinct: ["taskType", "skillId"],
-      select: { id: true },
-    }),
-  ]);
+  const groups = await prisma.practiceExerciseCompletion.groupBy({
+    by: ["completionMethod"],
+    where: { session: { userId } },
+    _count: { _all: true },
+  });
 
   const countFor = (method: PracticeCompletionMethod) =>
     groups.find((group) => group.completionMethod === method)?._count._all ?? 0;
   const completedWithHelp = countFor(PracticeCompletionMethod.REVEALED);
+  // CORRECT only appears on rows written by the earlier part-by-part trainer.
   const completedIndependently =
     countFor(PracticeCompletionMethod.CORRECT) + countFor(PracticeCompletionMethod.SELF_REVIEW);
 
@@ -181,6 +144,5 @@ export async function getPracticeProgressSummary(userId: string): Promise<Practi
     completedExercises: completedIndependently + completedWithHelp,
     completedIndependently,
     completedWithHelp,
-    completedTaskParts: completedSessions.length,
   };
 }

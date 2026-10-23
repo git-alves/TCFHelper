@@ -23,7 +23,7 @@ const { POST } = await import("./route");
 
 const USER_ID = "learner_1";
 const SESSION_ID = "practice_session_1";
-const validBody = { exerciseId: "t1-b2-salutations-1", completionMethod: "correct" };
+const validBody = { exerciseId: "t1-b2-new-flat", completionMethod: "self-review" };
 
 function post(body: unknown) {
   return POST(
@@ -53,8 +53,8 @@ describe("POST /api/practice/sessions/[sessionId]/completions", () => {
     expect(recordPracticeCompletionMock).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed completion methods", async () => {
-    const response = await post({ ...validBody, completionMethod: "guessed" });
+  it.each(["guessed", "correct"])("rejects the %s completion method", async (completionMethod) => {
+    const response = await post({ ...validBody, completionMethod });
 
     expect(response.status).toBe(400);
     expect(recordPracticeCompletionMock).not.toHaveBeenCalled();

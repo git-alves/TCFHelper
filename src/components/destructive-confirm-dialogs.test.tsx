@@ -104,7 +104,7 @@ describe("destructive confirm dialogs", () => {
     render(
       <PracticeProgressCardContent
         copy={getAppCopy("en")}
-        summary={{ completedExercises: 5, completedIndependently: 4, completedWithHelp: 1, completedTaskParts: 1 }}
+        summary={{ completedExercises: 5, completedIndependently: 4, completedWithHelp: 1 }}
       />,
     );
     clickByText("Clear progress");

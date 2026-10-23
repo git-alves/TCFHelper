@@ -10,8 +10,7 @@ const requestSchema = z
   .object({
     task: z.enum(["TASK_1", "TASK_2", "TASK_3"]),
     level: z.enum(["B2", "C1", "C2"]),
-    skillId: z.string().min(1).max(120),
-    exerciseIds: z.array(z.string().min(1).max(160)).length(6),
+    exerciseId: z.string().min(1).max(160),
   })
   .strict();
 
