@@ -231,6 +231,12 @@ export interface AppCopy {
     deleteCorrectionConfirm: string;
     deleteCorrectionError: string;
     deleteCorrectionSuccess: string;
+    clearCorrectionHistoryAction: string;
+    clearCorrectionHistoryConfirmTitle: string;
+    clearCorrectionHistoryConfirmDescription: string;
+    clearCorrectionHistoryConfirm: string;
+    clearCorrectionHistoryError: string;
+    clearCorrectionHistorySuccess: string;
     paginationPrevious: string;
     paginationNext: string;
     paginationPageOf: (values: { page: number; pageCount: number }) => string;
@@ -772,6 +778,13 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Delete",
       deleteCorrectionError: "Couldn't delete this correction. Please try again.",
       deleteCorrectionSuccess: "Correction deleted.",
+      clearCorrectionHistoryAction: "Clear all",
+      clearCorrectionHistoryConfirmTitle: "Clear all correction history?",
+      clearCorrectionHistoryConfirmDescription:
+        "This will permanently delete all your corrections and their feedback, and reset your progress chart. This can't be undone.",
+      clearCorrectionHistoryConfirm: "Clear all",
+      clearCorrectionHistoryError: "Couldn't clear your correction history. Please try again.",
+      clearCorrectionHistorySuccess: "Correction history cleared.",
       paginationPrevious: "Previous",
       paginationNext: "Next",
       paginationPageOf: ({ page, pageCount }) => `Page ${page} of ${pageCount}`,
@@ -1466,6 +1479,13 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Supprimer",
       deleteCorrectionError: "Impossible de supprimer cette correction. Veuillez réessayer.",
       deleteCorrectionSuccess: "Correction supprimée.",
+      clearCorrectionHistoryAction: "Tout effacer",
+      clearCorrectionHistoryConfirmTitle: "Effacer tout l’historique des corrections ?",
+      clearCorrectionHistoryConfirmDescription:
+        "Cela supprimera définitivement toutes vos corrections et leurs commentaires, et réinitialisera votre graphique de progression. Cette action est irréversible.",
+      clearCorrectionHistoryConfirm: "Tout effacer",
+      clearCorrectionHistoryError: "Impossible d’effacer votre historique des corrections. Veuillez réessayer.",
+      clearCorrectionHistorySuccess: "Historique des corrections effacé.",
       paginationPrevious: "Précédent",
       paginationNext: "Suivant",
       paginationPageOf: ({ page, pageCount }) => `Page ${page} sur ${pageCount}`,
@@ -2170,6 +2190,13 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Eliminar",
       deleteCorrectionError: "No se pudo eliminar esta corrección. Inténtalo de nuevo.",
       deleteCorrectionSuccess: "Corrección eliminada.",
+      clearCorrectionHistoryAction: "Borrar todo",
+      clearCorrectionHistoryConfirmTitle: "¿Borrar todo el historial de correcciones?",
+      clearCorrectionHistoryConfirmDescription:
+        "Se eliminarán de forma permanente todas tus correcciones y sus comentarios, y se reiniciará tu gráfico de progreso. No se puede deshacer.",
+      clearCorrectionHistoryConfirm: "Borrar todo",
+      clearCorrectionHistoryError: "No se pudo borrar tu historial de correcciones. Inténtalo de nuevo.",
+      clearCorrectionHistorySuccess: "Historial de correcciones borrado.",
       paginationPrevious: "Anterior",
       paginationNext: "Siguiente",
       paginationPageOf: ({ page, pageCount }) => `Página ${page} de ${pageCount}`,
@@ -2873,6 +2900,13 @@ export const APP_COPY = {
       deleteCorrectionConfirm: "Excluir",
       deleteCorrectionError: "Não foi possível excluir esta correção. Tente novamente.",
       deleteCorrectionSuccess: "Correção excluída.",
+      clearCorrectionHistoryAction: "Limpar tudo",
+      clearCorrectionHistoryConfirmTitle: "Limpar todo o histórico de correções?",
+      clearCorrectionHistoryConfirmDescription:
+        "Isso excluirá permanentemente todas as suas correções e seus comentários e redefinirá seu gráfico de progresso. Esta ação não pode ser desfeita.",
+      clearCorrectionHistoryConfirm: "Limpar tudo",
+      clearCorrectionHistoryError: "Não foi possível limpar seu histórico de correções. Tente novamente.",
+      clearCorrectionHistorySuccess: "Histórico de correções limpo.",
       paginationPrevious: "Anterior",
       paginationNext: "Próximo",
       paginationPageOf: ({ page, pageCount }) => `Página ${page} de ${pageCount}`,

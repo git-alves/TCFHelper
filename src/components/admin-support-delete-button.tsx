@@ -125,6 +125,7 @@ export function AdminSupportDeleteButton({ requestId, isSyncedToHubspot }: Admin
       </button>
       <ConfirmDialog
         open={isConfirming}
+        destructive
         title="Delete this support request?"
         description={
           isSyncedToHubspot

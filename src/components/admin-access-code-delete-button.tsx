@@ -139,6 +139,7 @@ export function AdminAccessCodeDeleteButton({ accessCodeId, code }: AdminAccessC
       </button>
       <ConfirmDialog
         open={isConfirming}
+        destructive
         title="Delete this access code?"
         description={`${code} will be permanently removed and can never be redeemed. This cannot be undone.`}
         confirmLabel={isDeleting ? "Deleting…" : "Delete"}
