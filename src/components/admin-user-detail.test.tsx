@@ -12,6 +12,8 @@ const baseUser = {
   email: "learner@example.com",
   name: "Learner Example",
   createdAt: "2026-08-10T12:00:00.000Z",
+  lastSignInAt: "2026-10-22T09:00:00.000Z",
+  lastActiveAt: "2026-10-23T10:30:00.000Z",
   timezone: null,
   isAdmin: false,
   isBlocked: false,
@@ -56,6 +58,21 @@ describe("AdminUserDetail", () => {
     expect(markup).toContain("code they used remains permanently spent");
     expect(markup).toContain("Block user");
     expect(markup).toContain("Current API usage");
+  });
+
+  it("shows the last sign-in and last activity, or says the sign-in is not recorded yet", () => {
+    const known = renderToStaticMarkup(createElement(AdminUserDetail, { user: baseUser, currentAdminId: "owner_1" }));
+    expect(known).toContain("Last signed in Oct 22, 2026");
+    expect(known).toContain("Last active Oct 23, 2026");
+
+    const unknown = renderToStaticMarkup(
+      createElement(AdminUserDetail, {
+        user: { ...baseUser, lastSignInAt: null, lastActiveAt: null },
+        currentAdminId: "owner_1",
+      }),
+    );
+    expect(unknown).toContain("Last sign-in not recorded yet.");
+    expect(unknown).not.toContain("Last active");
   });
 
   it("removes the self-block action for the owner account", () => {

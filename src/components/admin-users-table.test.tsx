@@ -19,6 +19,8 @@ function user(overrides: Partial<AdminUserListItem>): AdminUserListItem {
     email: "learner@example.com",
     name: null,
     createdAt: "2026-08-01T00:00:00.000Z",
+    lastSignInAt: null,
+    lastActiveAt: null,
     timezone: null,
     isAdmin: false,
     isBlocked: false,
@@ -34,6 +36,31 @@ function renderUsers(users: AdminUserListItem[]) {
 }
 
 describe("AdminUsersTable", () => {
+  it("shows last sign-in and activity in UTC for every learner, whatever their own timezone", () => {
+    const markup = renderUsers([
+      user({
+        id: "user_sp",
+        lastSignInAt: "2026-10-22T23:30:00.000Z",
+        lastActiveAt: "2026-10-23T08:15:00.000Z",
+        timezone: "America/Sao_Paulo",
+      }),
+      user({ id: "user_tokyo", lastSignInAt: "2026-10-22T23:30:00.000Z", timezone: "Asia/Tokyo" }),
+    ]);
+
+    expect(markup).toContain("Last sign-in (UTC)");
+    // Same instant, same text for both learners, regardless of zone.
+    expect(markup.match(/Oct 22, 2026, 11:30 PM/g)).toHaveLength(2);
+    expect(markup).toContain("Oct 23, 2026, 8:15 AM");
+    expect(markup).not.toContain("8:30 PM");
+  });
+
+  it("says plainly when no sign-in has been recorded yet instead of implying they never signed in", () => {
+    const markup = renderUsers([user({ lastSignInAt: null, lastActiveAt: null })]);
+
+    expect(markup).toContain("Not recorded yet");
+    expect(markup).not.toContain("Never");
+  });
+
   it("shows a green Activated badge for a live admission", () => {
     const markup = renderUsers([
       user({ activatedAt: "2026-08-05T00:00:00.000Z", hasLiveAdmission: true }),

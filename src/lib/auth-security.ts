@@ -288,6 +288,13 @@ export async function recordAuthSecuritySession(
           select: { id: true },
         });
 
+        // Only ever moves forward, so a late or replayed delivery for an older
+        // session cannot make the learner look like they signed in earlier.
+        await tx.user.updateMany({
+          where: { id: userId, OR: [{ lastSignInAt: null }, { lastSignInAt: { lt: occurredAt } }] },
+          data: { lastSignInAt: occurredAt },
+        });
+
         await recordAdminEventInTransaction(
           tx,
           {

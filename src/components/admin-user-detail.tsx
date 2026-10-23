@@ -66,6 +66,12 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
           </div>
         </div>
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Joined {dateTime(user.createdAt, user.timezone)}.</p>
+        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+          {user.lastSignInAt
+            ? `Last signed in ${dateTime(user.lastSignInAt, user.timezone)}.`
+            : "Last sign-in not recorded yet."}
+          {user.lastActiveAt ? ` Last active ${dateTime(user.lastActiveAt, user.timezone)}.` : ""}
+        </p>
       </div>
 
       <section aria-labelledby="usage-heading">
