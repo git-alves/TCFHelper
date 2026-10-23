@@ -17,6 +17,7 @@ vi.mock("@/lib/prisma", () => ({
 import { EssayStatus } from "@prisma/client";
 import {
   CORRECTION_HISTORY_PAGE_SIZE,
+  deleteAllCorrectionsForUser,
   deleteCorrectionForUser,
   getCorrectionForUser,
   getCorrectionHistoryPage,
@@ -426,5 +427,27 @@ describe("deleteCorrectionForUser", () => {
     deleteManyMock.mockResolvedValue({ count: 0 });
 
     await expect(deleteCorrectionForUser("learner_1", "another_users_essay")).resolves.toBe(false);
+  });
+});
+
+describe("deleteAllCorrectionsForUser", () => {
+  it("deletes only the learner's submitted, reviewed essays and returns the count", async () => {
+    deleteManyMock.mockResolvedValue({ count: 7 });
+
+    await expect(deleteAllCorrectionsForUser("learner_1")).resolves.toBe(7);
+
+    expect(deleteManyMock).toHaveBeenCalledWith({
+      where: {
+        userId: "learner_1",
+        status: EssayStatus.SUBMITTED,
+        feedback: { is: {} },
+      },
+    });
+  });
+
+  it("resolves to zero when there is nothing to clear", async () => {
+    deleteManyMock.mockResolvedValue({ count: 0 });
+
+    await expect(deleteAllCorrectionsForUser("learner_1")).resolves.toBe(0);
   });
 });

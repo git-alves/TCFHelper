@@ -53,6 +53,15 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).toContain("View correction");
     expect(markup).toContain(">Delete<");
+    expect(markup).toContain(">Clear all<");
+  });
+
+  it("offers clear-all only while there is history to clear", () => {
+    const emptyMarkup = renderToStaticMarkup(
+      createElement(CorrectionHistoryListContent, { locale: "en", copy: APP_COPY.en, items: [] }),
+    );
+
+    expect(emptyMarkup).not.toContain("Clear all");
   });
 
   it("uses the dedicated no-history state instead of the progress-chart empty state", () => {

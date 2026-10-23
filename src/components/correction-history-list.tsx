@@ -53,6 +53,11 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteStatus, setDeleteStatus] = useState<"idle" | "success" | "error">("idle");
+  // Which action the status message above refers to: a single delete or a
+  // clear-all share one live region.
+  const [statusAction, setStatusAction] = useState<"delete" | "clear">("delete");
+  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const menuContainerRefs = useRef(new Map<string, HTMLDivElement | null>());
   const menuTriggerRefs = useRef(new Map<string, HTMLButtonElement | null>());
   const emptyStateRef = useRef<HTMLDivElement>(null);
@@ -103,6 +108,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
 
     setPendingDeleteId(null);
     setDeletingId(id);
+    setStatusAction("delete");
     setDeleteStatus("idle");
     try {
       const res = await fetch(`/api/essays/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -129,6 +135,38 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
     }
   }
 
+  async function handleConfirmClearAll() {
+    setIsClearConfirmOpen(false);
+    setIsClearing(true);
+    setStatusAction("clear");
+    setDeleteStatus("idle");
+    try {
+      const res = await fetch("/api/essays", { method: "DELETE" });
+      if (!res.ok) throw new Error("Clear failed");
+      pendingFocusIdRef.current = null;
+      setVisibleItems([]);
+      setDeleteStatus("success");
+    } catch {
+      setDeleteStatus("error");
+    } finally {
+      // Same reconciliation as a single delete: the server-rendered totals,
+      // chart and "view all" link only update from a refresh.
+      router.refresh();
+      setIsClearing(false);
+    }
+  }
+
+  const statusMessage =
+    deleteStatus === "idle"
+      ? ""
+      : statusAction === "clear"
+        ? deleteStatus === "error"
+          ? copy.dashboard.clearCorrectionHistoryError
+          : copy.dashboard.clearCorrectionHistorySuccess
+        : deleteStatus === "error"
+          ? copy.dashboard.deleteCorrectionError
+          : copy.dashboard.deleteCorrectionSuccess;
+
   return (
     <>
       {/* A single, persistent live region with a fixed role (rather than one
@@ -145,16 +183,22 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
         aria-live="polite"
         className={`text-sm ${deleteStatus === "error" ? "text-red-600 dark:text-red-400" : "text-zinc-500 dark:text-zinc-400"}`}
       >
-        {deleteStatus === "error"
-          ? copy.dashboard.deleteCorrectionError
-          : deleteStatus === "success"
-            ? copy.dashboard.deleteCorrectionSuccess
-            : ""}
+        {statusMessage}
       </p>
       {visibleItems.length === 0 ? (
         <CorrectionHistoryEmpty copy={copy} focusRef={emptyStateRef} />
       ) : (
         <>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsClearConfirmOpen(true)}
+              disabled={isClearing}
+              className="rounded-full px-3 py-2 text-sm font-medium text-red-700 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-400 dark:hover:bg-red-400/10"
+            >
+              {copy.dashboard.clearCorrectionHistoryAction}
+            </button>
+          </div>
           <ol className="grid gap-3">
             {visibleItems.map((item) => {
               const task = TASK_INSTRUCTIONS[item.taskType];
@@ -206,7 +250,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                         }}
                         type="button"
                         onClick={() => setOpenMenuId((current) => (current === item.id ? null : item.id))}
-                        disabled={deletingId === item.id}
+                        disabled={deletingId === item.id || isClearing}
                         aria-expanded={openMenuId === item.id}
                         aria-label={copy.dashboard.correctionActionsMenu}
                         className="flex h-11 w-11 items-center justify-center rounded-full text-zinc-600 transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:text-zinc-300 dark:hover:bg-white/[.06]"
@@ -259,6 +303,15 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
             cancelLabel={copy.common.cancel}
             onConfirm={() => void handleConfirmDelete()}
             onCancel={() => setPendingDeleteId(null)}
+          />
+          <ConfirmDialog
+            open={isClearConfirmOpen}
+            title={copy.dashboard.clearCorrectionHistoryConfirmTitle}
+            description={copy.dashboard.clearCorrectionHistoryConfirmDescription}
+            confirmLabel={copy.dashboard.clearCorrectionHistoryConfirm}
+            cancelLabel={copy.common.cancel}
+            onConfirm={() => void handleConfirmClearAll()}
+            onCancel={() => setIsClearConfirmOpen(false)}
           />
         </>
       )}

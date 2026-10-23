@@ -389,3 +389,14 @@ export async function deleteCorrectionForUser(userId: string, essayId: string): 
 
   return count > 0;
 }
+
+/**
+ * Deletes every completed correction the learner can see in their history and
+ * returns how many were removed. Uses the same owner-scoped filter as the
+ * history reads and the single delete, so drafts and other learners' rows are
+ * never touched. Feedback rows cascade-delete with their Essay.
+ */
+export async function deleteAllCorrectionsForUser(userId: string): Promise<number> {
+  const { count } = await prisma.essay.deleteMany({ where: submittedCorrectionWhere(userId) });
+  return count;
+}
