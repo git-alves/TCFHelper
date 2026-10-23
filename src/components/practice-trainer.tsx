@@ -1,239 +1,31 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAppCopy } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
-import { ThemedSelect, type ThemedSelectOption } from "@/components/themed-select";
-import type { AppCopy } from "@/lib/app-copy";
-import { selectPracticeExerciseSession } from "@/lib/practice-exercise-order";
-import { PRACTICE_SESSION_STAGES } from "@/lib/practice-session-stages";
 import {
-  clearStoredPracticeSession,
-  loadStoredPracticeSession,
-  saveStoredPracticeSession,
-  type StoredPracticeSession,
-} from "@/lib/practice-session-storage";
+  clearStoredPracticeDraft,
+  loadStoredPracticeDraft,
+  saveStoredPracticeDraft,
+  type StoredSectionReveal,
+} from "@/lib/practice-draft-storage";
+import {
+  PRACTICE_LEVELS,
+  PRACTICE_SECTION_BLUEPRINT,
+  countWords,
+  type PracticeLevel,
+  type SectionedPracticeExercise,
+} from "@/lib/sectioned-practice";
 import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
-export type PracticeLevel = "B2" | "C1" | "C2";
-export type PracticeExerciseType = "recognize" | "complete" | "transform" | "organize" | "develop" | "produce";
-
-// This is intentionally a content-shaped contract, rather than a UI-shaped
-// one. Exercises are reviewed teaching material in the question bank; this
-// component only renders and evaluates the fixed data it receives.
-export interface CuratedPracticeSkill {
-  id: string;
-  task: PracticeTask;
-  level: PracticeLevel;
-  /** Stable position of this part within the selected TCF task. */
-  part_order: number;
-  /** Whether this level has a complete fixed, reviewed session path. */
-  is_available: boolean;
-  label: string;
-  description: string;
-  learning_outcome: string;
-  estimated_minutes: number;
-}
-
-export interface CuratedPracticeExercise {
-  id: string;
-  task: PracticeTask;
-  level: PracticeLevel;
-  skill: string;
-  sub_skill: string;
-  exercise_type: PracticeExerciseType;
-  prompt: string;
-  instructions: string;
-  options?: readonly string[];
-  correct_answer?: string | readonly string[];
-  accepted_answers?: readonly string[];
-  explanation: string;
-  target_language_feature: string;
-  difficulty: number;
-  sequence_order: number;
-  prerequisite_exercise?: string;
-  tags: readonly string[];
-  self_check?: readonly string[];
-  /** A reviewed starting suggestion for Develop/Produce; never a model answer. */
-  hint?: string;
-}
-
-export interface CuratedPracticeCurriculum {
-  skills: readonly CuratedPracticeSkill[];
-  exercises: readonly CuratedPracticeExercise[];
-}
+const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 
 interface PracticeTrainerProps {
-  curriculum: CuratedPracticeCurriculum;
-  /**
-   * The ordered stages one session walks through. Defaults to the product's
-   * shortened sequence; exercises authored for any other stage are never
-   * shown, and a saved session that doesn't match is discarded.
-   */
-  stages?: readonly PracticeExerciseType[];
-}
-
-const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
-const LEVELS: readonly PracticeLevel[] = ["B2", "C1", "C2"];
-
-type CheckState = "correct" | "try-again" | "revealed" | "self-review" | null;
-type CompletionMethod = "correct" | "revealed" | "self-review";
-type DifficultyRating = "too-easy" | "appropriate" | "too-hard";
-type PendingProgressCompletion = { exerciseId: string; completionMethod: CompletionMethod };
-
-const DIFFICULTY_RATINGS: readonly DifficultyRating[] = ["too-easy", "appropriate", "too-hard"];
-
-const SELECT_BUTTON_CLASS =
-  "flex w-full items-center justify-between gap-3 rounded-xl border border-black/[.15] bg-white px-4 py-3 text-left text-sm shadow-sm outline-none transition-colors focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950";
-const SELECT_LIST_CLASS =
-  "absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-xl border border-black/[.15] bg-white p-1 shadow-lg dark:border-white/[.2] dark:bg-zinc-950";
-
-function normalizeAnswer(answer: string): string {
-  return answer
-    .trim()
-    .toLocaleLowerCase("fr")
-    .replace(/[’']/g, "'")
-    .replace(/\s+/g, " ")
-    .replace(/[.!?]+$/, "");
-}
-
-function matchesAnswer(answer: string, exercise: CuratedPracticeExercise): boolean {
-  const expected = [
-    ...(typeof exercise.correct_answer === "string" ? [exercise.correct_answer] : []),
-    ...(exercise.accepted_answers ?? []),
-  ].map(normalizeAnswer);
-  return expected.includes(normalizeAnswer(answer));
-}
-
-function isOrderedCorrect(order: readonly string[], exercise: CuratedPracticeExercise): boolean {
-  return (
-    Array.isArray(exercise.correct_answer) &&
-    order.length === exercise.correct_answer.length &&
-    order.every((item, index) => item === exercise.correct_answer?.[index])
-  );
-}
-
-// Many reviewed "organize" items happen to list their source sentences in
-// already-correct order, which would let a learner pass by clicking Check
-// without reordering anything. Scrambling on entry, and guaranteeing the
-// scramble isn't itself the correct order, keeps the stage meaningful
-// regardless of how a given exercise's options were authored.
-export function scrambleOrdering(
-  options: readonly string[],
-  correctAnswer: readonly string[] | undefined,
-): readonly string[] {
-  if (options.length < 2) return [...options];
-  const shuffled = [...options];
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const swapWith = Math.floor(Math.random() * (index + 1));
-    [shuffled[index], shuffled[swapWith]] = [shuffled[swapWith], shuffled[index]];
-  }
-  if (correctAnswer && shuffled.every((item, index) => item === correctAnswer[index])) {
-    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
-  }
-  return shuffled;
-}
-
-// Length targets ("80 à 100 mots", "3 ou 4 phrases") live only as prose
-// inside each exercise's authored instructions, not as a structured field --
-// parsing that text would be fragile against copy changes. Counting the
-// learner's own input instead gives an always-correct live signal they can
-// check against the instructions above, without the app needing to know the
-// exact target.
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  return trimmed.length === 0 ? 0 : trimmed.split(/\s+/).length;
-}
-
-function countSentences(text: string): number {
-  return text
-    .split(/[.!?]+/)
-    .map((segment) => segment.trim())
-    .filter((segment) => segment.length > 0).length;
-}
-
-function getReviewedAnswers(exercise: CuratedPracticeExercise | null): readonly string[] {
-  if (!exercise) return [];
-  if (typeof exercise.correct_answer === "string") return [exercise.correct_answer];
-  if (Array.isArray(exercise.correct_answer)) return exercise.correct_answer;
-  return exercise.accepted_answers ?? [];
-}
-
-function getExercisesForSkill(
-  curriculum: CuratedPracticeCurriculum,
-  skill: CuratedPracticeSkill,
-): CuratedPracticeExercise[] {
-  return curriculum.exercises.filter(
-    (exercise) => exercise.task === skill.task && exercise.level === skill.level && exercise.skill === skill.id,
-  );
-}
-
-function resolveStoredSession(
-  curriculum: CuratedPracticeCurriculum,
-  session: StoredPracticeSession,
-  stages: readonly PracticeExerciseType[],
-): { skill: CuratedPracticeSkill; exercises: readonly CuratedPracticeExercise[] } | null {
-  const skill = curriculum.skills.find(
-    (candidate) => candidate.task === session.task && candidate.level === session.level && candidate.id === session.skillId,
-  );
-  if (!skill) return null;
-
-  const exerciseById = new Map(getExercisesForSkill(curriculum, skill).map((exercise) => [exercise.id, exercise]));
-  const savedExercises = session.exerciseIds.map((id) => exerciseById.get(id));
-  if (
-    savedExercises.length !== stages.length ||
-    savedExercises.some((exercise) => !exercise) ||
-    new Set(session.exerciseIds).size !== session.exerciseIds.length ||
-    session.currentExerciseIndex >= savedExercises.length ||
-    savedExercises.some((exercise, index) => exercise?.exercise_type !== stages[index])
-  ) {
-    return null;
-  }
-
-  return { skill, exercises: savedExercises as CuratedPracticeExercise[] };
-}
-
-function getBrowserStorage(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
-// Matches the writing workspace's own step-heading treatment (a numbered
-// violet badge plus a bolder, accent-colored label) so both pages use the
-// same visual language for "these are the primary steps" -- see StepHeading
-// in writing-workspace.tsx. A <legend>, not an <h2>, since these caption a
-// <fieldset> here; the step number is still announced to assistive tech via
-// a visually-hidden "Step N:" prefix, since it's no longer in the visible text.
-function StepLegend({
-  number,
-  stepLabel,
-  id,
-  children,
-}: {
-  number: number;
-  stepLabel: (values: { number: number }) => string;
-  id?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <legend id={id} className="flex items-center gap-2 text-base font-semibold text-violet-700 dark:text-violet-300">
-      <span
-        aria-hidden="true"
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white dark:bg-violet-500"
-      >
-        {number}
-      </span>
-      <span className="sr-only">{stepLabel({ number })}</span>
-      {children}
-    </legend>
-  );
+  /** Serializable, reviewed exercises from the server page. */
+  exercises: readonly SectionedPracticeExercise[];
 }
 
 function ChoiceCard({
@@ -264,994 +56,221 @@ function ChoiceCard({
   );
 }
 
-function ProgressSteps({
-  exercises,
-  currentIndex,
-  completionMethods,
-  practice,
+function StepLegend({
+  number,
+  stepLabel,
+  children,
 }: {
-  exercises: readonly CuratedPracticeExercise[];
-  currentIndex: number;
-  completionMethods: ReadonlyMap<string, CompletionMethod>;
-  practice: AppCopy["practice"];
+  number: number;
+  stepLabel: (values: { number: number }) => string;
+  children: React.ReactNode;
 }) {
   return (
-    <ol aria-label={practice.progress({ step: currentIndex + 1, total: exercises.length })} className="grid grid-cols-6 gap-1 sm:gap-2">
-      {exercises.map((exercise, index) => {
-        const state = index < currentIndex ? "done" : index === currentIndex ? "current" : "future";
-        // A stage finished by revealing the answer stays visibly distinct
-        // from one the learner actually solved, so progress signals honest
-        // mastery rather than mere completion.
-        const doneWithHelp = state === "done" && completionMethods.get(exercise.id) === "revealed";
-        return (
-          <li key={exercise.id} className="min-w-0">
-            <div
-              aria-current={state === "current" ? "step" : undefined}
-              title={doneWithHelp ? practice.completedWithHelpLabel : undefined}
-              className={`h-1.5 rounded-full ${
-                doneWithHelp
-                  ? "bg-amber-500 dark:bg-amber-400"
-                  : state === "done"
-                    ? "bg-violet-600 dark:bg-violet-300"
-                    : state === "current"
-                      ? "bg-violet-400 dark:bg-violet-500"
-                      : "bg-zinc-200 dark:bg-zinc-800"
-              }`}
-            />
-            <span className="mt-2 block truncate text-center text-[11px] font-medium text-zinc-500 dark:text-zinc-400 sm:text-xs">
-              {practice.stages[exercise.exercise_type]}
-              {doneWithHelp && <span className="sr-only"> ({practice.completedWithHelpLabel})</span>}
-            </span>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-function DevelopStructureAid({
-  disabled,
-  practice,
-}: {
-  disabled: boolean;
-  practice: AppCopy["practice"];
-}) {
-  // Purely local scratch space: optional, ungraded, and never folded into
-  // the exercise's answer -- resetting when the learner moves to a
-  // different exercise (via the `key={exercise.id}` the caller renders this
-  // with) is the desired behavior, not state to persist.
-  const [isVisible, setIsVisible] = useState(false);
-  const [context, setContext] = useState("");
-  const [objective, setObjective] = useState("");
-
-  return (
-    <div>
-      <button
-        type="button"
-        aria-expanded={isVisible}
-        aria-controls="practice-develop-structure-aid"
-        onClick={() => setIsVisible((visible) => !visible)}
-        className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+    <legend className="flex items-center gap-2 text-base font-semibold text-violet-700 dark:text-violet-300">
+      <span
+        aria-hidden="true"
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-semibold text-white dark:bg-violet-500"
       >
-        {isVisible ? practice.developHideStructureAid : practice.developShowStructureAid}
-      </button>
-      {isVisible && (
-        <div
-          id="practice-develop-structure-aid"
-          className="mt-3 flex flex-col gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 dark:border-sky-900 dark:bg-sky-950/30"
-        >
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-sky-950 dark:text-sky-100">{practice.developContextLabel}</span>
-            <input
-              type="text"
-              value={context}
-              disabled={disabled}
-              onChange={(event) => setContext(event.target.value)}
-              placeholder={practice.developContextPlaceholder}
-              className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900 dark:bg-zinc-950"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="font-medium text-sky-950 dark:text-sky-100">{practice.developObjectiveLabel}</span>
-            <input
-              type="text"
-              value={objective}
-              disabled={disabled}
-              onChange={(event) => setObjective(event.target.value)}
-              placeholder={practice.developObjectivePlaceholder}
-              className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-sky-900 dark:bg-zinc-950"
-            />
-          </label>
-          <p className="text-xs leading-5 text-sky-900/80 dark:text-sky-100/80">
-            <span className="font-semibold">{practice.developStructureExampleLabel}:</span>{" "}
-            {practice.developStructureExampleText}
-          </p>
-        </div>
-      )}
-    </div>
+        {number}
+      </span>
+      <span className="sr-only">{stepLabel({ number })}</span>
+      {children}
+    </legend>
   );
 }
 
-function ExerciseInput({
-  exercise,
-  answer,
-  onAnswerChange,
-  ordering,
-  onOrderingChange,
-  disabled,
-  practice,
-}: {
-  exercise: CuratedPracticeExercise;
-  answer: string;
-  onAnswerChange: (answer: string) => void;
-  ordering: readonly string[];
-  onOrderingChange: (ordering: readonly string[]) => void;
-  disabled: boolean;
-  practice: AppCopy["practice"];
-}) {
-  if (exercise.exercise_type === "recognize" || (exercise.exercise_type === "complete" && exercise.options && exercise.options.length > 0)) {
-    return (
-      <fieldset className="grid gap-3">
-        <legend className="sr-only">{practice.selectAnswer}</legend>
-        {exercise.options?.map((option) => (
-          <ChoiceCard
-            key={option}
-            selected={answer === option}
-            onClick={() => onAnswerChange(option)}
-            disabled={disabled}
-          >
-            <span className="text-sm leading-6">{option}</span>
-          </ChoiceCard>
-        ))}
-      </fieldset>
-    );
-  }
+const PRIMARY_BUTTON =
+  "rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]";
+const SECONDARY_BUTTON =
+  "rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
-  if (exercise.exercise_type === "organize") {
-    // The bank supports two equally valid reviewed formats for organisation:
-    // choose a complete order (useful for short sequences) or physically
-    // reorder the source cards (useful when authors store every sentence).
-    if (typeof exercise.correct_answer === "string") {
-      return (
-        <fieldset className="grid gap-3">
-          <legend className="sr-only">{practice.selectOrder}</legend>
-          {exercise.options?.map((option) => (
-            <ChoiceCard
-              key={option}
-              selected={answer === option}
-              onClick={() => onAnswerChange(option)}
-              disabled={disabled}
-            >
-              <span className="text-sm leading-6">{option}</span>
-            </ChoiceCard>
-          ))}
-        </fieldset>
-      );
-    }
-    return (
-      <div className="grid gap-2" aria-label={practice.reorderItems}>
-        {ordering.map((item, index) => (
-          <div
-            key={item}
-            className="flex items-center gap-2 rounded-xl border border-black/[.1] bg-white p-3 dark:border-white/[.16] dark:bg-zinc-950"
-          >
-            <span className="w-5 text-xs font-semibold text-zinc-500 dark:text-zinc-400">{index + 1}</span>
-            <p className="min-w-0 flex-1 text-sm leading-5">{item}</p>
-            <div className="flex shrink-0 gap-1">
-              <button
-                type="button"
-                aria-label={practice.moveUp}
-                disabled={disabled || index === 0}
-                onClick={() => {
-                  const next = [...ordering];
-                  [next[index - 1], next[index]] = [next[index], next[index - 1]];
-                  onOrderingChange(next);
-                }}
-                className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                <span aria-hidden="true" className="sm:hidden">
-                  ↑
-                </span>
-                <span className="hidden sm:inline">{practice.moveUp}</span>
-              </button>
-              <button
-                type="button"
-                aria-label={practice.moveDown}
-                disabled={disabled || index === ordering.length - 1}
-                onClick={() => {
-                  const next = [...ordering];
-                  [next[index], next[index + 1]] = [next[index + 1], next[index]];
-                  onOrderingChange(next);
-                }}
-                className="rounded-lg border border-black/[.12] px-2 py-1 text-xs hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                <span aria-hidden="true" className="sm:hidden">
-                  ↓
-                </span>
-                <span className="hidden sm:inline">{practice.moveDown}</span>
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (exercise.exercise_type === "develop") {
-    return (
-      <div className="flex flex-col gap-4">
-        <DevelopStructureAid key={exercise.id} disabled={disabled} practice={practice} />
-        <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />
-      </div>
-    );
-  }
-
-  if (exercise.exercise_type === "produce") {
-    return <WritingResponseField answer={answer} onAnswerChange={onAnswerChange} disabled={disabled} practice={practice} />;
-  }
-
-  return (
-    <textarea
-      value={answer}
-      disabled={disabled}
-      onChange={(event) => onAnswerChange(event.target.value)}
-      rows={3}
-      aria-label={practice.responseLabel}
-      placeholder={practice.suggestionPlaceholder}
-      className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
-    />
-  );
-}
-
-function WritingResponseField({
-  answer,
-  onAnswerChange,
-  disabled,
-  practice,
-}: {
-  answer: string;
-  onAnswerChange: (answer: string) => void;
-  disabled: boolean;
-  practice: AppCopy["practice"];
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <textarea
-        value={answer}
-        disabled={disabled}
-        onChange={(event) => onAnswerChange(event.target.value)}
-        rows={6}
-        aria-label={practice.responseLabel}
-        aria-describedby="practice-length-counter"
-        placeholder={practice.responsePlaceholder}
-        className="w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-sm leading-6 outline-none transition-colors placeholder:text-zinc-400 focus:border-violet-600 focus:ring-2 focus:ring-violet-200 disabled:cursor-not-allowed disabled:opacity-70 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
-      />
-      <p id="practice-length-counter" className="text-xs text-zinc-500 dark:text-zinc-400">
-        {practice.lengthCounter({ words: countWords(answer), sentences: countSentences(answer) })}
-      </p>
-    </div>
-  );
-}
-
-export function PracticeTrainer({ curriculum, stages = PRACTICE_SESSION_STAGES }: PracticeTrainerProps) {
+export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
   const appCopy = useAppCopy();
   const practice = appCopy.practice;
   const searchParams = useSearchParams();
-  // The comprehensive tour's final Practice step points at the stage
-  // plan panel below, which normally only renders after a manual selection.
-  // Seeding a guaranteed-available demo skill (Task 1, the same task the
-  // Tasks tour already uses as its own worked example) gives that step a
-  // real target without waiting on the learner to choose anything first.
-  const demoSkill = isFullWalkthrough(searchParams?.get(FULL_WALKTHROUGH_PARAM) ?? null)
-    ? [...curriculum.skills]
-        .filter((skill) => skill.task === "TASK_1" && skill.level === "B2" && skill.is_available)
-        .sort((left, right) => left.part_order - right.part_order)[0] ?? null
-    : null;
-  const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(() => demoSkill?.task ?? null);
-  const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(() => demoSkill?.level ?? null);
-  // A skill label/ID is scoped to a task and level. Keeping the selected
-  // record, rather than resolving a bare ID against the full catalogue,
-  // prevents a future shared label such as "conclusion" from loading the
-  // sequence belonging to another Tâche.
-  const [selectedSkill, setSelectedSkill] = useState<CuratedPracticeSkill | null>(() => demoSkill);
-  const [exerciseOrder, setExerciseOrder] = useState<readonly CuratedPracticeExercise[]>([]);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [answer, setAnswer] = useState("");
-  const [ordering, setOrdering] = useState<readonly string[]>([]);
-  const [checkState, setCheckState] = useState<CheckState>(null);
-  const [isHintVisible, setIsHintVisible] = useState(false);
-  const [isSequenceComplete, setIsSequenceComplete] = useState(false);
-  const [sessionDifficulty, setSessionDifficulty] = useState<DifficultyRating | null>(null);
-  // Tracked separately from checkState so a stage's completion method
-  // survives navigating to later stages, letting the progress bar keep
-  // showing which earlier stages were solved versus revealed.
-  const [completionMethods, setCompletionMethods] = useState<ReadonlyMap<string, CompletionMethod>>(new Map());
-  const [storageLoaded, setStorageLoaded] = useState(false);
-  const [savedSession, setSavedSession] = useState<StoredPracticeSession | null>(null);
-  const [isChangePartConfirmOpen, setIsChangePartConfirmOpen] = useState(false);
-  // Local storage remains the fast, private resume mechanism. This separate
-  // server session is intentionally just an activity ledger for the
-  // Dashboard; its request must never block a learner from working through a
-  // curated sequence when they are offline or the network is unavailable.
+  // The comprehensive tour's last Practice step points at the exercise preview,
+  // which normally only appears after a manual selection. Seeding Task 1 / B2
+  // (the task the Simulate tour also uses) gives that step a real target.
+  const isTour = isFullWalkthrough(searchParams?.get(FULL_WALKTHROUGH_PARAM) ?? null);
+  const [selectedTask, setSelectedTask] = useState<PracticeTask | null>(isTour ? "TASK_1" : null);
+  const [selectedLevel, setSelectedLevel] = useState<PracticeLevel | null>(isTour ? "B2" : null);
+  const [active, setActive] = useState<SectionedPracticeExercise | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [reveals, setReveals] = useState<StoredSectionReveal[]>([]);
+  const [isConfirmingLeave, setIsConfirmingLeave] = useState(false);
   const progressSessionIdRef = useRef<string | null>(null);
-  const progressSessionGenerationRef = useRef(0);
-  const pendingProgressCompletionsRef = useRef<PendingProgressCompletion[]>([]);
-  const reportedExerciseIdsRef = useRef<Set<string>>(new Set());
-  const [progressSessionId, setProgressSessionId] = useState<string | null>(null);
+  const completionRecordedRef = useRef(false);
+  const hasRestoredRef = useRef(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
-  const matchingSkills = useMemo(
-    () =>
-      selectedTask && selectedLevel
-        ? curriculum.skills
-            .filter((skill) => skill.task === selectedTask && skill.level === selectedLevel)
-            .sort((left, right) => left.part_order - right.part_order)
-        : [],
-    [curriculum.skills, selectedLevel, selectedTask],
-  );
-  const availableLevels = useMemo(
-    () =>
-      selectedTask
-        ? LEVELS.filter((level) =>
-            curriculum.skills.some(
-              (skill) =>
-                skill.task === selectedTask &&
-                skill.level === level &&
-                skill.is_available &&
-                (!selectedSkill || skill.id === selectedSkill.id),
-            ),
-          )
-        : [],
-    [curriculum.skills, selectedSkill, selectedTask],
-  );
-  const exercises = exerciseOrder;
-  const currentExercise = exercises[currentExerciseIndex] ?? null;
-  const isIndependentWriting =
-    currentExercise?.exercise_type === "develop" || currentExercise?.exercise_type === "produce";
-  const hasAnswer =
-    currentExercise?.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
-      ? ordering.length > 0
-      : answer.trim().length > 0;
-  // Organize's ordering is always pre-filled (scrambled on entry), so its
-  // "ordering.length > 0" isn't a signal of learner work the way a typed
-  // answer is -- redoing a shuffle costs seconds, not a lost paragraph.
-  const hasDraftInProgress = currentExercise != null && currentExercise.exercise_type !== "organize" && answer.trim().length > 0;
-  const reviewedAnswers = getReviewedAnswers(currentExercise);
-  const canRevealAnswer = !isIndependentWriting && reviewedAnswers.length > 0;
-  const isExerciseComplete =
-    checkState === "correct" || checkState === "revealed" || checkState === "self-review";
+  const selectedExercise =
+    selectedTask && selectedLevel
+      ? (exercises.find((exercise) => exercise.task === selectedTask && exercise.level === selectedLevel) ?? null)
+      : null;
 
-  function clearLocalSession() {
-    const storage = getBrowserStorage();
-    if (storage) clearStoredPracticeSession(storage);
-    setSavedSession(null);
+  function open(exercise: SectionedPracticeExercise, saved?: { answers: readonly string[]; reveals: readonly StoredSectionReveal[] }) {
+    const sectionCount = PRACTICE_SECTION_BLUEPRINT[exercise.task].length;
+    setActive(exercise);
+    setSelectedTask(exercise.task);
+    setSelectedLevel(exercise.level);
+    setAnswers(saved ? [...saved.answers] : Array.from({ length: sectionCount }, () => ""));
+    setReveals(saved ? [...saved.reveals] : Array.from({ length: sectionCount }, () => null));
   }
 
-  function resetProgressTracking() {
-    progressSessionGenerationRef.current += 1;
-    progressSessionIdRef.current = null;
-    pendingProgressCompletionsRef.current = [];
-    reportedExerciseIdsRef.current = new Set();
-    setProgressSessionId(null);
-  }
+  // Restore an unfinished exercise after a refresh. localStorage only exists
+  // in the browser, so this has to run after mount rather than in an initialiser.
+  useEffect(() => {
+    if (hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
+    const saved = loadStoredPracticeDraft(window.localStorage);
+    const exercise = saved ? exercises.find((candidate) => candidate.id === saved.exerciseId) : null;
+    if (!saved || !exercise || saved.answers.length !== PRACTICE_SECTION_BLUEPRINT[exercise.task].length) return;
+    progressSessionIdRef.current = saved.progressSessionId ?? null;
+    completionRecordedRef.current = saved.completionRecorded ?? false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from browser storage
+    open(exercise, saved);
+  }, [exercises]);
 
-  async function persistProgressCompletion(
-    sessionId: string,
-    completion: PendingProgressCompletion,
-  ) {
+  useEffect(() => {
+    if (!active) return;
+    saveStoredPracticeDraft(window.localStorage, {
+      version: 1,
+      exerciseId: active.id,
+      answers,
+      reveals,
+      progressSessionId: progressSessionIdRef.current ?? undefined,
+      completionRecorded: completionRecordedRef.current,
+    });
+  }, [active, answers, reveals]);
+
+  useEffect(() => {
+    if (active) headingRef.current?.focus();
+  }, [active]);
+
+  async function recordCompletion(exercise: SectionedPracticeExercise, method: "self-review" | "revealed") {
     try {
-      await fetch(`/api/practice/sessions/${encodeURIComponent(sessionId)}/completions`, {
+      let sessionId = progressSessionIdRef.current;
+      if (!sessionId) {
+        const response = await fetch("/api/practice/sessions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ task: exercise.task, level: exercise.level, exerciseId: exercise.id }),
+        });
+        if (!response.ok) throw new Error("Session failed");
+        const body: unknown = await response.json().catch(() => null);
+        sessionId =
+          body && typeof body === "object" && "sessionId" in body && typeof body.sessionId === "string"
+            ? body.sessionId
+            : null;
+        if (!sessionId) throw new Error("Session failed");
+        progressSessionIdRef.current = sessionId;
+      }
+      const response = await fetch(`/api/practice/sessions/${encodeURIComponent(sessionId)}/completions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(completion),
+        body: JSON.stringify({ exerciseId: exercise.id, completionMethod: method }),
       });
+      if (!response.ok) throw new Error("Completion failed");
     } catch {
-      // Practice itself is always usable without this optional progress
-      // report. A later sequence will establish a fresh durable session.
+      // Dashboard activity is best-effort: a failed save must never get in
+      // the way of the exercise, but it should be retried on the next reveal.
+      completionRecordedRef.current = false;
     }
   }
 
-  function reportExerciseCompletion(exerciseId: string, completionMethod: CompletionMethod) {
-    if (reportedExerciseIdsRef.current.has(exerciseId)) return;
-    reportedExerciseIdsRef.current.add(exerciseId);
+  function showModelAnswer(index: number) {
+    if (!active || reveals[index]) return;
+    const nextReveals = [...reveals];
+    nextReveals[index] = countWords(answers[index] ?? "") > 0 ? "written" : "empty";
+    setReveals(nextReveals);
 
-    const completion = { exerciseId, completionMethod };
-    const sessionId = progressSessionIdRef.current;
-    if (!sessionId) {
-      pendingProgressCompletionsRef.current.push(completion);
-      return;
+    if (nextReveals.every((reveal) => reveal !== null) && !completionRecordedRef.current) {
+      completionRecordedRef.current = true;
+      void recordCompletion(active, nextReveals.every((reveal) => reveal === "written") ? "self-review" : "revealed");
     }
-    void persistProgressCompletion(sessionId, completion);
   }
 
-  function beginProgressSession(
-    skill: CuratedPracticeSkill,
-    sessionExercises: readonly CuratedPracticeExercise[],
-    existingCompletions: readonly (readonly [string, CompletionMethod])[] = [],
-    existingProgressSessionId?: string,
-  ) {
-    resetProgressTracking();
-    const generation = progressSessionGenerationRef.current;
-    const exerciseIds = sessionExercises.map((exercise) => exercise.id);
-    const validExerciseIds = new Set(exerciseIds);
-    const completed = existingCompletions.filter(([exerciseId]) => validExerciseIds.has(exerciseId));
-    reportedExerciseIdsRef.current = new Set(completed.map(([exerciseId]) => exerciseId));
-    pendingProgressCompletionsRef.current = completed.map(([exerciseId, completionMethod]) => ({
-      exerciseId,
-      completionMethod,
-    }));
-
-    function flushPendingCompletions(sessionId: string) {
-      const pending = pendingProgressCompletionsRef.current;
-      pendingProgressCompletionsRef.current = [];
-      for (const completion of pending) {
-        void persistProgressCompletion(sessionId, completion);
-      }
-    }
-
-    // A saved browser session can reconnect to its original durable ledger.
-    // The completion endpoint independently owner-scopes and validates it;
-    // a stale session never creates duplicate activity when the learner
-    // resumes their local exercise state.
-    if (existingProgressSessionId) {
-      progressSessionIdRef.current = existingProgressSessionId;
-      setProgressSessionId(existingProgressSessionId);
-      flushPendingCompletions(existingProgressSessionId);
-      return;
-    }
-
-    void fetch("/api/practice/sessions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        task: skill.task,
-        level: skill.level,
-        skillId: skill.id,
-        exerciseIds,
-      }),
-    })
-      .then(async (response) => {
-        if (!response.ok) return null;
-        const body: unknown = await response.json().catch(() => null);
-        return body && typeof body === "object" && "sessionId" in body && typeof body.sessionId === "string"
-          ? body.sessionId
-          : null;
-      })
-      .then((sessionId) => {
-        if (!sessionId || generation !== progressSessionGenerationRef.current) return;
-        progressSessionIdRef.current = sessionId;
-        setProgressSessionId(sessionId);
-        flushPendingCompletions(sessionId);
-      })
-      .catch(() => {
-        // See persistProgressCompletion: reporting is deliberately best
-        // effort and cannot turn a Practice activity into a failed exercise.
-      });
+  function resetExercise() {
+    if (!active) return;
+    progressSessionIdRef.current = null;
+    completionRecordedRef.current = false;
+    open(active);
   }
 
-  useEffect(() => {
-    const storage = getBrowserStorage();
-    const session = storage ? loadStoredPracticeSession(storage) : null;
-    const timeoutId = window.setTimeout(() => {
-      if (session && resolveStoredSession(curriculum, session, stages)) {
-        setSavedSession(session);
-      } else if (session && storage) {
-        clearStoredPracticeSession(storage);
-      }
-      setStorageLoaded(true);
-    }, 0);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [curriculum, stages]);
-
-  useEffect(() => {
-    if (
-      !storageLoaded ||
-      !selectedSkill ||
-      !currentExercise ||
-      exercises.length === 0 ||
-      isSequenceComplete
-    ) {
-      return;
-    }
-
-    const storage = getBrowserStorage();
-    if (!storage) return;
-
-    saveStoredPracticeSession(storage, {
-      version: 1,
-      task: selectedSkill.task,
-      level: selectedSkill.level,
-      skillId: selectedSkill.id,
-      exerciseIds: exercises.map((exercise) => exercise.id),
-      currentExerciseIndex,
-      answer,
-      ordering,
-      checkState,
-      completionMethods: [...completionMethods.entries()],
-      progressSessionId: progressSessionId ?? undefined,
-    });
-  }, [
-    answer,
-    checkState,
-    completionMethods,
-    currentExercise,
-    currentExerciseIndex,
-    exercises,
-    isSequenceComplete,
-    ordering,
-    progressSessionId,
-    selectedSkill,
-    storageLoaded,
-  ]);
-
-  function resetExercise(nextExercise: CuratedPracticeExercise | null) {
-    setAnswer("");
-    setOrdering(
-      nextExercise?.exercise_type === "organize" && Array.isArray(nextExercise.correct_answer)
-        ? scrambleOrdering(nextExercise.options ?? [], nextExercise.correct_answer)
-        : nextExercise?.exercise_type === "organize"
-          ? [...(nextExercise.options ?? [])]
-          : [],
-    );
-    setCheckState(null);
-    setIsHintVisible(false);
+  function leaveExercise() {
+    clearStoredPracticeDraft(window.localStorage);
+    progressSessionIdRef.current = null;
+    completionRecordedRef.current = false;
+    setIsConfirmingLeave(false);
+    setActive(null);
+    setAnswers([]);
+    setReveals([]);
   }
 
-  function chooseTask(task: PracticeTask) {
-    clearLocalSession();
-    resetProgressTracking();
-    setSelectedTask(task);
-    setSelectedLevel(null);
-    setSelectedSkill(null);
-    setExerciseOrder([]);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setSessionDifficulty(null);
-    resetExercise(null);
+  function requestLeave() {
+    const isComplete = reveals.length > 0 && reveals.every((reveal) => reveal !== null);
+    if (!isComplete && answers.some((answer) => answer.trim().length > 0)) setIsConfirmingLeave(true);
+    else leaveExercise();
   }
 
-  function chooseLevel(level: PracticeLevel) {
-    clearLocalSession();
-    resetProgressTracking();
-    setSelectedLevel(level);
-    setSelectedSkill(null);
-    setExerciseOrder([]);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setSessionDifficulty(null);
-    resetExercise(null);
-  }
-
-  function chooseSkill(skill: CuratedPracticeSkill) {
-    clearLocalSession();
-    resetProgressTracking();
-    setSelectedSkill(skill);
-    setExerciseOrder([]);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setCompletionMethods(new Map());
-    setSessionDifficulty(null);
-    resetExercise(null);
-  }
-
-  function startSequence() {
-    if (!selectedSkill || !selectedSkill.is_available) return;
-    clearLocalSession();
-    // The scaffold stage order (Recognize -> ... -> Produce) is always fixed;
-    // when a stage has more than one reviewed variant, a random one is used
-    // so replaying a task part doesn't always show the identical exercise.
-    const nextExercises = selectPracticeExerciseSession(
-      getExercisesForSkill(curriculum, selectedSkill),
-      Math.random,
-      new Set(),
-      stages,
-    );
-    beginProgressSession(selectedSkill, nextExercises);
-    setExerciseOrder(nextExercises);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setCompletionMethods(new Map());
-    setSessionDifficulty(null);
-    resetExercise(nextExercises[0] ?? null);
-  }
-
-  function updateAnswer(nextAnswer: string) {
-    setAnswer(nextAnswer);
-    setCheckState(null);
-  }
-
-  function updateOrdering(nextOrdering: readonly string[]) {
-    setOrdering(nextOrdering);
-    setCheckState(null);
-  }
-
-  function markCompletion(exerciseId: string, method: CompletionMethod) {
-    setCompletionMethods((previous) => new Map(previous).set(exerciseId, method));
-    reportExerciseCompletion(exerciseId, method);
-  }
-
-  function checkAnswer() {
-    if (!currentExercise) return;
-    if (isIndependentWriting) {
-      // Not yet a completion: self-review only shows the checklist. Editing
-      // the response afterward resets checkState to null (see updateAnswer),
-      // which must mean "not complete" for real, not just in the UI -- so
-      // the actual completion (local + server report) is recorded in
-      // moveNext, once the learner explicitly chooses to move on rather
-      // than keep revising.
-      setCheckState("self-review");
-      return;
-    }
-
-    const correct =
-      currentExercise.exercise_type === "organize" && Array.isArray(currentExercise.correct_answer)
-        ? isOrderedCorrect(ordering, currentExercise)
-        : matchesAnswer(answer, currentExercise);
-    setCheckState(correct ? "correct" : "try-again");
-    if (correct) markCompletion(currentExercise.id, "correct");
-  }
-
-  function revealAnswer() {
-    if (!canRevealAnswer || !currentExercise) return;
-    setCheckState("revealed");
-    markCompletion(currentExercise.id, "revealed");
-  }
-
-  function moveNext() {
-    // Reachable only while isExerciseComplete is true (the sole caller is
-    // the Next/Finish button), so checkState is always one of the three
-    // completed states here. "correct"/"revealed" already recorded their
-    // completion the moment they were reached, since neither is revisable;
-    // "self-review" defers to here specifically because it is.
-    if (checkState === "self-review" && currentExercise) {
-      markCompletion(currentExercise.id, "self-review");
-    }
-    const nextIndex = currentExerciseIndex + 1;
-    if (nextIndex >= exercises.length) {
-      clearLocalSession();
-      setIsSequenceComplete(true);
-      return;
-    }
-    setCurrentExerciseIndex(nextIndex);
-    resetExercise(exercises[nextIndex]);
-  }
-
-  function restartSequence() {
-    if (!selectedSkill) return;
-    clearLocalSession();
-    // The stage order stays fixed on replay too; only the variant chosen for
-    // a stage with more than one reviewed option can change.
-    const previousExerciseIds = new Set(exercises.map((exercise) => exercise.id));
-    const nextExercises = selectPracticeExerciseSession(
-      getExercisesForSkill(curriculum, selectedSkill),
-      Math.random,
-      previousExerciseIds,
-      stages,
-    );
-    beginProgressSession(selectedSkill, nextExercises);
-    setExerciseOrder(nextExercises);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setCompletionMethods(new Map());
-    setSessionDifficulty(null);
-    resetExercise(nextExercises[0] ?? null);
-  }
-
-  function returnToSkills() {
-    clearLocalSession();
-    resetProgressTracking();
-    setSelectedSkill(null);
-    setExerciseOrder([]);
-    setCurrentExerciseIndex(0);
-    setIsSequenceComplete(false);
-    setCompletionMethods(new Map());
-    setSessionDifficulty(null);
-    resetExercise(null);
-  }
-
-  // "Change task part" reads as ordinary navigation, but it silently
-  // discards an in-progress answer via returnToSkills() above. Confirm
-  // first whenever there's a draft worth losing.
-  function requestReturnToSkills() {
-    if (hasDraftInProgress) {
-      setIsChangePartConfirmOpen(true);
-      return;
-    }
-    returnToSkills();
-  }
-
-  function resumeSavedSession() {
-    if (!savedSession) return;
-    const resolved = resolveStoredSession(curriculum, savedSession, stages);
-    if (!resolved) {
-      clearLocalSession();
-      return;
-    }
-
-    const currentSavedExercise = resolved.exercises[savedSession.currentExerciseIndex];
-    // A session saved before the pre-solved-ordering fix (6291776) may have
-    // persisted its ordering from back when entry didn't scramble it, so it
-    // can still equal correct_answer verbatim. Re-apply the same "never
-    // pre-solved" invariant used on fresh entry rather than trusting
-    // whatever ordering was on disk.
-    const savedOrderingIsPreSolved =
-      currentSavedExercise.exercise_type === "organize" &&
-      savedSession.ordering.length > 0 &&
-      isOrderedCorrect(savedSession.ordering, currentSavedExercise);
-    setSelectedTask(resolved.skill.task);
-    setSelectedLevel(resolved.skill.level);
-    setSelectedSkill(resolved.skill);
-    setExerciseOrder(resolved.exercises);
-    setCurrentExerciseIndex(savedSession.currentExerciseIndex);
-    setAnswer(savedSession.answer);
-    setOrdering(
-      currentSavedExercise.exercise_type === "organize"
-        ? savedSession.ordering.length > 0 && !savedOrderingIsPreSolved
-          ? savedSession.ordering
-          : Array.isArray(currentSavedExercise.correct_answer)
-            ? scrambleOrdering(currentSavedExercise.options ?? [], currentSavedExercise.correct_answer)
-            : [...(currentSavedExercise.options ?? [])]
-        : [],
-    );
-    setCheckState(savedSession.checkState);
-    setCompletionMethods(new Map(savedSession.completionMethods));
-    setSessionDifficulty(null);
-    setIsSequenceComplete(false);
-    setSavedSession(null);
-    beginProgressSession(
-      resolved.skill,
-      resolved.exercises,
-      savedSession.completionMethods,
-      savedSession.progressSessionId,
-    );
-  }
-
-  const resumableSession = savedSession ? resolveStoredSession(curriculum, savedSession, stages) : null;
-
-  // Keeping all three selectors on one screen makes the dependency visible
-  // while avoiding a modal or a three-page setup. Disabled later choices
-  // prevent invalid combinations; their nearby explanation tells the learner
-  // how to recover rather than leaving an inert control unexplained.
-  if (!selectedSkill || !currentExercise || isSequenceComplete) {
-    if (isSequenceComplete && selectedSkill) {
-      return (
-        <section aria-labelledby="practice-complete-heading" className="w-full">
-          <div className="rounded-3xl border border-violet-200 bg-violet-50 p-6 sm:p-8 dark:border-violet-900 dark:bg-violet-950/40">
-            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.completedEyebrow}</p>
-            <h1 id="practice-complete-heading" className="mt-2 text-3xl font-semibold tracking-tight">
-              {practice.completedTitle({ part: selectedSkill.label })}
-            </h1>
-            <p className="mt-3 max-w-2xl leading-7 text-zinc-700 dark:text-zinc-300">
-              {practice.completedDescription({ outcome: selectedSkill.learning_outcome })}
-            </p>
-            <p className="mt-3 text-sm leading-6 text-violet-950/80 dark:text-violet-100/80">
-              {practice.nextActionDescription}
-            </p>
-            <fieldset className="mt-5 border-t border-violet-200 pt-5 dark:border-violet-900">
-              <legend className="text-sm font-semibold">{practice.difficultyPrompt}</legend>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {DIFFICULTY_RATINGS.map((rating) => {
-                  const selected = sessionDifficulty === rating;
-                  const label =
-                    rating === "too-easy"
-                      ? practice.difficultyTooEasy
-                      : rating === "appropriate"
-                        ? practice.difficultyAppropriate
-                        : practice.difficultyTooHard;
-                  return (
-                    <button
-                      key={rating}
-                      type="button"
-                      aria-pressed={selected}
-                      onClick={() => setSessionDifficulty(rating)}
-                      className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        selected
-                          ? "border-violet-600 bg-white text-violet-900 dark:border-violet-300 dark:bg-violet-950/50 dark:text-violet-100"
-                          : "border-black/[.15] hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-                      }`}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              {sessionDifficulty && (
-                <p role="status" className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
-                  {practice.difficultyRecorded}
-                </p>
-              )}
-            </fieldset>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={restartSequence}
-                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-              >
-                {practice.replayWithVariants}
-              </button>
-              <button
-                type="button"
-                onClick={startSequence}
-                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                {practice.startFresh}
-              </button>
-              <button
-                type="button"
-                onClick={returnToSkills}
-                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                {practice.chooseAnotherPart}
-              </button>
-              <Link
-                href="/tasks"
-                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                {practice.tryFullTask}
-              </Link>
-            </div>
-          </div>
-        </section>
-      );
-    }
-
+  if (!active) {
+    const sections = selectedTask ? PRACTICE_SECTION_BLUEPRINT[selectedTask] : [];
     return (
-      <section aria-labelledby="practice-heading" className="flex w-full flex-col gap-8">
+      <section aria-labelledby="practice-heading" className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header data-walkthrough="practice-intro">
           <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">{practice.eyebrow}</p>
           <h1 id="practice-heading" className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
             {practice.title}
           </h1>
-          <p className="mt-3 text-base leading-7 text-zinc-600 dark:text-zinc-400">
-            {practice.description}
-          </p>
+          <p className="mt-3 text-base leading-7 text-zinc-600 dark:text-zinc-400">{practice.description}</p>
         </header>
 
-        {savedSession && resumableSession && (
-          <aside aria-labelledby="resume-practice-heading" className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30">
-            <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.resumeEyebrow}</p>
-            <h2 id="resume-practice-heading" className="mt-1 text-xl font-semibold">
-              {practice.resumeTitle({ part: resumableSession.skill.label })}
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-              {practice.resumeDescription({
-                step: savedSession.currentExerciseIndex + 1,
-                total: resumableSession.exercises.length,
-              })}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-zinc-600 dark:text-zinc-400">{practice.localSessionNotice}</p>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={resumeSavedSession}
-                className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-              >
-                {practice.resumeSession}
-              </button>
-              <button
-                type="button"
-                onClick={clearLocalSession}
-                className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-              >
-                {practice.discardSavedSession}
-              </button>
-            </div>
-          </aside>
-        )}
-
         <div className="grid gap-6">
-          <fieldset>
-            <StepLegend number={1} stepLabel={appCopy.workspace.stepLabel}>
-              {practice.chooseTask}
-            </StepLegend>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              {TASKS.map((task) => (
-                <ChoiceCard key={task} selected={selectedTask === task} onClick={() => chooseTask(task)}>
-                  <strong className="block text-base">{practice.tasks[task].title}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{practice.tasks[task].description}</span>
-                </ChoiceCard>
-              ))}
-            </div>
-          </fieldset>
+          <div data-walkthrough="practice-part-selector" className="grid gap-6">
+            <fieldset>
+              <StepLegend number={1} stepLabel={appCopy.workspace.stepLabel}>
+                {practice.chooseTask}
+              </StepLegend>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {TASKS.map((task) => (
+                  <ChoiceCard key={task} selected={selectedTask === task} onClick={() => setSelectedTask(task)}>
+                    <strong className="block text-base">{practice.tasks[task].title}</strong>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">
+                      {practice.tasks[task].description}
+                    </span>
+                  </ChoiceCard>
+                ))}
+              </div>
+            </fieldset>
 
-          <fieldset disabled={!selectedTask} aria-describedby={!selectedTask ? "level-help" : undefined}>
-            <StepLegend number={2} stepLabel={appCopy.workspace.stepLabel}>
-              {practice.chooseLevel}
-            </StepLegend>
-            <div className="mt-3 grid gap-3 md:grid-cols-3">
-              {LEVELS.map((level) => (
-                <ChoiceCard
-                  key={level}
-                  selected={selectedLevel === level}
-                  onClick={() => chooseLevel(level)}
-                  disabled={!selectedTask}
-                >
-                  <strong className="block text-base">{level}</strong>
-                  <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">{practice.levels[level].description}</span>
-                </ChoiceCard>
-              ))}
-            </div>
-            {!selectedTask && (
-              <p id="level-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {practice.levelHelp}
-              </p>
-            )}
-          </fieldset>
-
-          <fieldset
-            data-walkthrough="practice-part-selector"
-            disabled={!selectedTask || !selectedLevel}
-            aria-describedby={!selectedLevel ? "part-help" : undefined}
-            className="min-w-0"
-          >
-            <StepLegend number={3} id="practice-part-label" stepLabel={appCopy.workspace.stepLabel}>
-              {practice.choosePart}
-            </StepLegend>
-            <ThemedSelect<string>
-              value={selectedSkill?.id ?? ""}
-              options={[
-                { value: "", label: practice.partPlaceholder },
-                ...matchingSkills.map((skill) => ({
-                  value: skill.id,
-                  label: `${practice.partLabel({ order: skill.part_order })}: ${skill.label} — ${skill.description}`,
-                })),
-              ] satisfies readonly ThemedSelectOption<string>[]}
-              disabled={!selectedTask || !selectedLevel}
-              ariaLabelledBy="practice-part-label"
-              onChange={(skillId) => {
-                const skill = matchingSkills.find((candidate) => candidate.id === skillId);
-                if (skill) {
-                  chooseSkill(skill);
-                } else if (!skillId) {
-                  returnToSkills();
-                }
-              }}
-              buttonClassName={`mt-3 ${SELECT_BUTTON_CLASS}`}
-              listClassName={SELECT_LIST_CLASS}
-            />
-            {selectedSkill && !selectedSkill.is_available && (
-              <aside className="mt-3 rounded-xl border border-amber-300 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
-                <p className="font-semibold">
-                  {practice.unavailableTitle({
-                    task: `${practice.tasks[selectedSkill.task].title} · ${practice.partLabel({ order: selectedSkill.part_order })}: ${selectedSkill.label}`,
-                    level: selectedSkill.level,
-                  })}
+            <fieldset disabled={!selectedTask} aria-describedby={!selectedTask ? "level-help" : undefined}>
+              <StepLegend number={2} stepLabel={appCopy.workspace.stepLabel}>
+                {practice.chooseLevel}
+              </StepLegend>
+              <div className="mt-3 grid gap-3 md:grid-cols-3">
+                {PRACTICE_LEVELS.map((level) => (
+                  <ChoiceCard
+                    key={level}
+                    selected={selectedLevel === level}
+                    onClick={() => setSelectedLevel(level)}
+                    disabled={!selectedTask}
+                  >
+                    <strong className="block text-base">{level}</strong>
+                    <span className="mt-1 block text-sm leading-5 text-zinc-600 dark:text-zinc-400">
+                      {practice.levels[level].description}
+                    </span>
+                  </ChoiceCard>
+                ))}
+              </div>
+              {!selectedTask && (
+                <p id="level-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                  {practice.levelHelp}
                 </p>
-                <p className="mt-1">{practice.unavailableDescription}</p>
-                {availableLevels.length > 0 ? (
-                  <div className="mt-3">
-                    <p className="font-medium">{practice.availableLevelsLabel}</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {availableLevels.map((level) => {
-                        const topicCount = curriculum.skills.filter(
-                          (skill) => skill.task === selectedTask && skill.level === level && skill.is_available,
-                        ).length;
-                        return (
-                          <button
-                            key={level}
-                            type="button"
-                            onClick={() => chooseLevel(level)}
-                            className="rounded-full border border-amber-700/30 bg-white/70 px-3 py-1.5 text-sm font-medium transition-colors hover:bg-white dark:border-amber-200/30 dark:bg-black/10 dark:hover:bg-black/20"
-                          >
-                            {practice.availableLevel({ level, parts: topicCount })}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-2">{practice.unavailableCombination}</p>
-                )}
-              </aside>
-            )}
-            {(!selectedTask || !selectedLevel) && (
-              <p id="part-help" className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                {practice.partHelp}
-              </p>
-            )}
-          </fieldset>
+              )}
+            </fieldset>
+          </div>
 
-          {selectedSkill?.is_available && (
+          {selectedExercise && selectedTask && selectedLevel && (
             <aside
               data-walkthrough="practice-stages-preview"
               aria-labelledby="practice-preview-heading"
@@ -1259,31 +278,23 @@ export function PracticeTrainer({ curriculum, stages = PRACTICE_SESSION_STAGES }
             >
               <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.previewEyebrow}</p>
               <h2 id="practice-preview-heading" className="mt-1 text-xl font-semibold">
-                {practice.previewTitle({ part: `${practice.partLabel({ order: selectedSkill.part_order })}: ${selectedSkill.label}` })}
+                {practice.previewTitle({ task: practice.tasks[selectedTask].title, level: selectedLevel })}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
-                <span className="font-semibold">{practice.previewOutcomeLabel}</span> {selectedSkill.learning_outcome}
-              </p>
-              <p className="mt-3 text-sm font-medium text-violet-900 dark:text-violet-100">
-                {practice.durationAndSteps({ minutes: selectedSkill.estimated_minutes, steps: stages.length })}
-              </p>
-              <div className="mt-4">
-                <p className="text-sm font-semibold">{practice.previewStagesLabel}</p>
-                <ol className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {stages.map((stage, index) => (
-                    <li key={stage} className="rounded-xl bg-white/70 px-3 py-2 text-sm dark:bg-black/15">
-                      <span className="mr-2 text-xs font-semibold text-violet-700 dark:text-violet-300">{index + 1}</span>
-                      {practice.stages[stage]}
-                    </li>
-                  ))}
-                </ol>
-              </div>
-              <button
-                type="button"
-                onClick={startSequence}
-                className="mt-5 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-              >
-                {practice.startFresh}
+              <p className="mt-1 text-sm text-zinc-700 dark:text-zinc-300">{selectedExercise.title}</p>
+              <p className="mt-4 text-sm font-semibold">{practice.previewSectionsLabel}</p>
+              <ol className="mt-2 grid gap-2 sm:grid-cols-3">
+                {sections.map((section, index) => (
+                  <li key={section.id} className="rounded-xl bg-white/70 px-3 py-2 text-sm dark:bg-black/15">
+                    <span className="mr-2 text-xs font-semibold text-violet-700 dark:text-violet-300">{index + 1}</span>
+                    {practice.sections[section.id].label}
+                    <span className="block text-xs text-zinc-600 dark:text-zinc-400">
+                      {practice.wordRange({ min: section.minWords, max: section.maxWords })}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <button type="button" onClick={() => open(selectedExercise)} className={`mt-5 ${PRIMARY_BUTTON}`}>
+                {practice.startExercise}
               </button>
             </aside>
           )}
@@ -1292,192 +303,205 @@ export function PracticeTrainer({ curriculum, stages = PRACTICE_SESSION_STAGES }
     );
   }
 
+  const blueprint = PRACTICE_SECTION_BLUEPRINT[active.task];
+  const viewed = reveals.filter((reveal) => reveal !== null).length;
+  const isComplete = viewed === blueprint.length;
+  const completedIndependently = isComplete && reveals.every((reveal) => reveal === "written");
+
   return (
-    <section aria-labelledby="exercise-heading" className="flex w-full flex-col gap-6">
+    <section aria-labelledby="exercise-heading" className="mx-auto flex w-full max-w-3xl flex-col gap-6">
       <button
         type="button"
-        onClick={requestReturnToSkills}
+        onClick={requestLeave}
         className="w-fit text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
       >
-        {practice.changePart}
+        {practice.backToChoice}
       </button>
-
-      <ConfirmDialog
-        open={isChangePartConfirmOpen}
-        title={practice.changePartConfirmTitle}
-        description={practice.changePartConfirmDescription}
-        confirmLabel={practice.changePartConfirmDiscard}
-        cancelLabel={practice.changePartConfirmKeep}
-        onConfirm={() => {
-          setIsChangePartConfirmOpen(false);
-          returnToSkills();
-        }}
-        onCancel={() => setIsChangePartConfirmOpen(false)}
-      />
 
       <header>
         <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
-          {practice.tasks[selectedSkill.task].title} · {selectedSkill.level} · {practice.partLabel({ order: selectedSkill.part_order })}: {selectedSkill.label}
+          {practice.previewTitle({ task: practice.tasks[active.task].title, level: active.level })}
         </p>
-        <h1 id="exercise-heading" className="mt-2 text-3xl font-semibold tracking-tight">
-          {selectedSkill.learning_outcome}
+        <h1
+          id="exercise-heading"
+          ref={headingRef}
+          tabIndex={-1}
+          className="mt-1 text-2xl font-semibold tracking-tight outline-none sm:text-3xl"
+        >
+          {active.title}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">
-          {selectedSkill.description} {practice.sequenceDescription({ count: exercises.length })}
-        </p>
       </header>
 
-      <ProgressSteps
-        exercises={exercises}
-        currentIndex={currentExerciseIndex}
-        completionMethods={completionMethods}
-        practice={practice}
-      />
-
-      <article className="rounded-3xl border border-black/[.1] bg-white p-5 shadow-sm sm:p-7 dark:border-white/[.15] dark:bg-zinc-950">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-800 dark:bg-violet-950 dark:text-violet-200">
-            {practice.stages[currentExercise.exercise_type]}
-          </span>
-          <span className="text-sm text-zinc-500 dark:text-zinc-400">
-            {practice.progress({ step: currentExerciseIndex + 1, total: exercises.length })}
-          </span>
-        </div>
-        <p className="mt-5 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          {practice.examTaskLanguageNote}
+      <div className="rounded-2xl border border-black/[.1] bg-white p-5 dark:border-white/[.15] dark:bg-zinc-950">
+        <p className="text-sm font-semibold">{practice.scenarioLabel}</p>
+        <p lang="fr" className="mt-2 text-base leading-7">
+          {active.prompt}
         </p>
-        <h2 className="mt-1 text-xl font-semibold leading-7">{currentExercise.prompt}</h2>
-        <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{currentExercise.instructions}</p>
-        <p className="mt-4 rounded-xl bg-zinc-50 px-3 py-2 text-sm text-zinc-700 dark:bg-white/[.06] dark:text-zinc-300">
-          <span className="font-semibold">{practice.attentionLabel}</span> {currentExercise.target_language_feature}
-        </p>
+        {active.requiredElements && (
+          <div className="mt-3">
+            <p className="text-sm font-semibold">{practice.requiredElementsLabel}</p>
+            <ul lang="fr" className="mt-1 list-disc pl-5 text-sm leading-6">
+              {active.requiredElements.map((element) => (
+                <li key={element}>{element}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {active.documents && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {active.documents.map((document) => (
+              <figure key={document.label} className="rounded-xl bg-black/[.03] p-4 dark:bg-white/[.05]">
+                <figcaption className="text-sm font-semibold">{document.label}</figcaption>
+                <p lang="fr" className="mt-1 text-sm leading-6">
+                  {document.text}
+                </p>
+              </figure>
+            ))}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">{practice.examTaskLanguageNote}</p>
+      </div>
 
-        <div className="mt-5">
-          <ExerciseInput
-            exercise={currentExercise}
-            answer={answer}
-            onAnswerChange={updateAnswer}
-            ordering={ordering}
-            onOrderingChange={updateOrdering}
-            disabled={checkState === "correct" || checkState === "revealed"}
-            practice={practice}
-          />
-        </div>
+      <ol className="grid gap-5">
+        {blueprint.map((section, index) => {
+          const copy = practice.sections[section.id];
+          const words = countWords(answers[index] ?? "");
+          const inRange = words >= section.minWords && words <= section.maxWords;
+          const isRevealed = reveals[index] !== null && reveals[index] !== undefined;
+          const textareaId = `section-${section.id}`;
+          const counterId = `${textareaId}-count`;
 
-        {isIndependentWriting && currentExercise.hint && (
-          <div className="mt-4">
-            <button
-              type="button"
-              aria-expanded={isHintVisible}
-              aria-controls="practice-writing-hint"
-              onClick={() => setIsHintVisible((visible) => !visible)}
-              className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-            >
-              {isHintVisible ? practice.hideHint : practice.showHint}
-            </button>
-            {isHintVisible && (
-              <aside
-                id="practice-writing-hint"
-                role="status"
-                className="mt-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-950 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-100"
+          return (
+            <li key={section.id}>
+              <section
+                aria-labelledby={`${textareaId}-heading`}
+                className="rounded-2xl border border-black/[.1] p-5 dark:border-white/[.15]"
               >
-                <p className="font-semibold">{practice.hintLabel}</p>
-                <p className="mt-1">{currentExercise.hint}</p>
-                <p className="mt-2 text-sky-900/80 dark:text-sky-100/80">{practice.hintNotice}</p>
-              </aside>
-            )}
-          </div>
-        )}
-
-        {checkState && (
-          <div
-            role="status"
-            aria-live="polite"
-            className={`mt-5 rounded-xl border px-4 py-3 text-sm leading-6 ${
-              checkState === "correct"
-                ? "border-emerald-300 bg-emerald-50 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100"
-                : checkState === "self-review" || checkState === "revealed"
-                  ? "border-violet-300 bg-violet-50 text-violet-950 dark:border-violet-900 dark:bg-violet-950/30 dark:text-violet-100"
-                  : "border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"
-            }`}
-          >
-            <p className="font-semibold">
-              {checkState === "correct"
-                ? practice.correctFeedback
-                : checkState === "self-review"
-                  ? practice.selfReviewFeedback
-                  : checkState === "revealed"
-                    ? practice.revealedFeedback
-                  : practice.retryFeedback}
-            </p>
-            <p className="mt-3">
-              <span className="font-semibold">
-                {checkState === "try-again"
-                  ? practice.retryExplanationLabel
-                  : checkState === "self-review"
-                    ? practice.selfReviewExplanationLabel
-                    : practice.explanationLabel}
-              </span>{" "}
-              {currentExercise.explanation}
-            </p>
-            {checkState === "revealed" && (
-              <div className="mt-3 rounded-lg bg-white/60 px-3 py-2 dark:bg-black/15">
-                <p className="font-medium">{practice.reviewedAnswerLabel}</p>
-                {currentExercise.exercise_type === "organize" && reviewedAnswers.length > 1 ? (
-                  <ol className="mt-1 list-decimal space-y-1 pl-5">
-                    {reviewedAnswers.map((reviewedAnswer) => (
-                      <li key={reviewedAnswer}>{reviewedAnswer}</li>
-                    ))}
-                  </ol>
-                ) : (
-                  <p className="mt-1">{reviewedAnswers.join(" / ")}</p>
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  <h2 id={`${textareaId}-heading`} className="text-lg font-semibold">
+                    {practice.sectionHeading({ number: index + 1, label: copy.label })}
+                  </h2>
+                  <p className="text-sm font-medium text-zinc-600 dark:text-zinc-400">
+                    {practice.wordRange({ min: section.minWords, max: section.maxWords })}
+                  </p>
+                </div>
+                <p className="mt-1 text-sm leading-6 text-zinc-600 dark:text-zinc-400">{copy.guidance}</p>
+                {section.example && (
+                  <p className="mt-2 text-sm leading-6">
+                    <span className="font-semibold">{practice.exampleLabel} : </span>
+                    <span lang="fr" className="italic">
+                      « {section.example} »
+                    </span>
+                  </p>
                 )}
-              </div>
-            )}
-            {checkState === "self-review" && currentExercise.self_check && (
-              <ul className="mt-3 list-disc space-y-1 pl-5">
-                {currentExercise.self_check.map((check) => (
-                  <li key={check}>{check}</li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+                {section.connectors && (
+                  <p className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="font-semibold">{practice.connectorsLabel} :</span>
+                    {section.connectors.map((connector) => (
+                      <span
+                        key={connector}
+                        lang="fr"
+                        className="rounded-full bg-violet-500/10 px-2.5 py-0.5 text-violet-900 dark:bg-violet-400/15 dark:text-violet-200"
+                      >
+                        {connector}
+                      </span>
+                    ))}
+                  </p>
+                )}
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          {(!isExerciseComplete || checkState === "self-review") && (
-            <button
-              type="button"
-              disabled={!hasAnswer}
-              onClick={checkAnswer}
-              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-45 dark:hover:bg-[#ccc]"
-            >
-              {isIndependentWriting ? practice.selfReview : practice.verify}
+                <label htmlFor={textareaId} className="sr-only">
+                  {practice.draftLabel({ label: copy.label })}
+                </label>
+                <textarea
+                  id={textareaId}
+                  lang="fr"
+                  value={answers[index] ?? ""}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setAnswers((current) => current.map((answer, i) => (i === index ? value : answer)));
+                  }}
+                  rows={section.maxWords > 40 ? 6 : 3}
+                  placeholder={practice.draftPlaceholder}
+                  aria-describedby={counterId}
+                  className="mt-3 w-full resize-y rounded-xl border border-black/[.15] bg-white px-4 py-3 text-base leading-7 outline-none focus:border-violet-600 focus:ring-2 focus:ring-violet-200 dark:border-white/[.2] dark:bg-zinc-950 dark:focus:border-violet-300 dark:focus:ring-violet-950"
+                />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+                  <p
+                    id={counterId}
+                    className={`text-sm ${
+                      inRange ? "font-medium text-emerald-700 dark:text-emerald-400" : "text-zinc-600 dark:text-zinc-400"
+                    }`}
+                  >
+                    {practice.wordCounter({ words, min: section.minWords, max: section.maxWords })}
+                  </p>
+                  {!isRevealed && (
+                    <button type="button" onClick={() => showModelAnswer(index)} className={SECONDARY_BUTTON}>
+                      {practice.showModelAnswer}
+                    </button>
+                  )}
+                </div>
+
+                {isRevealed && (
+                  <div className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+                    <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">
+                      {practice.modelAnswerLabel}
+                    </p>
+                    <p lang="fr" className="mt-1 text-base leading-7">
+                      {active.modelAnswers[index]}
+                    </p>
+                  </div>
+                )}
+              </section>
+            </li>
+          );
+        })}
+      </ol>
+
+      <div className="flex flex-col gap-1">
+        <p role="status" aria-live="polite" className="text-sm font-medium">
+          {practice.progress({ viewed, total: blueprint.length })}
+        </p>
+        {viewed > 0 && !isComplete && (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">{practice.compareHint}</p>
+        )}
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">{practice.draftSavedNotice}</p>
+      </div>
+
+      {isComplete && (
+        <aside
+          aria-labelledby="practice-complete-heading"
+          className="rounded-2xl border border-violet-200 bg-violet-50 p-5 dark:border-violet-900 dark:bg-violet-950/30"
+        >
+          <p className="text-sm font-semibold text-violet-800 dark:text-violet-200">{practice.completedEyebrow}</p>
+          <h2 id="practice-complete-heading" className="mt-1 text-xl font-semibold">
+            {practice.completedTitle}
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-zinc-700 dark:text-zinc-300">
+            {completedIndependently ? practice.completedDescription : practice.completedWithHelpDescription}
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button type="button" onClick={resetExercise} className={PRIMARY_BUTTON}>
+              {practice.practiceAgain}
             </button>
-          )}
-          {canRevealAnswer && !isExerciseComplete && (
-            <button
-              type="button"
-              onClick={revealAnswer}
-              className="rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-            >
-              {practice.revealAnswer}
+            <button type="button" onClick={leaveExercise} className={SECONDARY_BUTTON}>
+              {practice.chooseAnother}
             </button>
-          )}
-          {isExerciseComplete && (
-            <button
-              type="button"
-              onClick={moveNext}
-              className="rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-            >
-              {currentExerciseIndex + 1 === exercises.length ? practice.finishSequence : practice.nextExercise}
-            </button>
-          )}
-          {checkState === "try-again" && (
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">{practice.retryHint}</span>
-          )}
-        </div>
-      </article>
+            <Link href="/tasks" className={SECONDARY_BUTTON}>
+              {practice.tryFullTask}
+            </Link>
+          </div>
+        </aside>
+      )}
+
+      <ConfirmDialog
+        open={isConfirmingLeave}
+        title={practice.leaveTitle}
+        description={practice.leaveDescription}
+        confirmLabel={practice.leaveConfirm}
+        cancelLabel={practice.leaveKeep}
+        onConfirm={leaveExercise}
+        onCancel={() => setIsConfirmingLeave(false)}
+      />
     </section>
   );
 }

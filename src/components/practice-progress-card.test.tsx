@@ -11,8 +11,7 @@ describe("PracticeProgressCardContent", () => {
         summary={{
           completedExercises: 18,
           completedIndependently: 14,
-          completedWithHelp: 4,
-          completedTaskParts: 3,
+          completedWithHelp: 4
         }}
       />,
     );
@@ -20,7 +19,7 @@ describe("PracticeProgressCardContent", () => {
     expect(markup).toContain("Practice activity");
     expect(markup).toContain("18 exercises completed");
     expect(markup).toContain("14 independently · 4 with help");
-    expect(markup).toContain("3 task parts trained");
+    expect(markup).not.toContain("task part");
     expect(markup).toContain('href="/practice"');
     expect(markup).toContain("More options");
   });
@@ -32,8 +31,7 @@ describe("PracticeProgressCardContent", () => {
         summary={{
           completedExercises: 0,
           completedIndependently: 0,
-          completedWithHelp: 0,
-          completedTaskParts: 0,
+          completedWithHelp: 0
         }}
       />,
     );

@@ -131,11 +131,6 @@ export function PracticeProgressCardContent({ summary, copy }: PracticeProgressC
           helped: summary.completedWithHelp,
         })}
       </p>
-      {summary.completedTaskParts > 0 && (
-        <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-          {dashboardCopy.practiceTaskPartsCompleted({ count: summary.completedTaskParts })}
-        </p>
-      )}
       <Link
         href="/practice"
         className="mt-4 inline-flex rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"

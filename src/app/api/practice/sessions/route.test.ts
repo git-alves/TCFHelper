@@ -28,8 +28,7 @@ const USER_ID = "learner_1";
 const validBody = {
   task: "TASK_1",
   level: "B2",
-  skillId: "salutations",
-  exerciseIds: ["t1-b2-salutations-1", "t1-b2-salutations-2", "t1-b2-salutations-3", "t1-b2-salutations-4", "t1-b2-salutations-5", "t1-b2-salutations-6"],
+  exerciseId: "t1-b2-new-flat",
 };
 
 function post(body: unknown) {
@@ -71,7 +70,7 @@ describe("POST /api/practice/sessions", () => {
   });
 
   it("rejects a malformed session before it reaches the persistence layer", async () => {
-    const response = await post({ ...validBody, exerciseIds: ["only-one"] });
+    const response = await post({ ...validBody, exerciseId: "" });
 
     expect(response.status).toBe(400);
     expect(createPracticeSessionMock).not.toHaveBeenCalled();

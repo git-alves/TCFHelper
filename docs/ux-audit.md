@@ -42,7 +42,7 @@ flowchart TD
   E --> F[Welcome]
   D -- Yes --> G[Dashboard]
   F --> G
-  G --> H[Train: a three-stage task part]
+  G --> H[Train: a task written in three sections]
   G --> I[Simulate: full TCF task]
   H --> G
   I --> J[Choose task]
