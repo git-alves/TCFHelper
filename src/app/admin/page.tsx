@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminOnlineNowTile } from "@/components/admin-online-now-tile";
 import { AdminRecentActivityFeed } from "@/components/admin-recent-activity-feed";
@@ -54,44 +53,6 @@ export default async function AdminOverviewPage() {
             Registered users and live API usage across the app.
           </p>
         </div>
-        <nav aria-label="Admin sections" className="flex flex-wrap gap-3 text-sm font-medium">
-          <Link
-            href="/admin/users"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Users
-          </Link>
-          <Link
-            href="/admin/access-codes"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Access codes
-          </Link>
-          <Link
-            href="/admin/logs"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Operational log
-          </Link>
-          <Link
-            href="/admin/support"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Support requests
-          </Link>
-          <Link
-            href="/admin/api-keys"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            API Keys
-          </Link>
-          <Link
-            href="/admin/prompts"
-            className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-          >
-            Prompts
-          </Link>
-        </nav>
       </div>
 
       <section aria-labelledby="registered-users-heading" className="flex flex-col gap-3">

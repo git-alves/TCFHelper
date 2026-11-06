@@ -59,13 +59,6 @@ export default async function AdminLogsPage({ searchParams }: AdminLogsPageProps
             A 30-day, structured ledger of access, quota, provider, and new authenticated-session events. Session entries show only a masked network and coarse device details; raw IP addresses, user agents, and session IDs are never stored.
           </p>
         </div>
-        <nav aria-label="Admin sections" className="flex flex-wrap gap-3 text-sm font-medium">
-          <Link href="/admin" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Overview</Link>
-          <Link href="/admin/users" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Users</Link>
-          <Link href="/admin/access-codes" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Access codes</Link>
-          <Link href="/admin/api-keys" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">API Keys</Link>
-          <Link href="/admin/prompts" className="text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">Prompts</Link>
-        </nav>
       </div>
 
       <AdminEventLogFilters

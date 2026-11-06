@@ -161,6 +161,9 @@ export function AdminPromptsForm({ initialDisplay }: AdminPromptsFormProps) {
   // page, outside this form) confirm before discarding an unsaved edit.
   useEffect(() => {
     setHasUnsavedChanges(hasUnsavedChanges);
+    // The guard lives in the persistent /admin layout, so clear it when this
+    // form unmounts or later sidebar navigation would keep prompting.
+    return () => setHasUnsavedChanges(false);
   }, [hasUnsavedChanges, setHasUnsavedChanges]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
