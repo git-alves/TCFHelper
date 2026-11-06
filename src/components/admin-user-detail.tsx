@@ -37,7 +37,7 @@ function dateTime(value: string, timeZone: string | null) {
 export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) {
   const isCurrentAdmin = user.id === currentAdminId;
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+    <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div>
         <Link href="/admin/users" className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">
           ← All users
