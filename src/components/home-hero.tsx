@@ -7,6 +7,7 @@ import { DashboardPreview } from "@/components/dashboard-preview";
 import { EditorDemo } from "@/components/editor-demo";
 import { MethodPreview } from "@/components/method-preview";
 import { LANDING_PAGE_COPY } from "@/lib/landing-page-copy";
+import { LEGAL_DOCUMENT_LIST } from "@/lib/legal-documents";
 import { useScrollParallax } from "@/lib/use-parallax";
 import { useReveal } from "@/lib/use-reveal";
 
@@ -208,6 +209,13 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
             </a>
           ))}
         </div>
+        <nav aria-label="Legal" className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
+          {LEGAL_DOCUMENT_LIST.map((legalDocument) => (
+            <Link key={legalDocument.slug} href={legalDocument.path} className="transition-colors hover:text-zinc-300">
+              {legalDocument.title}
+            </Link>
+          ))}
+        </nav>
         <p className="mt-4">{copy.footer}</p>
       </footer>
     </main>
