@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AdminSupportDeleteButton } from "@/components/admin-support-delete-button";
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
@@ -61,12 +60,6 @@ export default async function AdminSupportPage() {
             The 100 most recent requests from learners.
           </p>
         </div>
-        <Link
-          href="/admin"
-          className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100"
-        >
-          Back to overview
-        </Link>
       </div>
 
       {requests.length === 0 ? (

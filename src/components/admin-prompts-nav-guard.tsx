@@ -10,12 +10,12 @@ interface AdminPromptsNavGuardContextValue {
 
 const AdminPromptsNavGuardContext = createContext<AdminPromptsNavGuardContextValue | null>(null);
 
-// Scoped to just the /admin/prompts page -- AdminPromptsForm reports its
-// dirty state here, and AdminPromptsNavLink (the page's own "Admin
-// sections" links) reads it to confirm before navigating away. Deliberately
-// separate from the app-wide DashboardNavGuardProvider (writing-workspace's
-// guard against leaving /tasks): that one coordinates through the shared
-// nav bar, which this page's in-page section links never go through.
+// Provided by the admin layout -- AdminPromptsForm reports its dirty state
+// here, and AdminPromptsNavLink (the admin sidebar's links) reads it to
+// confirm before navigating away. Deliberately separate from the app-wide
+// DashboardNavGuardProvider (writing-workspace's guard against leaving
+// /tasks): that one coordinates through the shared nav bar, which the
+// sidebar's section links never go through.
 export function AdminPromptsNavGuardProvider({ children }: { children: ReactNode }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const value = useMemo(() => ({ hasUnsavedChanges, setHasUnsavedChanges }), [hasUnsavedChanges]);
@@ -31,7 +31,7 @@ export function useAdminPromptsNavGuard(): AdminPromptsNavGuardContextValue {
   return ctx;
 }
 
-/** A drop-in Link for this page's own nav that confirms before discarding an unsaved prompt edit. */
+/** A drop-in Link for the admin sidebar that confirms before discarding an unsaved prompt edit. */
 export function AdminPromptsNavLink(props: LinkProps & { className?: string; children: ReactNode }) {
   const { hasUnsavedChanges } = useAdminPromptsNavGuard();
 
