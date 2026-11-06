@@ -14,7 +14,7 @@ export default async function AdminApiKeysPage() {
   const display = await getAppConfigDisplay();
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-7 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
+    <main className="flex w-full flex-1 flex-col gap-7 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Admin</p>
