@@ -1,4 +1,5 @@
 import { SignUp } from "@clerk/nextjs";
+import { LegalConsentNotice } from "@/components/legal-consent-notice";
 import { getSafeRedirectPath } from "@/lib/safe-redirect";
 
 interface SignupPageProps {
@@ -19,6 +20,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
         signInUrl="/login"
         fallbackRedirectUrl={safeRedirectPath}
       />
+      <LegalConsentNotice className="mt-6" />
     </main>
   );
 }
