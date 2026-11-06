@@ -7,7 +7,8 @@ import { DashboardPreview } from "@/components/dashboard-preview";
 import { EditorDemo } from "@/components/editor-demo";
 import { MethodPreview } from "@/components/method-preview";
 import { LANDING_PAGE_COPY } from "@/lib/landing-page-copy";
-import { LEGAL_DOCUMENT_LIST } from "@/lib/legal-documents";
+import { LEGAL_DOCUMENT_PATHS } from "@/lib/legal-constants";
+import { LEGAL_DOCUMENT_SLUGS, LEGAL_LINK_COPY } from "@/lib/legal-link-copy";
 import { useScrollParallax } from "@/lib/use-parallax";
 import { useReveal } from "@/lib/use-reveal";
 
@@ -210,9 +211,9 @@ export function HomeHero({ isAuthenticated }: HomeHeroProps) {
           ))}
         </div>
         <nav aria-label="Legal" className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-          {LEGAL_DOCUMENT_LIST.map((legalDocument) => (
-            <Link key={legalDocument.slug} href={legalDocument.path} className="transition-colors hover:text-zinc-300">
-              {legalDocument.title}
+          {LEGAL_DOCUMENT_SLUGS.map((slug) => (
+            <Link key={slug} href={LEGAL_DOCUMENT_PATHS[slug]} className="transition-colors hover:text-zinc-300">
+              {LEGAL_LINK_COPY[locale].titles[slug]}
             </Link>
           ))}
         </nav>
