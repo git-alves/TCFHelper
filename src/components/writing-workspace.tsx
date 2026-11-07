@@ -58,6 +58,8 @@ interface RecentExamTopic {
   prompt: string;
   sourceUrl: string;
   sourceMonth: string;
+  /** True when the live source was unavailable and this is an earlier, stored topic. */
+  previouslyPublished: boolean;
   guideContext: WritingContextClassification;
 }
 
@@ -247,7 +249,7 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   if (!topic || typeof topic !== "object") return null;
 
   const candidate = topic as Record<string, unknown>;
-  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext } = candidate;
+  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext, previouslyPublished } = candidate;
   if (
     typeof id !== "string" ||
     taskType !== expectedTaskType ||
@@ -260,7 +262,16 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
     return null;
   }
 
-  return { id, taskType: expectedTaskType, title, prompt, sourceUrl, sourceMonth, guideContext };
+  return {
+    id,
+    taskType: expectedTaskType,
+    title,
+    prompt,
+    sourceUrl,
+    sourceMonth,
+    previouslyPublished: previouslyPublished === true,
+    guideContext,
+  };
 }
 
 // A Tâche 3 topic's prompt is built as "title\n\nDocument 1 :\n...\n\nDocument
@@ -2019,9 +2030,26 @@ export function WritingWorkspace() {
 
             {topicMode === "recent" && recentTopic && (
               <article
-                aria-label={copy.workspace.topic.selectedRecentExamAriaLabel}
+                aria-label={
+                  recentTopic.previouslyPublished
+                    ? copy.workspace.topic.selectedPreviouslyPublishedAriaLabel
+                    : copy.workspace.topic.selectedRecentExamAriaLabel
+                }
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
+                {recentTopic.previouslyPublished && (
+                  <div
+                    role="note"
+                    className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+                  >
+                    <p className="font-semibold">{copy.workspace.topic.previouslyPublishedBadge}</p>
+                    <p className="mt-1">
+                      {copy.workspace.topic.previouslyPublishedNotice({
+                        month: formatSourceMonth(recentTopic.sourceMonth, locale),
+                      })}
+                    </p>
+                  </div>
+                )}
                 <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
                 <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
                   {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
@@ -2034,7 +2062,9 @@ export function WritingWorkspace() {
                     rel="noreferrer"
                     className="underline underline-offset-2 hover:text-foreground"
                   >
-                    {copy.workspace.topic.recentExamsSource({
+                    {(recentTopic.previouslyPublished
+                      ? copy.workspace.topic.previouslyPublishedSource
+                      : copy.workspace.topic.recentExamsSource)({
                       month: formatSourceMonth(recentTopic.sourceMonth, locale),
                     })}
                   </a>

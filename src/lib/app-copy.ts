@@ -326,6 +326,10 @@ export interface AppCopy {
       selectedRecentExamAriaLabel: string;
       sourceLabel: string;
       recentExamsSource: (values: SourceMonthValues) => string;
+      previouslyPublishedBadge: string;
+      previouslyPublishedNotice: (values: SourceMonthValues) => string;
+      previouslyPublishedSource: (values: SourceMonthValues) => string;
+      selectedPreviouslyPublishedAriaLabel: string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
     };
@@ -857,6 +861,11 @@ export const APP_COPY = {
         selectedRecentExamAriaLabel: "Selected recent-exam prompt",
         sourceLabel: "Source:",
         recentExamsSource: ({ month }) => `Recent exams — ${month}`,
+        previouslyPublishedBadge: "Previously published topic",
+        previouslyPublishedNotice: ({ month }) =>
+          `We couldn't load the latest exam prompts, so this one was published earlier (${month}). It may not match the current exam.`,
+        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (previously published)`,
+        selectedPreviouslyPublishedAriaLabel: "Selected previously published prompt",
         customTopicLabel: "Your exam prompt",
         customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
@@ -1525,6 +1534,11 @@ export const APP_COPY = {
         selectedRecentExamAriaLabel: "Consigne d’examen récent sélectionnée",
         sourceLabel: "Source :",
         recentExamsSource: ({ month }) => `Examens récents — ${month}`,
+        previouslyPublishedBadge: "Consigne précédemment publiée",
+        previouslyPublishedNotice: ({ month }) =>
+          `Nous n’avons pas pu charger les dernières consignes d’examen ; celle-ci a été publiée plus tôt (${month}). Elle peut ne pas correspondre à l’examen actuel.`,
+        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publiée précédemment)`,
+        selectedPreviouslyPublishedAriaLabel: "Consigne précédemment publiée sélectionnée",
         customTopicLabel: "Votre consigne d’examen",
         customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
@@ -2197,6 +2211,11 @@ export const APP_COPY = {
         selectedRecentExamAriaLabel: "Consigna de examen reciente seleccionada",
         sourceLabel: "Fuente:",
         recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
+        previouslyPublishedBadge: "Consigna publicada anteriormente",
+        previouslyPublishedNotice: ({ month }) =>
+          `No pudimos cargar las consignas de examen más recientes; esta se publicó antes (${month}). Puede no corresponder al examen actual.`,
+        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicada anteriormente)`,
+        selectedPreviouslyPublishedAriaLabel: "Consigna publicada anteriormente seleccionada",
         customTopicLabel: "Tu consigna de examen",
         customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
@@ -2869,6 +2888,11 @@ export const APP_COPY = {
         selectedRecentExamAriaLabel: "Enunciado de exame recente selecionado",
         sourceLabel: "Fonte:",
         recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
+        previouslyPublishedBadge: "Enunciado publicado anteriormente",
+        previouslyPublishedNotice: ({ month }) =>
+          `Não foi possível carregar os enunciados de exame mais recentes; este foi publicado antes (${month}). Ele pode não corresponder ao exame atual.`,
+        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicado anteriormente)`,
+        selectedPreviouslyPublishedAriaLabel: "Enunciado publicado anteriormente selecionado",
         customTopicLabel: "Seu enunciado de exame",
         customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },

@@ -32,6 +32,18 @@ function notPublishedResponse() {
 
 const SOURCE_MONTH_PATTERN = /:(\d{4}-\d{2}):/u;
 const STORED_TOPIC_CANDIDATES = 40;
+// How old a stored topic may be and still be offered when the live source is
+// down: its source month must fall within this many months of today. Older
+// prompts no longer say anything useful about the current exam, so beyond this
+// the learner is told the source is unavailable instead.
+const STORED_TOPIC_MAX_AGE_MONTHS = 6;
+
+// "YYYY-MM" for the oldest source month still inside the window, in UTC to match
+// how source months are derived (see getRecentExamSource).
+function oldestAllowedSourceMonth(now: Date): string {
+  const oldest = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - STORED_TOPIC_MAX_AGE_MONTHS, 1));
+  return `${oldest.getUTCFullYear()}-${String(oldest.getUTCMonth() + 1).padStart(2, "0")}`;
+}
 
 // The upstream site can be unreachable or answer automated requests with a bot
 // challenge, and that must not leave learners with no exam prompt at all. Topics
@@ -60,9 +72,13 @@ async function findStoredRecentTopic(taskType: TaskType) {
     },
   });
 
+  const oldestAllowed = oldestAllowedSourceMonth(new Date());
   const candidates = rows.flatMap((row) => {
     const sourceMonth = row.externalRef?.match(SOURCE_MONTH_PATTERN)?.[1];
-    return sourceMonth && row.sourceUrl ? [{ ...row, sourceUrl: row.sourceUrl, sourceMonth }] : [];
+    // "YYYY-MM" strings compare correctly as text.
+    return sourceMonth && row.sourceUrl && sourceMonth >= oldestAllowed
+      ? [{ ...row, sourceUrl: row.sourceUrl, sourceMonth }]
+      : [];
   });
   if (candidates.length === 0) return null;
 
@@ -81,6 +97,7 @@ function topicResponse(
   },
   sourceUrl: string,
   sourceMonth: string,
+  previouslyPublished: boolean,
 ) {
   // An editorial override on the stored record always wins over the
   // deterministic classifier -- see docs/guided-writing.md's context-source
@@ -100,6 +117,9 @@ function topicResponse(
         prompt: topic.prompt,
         sourceUrl,
         sourceMonth,
+        // True only for a stored topic served after a live-retrieval failure, so
+        // the client can disclose that it is not current exam content.
+        previouslyPublished,
         guideContext,
       },
     },
@@ -188,7 +208,7 @@ export async function GET(request: Request) {
       throw new Error("Recent-exam topic provenance did not match the request.");
     }
 
-    return topicResponse(topic, recentTopic.sourceUrl, recentTopic.sourceMonth);
+    return topicResponse(topic, recentTopic.sourceUrl, recentTopic.sourceMonth, false);
   } catch (error) {
     if (error instanceof RecentExamTopicError && error.code === "NOT_PUBLISHED") {
       return notPublishedResponse();
@@ -200,7 +220,7 @@ export async function GET(request: Request) {
       const stored = await findStoredRecentTopic(taskType);
       if (stored) {
         console.warn(`Serving stored recent-exam topic ${stored.id} (${stored.sourceMonth}) after a live retrieval failure`);
-        return topicResponse(stored, stored.sourceUrl, stored.sourceMonth);
+        return topicResponse(stored, stored.sourceUrl, stored.sourceMonth, true);
       }
     } catch (fallbackError) {
       console.error("Stored recent-exam topic lookup failed", fallbackError);
