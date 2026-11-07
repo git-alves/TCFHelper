@@ -51,20 +51,18 @@ import type { WritingContextClassification } from "@/lib/guided-writing-classifi
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 
-interface RecentExamTopic {
+// A topic from the app's own database of practice prompts (see
+// src/lib/starter-topics.ts), served at random by /api/topics/random.
+interface BankTopic {
   id: string;
   taskType: TaskType;
   title: string;
   prompt: string;
-  sourceUrl: string;
-  sourceMonth: string;
-  /** True when the live source was unavailable and this is an earlier, stored topic. */
-  previouslyPublished: boolean;
   guideContext: WritingContextClassification;
 }
 
 type TopicMode = "recent" | "custom" | null;
-type RecentTopicErrorKind = "fetch" | "unavailable" | "notPublished";
+type RecentTopicErrorKind = "fetch" | "unavailable";
 type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
@@ -95,9 +93,8 @@ interface TimedTaskSummary {
 type ExampleLevel = "B2" | "C1" | "C2";
 type ExampleErrorKind = "dailyLimit" | "rateLimited" | "unavailable" | "generic";
 const EXAMPLE_LEVELS: ExampleLevel[] = ["B2", "C1", "C2"];
-// Distinguishes the three task cards at a glance, reused for the recent
-// exams/write-your-own prompt cards to visually tie "Get a prompt from
-// recent exams" back to Task 1's color and "Write or paste my own prompt"
+// Distinguishes the three task cards at a glance, reused for the random-topic
+// and write-your-own cards to visually tie "Get a random topic" back to Task 1's color and "Write or paste my own prompt"
 // back to Task 3's, rather than introducing unrelated colors there.
 const TASK_TITLE_COLOR: Record<TaskType, string> = {
   TASK_1: "text-blue-600 dark:text-blue-400",
@@ -242,40 +239,29 @@ function isWritingContextClassification(value: unknown): value is WritingContext
   );
 }
 
-function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): RecentExamTopic | null {
+function readBankTopic(value: unknown, expectedTaskType: TaskType): BankTopic | null {
   if (!value || typeof value !== "object") return null;
 
   const topic = (value as { topic?: unknown }).topic;
   if (!topic || typeof topic !== "object") return null;
 
   const candidate = topic as Record<string, unknown>;
-  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext, previouslyPublished } = candidate;
+  const { id, taskType, title, prompt, guideContext } = candidate;
   if (
     typeof id !== "string" ||
     taskType !== expectedTaskType ||
     typeof title !== "string" ||
     typeof prompt !== "string" ||
-    typeof sourceUrl !== "string" ||
-    typeof sourceMonth !== "string" ||
     !isWritingContextClassification(guideContext)
   ) {
     return null;
   }
 
-  return {
-    id,
-    taskType: expectedTaskType,
-    title,
-    prompt,
-    sourceUrl,
-    sourceMonth,
-    previouslyPublished: previouslyPublished === true,
-    guideContext,
-  };
+  return { id, taskType: expectedTaskType, title, prompt, guideContext };
 }
 
 // A Tâche 3 topic's prompt is built as "title\n\nDocument 1 :\n...\n\nDocument
-// 2 :\n..." (see parseTaskThree in recent-exam-topics.ts) so the model
+// 2 :\n..." (see starter-topics.ts) so the model
 // answer generator sees the title alongside the source documents. The title
 // is also shown on its own above the prompt, so displaying the prompt
 // verbatim would show it twice -- strip just that leading duplicate for
@@ -305,17 +291,6 @@ function resizeCustomTopicTextarea(textarea: HTMLTextAreaElement | null) {
   textarea.style.height = "auto";
   const { borderTopWidth, borderBottomWidth } = window.getComputedStyle(textarea);
   textarea.style.height = `${textarea.scrollHeight + parseFloat(borderTopWidth) + parseFloat(borderBottomWidth)}px`;
-}
-
-function formatSourceMonth(sourceMonth: string, locale: AppLocale) {
-  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(sourceMonth);
-  if (!match) return sourceMonth;
-
-  return new Intl.DateTimeFormat(APP_LOCALE_INTL_TAGS[locale], {
-    month: "long",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)));
 }
 
 // Shared open/close plumbing for the two level-picker menus below: closes on
@@ -587,7 +562,7 @@ export function WritingWorkspace() {
   const [taskType, setTaskType] = useState<TaskType | null>(null);
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
 
-  const [recentTopic, setRecentTopic] = useState<RecentExamTopic | null>(null);
+  const [recentTopic, setRecentTopic] = useState<BankTopic | null>(null);
   const [isRecentTopicLoading, setIsRecentTopicLoading] = useState(false);
   // Keep transient errors as stable states rather than translated strings.
   // A language switch can happen while either request is in flight, and the
@@ -1376,7 +1351,7 @@ export function WritingWorkspace() {
   }
 
   // The scripted demo's topic-picker step has no real exam to fall back on
-  // if /api/topics/recent fails -- and unlike the full tour, the short
+  // if /api/topics/random fails -- and unlike the full tour, the short
   // contextual guide (task-picker -> topic-picker -> editor -> correct-
   // button) never reaches guided-writing, whose own step would otherwise
   // paper over exactly this by scripting its own topic. Scripting the same
@@ -1408,20 +1383,15 @@ export function WritingWorkspace() {
 
     try {
       const res = await fetch(
-        `/api/topics/recent?taskType=${encodeURIComponent(currentTaskType)}`,
+        `/api/topics/random?taskType=${encodeURIComponent(currentTaskType)}`,
       );
 
       if (!res.ok) {
-        const data: unknown = await res.json().catch(() => null);
-        const errorCode =
-          data && typeof data === "object" && "code" in data
-            ? (data as { code?: unknown }).code
-            : undefined;
         if (requestId === recentTopicRequestId.current) {
           if (walkthroughDemoActiveRef.current) {
             applyWalkthroughTopicFallback();
           } else {
-            setRecentTopicError(errorCode === "RECENT_EXAM_NOT_PUBLISHED" ? "notPublished" : "fetch");
+            setRecentTopicError("fetch");
           }
         }
         return;
@@ -1430,7 +1400,7 @@ export function WritingWorkspace() {
       const data: unknown = await res.json();
       if (requestId !== recentTopicRequestId.current) return;
 
-      const nextTopic = readRecentExamTopic(data, currentTaskType);
+      const nextTopic = readBankTopic(data, currentTaskType);
       if (!nextTopic) {
         if (walkthroughDemoActiveRef.current) {
           applyWalkthroughTopicFallback();
@@ -1761,7 +1731,7 @@ export function WritingWorkspace() {
     if (!taskType || isTopicLoading || isCorrecting || isGeneratingExample) return;
 
     // An example may only be generated for a topic the learner actually has
-    // in front of them: pulled from the recent-exam source, or their own
+    // in front of them: drawn from the topic bank, or their own
     // pasted/typed prompt. There is no other trusted topic source. The
     // prerequisite is shown as a focused status message without calling the
     // API when the learner has not chosen one yet.
@@ -2020,54 +1990,23 @@ export function WritingWorkspace() {
 
             {recentTopicError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {recentTopicError === "notPublished"
-                  ? copy.workspace.topic.notPublishedError
-                  : recentTopicError === "unavailable"
-                    ? copy.workspace.topic.unavailableError
-                    : copy.workspace.topic.fetchError}
+                {recentTopicError === "unavailable"
+                  ? copy.workspace.topic.unavailableError
+                  : copy.workspace.topic.fetchError}
               </p>
             )}
 
             {topicMode === "recent" && recentTopic && (
               <article
-                aria-label={
-                  recentTopic.previouslyPublished
-                    ? copy.workspace.topic.selectedPreviouslyPublishedAriaLabel
-                    : copy.workspace.topic.selectedRecentExamAriaLabel
-                }
+                aria-label={copy.workspace.topic.selectedTopicAriaLabel}
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
-                {recentTopic.previouslyPublished && (
-                  <div
-                    role="note"
-                    className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
-                  >
-                    <p className="font-semibold">{copy.workspace.topic.previouslyPublishedBadge}</p>
-                    <p className="mt-1">
-                      {copy.workspace.topic.previouslyPublishedNotice({
-                        month: formatSourceMonth(recentTopic.sourceMonth, locale),
-                      })}
-                    </p>
-                  </div>
-                )}
                 <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
                 <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
                   {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
                 </p>
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.sourceLabel}{" "}
-                  <a
-                    href={recentTopic.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline underline-offset-2 hover:text-foreground"
-                  >
-                    {(recentTopic.previouslyPublished
-                      ? copy.workspace.topic.previouslyPublishedSource
-                      : copy.workspace.topic.recentExamsSource)({
-                      month: formatSourceMonth(recentTopic.sourceMonth, locale),
-                    })}
-                  </a>
+                  {copy.workspace.topic.practiceTopicNote}
                 </p>
               </article>
             )}

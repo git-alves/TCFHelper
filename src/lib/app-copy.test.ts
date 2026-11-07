@@ -181,19 +181,13 @@ describe("APP_COPY", () => {
         copy.workspace.topic.heading,
         copy.workspace.topic.recentExamTitle,
         copy.workspace.topic.recentExamDescription,
+        copy.workspace.topic.selectedTopicAriaLabel,
+        copy.workspace.topic.practiceTopicNote,
         copy.workspace.topic.customTitle,
         copy.workspace.topic.customDescription,
         copy.workspace.topic.loading,
         copy.workspace.topic.fetchError,
         copy.workspace.topic.unavailableError,
-        copy.workspace.topic.notPublishedError,
-        copy.workspace.topic.selectedRecentExamAriaLabel,
-        copy.workspace.topic.sourceLabel,
-        copy.workspace.topic.recentExamsSource({ month: "July 2026" }),
-        copy.workspace.topic.previouslyPublishedBadge,
-        copy.workspace.topic.previouslyPublishedNotice({ month: "July 2026" }),
-        copy.workspace.topic.previouslyPublishedSource({ month: "July 2026" }),
-        copy.workspace.topic.selectedPreviouslyPublishedAriaLabel,
         copy.workspace.topic.customTopicLabel,
         copy.workspace.topic.customTopicPlaceholder,
         copy.workspace.editor.heading,
@@ -452,6 +446,34 @@ describe("APP_COPY", () => {
       expect(copy.walkthrough.dashboardStartWritingTitle).toBe(expected.simulateTaskTitle);
       expect(copy.walkthrough.dashboardStartWritingBody).toContain(expected.simulate);
       expect(copy.walkthrough.practiceStagesBody).toContain(expected.simulate);
+    }
+  });
+
+  it("names the topic button \"random topic\" in every language, and the tour step names the same button", () => {
+    const expected = {
+      en: "Get a random topic",
+      fr: "Obtenir un sujet aléatoire",
+      es: "Obtener un tema aleatorio",
+      pt: "Obter um tema aleatório",
+    } as const;
+
+    for (const locale of APP_LOCALES) {
+      const copy = getAppCopy(locale);
+      const label = expected[locale];
+
+      expect(copy.workspace.topic.recentExamTitle).toBe(label);
+      expect(copy.walkthrough.topicPickerBody).toContain(label);
+    }
+  });
+
+  it("no longer promises that every tour or picker prompt is a real, authentic exam prompt", () => {
+    const claims = /authentic|authentique|auténtic|autêntic|pulled directly|proviennent directement/i;
+
+    for (const locale of APP_LOCALES) {
+      const copy = getAppCopy(locale);
+
+      expect(copy.walkthrough.topicPickerBody).not.toMatch(claims);
+      expect(copy.workspace.topic.recentExamDescription).not.toMatch(claims);
     }
   });
 });

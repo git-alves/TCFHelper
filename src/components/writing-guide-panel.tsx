@@ -36,7 +36,7 @@ const CONFIRMABLE_PROFILES: Record<TaskType, readonly GuideProfile[]> = {
 interface WritingGuidePanelProps {
   taskType: TaskType;
   topicMode: "recent" | "custom";
-  // Server-classified for a recent-exam topic (see /api/topics/recent) --
+  // Server-classified for a bank topic (see /api/topics/random) --
   // null only while that topic is still loading.
   recentTopicContext: WritingContextClassification | null;
   customTopicPrompt: string;
