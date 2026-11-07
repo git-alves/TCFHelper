@@ -64,7 +64,7 @@ interface BankTopic {
 }
 
 type TopicMode = "recent" | "custom" | null;
-type RecentTopicErrorKind = "fetch" | "unavailable";
+type RecentTopicErrorKind = "fetch" | "unavailable" | "empty";
 type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
 type TranslationProviderKind = "deepl" | "unofficial";
@@ -1391,11 +1391,16 @@ export function WritingWorkspace() {
       );
 
       if (!res.ok) {
+        // An empty bank (no topics seeded for this task) is not a transient
+        // failure: retrying cannot help, so say so instead of "try again".
+        const data: unknown = await res.json().catch(() => null);
+        const errorCode =
+          data && typeof data === "object" && "code" in data ? (data as { code?: unknown }).code : undefined;
         if (requestId === recentTopicRequestId.current) {
           if (walkthroughDemoActiveRef.current) {
             applyWalkthroughTopicFallback();
           } else {
-            setRecentTopicError("fetch");
+            setRecentTopicError(errorCode === "NO_TOPICS_AVAILABLE" ? "empty" : "fetch");
           }
         }
         return;
@@ -1994,9 +1999,11 @@ export function WritingWorkspace() {
 
             {recentTopicError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {recentTopicError === "unavailable"
-                  ? copy.workspace.topic.unavailableError
-                  : copy.workspace.topic.fetchError}
+                {recentTopicError === "empty"
+                  ? copy.workspace.topic.noTopicsError
+                  : recentTopicError === "unavailable"
+                    ? copy.workspace.topic.unavailableError
+                    : copy.workspace.topic.fetchError}
               </p>
             )}
 
