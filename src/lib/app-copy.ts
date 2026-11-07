@@ -320,6 +320,7 @@ export interface AppCopy {
       loading: string;
       fetchError: string;
       unavailableError: string;
+      noTopicsError: string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
     };
@@ -848,6 +849,7 @@ export const APP_COPY = {
         loading: "Getting a random topic…",
         fetchError: "We couldn't get a topic. Please try again or write your own.",
         unavailableError: "No topic was available. Please try again or write your own.",
+        noTopicsError: "We don't have any topics for this task yet. Please write or paste your own.",
         customTopicLabel: "Your exam prompt",
         customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
@@ -1513,6 +1515,8 @@ export const APP_COPY = {
           "Nous n’avons pas pu obtenir de sujet. Réessayez ou rédigez le vôtre.",
         unavailableError:
           "Aucun sujet n’est disponible. Réessayez ou rédigez le vôtre.",
+        noTopicsError:
+          "Nous n’avons pas encore de sujets pour cette tâche. Rédigez ou collez le vôtre.",
         customTopicLabel: "Votre consigne d’examen",
         customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
@@ -2182,6 +2186,8 @@ export const APP_COPY = {
           "No pudimos obtener un tema. Inténtalo de nuevo o escribe el tuyo.",
         unavailableError:
           "No había ningún tema disponible. Inténtalo de nuevo o escribe el tuyo.",
+        noTopicsError:
+          "Todavía no tenemos temas para esta tarea. Escribe o pega el tuyo.",
         customTopicLabel: "Tu consigna de examen",
         customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
@@ -2851,6 +2857,8 @@ export const APP_COPY = {
           "Não foi possível obter um tema. Tente novamente ou escreva o seu.",
         unavailableError:
           "Nenhum tema estava disponível. Tente novamente ou escreva o seu.",
+        noTopicsError:
+          "Ainda não temos temas para esta tarefa. Escreva ou cole o seu.",
         customTopicLabel: "Seu enunciado de exame",
         customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },

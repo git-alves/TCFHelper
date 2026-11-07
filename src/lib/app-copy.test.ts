@@ -188,6 +188,7 @@ describe("APP_COPY", () => {
         copy.workspace.topic.loading,
         copy.workspace.topic.fetchError,
         copy.workspace.topic.unavailableError,
+        copy.workspace.topic.noTopicsError,
         copy.workspace.topic.customTopicLabel,
         copy.workspace.topic.customTopicPlaceholder,
         copy.workspace.editor.heading,
