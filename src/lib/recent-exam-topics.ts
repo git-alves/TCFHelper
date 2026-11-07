@@ -256,6 +256,16 @@ async function fetchCurrentMonthPage(
 }
 
 function validateResponse(response: Response, source: RecentExamSource): void {
+  // Cloudflare answers automated clients with a managed challenge (HTTP 403 and
+  // `cf-mitigated: challenge`). We never try to get past it; name it so the
+  // server log shows the real cause instead of a generic "unavailable".
+  if (response.headers.get("cf-mitigated")?.toLowerCase() === "challenge") {
+    throw new RecentExamTopicError(
+      "UNAVAILABLE",
+      "The recent-exam source blocked the request with a bot-protection challenge.",
+    );
+  }
+
   if (!response.ok) {
     throw new RecentExamTopicError("UNAVAILABLE", "The recent-exam source is unavailable.");
   }

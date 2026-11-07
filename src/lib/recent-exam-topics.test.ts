@@ -203,6 +203,17 @@ describe("getRecentExamTopic", () => {
     ).rejects.toMatchObject({ code: "UNAVAILABLE" });
   });
 
+  it("names a Cloudflare bot-protection challenge as the cause instead of a generic failure", async () => {
+    const challenge = new Response("<html>Just a moment...</html>", {
+      status: 403,
+      headers: { "content-type": "text/html", "cf-mitigated": "challenge" },
+    });
+
+    await expect(
+      getRecentExamTopic("TASK_1", { now: JULY_2026, fetch: vi.fn().mockResolvedValue(challenge) as typeof fetch })
+    ).rejects.toMatchObject({ code: "UNAVAILABLE", message: expect.stringContaining("bot-protection") });
+  });
+
   it("rejects malformed source JSON instead of treating it as a topic", async () => {
     await expect(
       getRecentExamTopic("TASK_1", {

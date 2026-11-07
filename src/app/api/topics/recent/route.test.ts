@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   getCurrentActivatedAppUserMock,
   AppUserProvisioningErrorMock,
   getRecentExamTopicMock,
   upsertMock,
+  findManyMock,
   RecentExamTopicErrorMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
@@ -22,6 +23,7 @@ const {
     AppUserProvisioningErrorMock,
     getRecentExamTopicMock: vi.fn(),
     upsertMock: vi.fn(),
+    findManyMock: vi.fn(),
     RecentExamTopicErrorMock,
   };
 });
@@ -35,7 +37,7 @@ vi.mock("@/lib/recent-exam-topics", () => ({
   RecentExamTopicError: RecentExamTopicErrorMock,
 }));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { topic: { upsert: upsertMock } },
+  prisma: { topic: { upsert: upsertMock, findMany: findManyMock } },
 }));
 
 const { GET } = await import("./route");
@@ -54,6 +56,8 @@ beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   getRecentExamTopicMock.mockReset();
   upsertMock.mockReset();
+  findManyMock.mockReset();
+  findManyMock.mockResolvedValue([]);
 
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   getRecentExamTopicMock.mockResolvedValue(recentTopic);
@@ -105,6 +109,7 @@ describe("GET /api/topics/recent", () => {
         prompt: recentTopic.prompt,
         sourceUrl: recentTopic.sourceUrl,
         sourceMonth: "2026-07",
+        previouslyPublished: false,
         // No editorial override on this freshly scraped row -- falls back to
         // the deterministic classifier, which can't tell article from public
         // letter for this prompt and asks the learner to confirm.
@@ -197,5 +202,144 @@ describe("GET /api/topics/recent", () => {
 
     expect(response.status).toBe(502);
     expect(upsertMock).not.toHaveBeenCalled();
+  });
+
+  describe("when the live source cannot be used", () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(new Date("2026-11-07T12:00:00Z"));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const stored = (id: string, month: string, over: Record<string, unknown> = {}) => ({
+      id,
+      taskType: "TASK_2",
+      title: `Tâche 2 — ${id}`,
+      prompt: `Prompt ${id}`,
+      sourceUrl: `https://reussir-tcfcanada.com/${month}/`,
+      externalRef: `reussir-tcf-canada:${month}:TASK_2:1:abc123`,
+      guideContext: null,
+      ...over,
+    });
+
+    it("serves a previously stored recent-exam topic instead of failing (bot-protection block, outage)", async () => {
+      getRecentExamTopicMock.mockRejectedValue(
+        new RecentExamTopicErrorMock("UNAVAILABLE", "The recent-exam source blocked the request."),
+      );
+      findManyMock.mockResolvedValue([stored("t_old", "2026-09"), stored("t_new", "2026-10")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(200);
+      const body = await response.json();
+      expect(body.topic).toMatchObject({
+        id: "t_new",
+        taskType: "TASK_2",
+        sourceMonth: "2026-10",
+        sourceUrl: "https://reussir-tcfcanada.com/2026-10/",
+        previouslyPublished: true,
+      });
+      expect(body.topic.guideContext).toBeDefined();
+      expect(upsertMock).not.toHaveBeenCalled();
+      expect(findManyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ source: "RECENT_EXAM", taskType: "TASK_2", retiredAt: null }),
+        }),
+      );
+    });
+
+    it("flags a live topic as not previously published", async () => {
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect((await response.json()).topic.previouslyPublished).toBe(false);
+    });
+
+    it("offers a stored topic from exactly the oldest month inside the window", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("edge", "2026-05")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(200);
+      expect((await response.json()).topic).toMatchObject({ id: "edge", sourceMonth: "2026-05", previouslyPublished: true });
+    });
+
+    it("refuses stored topics older than the window instead of presenting stale exam content", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("stale", "2026-04"), stored("ancient", "2024-01")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(502);
+    });
+
+    it("skips over-age rows but still serves a fresher one from the same lookup", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("stale", "2025-12"), stored("fresh", "2026-08")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect((await response.json()).topic.id).toBe("fresh");
+    });
+
+    it("applies the window across a year boundary", async () => {
+      vi.setSystemTime(new Date("2027-02-10T12:00:00Z"));
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("inside", "2026-08"), stored("outside", "2026-07")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect((await response.json()).topic.id).toBe("inside");
+    });
+
+    it("prefers an editorial guide context on the stored topic", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("t1", "2026-10", { guideContext: "INFORMAL_PERSONAL_MESSAGE" })]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect((await response.json()).topic.guideContext).toEqual({
+        profile: "INFORMAL_PERSONAL_MESSAGE",
+        confidence: "deterministic",
+      });
+    });
+
+    it("ignores stored rows that lack a parsable source month", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockResolvedValue([stored("bad", "2026-10", { externalRef: "something-else" })]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(502);
+    });
+
+    it("still reports unavailable when nothing has been stored yet", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(502);
+    });
+
+    it("still reports unavailable if the stored-topic lookup itself fails", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+      findManyMock.mockRejectedValue(new Error("database down"));
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(502);
+    });
+
+    it("does not substitute a stored topic when the month is simply not published yet", async () => {
+      getRecentExamTopicMock.mockRejectedValue(new RecentExamTopicErrorMock("NOT_PUBLISHED", "not yet"));
+      findManyMock.mockResolvedValue([stored("t1", "2026-10")]);
+
+      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+      expect(response.status).toBe(404);
+      expect(findManyMock).not.toHaveBeenCalled();
+    });
   });
 });
