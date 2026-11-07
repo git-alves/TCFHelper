@@ -35,6 +35,7 @@ import { selectMenuPlacement, visibleBoundaryFor } from "@/components/themed-sel
 import { TranslationProviderNotice } from "@/components/translation-provider-notice";
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
+import { TaskThreeDocumentsView } from "@/components/task-three-documents";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
 import { checkFrenchText } from "@/lib/french-text-check";
@@ -50,6 +51,7 @@ import {
 import type { WritingContextClassification } from "@/lib/guided-writing-classifier";
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
+import { splitTaskThreeDocuments } from "@/lib/task-three-topic";
 
 // A topic from the app's own database of practice prompts (see
 // src/lib/starter-topics.ts), served at random by /api/topics/random.
@@ -563,6 +565,8 @@ export function WritingWorkspace() {
   const [topicMode, setTopicMode] = useState<TopicMode>(null);
 
   const [recentTopic, setRecentTopic] = useState<BankTopic | null>(null);
+  // Only a Tâche 3 topic splits into two documents, and then it is shown as the exam sheet.
+  const recentTopicDocuments = recentTopic ? splitTaskThreeDocuments(recentTopic.prompt) : null;
   const [isRecentTopicLoading, setIsRecentTopicLoading] = useState(false);
   // Keep transient errors as stable states rather than translated strings.
   // A language switch can happen while either request is in flight, and the
@@ -2001,10 +2005,16 @@ export function WritingWorkspace() {
                 aria-label={copy.workspace.topic.selectedTopicAriaLabel}
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
-                <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
-                <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
-                  {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
-                </p>
+                {recentTopicDocuments ? (
+                  <TaskThreeDocumentsView title={recentTopic.title} documents={recentTopicDocuments.documents} />
+                ) : (
+                  <>
+                    <h3 lang="fr" className="font-medium">{recentTopic.title}</h3>
+                    <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
+                      {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
+                    </p>
+                  </>
+                )}
                 <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
                   {copy.workspace.topic.practiceTopicNote}
                 </p>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasTaskThreeDocuments } from "./task-three-topic";
+import { hasTaskThreeDocuments, splitTaskThreeDocuments } from "./task-three-topic";
 
 describe("hasTaskThreeDocuments", () => {
   it("detects the real recent-exam format: a title, then labeled sections each on their own line", () => {
@@ -79,5 +79,36 @@ describe("hasTaskThreeDocuments", () => {
       "Document 2 :\r\nLes téléphones sont des outils pédagogiques utiles.";
 
     expect(hasTaskThreeDocuments(topicPrompt)).toBe(true);
+  });
+});
+
+describe("splitTaskThreeDocuments", () => {
+  it("splits a bank-format prompt into its heading and two documents", () => {
+    const result = splitTaskThreeDocuments(
+      "Le vote obligatoire\n\nDocument 1 :\nPremier texte.\nSuite du premier.\n\nDocument 2 :\nSecond texte.",
+    );
+
+    expect(result).toEqual({
+      heading: "Le vote obligatoire",
+      documents: ["Premier texte.\nSuite du premier.", "Second texte."],
+    });
+  });
+
+  it("accepts content on the same line as the label and CRLF line endings", () => {
+    const result = splitTaskThreeDocuments("Document 1 : Un.\r\nDocument 2 : Deux.\r\n");
+
+    expect(result).toEqual({ heading: null, documents: ["Un.", "Deux."] });
+  });
+
+  it("returns null for anything that is not two non-empty documents", () => {
+    expect(splitTaskThreeDocuments("Écrivez un message à un ami.")).toBeNull();
+    expect(splitTaskThreeDocuments("Document 1 :\nSeul.")).toBeNull();
+    expect(splitTaskThreeDocuments("Document 1 :\n\nDocument 2 :\nDeux.")).toBeNull();
+  });
+
+  it("agrees with hasTaskThreeDocuments", () => {
+    for (const prompt of ["Document 1 : a\nDocument 2 : b", "Document 1 : a", "texte libre"]) {
+      expect(hasTaskThreeDocuments(prompt)).toBe(splitTaskThreeDocuments(prompt) !== null);
+    }
   });
 });
