@@ -77,7 +77,7 @@ function matchesAny(normalizedText: string, keywords: readonly string[]): boolea
  * Classifies a topic's writing situation from its visible French prompt
  * text only -- never the learner's draft. Task 3 is always the
  * argumentative-analysis profile (every TCF Tâche 3 prompt is a two-document
- * analysis, see starter-topics.ts and recent-exam-topics.ts's parseTaskThree),
+ * analysis, see starter-topics.ts and the Tâche 3 topic format),
  * so it's deterministic without reading the prompt at all. A colleague is
  * treated as professional/formal; "correspondant" and "camarade" are not
  * enough to establish a register on their own, so Task 1 and Task 2 fall

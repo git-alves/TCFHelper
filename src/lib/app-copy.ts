@@ -24,10 +24,6 @@ interface WordCountValues extends TargetLengthValues {
   count: number;
 }
 
-interface SourceMonthValues {
-  month: string;
-}
-
 interface TranslationLimitValues {
   maxCharacters: string;
 }
@@ -317,19 +313,13 @@ export interface AppCopy {
       heading: string;
       recentExamTitle: string;
       recentExamDescription: string;
+      selectedTopicAriaLabel: string;
+      practiceTopicNote: string;
       customTitle: string;
       customDescription: string;
       loading: string;
       fetchError: string;
       unavailableError: string;
-      notPublishedError: string;
-      selectedRecentExamAriaLabel: string;
-      sourceLabel: string;
-      recentExamsSource: (values: SourceMonthValues) => string;
-      previouslyPublishedBadge: string;
-      previouslyPublishedNotice: (values: SourceMonthValues) => string;
-      previouslyPublishedSource: (values: SourceMonthValues) => string;
-      selectedPreviouslyPublishedAriaLabel: string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
     };
@@ -790,9 +780,9 @@ export const APP_COPY = {
       taskPickerTitle: "Choose a task",
       taskPickerBody:
         "TCF written expression has three task types: Tâche 1 (communicate effectively in a short message, for the right reader and in the right register), Tâche 2 (recount an experience for several readers, with commentary suited to its purpose), and Tâche 3 (analyze a topic from different points of view). We'll walk through Tâche 1 as an example.",
-      topicPickerTitle: "Choose an exam prompt",
+      topicPickerTitle: "Choose a topic",
       topicPickerBody:
-        "Recent exam prompts are pulled directly from real, recently published TCF exams on this site, so you always practise with an authentic prompt. You can also paste in your own prompt instead.",
+        "Click Get a random topic to load a practice topic for your task from our own collection. You can also paste in your own topic instead.",
       timedTaskTourTitle: "Practise under exam conditions",
       timedTaskTourBody: "Start a timed task when you want to rehearse the real time pressure of the exam. It tracks the suggested time for this task and keeps running in the background while you write.",
       spellCheckTourTitle: "Catch spelling mistakes as you type",
@@ -848,24 +838,16 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Target length: ${minWords}–${maxWords} words.`,
       },
       topic: {
-        heading: "Choose an exam prompt",
-        recentExamTitle: "Get a prompt from recent exams",
-        recentExamDescription: "Load an authentic prompt for the task you selected.",
+        heading: "Choose a topic",
+        recentExamTitle: "Get a random topic",
+        recentExamDescription: "Load a practice topic for the task you selected.",
+        selectedTopicAriaLabel: "Selected topic",
+        practiceTopicNote: "This is a practice topic from our own collection, written in the format of the selected task.",
         customTitle: "Write or paste my own prompt",
         customDescription: "Use an exam prompt you already have.",
-        loading: "Getting a prompt from recent exams…",
-        fetchError: "We couldn't get a prompt from recent exams. Please try again or write your own.",
-        unavailableError: "The recent-exam prompt was unavailable. Please try again or write your own.",
-        notPublishedError:
-          "No recent-exam prompts have been published for this month or the previous month. Write or paste your own prompt.",
-        selectedRecentExamAriaLabel: "Selected recent-exam prompt",
-        sourceLabel: "Source:",
-        recentExamsSource: ({ month }) => `Recent exams — ${month}`,
-        previouslyPublishedBadge: "Previously published topic",
-        previouslyPublishedNotice: ({ month }) =>
-          `We couldn't load the latest exam prompts, so this one was published earlier (${month}). It may not match the current exam.`,
-        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (previously published)`,
-        selectedPreviouslyPublishedAriaLabel: "Selected previously published prompt",
+        loading: "Getting a random topic…",
+        fetchError: "We couldn't get a topic. Please try again or write your own.",
+        unavailableError: "No topic was available. Please try again or write your own.",
         customTopicLabel: "Your exam prompt",
         customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
@@ -900,7 +882,7 @@ export const APP_COPY = {
         exampleUnavailableError: "The example generator isn't available right now.",
         exampleGenericError: "We couldn't generate an example. Please try again.",
         exampleNeedsTopicWarning:
-          "Choose an exam prompt from recent exams or paste your own before generating an example.",
+          "Get a random topic or paste your own before generating an example.",
         copy: "Copy text",
         copied: "Copied!",
         copyFailed: "Couldn't copy",
@@ -1460,9 +1442,9 @@ export const APP_COPY = {
       taskPickerTitle: "Choisissez une tâche",
       taskPickerBody:
         "L’expression écrite du TCF comprend trois types de tâches : la Tâche 1 (communiquer efficacement dans un message court, au bon destinataire et dans le registre adapté), la Tâche 2 (raconter une expérience pour plusieurs destinataires, avec des commentaires adaptés à son objectif) et la Tâche 3 (analyser un sujet sous différents points de vue). Nous allons parcourir la Tâche 1 à titre d’exemple.",
-      topicPickerTitle: "Choisissez une consigne d’examen",
+      topicPickerTitle: "Choisissez un sujet",
       topicPickerBody:
-        "Les consignes d’examens récents proviennent directement de vrais examens du TCF récemment publiés sur ce site, pour vous entraîner avec des consignes authentiques. Vous pouvez aussi coller la vôtre.",
+        "Cliquez sur « Obtenir un sujet aléatoire » pour charger un sujet d’entraînement pour votre tâche, issu de notre propre collection. Vous pouvez aussi coller votre propre sujet.",
       timedTaskTourTitle: "Entraînez-vous dans les conditions de l'examen",
       timedTaskTourBody: "Démarrez une tâche chronométrée pour vous entraîner avec la vraie pression de temps de l'examen. Elle suit la durée suggérée pour cette tâche et continue en arrière-plan pendant que vous écrivez.",
       spellCheckTourTitle: "Repérez les fautes d’orthographe en écrivant",
@@ -1519,26 +1501,18 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Longueur visée : ${minWords}–${maxWords} mots.`,
       },
       topic: {
-        heading: "Choisissez une consigne d’examen",
-        recentExamTitle: "Obtenir une consigne d’examens récents",
-        recentExamDescription: "Chargez une consigne authentique pour la tâche choisie.",
+        heading: "Choisissez un sujet",
+        recentExamTitle: "Obtenir un sujet aléatoire",
+        recentExamDescription: "Chargez un sujet d’entraînement pour la tâche choisie.",
+        selectedTopicAriaLabel: "Sujet sélectionné",
+        practiceTopicNote: "Il s’agit d’un sujet d’entraînement issu de notre propre collection, rédigé selon le format de la tâche choisie.",
         customTitle: "Écrire ou coller ma propre consigne",
         customDescription: "Utilisez une consigne d’examen que vous avez déjà.",
-        loading: "Récupération d’une consigne d’examens récents…",
+        loading: "Récupération d’un sujet aléatoire…",
         fetchError:
-          "Nous n’avons pas pu obtenir une consigne d’examens récents. Réessayez ou rédigez la vôtre.",
+          "Nous n’avons pas pu obtenir de sujet. Réessayez ou rédigez le vôtre.",
         unavailableError:
-          "La consigne d’examens récents n’est pas disponible. Réessayez ou rédigez la vôtre.",
-        notPublishedError:
-          "Aucune consigne d’examens récents n’a été publiée pour ce mois-ci ni le mois précédent. Rédigez ou collez la vôtre.",
-        selectedRecentExamAriaLabel: "Consigne d’examen récent sélectionnée",
-        sourceLabel: "Source :",
-        recentExamsSource: ({ month }) => `Examens récents — ${month}`,
-        previouslyPublishedBadge: "Consigne précédemment publiée",
-        previouslyPublishedNotice: ({ month }) =>
-          `Nous n’avons pas pu charger les dernières consignes d’examen ; celle-ci a été publiée plus tôt (${month}). Elle peut ne pas correspondre à l’examen actuel.`,
-        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publiée précédemment)`,
-        selectedPreviouslyPublishedAriaLabel: "Consigne précédemment publiée sélectionnée",
+          "Aucun sujet n’est disponible. Réessayez ou rédigez le vôtre.",
         customTopicLabel: "Votre consigne d’examen",
         customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
@@ -1573,7 +1547,7 @@ export const APP_COPY = {
         exampleUnavailableError: "Le générateur d’exemples n’est pas disponible pour le moment.",
         exampleGenericError: "Nous n’avons pas pu générer d’exemple. Réessayez.",
         exampleNeedsTopicWarning:
-          "Choisissez une consigne d’examens récents ou collez la vôtre avant de générer un exemple.",
+          "Obtenez un sujet aléatoire ou collez le vôtre avant de générer un exemple.",
         copy: "Copier le texte",
         copied: "Copié !",
         copyFailed: "Impossible de copier",
@@ -2137,9 +2111,9 @@ export const APP_COPY = {
       taskPickerTitle: "Elige una tarea",
       taskPickerBody:
         "La expresión escrita del TCF tiene tres tipos de tareas: la Tarea 1 (comunicarse eficazmente en un mensaje breve, para el destinatario y el registro adecuados), la Tarea 2 (narrar una experiencia para varios destinatarios, con comentarios adaptados a su objetivo) y la Tarea 3 (analizar un tema desde distintos puntos de vista). Vamos a recorrer la Tarea 1 como ejemplo.",
-      topicPickerTitle: "Elige una consigna de examen",
+      topicPickerTitle: "Elige un tema",
       topicPickerBody:
-        "Las consignas de exámenes recientes provienen directamente de exámenes reales del TCF publicados recientemente en este sitio, para que practiques siempre con una consigna auténtica. También puedes pegar la tuya.",
+        "Haz clic en «Obtener un tema aleatorio» para cargar un tema de práctica para tu tarea, de nuestra propia colección. También puedes pegar tu propio tema.",
       timedTaskTourTitle: "Practica en condiciones de examen",
       timedTaskTourBody: "Inicia una tarea cronometrada cuando quieras practicar con la presión de tiempo real del examen. Sigue el tiempo sugerido para esta tarea y continúa en segundo plano mientras escribes.",
       spellCheckTourTitle: "Detecta errores de ortografía mientras escribes",
@@ -2196,26 +2170,18 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Extensión objetivo: ${minWords}–${maxWords} palabras.`,
       },
       topic: {
-        heading: "Elige una consigna de examen",
-        recentExamTitle: "Obtén una consigna de exámenes recientes",
-        recentExamDescription: "Carga una consigna auténtica para la tarea que seleccionaste.",
+        heading: "Elige un tema",
+        recentExamTitle: "Obtener un tema aleatorio",
+        recentExamDescription: "Carga un tema de práctica para la tarea que seleccionaste.",
+        selectedTopicAriaLabel: "Tema seleccionado",
+        practiceTopicNote: "Este es un tema de práctica de nuestra propia colección, redactado según el formato de la tarea elegida.",
         customTitle: "Escribe o pega mi propia consigna",
         customDescription: "Usa una consigna de examen que ya tengas.",
-        loading: "Obteniendo una consigna de exámenes recientes…",
+        loading: "Obteniendo un tema aleatorio…",
         fetchError:
-          "No pudimos obtener una consigna de exámenes recientes. Inténtalo de nuevo o escribe la tuya.",
+          "No pudimos obtener un tema. Inténtalo de nuevo o escribe el tuyo.",
         unavailableError:
-          "La consigna de exámenes recientes no estaba disponible. Inténtalo de nuevo o escribe la tuya.",
-        notPublishedError:
-          "No se ha publicado ninguna consigna de exámenes recientes para este mes ni el anterior. Escribe o pega la tuya.",
-        selectedRecentExamAriaLabel: "Consigna de examen reciente seleccionada",
-        sourceLabel: "Fuente:",
-        recentExamsSource: ({ month }) => `Exámenes recientes — ${month}`,
-        previouslyPublishedBadge: "Consigna publicada anteriormente",
-        previouslyPublishedNotice: ({ month }) =>
-          `No pudimos cargar las consignas de examen más recientes; esta se publicó antes (${month}). Puede no corresponder al examen actual.`,
-        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicada anteriormente)`,
-        selectedPreviouslyPublishedAriaLabel: "Consigna publicada anteriormente seleccionada",
+          "No había ningún tema disponible. Inténtalo de nuevo o escribe el tuyo.",
         customTopicLabel: "Tu consigna de examen",
         customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
@@ -2250,7 +2216,7 @@ export const APP_COPY = {
         exampleUnavailableError: "El generador de ejemplos no está disponible en este momento.",
         exampleGenericError: "No pudimos generar un ejemplo. Inténtalo de nuevo.",
         exampleNeedsTopicWarning:
-          "Elige una consigna de exámenes recientes o pega la tuya antes de generar un ejemplo.",
+          "Obtén un tema aleatorio o pega el tuyo antes de generar un ejemplo.",
         copy: "Copiar texto",
         copied: "¡Copiado!",
         copyFailed: "No se pudo copiar",
@@ -2814,9 +2780,9 @@ export const APP_COPY = {
       taskPickerTitle: "Escolha uma tarefa",
       taskPickerBody:
         "A expressão escrita do TCF tem três tipos de tarefa: a Tarefa 1 (comunicar-se com eficácia em uma mensagem curta, para o destinatário e o registro adequados), a Tarefa 2 (narrar uma experiência para vários destinatários, com comentários adequados ao seu objetivo) e a Tarefa 3 (analisar um tema sob diferentes pontos de vista). Vamos percorrer a Tarefa 1 como exemplo.",
-      topicPickerTitle: "Escolha um enunciado de exame",
+      topicPickerTitle: "Escolha um tema",
       topicPickerBody:
-        "Os enunciados de provas recentes vêm diretamente de provas reais do TCF publicadas recentemente neste site, para você praticar sempre com um enunciado autêntico. Você também pode colar o seu próprio enunciado.",
+        "Clique em “Obter um tema aleatório” para carregar um tema de prática para a sua tarefa, da nossa própria coleção. Você também pode colar o seu próprio tema.",
       timedTaskTourTitle: "Pratique nas condições da prova",
       timedTaskTourBody: "Inicie uma tarefa cronometrada quando quiser praticar com a pressão de tempo real da prova. Ela acompanha o tempo sugerido para esta tarefa e continua em segundo plano enquanto você escreve.",
       spellCheckTourTitle: "Identifique erros de ortografia enquanto escreve",
@@ -2873,26 +2839,18 @@ export const APP_COPY = {
         targetLength: ({ minWords, maxWords }) => `Extensão desejada: ${minWords}–${maxWords} palavras.`,
       },
       topic: {
-        heading: "Escolha um enunciado de exame",
-        recentExamTitle: "Obtenha um enunciado de exames recentes",
-        recentExamDescription: "Carregue um enunciado autêntico para a tarefa escolhida.",
+        heading: "Escolha um tema",
+        recentExamTitle: "Obter um tema aleatório",
+        recentExamDescription: "Carregue um tema de prática para a tarefa escolhida.",
+        selectedTopicAriaLabel: "Tema selecionado",
+        practiceTopicNote: "Este é um tema de prática da nossa própria coleção, escrito no formato da tarefa escolhida.",
         customTitle: "Escreva ou cole meu próprio enunciado",
         customDescription: "Use um enunciado de exame que você já tenha.",
-        loading: "Obtendo um enunciado de exames recentes…",
+        loading: "Obtendo um tema aleatório…",
         fetchError:
-          "Não foi possível obter um enunciado de exames recentes. Tente novamente ou escreva o seu.",
+          "Não foi possível obter um tema. Tente novamente ou escreva o seu.",
         unavailableError:
-          "O enunciado de exames recentes não está disponível. Tente novamente ou escreva o seu.",
-        notPublishedError:
-          "Nenhum enunciado de exames recentes foi publicado para este mês nem para o anterior. Escreva ou cole o seu.",
-        selectedRecentExamAriaLabel: "Enunciado de exame recente selecionado",
-        sourceLabel: "Fonte:",
-        recentExamsSource: ({ month }) => `Exames recentes — ${month}`,
-        previouslyPublishedBadge: "Enunciado publicado anteriormente",
-        previouslyPublishedNotice: ({ month }) =>
-          `Não foi possível carregar os enunciados de exame mais recentes; este foi publicado antes (${month}). Ele pode não corresponder ao exame atual.`,
-        previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicado anteriormente)`,
-        selectedPreviouslyPublishedAriaLabel: "Enunciado publicado anteriormente selecionado",
+          "Nenhum tema estava disponível. Tente novamente ou escreva o seu.",
         customTopicLabel: "Seu enunciado de exame",
         customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },
@@ -2927,7 +2885,7 @@ export const APP_COPY = {
         exampleUnavailableError: "O gerador de exemplos não está disponível no momento.",
         exampleGenericError: "Não conseguimos gerar um exemplo. Tente novamente.",
         exampleNeedsTopicWarning:
-          "Escolha um enunciado de exames recentes ou cole o seu antes de gerar um exemplo.",
+          "Obtenha um tema aleatório ou cole o seu antes de gerar um exemplo.",
         copy: "Copiar texto",
         copied: "Copiado!",
         copyFailed: "Não foi possível copiar",

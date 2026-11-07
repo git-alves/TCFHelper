@@ -4,7 +4,7 @@
 // that has no Next.js dependency (no useRouter/useSearchParams/useAppCopy)
 // is this context itself -- so it's the one part of the pair that can be
 // mounted and driven interactively instead of only type-checked. It can't
-// exercise the real /api/topics/recent fetch (that lives in WritingWorkspace,
+// exercise the real /api/topics/random fetch (that lives in WritingWorkspace,
 // which does need that Next.js context), but it locks in the contract that
 // fetch depends on: a step can be marked blocked, TasksWalkthroughRunner's
 // Next lock (mirrored here as a disabled button) reflects that on the very

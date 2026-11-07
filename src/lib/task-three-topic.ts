@@ -1,5 +1,5 @@
-// A recent-exam Task 3 topicPrompt is always built by parseTaskThree in
-// recent-exam-topics.ts, which formats it as a title followed by literal
+// A starter-bank Task 3 topicPrompt is always built in starter-topics.ts, which
+// formats it as a title followed by literal
 // "Document 1 :" / "Document 2 :" sections, each label on its own line
 // followed by real body text on the next line(s). A custom (learner-pasted)
 // Task 3 topic is free text and may not contain two opposing-viewpoint
@@ -16,7 +16,7 @@
 // empty-bodied labels don't count either). Content may appear on the same
 // line as the label, after the colon (e.g. a pasted "Document 1 : Les
 // téléphones distraient les élèves."), on the following line(s) as in the
-// real recent-exam format, or both.
+// bank format, or both.
 const DOCUMENT_ONE_LABEL_PATTERN = /^\s*Document\s*1\s*:(.*)$/iu;
 const DOCUMENT_TWO_LABEL_PATTERN = /^\s*Document\s*2\s*:(.*)$/iu;
 

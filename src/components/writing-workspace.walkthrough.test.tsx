@@ -3,7 +3,7 @@
 // Regression test for the contextual (short) tour's topic-picker failure
 // path: task-picker -> topic-picker -> editor -> correct-button never
 // passes through guided-writing, so unlike the full tour it can't rely on
-// that step's own scripted topic to paper over a failed /api/topics/recent
+// that step's own scripted topic to paper over a failed /api/topics/random
 // call. Renders the real WritingWorkspace (mocking only next/navigation,
 // which none of this behavior depends on) driven through
 // WalkthroughWorkspaceScriptProvider the same way TasksWalkthroughRunner
@@ -83,7 +83,7 @@ describe("contextual tour: failed topic-picker fetch", () => {
       ctx.applyStep("task-picker");
     });
 
-    // Kicks off the (mocked, failing) /api/topics/recent request and
+    // Kicks off the (mocked, failing) /api/topics/random request and
     // synchronously blocks Next in the same commit -- see fetchRecentTopic.
     act(() => {
       ctx.applyStep("topic-picker");

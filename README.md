@@ -1,8 +1,8 @@
 # MyTCFLab
 
 Writing practice and feedback for the TCF (Test de Connaissance du Français)
-exam. Students choose a task, get a matching topic from the current month's
-recent-exam source or enter their own prompt, write a response, and receive
+exam. Students choose a task, get a random matching topic from the app's own
+database or enter their own prompt, write a response, and receive
 structured grammar, vocabulary, word-count, and CEFR-level feedback.
 
 Phase 1 is the core writing loop. Its purpose is to validate feedback quality
@@ -106,39 +106,26 @@ against adjudicated writing samples before they affect learners.
    `/dashboard` progress/history views. Enable Google in the Clerk dashboard
    to show it as a sign-in option.
 
-## Recent-exam topics
+## Topics
 
-The Tasks screen (`/tasks`) has two topic choices: **Get a topic from recent exams** and
-**Write or paste my own topic**. The first choice is a server-side integration
-with the authorised recent-exam source. It derives the current French
-month/year URL, verifies that the page is for that month, and returns only the
-literal `Tâche 1`, `Tâche 2`, or `Tâche 3` matching the learner's selected
-task. It never accepts a client-supplied source URL.
-
-The upstream site lags a few days into each month before publishing that
-month's page. If the current month's page has not been published yet (an
-empty result from its WordPress API), the app retries once against last
-month's already-published page instead of failing outright; the displayed
-source label always reflects whichever month was actually used. Any other
-failure (the source is unreachable, or its structure changed) does not fall
-back — the app keeps the learner's draft and offers the paste-your-own path
-instead. Retrieved topics are saved with immutable provenance so Gemini grades
-against the exact prompt the learner saw.
-
-If neither the current nor the prior month is published, `/api/topics/recent`
-returns a stable `RECENT_EXAM_NOT_PUBLISHED` code (HTTP 404) instead of the
-generic unavailable response used for an actual outage or a changed page
-structure, and the UI shows a matching “not published yet” message rather than
-its generic retry copy.
+The Tasks screen (`/tasks`) has two topic choices: **Get a random topic** and
+**Write or paste my own topic**. The first draws one topic at random for the
+selected task from the app's own database (`/api/topics/random`). It never
+calls an outside website or an AI model, so it costs nothing per click and
+needs nothing but the database. Starter topics are practice prompts, not exam
+prompts, and the card says so.
 
 ## Seeded topics
 
-`npm run db:seed` loads a starter bank of original topics into `Topic`
-(`OFFICIAL_EXAM` source) — 11 per task, format-matched to the real exam
-structure (Task 3's are a title plus two contrasting `Document 1` /
-`Document 2` paragraphs) but not copied from any real exam.
+`npm run db:seed` loads a bank of original topics into `Topic` (`OFFICIAL_EXAM`
+source): 30 per task, format-matched to the real exam structure (Task 3's are a
+title plus two contrasting `Document 1` / `Document 2` paragraphs) but not
+copied from any real exam, and not ranked by how often a theme has appeared on
+the exam. The random-topic button serves one of these. New or changed starter
+topics only reach production through the deliberate seed step described under
+"Starter-topic bank rollout" below.
 
-The Tasks screen keeps its recent-exam and custom-topic choices. Once a topic is
+Once a topic is
 selected, learners can generate a B2, C1, or C2 French model answer directly
 into the editor. The app caches answers privately per learner/topic/level and
 limits fresh generations per day. Gemini generates new examples.
