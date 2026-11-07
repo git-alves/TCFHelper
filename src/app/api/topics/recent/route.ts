@@ -87,6 +87,27 @@ async function findStoredRecentTopic(taskType: TaskType) {
   return newest[Math.floor(Math.random() * newest.length)];
 }
 
+// Our own bank of practice prompts (the managed OFFICIAL_EXAM starter topics,
+// see starter-topics.ts), used when no live or recent stored exam topic can be
+// offered. A random one per click; retired starter rows are never offered.
+async function findPracticeTopic(taskType: TaskType) {
+  const topics = await prisma.topic.findMany({
+    where: { taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+    select: { id: true, taskType: true, title: true, prompt: true, guideContext: true },
+  });
+  return topics.length > 0 ? topics[Math.floor(Math.random() * topics.length)] : null;
+}
+
+async function practiceFallbackResponse(taskType: TaskType) {
+  try {
+    const practice = await findPracticeTopic(taskType);
+    if (practice) return topicResponse(practice, null, false);
+  } catch (practiceError) {
+    console.error("Practice topic lookup failed", practiceError);
+  }
+  return null;
+}
+
 function topicResponse(
   topic: {
     id: string;
@@ -95,8 +116,7 @@ function topicResponse(
     prompt: string;
     guideContext: GuideProfile | null;
   },
-  sourceUrl: string,
-  sourceMonth: string,
+  source: { sourceUrl: string; sourceMonth: string } | null,
   previouslyPublished: boolean,
 ) {
   // An editorial override on the stored record always wins over the
@@ -115,11 +135,15 @@ function topicResponse(
         taskType: topic.taskType,
         title: topic.title,
         prompt: topic.prompt,
-        sourceUrl,
-        sourceMonth,
+        // Null for a practice prompt: it has no exam month or external source.
+        sourceUrl: source?.sourceUrl ?? null,
+        sourceMonth: source?.sourceMonth ?? null,
         // True only for a stored topic served after a live-retrieval failure, so
         // the client can disclose that it is not current exam content.
         previouslyPublished,
+        // True for a prompt from our own practice bank: not an exam prompt at
+        // all, and disclosed as such.
+        practicePrompt: source === null,
         guideContext,
       },
     },
@@ -208,10 +232,13 @@ export async function GET(request: Request) {
       throw new Error("Recent-exam topic provenance did not match the request.");
     }
 
-    return topicResponse(topic, recentTopic.sourceUrl, recentTopic.sourceMonth, false);
+    return topicResponse(topic, { sourceUrl: recentTopic.sourceUrl, sourceMonth: recentTopic.sourceMonth }, false);
   } catch (error) {
     if (error instanceof RecentExamTopicError && error.code === "NOT_PUBLISHED") {
-      return notPublishedResponse();
+      // Nothing is wrong with the source, there is simply no exam page yet:
+      // older stored exam topics would misrepresent that, so offer a clearly
+      // labelled practice prompt instead, and only error if the bank is empty.
+      return (await practiceFallbackResponse(taskType)) ?? notPublishedResponse();
     }
 
     console.error("Recent-exam topic retrieval failed", error);
@@ -220,12 +247,12 @@ export async function GET(request: Request) {
       const stored = await findStoredRecentTopic(taskType);
       if (stored) {
         console.warn(`Serving stored recent-exam topic ${stored.id} (${stored.sourceMonth}) after a live retrieval failure`);
-        return topicResponse(stored, stored.sourceUrl, stored.sourceMonth, true);
+        return topicResponse(stored, { sourceUrl: stored.sourceUrl, sourceMonth: stored.sourceMonth }, true);
       }
     } catch (fallbackError) {
       console.error("Stored recent-exam topic lookup failed", fallbackError);
     }
 
-    return unavailableResponse();
+    return (await practiceFallbackResponse(taskType)) ?? unavailableResponse();
   }
 }

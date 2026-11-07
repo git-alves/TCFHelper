@@ -56,10 +56,13 @@ interface RecentExamTopic {
   taskType: TaskType;
   title: string;
   prompt: string;
-  sourceUrl: string;
-  sourceMonth: string;
+  /** Null for a practice prompt, which has no exam source. */
+  sourceUrl: string | null;
+  sourceMonth: string | null;
   /** True when the live source was unavailable and this is an earlier, stored topic. */
   previouslyPublished: boolean;
+  /** True for a prompt from our own practice bank rather than any exam. */
+  practicePrompt: boolean;
   guideContext: WritingContextClassification;
 }
 
@@ -249,14 +252,16 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
   if (!topic || typeof topic !== "object") return null;
 
   const candidate = topic as Record<string, unknown>;
-  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext, previouslyPublished } = candidate;
+  const { id, taskType, title, prompt, sourceUrl, sourceMonth, guideContext, previouslyPublished, practicePrompt } =
+    candidate;
+  const isPractice = practicePrompt === true;
   if (
     typeof id !== "string" ||
     taskType !== expectedTaskType ||
     typeof title !== "string" ||
     typeof prompt !== "string" ||
-    typeof sourceUrl !== "string" ||
-    typeof sourceMonth !== "string" ||
+    // A practice prompt has no exam month or source; every other topic must.
+    (!isPractice && (typeof sourceUrl !== "string" || typeof sourceMonth !== "string")) ||
     !isWritingContextClassification(guideContext)
   ) {
     return null;
@@ -267,9 +272,10 @@ function readRecentExamTopic(value: unknown, expectedTaskType: TaskType): Recent
     taskType: expectedTaskType,
     title,
     prompt,
-    sourceUrl,
-    sourceMonth,
+    sourceUrl: typeof sourceUrl === "string" ? sourceUrl : null,
+    sourceMonth: typeof sourceMonth === "string" ? sourceMonth : null,
     previouslyPublished: previouslyPublished === true,
+    practicePrompt: isPractice,
     guideContext,
   };
 }
@@ -2031,22 +2037,30 @@ export function WritingWorkspace() {
             {topicMode === "recent" && recentTopic && (
               <article
                 aria-label={
-                  recentTopic.previouslyPublished
-                    ? copy.workspace.topic.selectedPreviouslyPublishedAriaLabel
-                    : copy.workspace.topic.selectedRecentExamAriaLabel
+                  recentTopic.practicePrompt
+                    ? copy.workspace.topic.selectedPracticePromptAriaLabel
+                    : recentTopic.previouslyPublished
+                      ? copy.workspace.topic.selectedPreviouslyPublishedAriaLabel
+                      : copy.workspace.topic.selectedRecentExamAriaLabel
                 }
                 className="rounded-xl border border-black/[.08] bg-black/[.02] p-4 dark:border-white/[.1] dark:bg-white/[.03]"
               >
-                {recentTopic.previouslyPublished && (
+                {(recentTopic.practicePrompt || recentTopic.previouslyPublished) && (
                   <div
                     role="note"
                     className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
                   >
-                    <p className="font-semibold">{copy.workspace.topic.previouslyPublishedBadge}</p>
+                    <p className="font-semibold">
+                      {recentTopic.practicePrompt
+                        ? copy.workspace.topic.practicePromptBadge
+                        : copy.workspace.topic.previouslyPublishedBadge}
+                    </p>
                     <p className="mt-1">
-                      {copy.workspace.topic.previouslyPublishedNotice({
-                        month: formatSourceMonth(recentTopic.sourceMonth, locale),
-                      })}
+                      {recentTopic.practicePrompt
+                        ? copy.workspace.topic.practicePromptNotice
+                        : copy.workspace.topic.previouslyPublishedNotice({
+                            month: formatSourceMonth(recentTopic.sourceMonth ?? "", locale),
+                          })}
                     </p>
                   </div>
                 )}
@@ -2054,21 +2068,23 @@ export function WritingWorkspace() {
                 <p lang="fr" className="mt-2 whitespace-pre-wrap text-sm leading-6">
                   {promptWithoutLeadingTitle(recentTopic.title, recentTopic.prompt)}
                 </p>
-                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.sourceLabel}{" "}
-                  <a
-                    href={recentTopic.sourceUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline underline-offset-2 hover:text-foreground"
-                  >
-                    {(recentTopic.previouslyPublished
-                      ? copy.workspace.topic.previouslyPublishedSource
-                      : copy.workspace.topic.recentExamsSource)({
-                      month: formatSourceMonth(recentTopic.sourceMonth, locale),
-                    })}
-                  </a>
-                </p>
+                {recentTopic.sourceUrl && recentTopic.sourceMonth && (
+                  <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
+                    {copy.workspace.topic.sourceLabel}{" "}
+                    <a
+                      href={recentTopic.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline underline-offset-2 hover:text-foreground"
+                    >
+                      {(recentTopic.previouslyPublished
+                        ? copy.workspace.topic.previouslyPublishedSource
+                        : copy.workspace.topic.recentExamsSource)({
+                        month: formatSourceMonth(recentTopic.sourceMonth, locale),
+                      })}
+                    </a>
+                  </p>
+                )}
               </article>
             )}
 
