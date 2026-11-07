@@ -40,6 +40,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400, headers: NO_STORE_HEADERS });
   }
   const taskType = requestedTaskType as TaskType;
+  const excludeTopicId = new URL(request.url).searchParams.get("excludeTopicId");
 
   const topics = await prisma.topic.findMany({
     // A retired starter topic stays gradeable for whoever already has its id
@@ -56,7 +57,13 @@ export async function GET(request: Request) {
     );
   }
 
-  const topic = topics[Math.floor(Math.random() * topics.length)];
+  // A learner asking for another random topic expects to move on, not to be
+  // handed the card they are already reading. Keep the sole available topic
+  // selectable, though: exclusion must never turn a usable one-topic bank
+  // into an error state.
+  const selectableTopics =
+    excludeTopicId && topics.length > 1 ? topics.filter((topic) => topic.id !== excludeTopicId) : topics;
+  const topic = selectableTopics[Math.floor(Math.random() * selectableTopics.length)];
 
   // An editorial profile on the stored topic wins over the deterministic
   // classifier -- see docs/guided-writing.md's context-source table.
