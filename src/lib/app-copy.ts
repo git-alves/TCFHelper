@@ -330,6 +330,9 @@ export interface AppCopy {
       previouslyPublishedNotice: (values: SourceMonthValues) => string;
       previouslyPublishedSource: (values: SourceMonthValues) => string;
       selectedPreviouslyPublishedAriaLabel: string;
+      practicePromptBadge: string;
+      practicePromptNotice: string;
+      selectedPracticePromptAriaLabel: string;
       customTopicLabel: string;
       customTopicPlaceholder: string;
     };
@@ -850,7 +853,7 @@ export const APP_COPY = {
       topic: {
         heading: "Choose an exam prompt",
         recentExamTitle: "Get a prompt from recent exams",
-        recentExamDescription: "Load an authentic prompt for the task you selected.",
+        recentExamDescription: "Load a prompt for the task you selected: a recent exam prompt when available, or a practice prompt.",
         customTitle: "Write or paste my own prompt",
         customDescription: "Use an exam prompt you already have.",
         loading: "Getting a prompt from recent exams…",
@@ -866,6 +869,10 @@ export const APP_COPY = {
           `We couldn't load the latest exam prompts, so this one was published earlier (${month}). It may not match the current exam.`,
         previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (previously published)`,
         selectedPreviouslyPublishedAriaLabel: "Selected previously published prompt",
+        practicePromptBadge: "Practice prompt",
+        practicePromptNotice:
+          "This is a practice prompt from our own collection, not a prompt from a recent exam. It follows the format of the selected task.",
+        selectedPracticePromptAriaLabel: "Selected practice prompt",
         customTopicLabel: "Your exam prompt",
         customTopicPlaceholder: "Paste or write the exam prompt you want to respond to…",
       },
@@ -1521,7 +1528,7 @@ export const APP_COPY = {
       topic: {
         heading: "Choisissez une consigne d’examen",
         recentExamTitle: "Obtenir une consigne d’examens récents",
-        recentExamDescription: "Chargez une consigne authentique pour la tâche choisie.",
+        recentExamDescription: "Chargez une consigne pour la tâche choisie : une consigne d’examen récent si possible, sinon une consigne d’entraînement.",
         customTitle: "Écrire ou coller ma propre consigne",
         customDescription: "Utilisez une consigne d’examen que vous avez déjà.",
         loading: "Récupération d’une consigne d’examens récents…",
@@ -1539,6 +1546,10 @@ export const APP_COPY = {
           `Nous n’avons pas pu charger les dernières consignes d’examen ; celle-ci a été publiée plus tôt (${month}). Elle peut ne pas correspondre à l’examen actuel.`,
         previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publiée précédemment)`,
         selectedPreviouslyPublishedAriaLabel: "Consigne précédemment publiée sélectionnée",
+        practicePromptBadge: "Consigne d’entraînement",
+        practicePromptNotice:
+          "Il s’agit d’une consigne d’entraînement issue de notre propre collection, et non d’une consigne d’un examen récent. Elle suit le format de la tâche choisie.",
+        selectedPracticePromptAriaLabel: "Consigne d’entraînement sélectionnée",
         customTopicLabel: "Votre consigne d’examen",
         customTopicPlaceholder: "Collez ou rédigez la consigne d’examen à laquelle vous souhaitez répondre…",
       },
@@ -2198,7 +2209,7 @@ export const APP_COPY = {
       topic: {
         heading: "Elige una consigna de examen",
         recentExamTitle: "Obtén una consigna de exámenes recientes",
-        recentExamDescription: "Carga una consigna auténtica para la tarea que seleccionaste.",
+        recentExamDescription: "Carga una consigna para la tarea que seleccionaste: de un examen reciente si hay, o una consigna de práctica.",
         customTitle: "Escribe o pega mi propia consigna",
         customDescription: "Usa una consigna de examen que ya tengas.",
         loading: "Obteniendo una consigna de exámenes recientes…",
@@ -2216,6 +2227,10 @@ export const APP_COPY = {
           `No pudimos cargar las consignas de examen más recientes; esta se publicó antes (${month}). Puede no corresponder al examen actual.`,
         previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicada anteriormente)`,
         selectedPreviouslyPublishedAriaLabel: "Consigna publicada anteriormente seleccionada",
+        practicePromptBadge: "Consigna de práctica",
+        practicePromptNotice:
+          "Esta es una consigna de práctica de nuestra propia colección, no una consigna de un examen reciente. Sigue el formato de la tarea elegida.",
+        selectedPracticePromptAriaLabel: "Consigna de práctica seleccionada",
         customTopicLabel: "Tu consigna de examen",
         customTopicPlaceholder: "Pega o escribe la consigna de examen a la que quieres responder…",
       },
@@ -2875,7 +2890,7 @@ export const APP_COPY = {
       topic: {
         heading: "Escolha um enunciado de exame",
         recentExamTitle: "Obtenha um enunciado de exames recentes",
-        recentExamDescription: "Carregue um enunciado autêntico para a tarefa escolhida.",
+        recentExamDescription: "Carregue um enunciado para a tarefa escolhida: de um exame recente, se houver, ou um enunciado de prática.",
         customTitle: "Escreva ou cole meu próprio enunciado",
         customDescription: "Use um enunciado de exame que você já tenha.",
         loading: "Obtendo um enunciado de exames recentes…",
@@ -2893,6 +2908,10 @@ export const APP_COPY = {
           `Não foi possível carregar os enunciados de exame mais recentes; este foi publicado antes (${month}). Ele pode não corresponder ao exame atual.`,
         previouslyPublishedSource: ({ month }) => `Réussir TCF Canada — ${month} (publicado anteriormente)`,
         selectedPreviouslyPublishedAriaLabel: "Enunciado publicado anteriormente selecionado",
+        practicePromptBadge: "Enunciado de prática",
+        practicePromptNotice:
+          "Este é um enunciado de prática da nossa própria coleção, e não um enunciado de um exame recente. Ele segue o formato da tarefa escolhida.",
+        selectedPracticePromptAriaLabel: "Enunciado de prática selecionado",
         customTopicLabel: "Seu enunciado de exame",
         customTopicPlaceholder: "Cole ou escreva o enunciado de exame ao qual você quer responder…",
       },

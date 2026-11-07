@@ -134,9 +134,15 @@ its generic retry copy.
 ## Seeded topics
 
 `npm run db:seed` loads a starter bank of original topics into `Topic`
-(`OFFICIAL_EXAM` source) — 11 per task, format-matched to the real exam
+(`OFFICIAL_EXAM` source) — 30 per task, format-matched to the real exam
 structure (Task 3's are a title plus two contrasting `Document 1` /
-`Document 2` paragraphs) but not copied from any real exam.
+`Document 2` paragraphs) but not copied from any real exam, and not ranked by
+how often a theme has appeared on the exam. They are practice prompts. When no
+recent exam prompt can be loaded, "Get a prompt from recent exams" serves a
+random one of these, labelled as a practice prompt (see
+`src/app/api/topics/recent/route.ts`). New or changed starter topics only reach
+production through the deliberate seed step described under "Starter-topic bank
+rollout" below.
 
 The Tasks screen keeps its recent-exam and custom-topic choices. Once a topic is
 selected, learners can generate a B2, C1, or C2 French model answer directly

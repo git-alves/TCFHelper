@@ -110,6 +110,7 @@ describe("GET /api/topics/recent", () => {
         sourceUrl: recentTopic.sourceUrl,
         sourceMonth: "2026-07",
         previouslyPublished: false,
+        practicePrompt: false,
         // No editorial override on this freshly scraped row -- falls back to
         // the deterministic classifier, which can't tell article from public
         // letter for this prompt and asks the learner to confirm.
@@ -204,6 +205,14 @@ describe("GET /api/topics/recent", () => {
     expect(upsertMock).not.toHaveBeenCalled();
   });
 
+  // The route reads two different pools through the same findMany: stored
+  // recent-exam topics, then the practice bank. Answer each by its `source`.
+  function mockTopics({ recent = [], practice = [] }: { recent?: unknown[]; practice?: unknown[] }) {
+    findManyMock.mockImplementation(async (args: { where: { source: string } }) =>
+      args.where.source === "RECENT_EXAM" ? recent : practice,
+    );
+  }
+
   describe("when the live source cannot be used", () => {
     beforeEach(() => {
       vi.useFakeTimers({ toFake: ["Date"] });
@@ -228,7 +237,7 @@ describe("GET /api/topics/recent", () => {
       getRecentExamTopicMock.mockRejectedValue(
         new RecentExamTopicErrorMock("UNAVAILABLE", "The recent-exam source blocked the request."),
       );
-      findManyMock.mockResolvedValue([stored("t_old", "2026-09"), stored("t_new", "2026-10")]);
+      mockTopics({ recent: [stored("t_old", "2026-09"), stored("t_new", "2026-10")] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -258,7 +267,7 @@ describe("GET /api/topics/recent", () => {
 
     it("offers a stored topic from exactly the oldest month inside the window", async () => {
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("edge", "2026-05")]);
+      mockTopics({ recent: [stored("edge", "2026-05")] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -268,7 +277,7 @@ describe("GET /api/topics/recent", () => {
 
     it("refuses stored topics older than the window instead of presenting stale exam content", async () => {
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("stale", "2026-04"), stored("ancient", "2024-01")]);
+      mockTopics({ recent: [stored("stale", "2026-04"), stored("ancient", "2024-01")] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -277,7 +286,7 @@ describe("GET /api/topics/recent", () => {
 
     it("skips over-age rows but still serves a fresher one from the same lookup", async () => {
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("stale", "2025-12"), stored("fresh", "2026-08")]);
+      mockTopics({ recent: [stored("stale", "2025-12"), stored("fresh", "2026-08")] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -287,7 +296,7 @@ describe("GET /api/topics/recent", () => {
     it("applies the window across a year boundary", async () => {
       vi.setSystemTime(new Date("2027-02-10T12:00:00Z"));
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("inside", "2026-08"), stored("outside", "2026-07")]);
+      mockTopics({ recent: [stored("inside", "2026-08"), stored("outside", "2026-07")] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -296,7 +305,7 @@ describe("GET /api/topics/recent", () => {
 
     it("prefers an editorial guide context on the stored topic", async () => {
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("t1", "2026-10", { guideContext: "INFORMAL_PERSONAL_MESSAGE" })]);
+      mockTopics({ recent: [stored("t1", "2026-10", { guideContext: "INFORMAL_PERSONAL_MESSAGE" })] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -308,7 +317,7 @@ describe("GET /api/topics/recent", () => {
 
     it("ignores stored rows that lack a parsable source month", async () => {
       getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
-      findManyMock.mockResolvedValue([stored("bad", "2026-10", { externalRef: "something-else" })]);
+      mockTopics({ recent: [stored("bad", "2026-10", { externalRef: "something-else" })] });
 
       const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
 
@@ -332,14 +341,101 @@ describe("GET /api/topics/recent", () => {
       expect(response.status).toBe(502);
     });
 
-    it("does not substitute a stored topic when the month is simply not published yet", async () => {
-      getRecentExamTopicMock.mockRejectedValue(new RecentExamTopicErrorMock("NOT_PUBLISHED", "not yet"));
-      findManyMock.mockResolvedValue([stored("t1", "2026-10")]);
+    describe("practice bank", () => {
+      const bank = (id: string, over: Record<string, unknown> = {}) => ({
+        id,
+        taskType: "TASK_2",
+        title: `Practice ${id}`,
+        prompt: `Rédigez un article ${id}.`,
+        guideContext: "PUBLIC_ARTICLE_OR_NOTE",
+        ...over,
+      });
 
-      const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+      it("serves a random practice prompt, labelled as such, when no recent topic is stored", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+        mockTopics({ practice: [bank("p1"), bank("p2")] });
+        vi.spyOn(Math, "random").mockReturnValue(0.99);
 
-      expect(response.status).toBe(404);
-      expect(findManyMock).not.toHaveBeenCalled();
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect(response.status).toBe(200);
+        const { topic } = await response.json();
+        expect(topic).toMatchObject({
+          id: "p2",
+          title: "Practice p2",
+          sourceUrl: null,
+          sourceMonth: null,
+          practicePrompt: true,
+          previouslyPublished: false,
+          guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "deterministic" },
+        });
+        expect(findManyMock).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            where: { taskType: "TASK_2", source: "OFFICIAL_EXAM", retiredAt: null },
+          }),
+        );
+        vi.restoreAllMocks();
+      });
+
+      it("picks different prompts across clicks", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+        mockTopics({ practice: [bank("p1"), bank("p2"), bank("p3")] });
+        const random = vi.spyOn(Math, "random");
+        const seen = new Set<string>();
+
+        for (const roll of [0, 0.4, 0.8]) {
+          random.mockReturnValue(roll);
+          const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+          seen.add((await response.json()).topic.id);
+        }
+
+        expect(seen).toEqual(new Set(["p1", "p2", "p3"]));
+        vi.restoreAllMocks();
+      });
+
+      it("prefers a stored recent exam topic over the practice bank", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+        mockTopics({ recent: [stored("t_recent", "2026-10")], practice: [bank("p1")] });
+
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect((await response.json()).topic).toMatchObject({ id: "t_recent", practicePrompt: false, previouslyPublished: true });
+      });
+
+      it("falls to the practice bank, not an over-age exam topic", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+        mockTopics({ recent: [stored("stale", "2025-01")], practice: [bank("p1")] });
+
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect((await response.json()).topic).toMatchObject({ id: "p1", practicePrompt: true });
+      });
+
+      it("serves a practice prompt, not an older exam topic, when the month is simply not published yet", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new RecentExamTopicErrorMock("NOT_PUBLISHED", "not yet"));
+        mockTopics({ recent: [stored("t_recent", "2026-10")], practice: [bank("p1")] });
+
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect(response.status).toBe(200);
+        expect((await response.json()).topic).toMatchObject({ id: "p1", practicePrompt: true });
+      });
+
+      it("keeps the not-published 404 when the practice bank is empty too", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new RecentExamTopicErrorMock("NOT_PUBLISHED", "not yet"));
+
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect(response.status).toBe(404);
+      });
+
+      it("still fails with unavailable when neither pool has anything", async () => {
+        getRecentExamTopicMock.mockRejectedValue(new Error("source down"));
+
+        const response = await GET(new Request("http://localhost/api/topics/recent?taskType=TASK_2"));
+
+        expect(response.status).toBe(502);
+      });
     });
   });
 });
