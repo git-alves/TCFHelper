@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { TaskType } from "@prisma/client";
 import { STARTER_TOPICS } from "@/lib/starter-topics";
-import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
+import { hasTaskThreeDocuments, splitTaskThreeDocuments } from "@/lib/task-three-topic";
 
 const TASKS = [TaskType.TASK_1, TaskType.TASK_2, TaskType.TASK_3] as const;
 const forTask = (task: TaskType) => STARTER_TOPICS.filter((topic) => topic.taskType === task);
@@ -42,6 +42,18 @@ describe("starter topic bank", () => {
       expect(topic.prompt, topic.title).toMatch(/racontez/i);
       expect(topic.prompt, topic.title).toMatch(/(donnez|exprimez|partagez) votre avis/i);
       expect(topic.prompt, topic.title).toMatch(/afin d/i);
+    }
+  });
+
+  it("gives each Tâche 3 document a substantial text, as on the exam sheet", () => {
+    for (const topic of forTask(TaskType.TASK_3)) {
+      const split = splitTaskThreeDocuments(topic.prompt);
+      expect(split, topic.title).not.toBeNull();
+      const [one, two] = split!.documents;
+      expect(one.split(/\s+/).length, `${topic.title} / Document 1`).toBeGreaterThanOrEqual(40);
+      expect(two.split(/\s+/).length, `${topic.title} / Document 2`).toBeGreaterThanOrEqual(40);
+      expect(one, topic.title).not.toBe(two);
+      expect(split!.heading, topic.title).toBe(topic.title);
     }
   });
 });

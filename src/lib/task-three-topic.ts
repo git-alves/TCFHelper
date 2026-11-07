@@ -36,7 +36,19 @@ function hasNonBlankContent(sameLineContent: string, followingLines: string[]): 
   return sameLineContent.trim().length > 0 || followingLines.some((line) => line.trim().length > 0);
 }
 
-export function hasTaskThreeDocuments(topicPrompt: string): boolean {
+export interface TaskThreeDocuments {
+  /** The text before "Document 1 :" (the topic title), or null if there is none. */
+  heading: string | null;
+  documents: [string, string];
+}
+
+/**
+ * Splits a Tâche 3 prompt into its two source documents so they can be shown
+ * the way the real exam shows them (a titled sheet with two labelled boxes).
+ * Returns null whenever the prompt is not a two-document topic -- the same
+ * condition hasTaskThreeDocuments reports.
+ */
+export function splitTaskThreeDocuments(topicPrompt: string): TaskThreeDocuments | null {
   // Splitting on "\n" alone would leave a trailing "\r" on every line of
   // CRLF-encoded input (e.g. a topic pasted from Windows). That trailing
   // "\r" then sits between the label's captured content and the regex's `$`
@@ -47,13 +59,29 @@ export function hasTaskThreeDocuments(topicPrompt: string): boolean {
   const lines = topicPrompt.split(/\r?\n/);
 
   const documentOne = findLabelLine(lines, DOCUMENT_ONE_LABEL_PATTERN, 0);
-  if (!documentOne) return false;
+  if (!documentOne) return null;
 
   const documentTwo = findLabelLine(lines, DOCUMENT_TWO_LABEL_PATTERN, documentOne.index + 1);
-  if (!documentTwo) return false;
+  if (!documentTwo) return null;
 
-  return (
-    hasNonBlankContent(documentOne.sameLineContent, lines.slice(documentOne.index + 1, documentTwo.index)) &&
-    hasNonBlankContent(documentTwo.sameLineContent, lines.slice(documentTwo.index + 1))
-  );
+  const oneLines = lines.slice(documentOne.index + 1, documentTwo.index);
+  const twoLines = lines.slice(documentTwo.index + 1);
+  if (
+    !hasNonBlankContent(documentOne.sameLineContent, oneLines) ||
+    !hasNonBlankContent(documentTwo.sameLineContent, twoLines)
+  ) {
+    return null;
+  }
+
+  const body = (sameLine: string, rest: string[]) => [sameLine, ...rest].join("\n").trim();
+  const heading = lines.slice(0, documentOne.index).join("\n").trim();
+
+  return {
+    heading: heading === "" ? null : heading,
+    documents: [body(documentOne.sameLineContent, oneLines), body(documentTwo.sameLineContent, twoLines)],
+  };
+}
+
+export function hasTaskThreeDocuments(topicPrompt: string): boolean {
+  return splitTaskThreeDocuments(topicPrompt) !== null;
 }
