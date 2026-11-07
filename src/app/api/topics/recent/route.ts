@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { TaskType, TopicSource } from "@prisma/client";
+import { TaskType, TopicSource, type GuideProfile } from "@prisma/client";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +27,83 @@ function notPublishedResponse() {
       code: "RECENT_EXAM_NOT_PUBLISHED",
     },
     { status: 404, headers: NO_STORE_HEADERS },
+  );
+}
+
+const SOURCE_MONTH_PATTERN = /:(\d{4}-\d{2}):/u;
+const STORED_TOPIC_CANDIDATES = 40;
+
+// The upstream site can be unreachable or answer automated requests with a bot
+// challenge, and that must not leave learners with no exam prompt at all. Topics
+// are stored the first time they are fetched (immutable, content-hashed rows),
+// so serve one of those instead -- from the newest month we have for this task.
+// Only trusted RECENT_EXAM rows are eligible, never learner-submitted topics.
+async function findStoredRecentTopic(taskType: TaskType) {
+  const rows = await prisma.topic.findMany({
+    where: {
+      source: TopicSource.RECENT_EXAM,
+      taskType,
+      retiredAt: null,
+      sourceUrl: { not: null },
+      externalRef: { not: null },
+    },
+    orderBy: { createdAt: "desc" },
+    take: STORED_TOPIC_CANDIDATES,
+    select: {
+      id: true,
+      taskType: true,
+      title: true,
+      prompt: true,
+      sourceUrl: true,
+      externalRef: true,
+      guideContext: true,
+    },
+  });
+
+  const candidates = rows.flatMap((row) => {
+    const sourceMonth = row.externalRef?.match(SOURCE_MONTH_PATTERN)?.[1];
+    return sourceMonth && row.sourceUrl ? [{ ...row, sourceUrl: row.sourceUrl, sourceMonth }] : [];
+  });
+  if (candidates.length === 0) return null;
+
+  const newestMonth = candidates.reduce((max, c) => (c.sourceMonth > max ? c.sourceMonth : max), "");
+  const newest = candidates.filter((c) => c.sourceMonth === newestMonth);
+  return newest[Math.floor(Math.random() * newest.length)];
+}
+
+function topicResponse(
+  topic: {
+    id: string;
+    taskType: TaskType;
+    title: string;
+    prompt: string;
+    guideContext: GuideProfile | null;
+  },
+  sourceUrl: string,
+  sourceMonth: string,
+) {
+  // An editorial override on the stored record always wins over the
+  // deterministic classifier -- see docs/guided-writing.md's context-source
+  // table. A freshly scraped recent-exam topic never has one yet, but a
+  // later admin correction to this same immutable row is picked up here
+  // without any other change.
+  const guideContext = topic.guideContext
+    ? { profile: topic.guideContext, confidence: "deterministic" as const }
+    : classifyWritingContext(topic.taskType, topic.prompt);
+
+  return NextResponse.json(
+    {
+      topic: {
+        id: topic.id,
+        taskType: topic.taskType,
+        title: topic.title,
+        prompt: topic.prompt,
+        sourceUrl,
+        sourceMonth,
+        guideContext,
+      },
+    },
+    { headers: NO_STORE_HEADERS },
   );
 }
 
@@ -111,35 +188,24 @@ export async function GET(request: Request) {
       throw new Error("Recent-exam topic provenance did not match the request.");
     }
 
-    // An editorial override on the stored record always wins over the
-    // deterministic classifier -- see docs/guided-writing.md's context-source
-    // table. A freshly scraped recent-exam topic never has one yet, but a
-    // later admin correction to this same immutable row is picked up here
-    // without any other change.
-    const guideContext = topic.guideContext
-      ? { profile: topic.guideContext, confidence: "deterministic" as const }
-      : classifyWritingContext(topic.taskType, topic.prompt);
-
-    return NextResponse.json(
-      {
-        topic: {
-          id: topic.id,
-          taskType: topic.taskType,
-          title: topic.title,
-          prompt: topic.prompt,
-          sourceUrl: recentTopic.sourceUrl,
-          sourceMonth: recentTopic.sourceMonth,
-          guideContext,
-        },
-      },
-      { headers: NO_STORE_HEADERS }
-    );
+    return topicResponse(topic, recentTopic.sourceUrl, recentTopic.sourceMonth);
   } catch (error) {
     if (error instanceof RecentExamTopicError && error.code === "NOT_PUBLISHED") {
       return notPublishedResponse();
     }
 
     console.error("Recent-exam topic retrieval failed", error);
+
+    try {
+      const stored = await findStoredRecentTopic(taskType);
+      if (stored) {
+        console.warn(`Serving stored recent-exam topic ${stored.id} (${stored.sourceMonth}) after a live retrieval failure`);
+        return topicResponse(stored, stored.sourceUrl, stored.sourceMonth);
+      }
+    } catch (fallbackError) {
+      console.error("Stored recent-exam topic lookup failed", fallbackError);
+    }
+
     return unavailableResponse();
   }
 }
