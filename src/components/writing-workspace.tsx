@@ -1382,9 +1382,12 @@ export function WritingWorkspace() {
     setBlockedStep("topic-picker");
 
     try {
-      const res = await fetch(
-        `/api/topics/random?taskType=${encodeURIComponent(currentTaskType)}`,
-      );
+      const query = new URLSearchParams({ taskType: currentTaskType });
+      // Ask for a different card only when the visible card belongs to the
+      // task being refreshed. Changing task must not exclude an unrelated
+      // topic from the new task's bank.
+      if (recentTopic?.taskType === currentTaskType) query.set("excludeTopicId", recentTopic.id);
+      const res = await fetch(`/api/topics/random?${query}`);
 
       if (!res.ok) {
         // An empty bank (no topics seeded for this task) is not a transient

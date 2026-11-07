@@ -24,7 +24,11 @@ const bank = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const request = (taskType = "TASK_2") => new Request(`http://localhost/api/topics/random?taskType=${taskType}`);
+const request = (taskType = "TASK_2", excludeTopicId?: string) => {
+  const query = new URLSearchParams({ taskType });
+  if (excludeTopicId) query.set("excludeTopicId", excludeTopicId);
+  return new Request(`http://localhost/api/topics/random?${query}`);
+};
 
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
@@ -66,6 +70,23 @@ describe("GET /api/topics/random", () => {
     }
 
     expect(seen).toEqual(new Set(["t1", "t2", "t3"]));
+  });
+
+  it("does not return the topic the learner is replacing when another one exists", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+
+    const { topic } = await (await GET(request("TASK_2", "t1"))).json();
+
+    expect(topic.id).toBe("t2");
+  });
+
+  it("still returns the sole topic when it is the one being replaced", async () => {
+    findManyMock.mockResolvedValue([bank("t1")]);
+
+    const response = await GET(request("TASK_2", "t1"));
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).topic.id).toBe("t1");
   });
 
   it("reads only active starter-bank topics for the requested task", async () => {

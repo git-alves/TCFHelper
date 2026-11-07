@@ -74,6 +74,20 @@ async function pressRandomTopic() {
 
 const alertText = () => container.querySelector('[role="alert"]')?.textContent ?? "";
 
+const bankTopicResponse = (id: string) =>
+  ({
+    ok: true,
+    json: async () => ({
+      topic: {
+        id,
+        taskType: "TASK_1",
+        title: `Topic ${id}`,
+        prompt: `Write a message about topic ${id}.`,
+        guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "deterministic" },
+      },
+    }),
+  }) as Response;
+
 describe("Get a random topic", () => {
   it("asks the random-topic endpoint, not an outside source", async () => {
     topicResponse = () => ({ ok: false, json: async () => ({}) }) as Response;
@@ -101,5 +115,35 @@ describe("Get a random topic", () => {
 
     expect(alertText()).toMatch(/try again/i);
     expect(alertText()).not.toContain("We don't have any topics");
+  });
+
+  it("asks for a different topic after one is already displayed", async () => {
+    let call = 0;
+    topicResponse = () => bankTopicResponse(call++ === 0 ? "topic-one" : "topic-two");
+
+    await pressRandomTopic();
+
+    expect(container.textContent).toContain("Topic topic-one");
+
+    const button = [...container.querySelectorAll("button")].find((b) => b.textContent?.includes("Get a random topic"));
+    if (!button) throw new Error("random topic button not found");
+    await act(async () => {
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    // Replacing a displayed topic is intentionally guarded because it also
+    // discards the prompt, draft, and feedback. Confirm before asserting the
+    // request that actually changes topics.
+    const confirm = [...container.querySelectorAll("button")].find((b) => b.textContent === "Discard and switch");
+    if (!confirm) throw new Error("topic switch confirmation not found");
+    await act(async () => {
+      confirm.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(requestedUrls).toHaveLength(2);
+    expect(requestedUrls[1]).toContain("taskType=TASK_1");
+    expect(requestedUrls[1]).toContain("excludeTopicId=topic-one");
   });
 });
