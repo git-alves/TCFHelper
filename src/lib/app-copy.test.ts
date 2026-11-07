@@ -457,4 +457,32 @@ describe("APP_COPY", () => {
       expect(copy.walkthrough.practiceStagesBody).toContain(expected.simulate);
     }
   });
+
+  it("names the topic button \"random topic\" in every language, and the tour step names the same button", () => {
+    const expected = {
+      en: "Get a random topic",
+      fr: "Obtenir un sujet aléatoire",
+      es: "Obtener un tema aleatorio",
+      pt: "Obter um tema aleatório",
+    } as const;
+
+    for (const locale of APP_LOCALES) {
+      const copy = getAppCopy(locale);
+      const label = expected[locale];
+
+      expect(copy.workspace.topic.recentExamTitle).toBe(label);
+      expect(copy.walkthrough.topicPickerBody).toContain(label);
+    }
+  });
+
+  it("no longer promises that every tour or picker prompt is a real, authentic exam prompt", () => {
+    const claims = /authentic|authentique|auténtic|autêntic|pulled directly|proviennent directement/i;
+
+    for (const locale of APP_LOCALES) {
+      const copy = getAppCopy(locale);
+
+      expect(copy.walkthrough.topicPickerBody).not.toMatch(claims);
+      expect(copy.workspace.topic.recentExamDescription).not.toMatch(claims);
+    }
+  });
 });
