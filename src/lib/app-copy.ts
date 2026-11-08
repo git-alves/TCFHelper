@@ -314,7 +314,6 @@ export interface AppCopy {
       recentExamTitle: string;
       recentExamDescription: string;
       selectedTopicAriaLabel: string;
-      practiceTopicNote: string;
       customTitle: string;
       customDescription: string;
       loading: string;
@@ -843,7 +842,6 @@ export const APP_COPY = {
         recentExamTitle: "Get a random topic",
         recentExamDescription: "Load a practice topic for the task you selected.",
         selectedTopicAriaLabel: "Selected topic",
-        practiceTopicNote: "This is a practice topic from our own collection, written in the format of the selected task.",
         customTitle: "Write or paste my own prompt",
         customDescription: "Use an exam prompt you already have.",
         loading: "Getting a random topic…",
@@ -1507,7 +1505,6 @@ export const APP_COPY = {
         recentExamTitle: "Obtenir un sujet aléatoire",
         recentExamDescription: "Chargez un sujet d’entraînement pour la tâche choisie.",
         selectedTopicAriaLabel: "Sujet sélectionné",
-        practiceTopicNote: "Il s’agit d’un sujet d’entraînement issu de notre propre collection, rédigé selon le format de la tâche choisie.",
         customTitle: "Écrire ou coller ma propre consigne",
         customDescription: "Utilisez une consigne d’examen que vous avez déjà.",
         loading: "Récupération d’un sujet aléatoire…",
@@ -2178,7 +2175,6 @@ export const APP_COPY = {
         recentExamTitle: "Obtener un tema aleatorio",
         recentExamDescription: "Carga un tema de práctica para la tarea que seleccionaste.",
         selectedTopicAriaLabel: "Tema seleccionado",
-        practiceTopicNote: "Este es un tema de práctica de nuestra propia colección, redactado según el formato de la tarea elegida.",
         customTitle: "Escribe o pega mi propia consigna",
         customDescription: "Usa una consigna de examen que ya tengas.",
         loading: "Obteniendo un tema aleatorio…",
@@ -2849,7 +2845,6 @@ export const APP_COPY = {
         recentExamTitle: "Obter um tema aleatório",
         recentExamDescription: "Carregue um tema de prática para a tarefa escolhida.",
         selectedTopicAriaLabel: "Tema selecionado",
-        practiceTopicNote: "Este é um tema de prática da nossa própria coleção, escrito no formato da tarefa escolhida.",
         customTitle: "Escreva ou cole meu próprio enunciado",
         customDescription: "Use um enunciado de exame que você já tenha.",
         loading: "Obtendo um tema aleatório…",

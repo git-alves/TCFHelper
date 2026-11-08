@@ -182,7 +182,6 @@ describe("APP_COPY", () => {
         copy.workspace.topic.recentExamTitle,
         copy.workspace.topic.recentExamDescription,
         copy.workspace.topic.selectedTopicAriaLabel,
-        copy.workspace.topic.practiceTopicNote,
         copy.workspace.topic.customTitle,
         copy.workspace.topic.customDescription,
         copy.workspace.topic.loading,

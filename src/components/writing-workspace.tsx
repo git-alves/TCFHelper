@@ -2022,9 +2022,6 @@ export function WritingWorkspace() {
                     </p>
                   </>
                 )}
-                <p className="mt-3 text-sm text-zinc-500 dark:text-zinc-400">
-                  {copy.workspace.topic.practiceTopicNote}
-                </p>
               </article>
             )}
 
