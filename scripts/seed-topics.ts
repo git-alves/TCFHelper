@@ -13,15 +13,18 @@
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { runLockedSeedTopicSync } from "../src/lib/seed-topic-sync";
-import { STARTER_TOPICS } from "../src/lib/starter-topics";
+import { runLockedStarterTopicBankSync } from "../src/lib/seed-topic-sync";
+import { STARTER_TOPICS, STARTER_TOPIC_BANK_VERSION } from "../src/lib/starter-topics";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const { created, retired, unchanged } = await runLockedSeedTopicSync(prisma, STARTER_TOPICS);
+  const { created, retired, unchanged, status } = await runLockedStarterTopicBankSync(prisma, {
+    version: STARTER_TOPIC_BANK_VERSION,
+    topics: STARTER_TOPICS,
+  });
 
-  console.log(`Seed complete: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`);
+  console.log(`Seed ${status}: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`);
 }
 
 main()

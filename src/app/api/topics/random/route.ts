@@ -4,6 +4,7 @@ import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyWritingContext } from "@/lib/guided-writing-classifier";
+import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -40,6 +41,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400, headers: NO_STORE_HEADERS });
   }
   const taskType = requestedTaskType as TaskType;
+
+  // Runs only once per warm instance after this deployment receives traffic.
+  // It catches/logs its own failure so the last active DB bank remains usable.
+  await ensureStarterTopicBankSynced();
 
   const topics = await prisma.topic.findMany({
     // A retired starter topic stays gradeable for whoever already has its id

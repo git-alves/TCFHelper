@@ -1,6 +1,11 @@
 import { GuideProfile, TaskType } from "@prisma/client";
 import type { SeedTopic } from "@/lib/seed-topic-sync";
 
+// Increment this integer whenever STARTER_TOPICS changes. It is a monotonic
+// deployment-order fence, not a content hash: a later bank must have a higher
+// version so a delayed older deployment can never retire it back to old text.
+export const STARTER_TOPIC_BANK_VERSION = 1;
+
 // The app-managed OFFICIAL_EXAM starter bank, shared between the manual seed
 // entrypoint (scripts/seed-topics.ts, `npm run db:seed`) and the
 // production-deploy seed wrapper (scripts/deploy-seed-topics.ts) so the two

@@ -1,5 +1,6 @@
 import type { GuideProfile, PrismaClient, TaskType } from "@prisma/client";
 import { TopicSource } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 export interface SeedTopic {
   taskType: TaskType;
@@ -17,6 +18,36 @@ export interface SeedTopicSyncResult {
   // A retired-and-replaced pair, not an in-place update -- see syncSeedTopics.
   retired: number;
   unchanged: number;
+}
+
+export interface StarterTopicBank {
+  version: number;
+  topics: readonly SeedTopic[];
+}
+
+export interface StarterTopicBankSyncResult extends SeedTopicSyncResult {
+  status: "applied" | "unchanged" | "stale";
+}
+
+const STARTER_TOPIC_BANK_STATE_ID = 1;
+
+/**
+ * A deterministic fingerprint detects accidental reuse of a bank version.
+ * Version ordering, rather than this hash, is the deployment-order fence.
+ */
+export function getStarterTopicBankHash(topics: readonly SeedTopic[]) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        topics.map((topic) => ({
+          taskType: topic.taskType,
+          title: topic.title,
+          prompt: topic.prompt,
+          guideContext: topic.guideContext ?? null,
+        })),
+      ),
+    )
+    .digest("hex");
 }
 
 /**
@@ -107,6 +138,57 @@ export async function runLockedSeedTopicSync(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SEED_TOPIC_SYNC_LOCK_KEY})::bigint)`;
       return syncSeedTopics(tx, topics);
+    },
+    { timeout: 30_000 },
+  );
+}
+
+/**
+ * Reconciles a versioned starter bank under the same advisory lock used by
+ * manual seeding. A higher version may replace prompts; an equal version must
+ * have identical content; a lower version is a no-op. This prevents an
+ * out-of-order, older live bundle from rolling production back after a newer
+ * bundle has already served traffic.
+ */
+export async function runLockedStarterTopicBankSync(
+  prisma: PrismaClient,
+  bank: StarterTopicBank,
+): Promise<StarterTopicBankSyncResult> {
+  if (!Number.isSafeInteger(bank.version) || bank.version < 1) {
+    throw new Error("Starter-topic bank version must be a positive integer.");
+  }
+
+  const contentHash = getStarterTopicBankHash(bank.topics);
+
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SEED_TOPIC_SYNC_LOCK_KEY})::bigint)`;
+
+      const current = await tx.starterTopicBankState.findUnique({
+        where: { id: STARTER_TOPIC_BANK_STATE_ID },
+      });
+
+      if (current && current.version > bank.version) {
+        return { created: 0, retired: 0, unchanged: 0, status: "stale" };
+      }
+
+      if (current && current.version === bank.version) {
+        if (current.contentHash !== contentHash) {
+          throw new Error(
+            `Starter-topic bank version ${bank.version} has different content than the bank already in the database. Increment STARTER_TOPIC_BANK_VERSION before deploying a changed bank.`,
+          );
+        }
+        return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
+      }
+
+      const synced = await syncSeedTopics(tx, bank.topics);
+      await tx.starterTopicBankState.upsert({
+        where: { id: STARTER_TOPIC_BANK_STATE_ID },
+        create: { id: STARTER_TOPIC_BANK_STATE_ID, version: bank.version, contentHash },
+        update: { version: bank.version, contentHash },
+      });
+
+      return { ...synced, status: "applied" };
     },
     { timeout: 30_000 },
   );

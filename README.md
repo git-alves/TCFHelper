@@ -253,29 +253,31 @@ prompt) is still graded by the current rubric. Whether to version the
 rubric per topic is an open product decision, not something `retiredAt`
 attempts to solve.
 
-That sync deliberately does **not** run inside `vercel-build`, or as any
-step tied to a specific deploy or CI run. `vercel-build` runs entirely
-before Vercel promotes the new build to production traffic; a row retired
-from in there would be invisible to the *new* deployment's picker (which
-filters on `retiredAt: null`) while the *previous* deployment -- still live
-and serving requests until cutover completes -- has no such filter and
-would list both the retired and replacement topic as duplicates, or
-indefinitely if the build then failed. Tying it to a step inside
-`.github/workflows/deploy.yml` would also only cover one of the two deploy
-paths above (Option A, Vercel's own Git integration, has no GitHub Actions
-job to attach a post-deploy step to at all), and would depend on that
-specific CI/deploy run actually being the one whose commit ends up live --
-GitHub does not guarantee two triggered workflow runs finish in the order
-they started, so a slower run for an older commit could still retire a row
-after a newer commit's picker is already serving traffic.
+The live topic routes now reconcile the bank lazily, only after the new
+deployment is actually serving an authenticated topic request. Each warm
+instance has a cached completion flag (and a short failure cooldown), while
+Postgres's existing advisory lock serializes cold starts across instances.
+`STARTER_TOPIC_BANK_VERSION` is a monotonic deployment-order fence stored
+with a content hash in `StarterTopicBankState`: a lower-version bundle is a
+no-op, and reusing a version with changed content fails loudly. Increment the
+version whenever `STARTER_TOPICS` changes.
 
-Instead, `scripts/deploy-seed-topics.ts` (also reachable as `npm run
-db:seed:deploy`, which still requires the same production confirmation flags
-below -- see why the documented production command bypasses that alias
-regardless) is a deliberate, human-run maintenance step, run once an
-operator has confirmed in the Vercel dashboard that the deployment carrying
-a corrected starter-topic prompt is actually promoted to production. Do
-this once, in a fresh checkout of that exact commit:
+This deliberately remains outside `vercel-build` and `deploy.yml`. It runs
+after promotion rather than during a pre-promotion build. The duplicate-row
+risk described in the original rollout is now closed for the supported live
+versions because **both** topic routes filter `retiredAt: null`, and the
+retire/create operation plus state update commit atomically; nevertheless a
+failed build cannot mutate rows because it never receives traffic. Lazy live
+sync also works for Vercel Git integration (which has no Actions hook), and
+the stored monotonic version prevents a late older deployment from replacing
+a newer bank. A synchronization failure is logged and topic serving continues
+from the prior active rows.
+
+`scripts/deploy-seed-topics.ts` (also reachable as `npm run
+db:seed:deploy`) remains an operator fallback. It uses the same lock and
+version fence, so it cannot roll a newer bank backwards. Run it only to
+recover from a failed lazy sync or as an explicit maintenance action, from a
+fresh checkout of the intended version:
 
 ```sh
 npm ci
@@ -355,36 +357,14 @@ root: `deploy-seed-topics.ts`'s file guard checks `process.cwd()`, which
 only matches what `vercel env run` itself resolves as long as no `--cwd`,
 `npm --prefix`, or similar is layered on top. This repo is a single package
 with no workspaces, so that divergence isn't a risk today, but it would
-become one if this script were ever invoked through such a wrapper. Still
-run it from a clean checkout/worktree of the exact commit shown as live in
-the Vercel dashboard: a stale checkout's `STARTER_TOPICS` is a separate risk
-no environment guard addresses -- it would retire the current, corrected
-bank back to whatever an older commit's `STARTER_TOPICS` looked like.
+become one if this script were ever invoked through such a wrapper. Use a
+checkout with the intended bank version: a stale checkout is now safely a
+no-op once a higher version is recorded, rather than being allowed to retire
+the current bank backwards.
 `npm run db:seed` (`scripts/seed-topics.ts`)
 remains the fully unguarded local/maintenance entrypoint. Both go through
-the same Postgres
-advisory lock (`runLockedSeedTopicSync`) as each other and as any concurrent
-run of themselves, so re-running the step is always safe -- a run against
-already-current prompts is a no-op.
-
-Running it only after confirming cutover, rather than racing it against
-cutover, is what avoids the duplicate-listing window above -- and it needs
-no scheduler, so it carries none of a periodic cron's own hazards (Vercel
-Hobby permits cron only once daily, and a cron cannot be timed to a specific
-deploy's cutover in the first place). This does not make a *later* rollback
-free: rolling back to a pre-`retiredAt` deployment after this step has run
-restores a picker that filters only on `source`, so it lists both the
-retired and replacement `OFFICIAL_EXAM` rows as duplicates until you roll
-forward again -- the database change itself is not undone by a code
-rollback. This is a display-only duplication, not a data-integrity issue:
-either duplicate still has its own stable id and unmodified prompt text, so
-an essay against either one is still stored and correctable against
-exactly the topic text it was written for (subject to the same
-taskType-only rubric-selection caveat above, which is unaffected by
-rollback either way). It is the same "additive changes are
-forward-compatible only, not rollback-compatible" caveat that applies to
-this repo's other schema changes -- see "Production migration policy"
-above.
+the same Postgres advisory lock and version fence as lazy sync, so re-running
+the same bank is a no-op and an older bank cannot overwrite a newer one.
 
 The one-time `npm run onboarding:backfill-pre-gate` command is intentionally a
 reviewed maintenance operation rather than an automatic deployment migration:

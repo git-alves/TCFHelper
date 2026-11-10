@@ -1,17 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, ensureStarterTopicBankSyncedMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   return {
     getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findManyMock: vi.fn(),
+    ensureStarterTopicBankSyncedMock: vi.fn(),
   };
 });
 
 vi.mock("@/lib/activated-app-user", () => ({ getCurrentActivatedAppUser: getCurrentActivatedAppUserMock }));
 vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: AppUserProvisioningErrorMock }));
 vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findMany: findManyMock } } }));
+vi.mock("@/lib/starter-topic-bank-sync", () => ({ ensureStarterTopicBankSynced: ensureStarterTopicBankSyncedMock }));
 
 const { GET } = await import("./route");
 
@@ -29,8 +31,10 @@ const request = (taskType = "TASK_2") => new Request(`http://localhost/api/topic
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   findManyMock.mockReset();
+  ensureStarterTopicBankSyncedMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   findManyMock.mockResolvedValue([bank("t1"), bank("t2"), bank("t3")]);
+  ensureStarterTopicBankSyncedMock.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -75,6 +79,15 @@ describe("GET /api/topics/random", () => {
       expect.objectContaining({
         where: { taskType: "TASK_3", source: "OFFICIAL_EXAM", retiredAt: null },
       }),
+    );
+  });
+
+  it("triggers the lazy deployed-bank reconciliation before reading topics", async () => {
+    await GET(request());
+
+    expect(ensureStarterTopicBankSyncedMock).toHaveBeenCalledOnce();
+    expect(ensureStarterTopicBankSyncedMock.mock.invocationCallOrder[0]).toBeLessThan(
+      findManyMock.mock.invocationCallOrder[0],
     );
   });
 

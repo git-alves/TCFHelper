@@ -3,6 +3,7 @@ import { TaskType, TopicSource } from "@prisma/client";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
+import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
 
 const TASK_TYPES = Object.values(TaskType);
 
@@ -32,6 +33,10 @@ export async function GET(request: Request) {
   if (!taskType || !TASK_TYPES.includes(taskType as TaskType)) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400 });
   }
+
+  // Runs only once per warm instance after this deployment receives traffic.
+  // It catches/logs its own failure so the last active DB bank remains usable.
+  await ensureStarterTopicBankSynced();
 
   const topics = await prisma.topic.findMany({
     // A learner-supplied prompt is stored so its essay has durable context,

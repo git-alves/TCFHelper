@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, ensureStarterTopicBankSyncedMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
     getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findManyMock: vi.fn(),
+    ensureStarterTopicBankSyncedMock: vi.fn(),
   };
 });
 
@@ -17,14 +18,17 @@ vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: AppUserProvisioning
 vi.mock("@/lib/prisma", () => ({
   prisma: { topic: { findMany: findManyMock } },
 }));
+vi.mock("@/lib/starter-topic-bank-sync", () => ({ ensureStarterTopicBankSynced: ensureStarterTopicBankSyncedMock }));
 
 const { GET } = await import("./route");
 
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   findManyMock.mockReset();
+  ensureStarterTopicBankSyncedMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   findManyMock.mockResolvedValue([]);
+  ensureStarterTopicBankSyncedMock.mockResolvedValue(undefined);
 });
 
 describe("GET /api/topics", () => {
@@ -54,6 +58,15 @@ describe("GET /api/topics", () => {
       where: { taskType: "TASK_1", source: "OFFICIAL_EXAM", retiredAt: null },
       select: { id: true, title: true, prompt: true },
     });
+  });
+
+  it("triggers the lazy deployed-bank reconciliation before reading topics", async () => {
+    await GET(new Request("http://localhost/api/topics?taskType=TASK_1"));
+
+    expect(ensureStarterTopicBankSyncedMock).toHaveBeenCalledOnce();
+    expect(ensureStarterTopicBankSyncedMock.mock.invocationCallOrder[0]).toBeLessThan(
+      findManyMock.mock.invocationCallOrder[0],
+    );
   });
 
   it("rejects an invalid task type before querying the topic bank", async () => {
