@@ -7,10 +7,11 @@ import type { SeedTopic } from "@/lib/seed-topic-sync";
 // production sync failure.
 // It is a monotonic deployment-order fence, not a content hash: a later bank
 // must have a higher version so a delayed older deployment cannot roll back.
-export const STARTER_TOPIC_BANK_VERSION = 1;
+export const STARTER_TOPIC_BANK_VERSION = 2;
 
 export const STARTER_TOPIC_BANK_HASHES: Readonly<Record<number, string>> = {
   1: "fb30793e8260f4e1ddaf52212d79b19cf824d941fd1de26022a38bbdf4ce2234",
+  2: "5cbf2d576f3eea89b40f309742b75e3ebe2b87f335b1e855b81e3e4c89321b60",
 };
 
 // The app-managed OFFICIAL_EXAM starter bank, shared between the manual seed
@@ -706,5 +707,245 @@ export const STARTER_TOPICS: SeedTopic[] = [
       "Les médias sociaux et l'information\n\n" +
       "Document 1 :\nLes réseaux sociaux permettent à chacun de s'informer en quelques secondes sur ce qui se passe dans le monde, parfois avant même les grands médias. Ils donnent la parole à des témoins, à des associations et à des citoyens qui ne trouveraient pas de place ailleurs. Chacun peut ainsi comparer plusieurs points de vue et s'exprimer librement sur les sujets qui le concernent.\n\n" +
       "Document 2 :\nSur les réseaux sociaux, les fausses informations circulent plus vite que les vraies. Les algorithmes proposent à chacun des contenus qui lui ressemblent, ce qui l'enferme dans une bulle où il ne voit que les opinions qu'il partage déjà. Il est également difficile de vérifier qui est à l'origine d'une information. Pour bien s'informer, il vaut mieux croiser les sources et se tourner aussi vers des médias qui vérifient leurs informations.",
+  },
+
+  // Bank version 2 additions (10 more per task), appended after the version 1
+  // entries so none of them changes. A starter topic whose title and prompt
+  // already match is left alone by the sync, so these rows are created without
+  // retiring anything.
+  // Tâche 1 — décrire, raconter (60-120 mots)
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Proposer un voyage à un ami",
+    prompt:
+      "Écrivez un message à un ami pour lui proposer de partir en voyage ensemble et lui présenter la destination, les dates et les activités que vous imaginez.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Féliciter un ami pour la naissance de son bébé",
+    prompt:
+      "Écrivez un message à un ami pour le féliciter de la naissance de son bébé et lui demander de ses nouvelles et de celles de sa famille.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Prendre des nouvelles d'un ami malade",
+    prompt:
+      "Écrivez un message à un ami malade pour prendre de ses nouvelles, lui remonter le moral et lui proposer de l'aider.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Parler d'un nouveau passe-temps",
+    prompt:
+      "Écrivez un message à un ami pour lui parler d'un nouveau passe-temps que vous avez découvert et lui proposer de l'essayer avec vous.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Présenter son animal de compagnie",
+    prompt:
+      "Écrivez un message à un correspondant pour lui présenter votre animal de compagnie : son caractère, ses habitudes et ce qu'il vous apporte.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Raconter un concert ou un match",
+    prompt:
+      "Écrivez un message à un ami pour lui raconter un concert ou un match auquel vous avez assisté : l'ambiance, ce que vous avez aimé et ce qui vous a surpris.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.INFORMAL_PERSONAL_MESSAGE,
+    title: "Demander un service à un ami",
+    prompt:
+      "Écrivez un message à un ami pour lui demander de s'occuper de votre appartement et de vos plantes pendant votre absence, en lui expliquant ce qu'il doit faire.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.FORMAL_PROFESSIONAL_MESSAGE,
+    title: "Réserver une salle pour un événement",
+    prompt:
+      "Écrivez un courriel à la mairie pour réserver une salle pour une réunion d'association et préciser la date, le nombre de personnes et le matériel dont vous avez besoin.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.FORMAL_PROFESSIONAL_MESSAGE,
+    title: "Signaler une commande non reçue",
+    prompt:
+      "Écrivez un courriel au service client d'un site de vente en ligne pour signaler que vous n'avez pas reçu votre commande et demander une solution.",
+  },
+  {
+    taskType: TaskType.TASK_1,
+    guideContext: GuideProfile.FORMAL_PROFESSIONAL_MESSAGE,
+    title: "Demander un jour de congé",
+    prompt:
+      "Écrivez un courriel à votre responsable pour lui demander un jour de congé, en expliquer la raison et proposer comment organiser votre remplacement.",
+  },
+
+  // Tâche 2 — article, courrier ou note à plusieurs destinataires
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "L'importance du sommeil",
+    prompt:
+      "Rédigez un article pour le journal de votre université : racontez une période pendant laquelle vous avez manqué de sommeil et donnez votre avis sur l'importance de bien dormir, afin de conseiller les autres étudiants.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "Les musées et la culture pour tous",
+    prompt:
+      "Rédigez un article pour le site internet de votre ville : racontez une visite de musée ou d'exposition qui vous a marqué et donnez votre avis sur l'accès à la culture, afin d'inciter les habitants à en profiter.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "Le covoiturage",
+    prompt:
+      "Rédigez une note pour le journal interne de votre entreprise : racontez une expérience de covoiturage et donnez votre avis sur cette pratique, afin d'inciter vos collègues à l'adopter.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "Le gaspillage alimentaire",
+    prompt:
+      "Rédigez un article pour le bulletin de votre association de quartier : racontez une situation où vous avez jeté de la nourriture ou, au contraire, évité de le faire et donnez votre avis sur le gaspillage alimentaire, afin de sensibiliser vos lecteurs.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "Le stress pendant les examens",
+    prompt:
+      "Rédigez un article pour le magazine de votre école : racontez comment vous avez vécu une période d'examens et donnez votre avis sur les meilleures façons de gérer le stress, afin de conseiller les autres élèves.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "Les sorties en pleine nature",
+    prompt:
+      "Rédigez un article pour le bulletin de votre club de randonnée : racontez une sortie en pleine nature et donnez votre avis sur les bienfaits de ces moments, afin d'encourager vos lecteurs à y participer.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_ARTICLE_OR_NOTE,
+    title: "La musique au quotidien",
+    prompt:
+      "Rédigez une note pour le journal de votre quartier : racontez une expérience liée à la musique, comme un concert ou l'apprentissage d'un instrument, et donnez votre avis sur sa place dans la vie quotidienne, afin de partager votre passion avec les lecteurs.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
+    title: "Voyage organisé ou voyage en autonomie",
+    prompt:
+      "Rédigez un courrier destiné aux lecteurs d'un magazine de voyage : racontez un voyage organisé ou préparé par vous-même et donnez votre avis sur ces deux façons de voyager, afin de conseiller vos lecteurs.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
+    title: "Travail en équipe ou travail individuel",
+    prompt:
+      "Rédigez un courrier destiné aux lecteurs d'un magazine professionnel : racontez une expérience de travail en équipe et donnez votre avis sur ses avantages et ses limites, afin de conseiller vos lecteurs.",
+  },
+  {
+    taskType: TaskType.TASK_2,
+    guideContext: GuideProfile.PUBLIC_LETTER,
+    title: "Louer, prêter ou acheter",
+    prompt:
+      "Rédigez un courrier destiné aux lecteurs d'un magazine de consommation : racontez une expérience de prêt ou de location d'un objet au lieu de l'acheter et donnez votre avis sur cette pratique, afin de conseiller vos lecteurs.",
+  },
+
+  // Tâche 3 — analyser et argumenter (title + Document 1 + Document 2)
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Les salaires des sportifs professionnels",
+    prompt:
+      "Les salaires des sportifs professionnels\n\n" +
+      "Document 1 :\nLes meilleurs footballeurs, joueurs de tennis ou basketteurs gagnent des sommes colossales, parfois plus en une saison que ce que beaucoup de personnes gagnent en toute une vie. Ces revenus paraissent excessifs par rapport à des métiers essentiels, comme infirmier ou enseignant. Ils creusent aussi l'écart entre le sport de haut niveau et le sport amateur, qui manque de moyens. Certains proposent donc de plafonner les salaires des sportifs.\n\n" +
+      "Document 2 :\nLes sportifs de haut niveau ont consacré leur jeunesse à l'entraînement, au prix de nombreux sacrifices, et leur carrière est courte et risquée : une blessure peut tout arrêter. Leurs salaires reflètent les revenus considérables que génèrent les stades, les chaînes de télévision et les sponsors. Ces champions font aussi rêver les jeunes et leur donnent envie de pratiquer un sport. Plafonner leurs revenus risquerait surtout de les pousser à partir jouer à l'étranger.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "L'école à la maison",
+    prompt:
+      "L'école à la maison\n\n" +
+      "Document 1 :\nUn nombre croissant de familles choisissent d'instruire leurs enfants à la maison. Cette solution permet d'adapter les apprentissages au rythme de chaque enfant, qui n'est plus exposé aux moqueries ou au harcèlement. Les parents peuvent aussi choisir des méthodes plus souples et laisser davantage de place à la curiosité et aux projets personnels. Pour ces familles, l'école traditionnelle ne convient pas à tous les élèves.\n\n" +
+      "Document 2 :\nL'école ne sert pas seulement à transmettre des connaissances : elle apprend aussi à vivre avec les autres, à respecter des règles et à débattre avec des camarades différents de soi. Un enfant instruit à la maison risque de manquer de ces contacts et de rester dans un cercle trop restreint. Tous les parents n'ont pas non plus les compétences ni le temps nécessaires pour enseigner. L'État doit donc contrôler sérieusement ce type d'instruction.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "La mode à bas prix",
+    prompt:
+      "La mode à bas prix\n\n" +
+      "Document 1 :\nLes enseignes de vêtements à bas prix renouvellent leurs collections presque chaque semaine et permettent à tout le monde de s'habiller à la mode sans dépenser beaucoup. Pour les familles aux revenus modestes, ces boutiques sont souvent la seule possibilité de renouveler la garde-robe des enfants. Elles créent aussi de nombreux emplois dans la vente et la logistique. Beaucoup refusent donc de renoncer à des vêtements accessibles.\n\n" +
+      "Document 2 :\nCette mode jetable a un coût caché. Les vêtements sont souvent fabriqués dans des pays où les ouvriers sont mal payés et travaillent dans de mauvaises conditions, et leur production pollue beaucoup l'eau et l'air. Mal conçus, ils s'usent vite et finissent à la poubelle, ce qui produit des montagnes de déchets textiles. Acheter moins mais mieux, et réparer ou revendre ses vêtements, serait une manière plus responsable de s'habiller.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "L'exploration spatiale",
+    prompt:
+      "L'exploration spatiale\n\n" +
+      "Document 1 :\nEnvoyer des astronautes sur la Lune ou des robots sur Mars coûte des milliards d'euros. Cet argent pourrait servir à répondre à des urgences bien plus concrètes sur Terre, comme la lutte contre la faim, la santé ou le changement climatique. De plus, les lancements de fusées polluent l'atmosphère et multiplient les débris en orbite. Beaucoup estiment qu'il faudrait d'abord résoudre les problèmes de notre planète.\n\n" +
+      "Document 2 :\nLa recherche spatiale a déjà donné de nombreuses innovations utilisées chaque jour, comme les satellites de communication, les prévisions météo ou le GPS. Elle permet de mieux comprendre le climat de notre planète et donne aux jeunes l'envie de faire des études scientifiques. Elle encourage aussi la coopération entre des pays qui travaillent ensemble sur des projets communs. Investir dans l'espace, c'est donc aussi préparer l'avenir.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Vieillir chez soi ou en maison de retraite",
+    prompt:
+      "Vieillir chez soi ou en maison de retraite\n\n" +
+      "Document 1 :\nLa plupart des personnes âgées souhaitent rester chez elles le plus longtemps possible, dans leur quartier, entourées de leurs souvenirs et de leurs voisins. Avec une aide à domicile, elles gardent leur indépendance et leurs habitudes. Rester chez soi coûte souvent moins cher qu'une place en établissement spécialisé, et c'est généralement meilleur pour le moral. Les pouvoirs publics devraient donc développer les services d'aide à domicile.\n\n" +
+      "Document 2 :\nQuand la santé se fragilise, vivre seul devient dangereux : une chute, un oubli ou un malaise peuvent avoir de graves conséquences. Les maisons de retraite offrent une surveillance médicale permanente, des repas équilibrés et des activités qui évitent l'isolement. Les familles, souvent occupées, ne peuvent pas toujours s'occuper seules d'un proche dépendant. Pour beaucoup de seniors, un établissement bien choisi est une solution plus sûre et plus rassurante.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Les subventions à la culture",
+    prompt:
+      "Les subventions à la culture\n\n" +
+      "Document 1 :\nLes théâtres, les musées et les orchestres ont besoin de l'argent public pour survivre, car leurs spectacles ne sont pas toujours rentables. Grâce aux subventions, les prix des billets restent abordables et la culture est accessible à tous, y compris aux familles modestes. Ces aides permettent aussi de soutenir de jeunes artistes et des projets audacieux que le marché ne financerait pas. Une société qui néglige sa culture perd une partie de son identité.\n\n" +
+      "Document 2 :\nDans un contexte de budgets serrés, certains jugent que l'argent public doit aller en priorité à l'éducation, à la santé ou aux transports. Les subventions profitent souvent aux mêmes publics, déjà aisés et instruits, et ne touchent pas ceux qui n'ont jamais mis les pieds dans un théâtre. Les institutions culturelles pourraient chercher davantage de financements privés et de recettes propres, par exemple grâce au mécénat.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Acheter ou louer son logement",
+    prompt:
+      "Acheter ou louer son logement\n\n" +
+      "Document 1 :\nDevenir propriétaire est un projet important pour de nombreuses familles. Avec un crédit, on paie pour un bien qui nous appartient, plutôt que de verser un loyer qui ne rapporte rien. On est libre d'aménager son logement comme on le souhaite et on est protégé contre les hausses de loyer. Une fois le crédit remboursé, on dispose d'un patrimoine à transmettre ou à revendre, et d'une sécurité pour la retraite.\n\n" +
+      "Document 2 :\nAcheter demande un apport important et endette souvent pour vingt ans ou plus. Le propriétaire doit aussi payer les travaux, les taxes et les charges, et il lui est difficile de déménager rapidement pour un nouvel emploi. Louer offre au contraire de la souplesse : on peut changer de ville ou de quartier sans perdre d'argent. Pour beaucoup de jeunes actifs, la location reste donc un choix raisonnable, surtout quand les prix de l'immobilier sont très élevés.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Les médecines douces",
+    prompt:
+      "Les médecines douces\n\n" +
+      "Document 1 :\nL'homéopathie, l'acupuncture ou la phytothérapie séduisent de plus en plus de patients. Ces pratiques prennent le temps d'écouter la personne dans son ensemble, et pas seulement ses symptômes, et leurs traitements provoquent généralement peu d'effets secondaires. Elles peuvent soulager le stress, les douleurs chroniques ou les troubles du sommeil en complément des soins habituels. Beaucoup de patients disent s'en trouver mieux.\n\n" +
+      "Document 2 :\nL'efficacité de nombreuses médecines douces n'a jamais été prouvée par des études scientifiques sérieuses. Certains patients retardent un traitement indispensable en espérant guérir autrement, ce qui peut aggraver leur état. Ces consultations sont parfois coûteuses et peu encadrées, et certains charlatans profitent de la confiance des malades. Il faut donc les considérer uniquement comme un complément, sans jamais remplacer l'avis d'un médecin.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "L'année sabbatique après le lycée",
+    prompt:
+      "L'année sabbatique après le lycée\n\n" +
+      "Document 1 :\nBeaucoup de jeunes hésitent sur leur orientation à la fin du lycée. Une année de césure, consacrée à voyager, à travailler ou à faire du bénévolat, leur permet de prendre du recul avant de choisir leurs études. Ils gagnent en maturité, en autonomie et en confiance en eux, et découvrent parfois une vocation. Les universités et les employeurs apprécient de plus en plus ces parcours originaux.\n\n" +
+      "Document 2 :\nInterrompre ses études pendant un an comporte des risques. Certains jeunes perdent le rythme du travail scolaire et ont ensuite du mal à s'y remettre, voire n'y reviennent jamais. Cette année coûte aussi cher, et seules les familles qui en ont les moyens peuvent l'offrir à leurs enfants, ce qui accroît les inégalités. Il serait plus judicieux de proposer des stages et des journées d'orientation pendant le lycée pour aider les élèves à choisir.",
+  },
+  {
+    taskType: TaskType.TASK_3,
+    guideContext: GuideProfile.ARGUMENTATIVE_ANALYSIS,
+    title: "Les voitures sans conducteur",
+    prompt:
+      "Les voitures sans conducteur\n\n" +
+      "Document 1 :\nLes voitures autonomes, capables de rouler sans conducteur, promettent de rendre la route plus sûre. La plupart des accidents sont causés par l'erreur humaine : la fatigue, l'alcool ou la distraction. Un véhicule autonome ne s'endort pas et réagit plus vite. Ces voitures pourraient aussi faciliter les déplacements des personnes âgées ou handicapées et réduire les embouteillages en circulant de façon plus fluide.\n\n" +
+      "Document 2 :\nConfier sa vie à un ordinateur inquiète beaucoup de personnes. Un logiciel peut se tromper ou être piraté, et on ne sait pas toujours qui est responsable en cas d'accident : le constructeur, le propriétaire ou le programmeur ? Cette technologie pourrait aussi supprimer des milliers d'emplois de chauffeurs de taxi, de bus ou de camion. Avant de les autoriser partout, il faut des règles claires et de nombreux tests.",
   },
 ];

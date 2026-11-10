@@ -52,8 +52,19 @@ describe("starter-topic bank version contract", () => {
 });
 
 describe("starter topic bank", () => {
-  it.each(TASKS)("holds 30 topics for %s", (task) => {
-    expect(forTask(task)).toHaveLength(30);
+  it.each(TASKS)("holds 40 topics for %s", (task) => {
+    expect(forTask(task)).toHaveLength(40);
+  });
+
+  it("keeps the version 1 bank (the first 90 topics) unchanged and in order", () => {
+    // Editing or reordering a shipped topic would retire and replace its
+    // production row, so new topics are only ever appended.
+    expect(getStarterTopicBankHash(STARTER_TOPICS.slice(0, 90))).toBe(STARTER_TOPIC_BANK_HASHES[1]);
+  });
+
+  it("gives every topic in the bank a distinct title", () => {
+    const titles = STARTER_TOPICS.map((topic) => topic.title);
+    expect(new Set(titles).size).toBe(titles.length);
   });
 
   it.each(TASKS)("gives every %s topic a distinct title (the seed sync matches by title)", (task) => {

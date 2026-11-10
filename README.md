@@ -118,12 +118,13 @@ prompts, and the card says so.
 ## Seeded topics
 
 `npm run db:seed` loads a bank of original topics into `Topic` (`OFFICIAL_EXAM`
-source): 30 per task, format-matched to the real exam structure (Task 3's are a
+source): 40 per task, format-matched to the real exam structure (Task 3's are a
 title plus two contrasting `Document 1` / `Document 2` paragraphs) but not
 copied from any real exam, and not ranked by how often a theme has appeared on
 the exam. The random-topic button serves one of these. New or changed starter
-topics only reach production through the deliberate seed step described under
-"Starter-topic bank rollout" below.
+topics reach production automatically after a deploy, as described under
+"Starter-topic bank rollout" below (bump `STARTER_TOPIC_BANK_VERSION` and add
+a new hash entry whenever the bank changes).
 
 Once a topic is
 selected, learners can generate a B2, C1, or C2 French model answer directly
