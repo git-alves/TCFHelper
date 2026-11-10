@@ -11,7 +11,7 @@ export const STARTER_TOPIC_BANK_VERSION = 2;
 
 export const STARTER_TOPIC_BANK_HASHES: Readonly<Record<number, string>> = {
   1: "fb30793e8260f4e1ddaf52212d79b19cf824d941fd1de26022a38bbdf4ce2234",
-  2: "5cbf2d576f3eea89b40f309742b75e3ebe2b87f335b1e855b81e3e4c89321b60",
+  2: "9112fe1ba38c7ecd7b9cd654a8ea2dd06ad677a0f79a596e60aff3aa927569d3",
 };
 
 // The app-managed OFFICIAL_EXAM starter bank, shared between the manual seed
@@ -927,7 +927,7 @@ export const STARTER_TOPICS: SeedTopic[] = [
     title: "Les médecines douces",
     prompt:
       "Les médecines douces\n\n" +
-      "Document 1 :\nL'homéopathie, l'acupuncture ou la phytothérapie séduisent de plus en plus de patients. Ces pratiques prennent le temps d'écouter la personne dans son ensemble, et pas seulement ses symptômes, et leurs traitements provoquent généralement peu d'effets secondaires. Elles peuvent soulager le stress, les douleurs chroniques ou les troubles du sommeil en complément des soins habituels. Beaucoup de patients disent s'en trouver mieux.\n\n" +
+      "Document 1 :\nL'homéopathie, l'acupuncture ou la phytothérapie séduisent de plus en plus de patients. Ces pratiques prennent le temps d'écouter la personne dans son ensemble, et pas seulement ses symptômes, et leurs traitements provoquent généralement peu d'effets secondaires. Elles peuvent soulager le stress, les douleurs chroniques ou les troubles du sommeil, et beaucoup de patients disent s'en trouver mieux. Elles devraient donc être davantage reconnues et remboursées par les systèmes de santé.\n\n" +
       "Document 2 :\nL'efficacité de nombreuses médecines douces n'a jamais été prouvée par des études scientifiques sérieuses. Certains patients retardent un traitement indispensable en espérant guérir autrement, ce qui peut aggraver leur état. Ces consultations sont parfois coûteuses et peu encadrées, et certains charlatans profitent de la confiance des malades. Il faut donc les considérer uniquement comme un complément, sans jamais remplacer l'avis d'un médecin.",
   },
   {
