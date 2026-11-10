@@ -241,7 +241,9 @@ describe("runLockedStarterTopicBankSync", () => {
       status: "applied",
     });
 
-    expect(count).toHaveBeenCalledWith({ where: { source: TopicSource.OFFICIAL_EXAM, retiredAt: null } });
+    expect(count).toHaveBeenCalledWith({
+      where: { taskType: TaskType.TASK_3, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+    });
     expect(upsert).not.toHaveBeenCalled();
   });
 
@@ -261,10 +263,10 @@ describe("runLockedStarterTopicBankSync", () => {
     expect(upsert).not.toHaveBeenCalled();
   });
 
-  it("treats a version-0 bank as stale once version 1 is recorded", async () => {
-    const { prisma: lockedPrisma } = versionedPrisma({ version: 1, contentHash: "newer" });
+  it("treats a lower positive version as stale once a newer one is recorded", async () => {
+    const { prisma: lockedPrisma } = versionedPrisma({ version: 2, contentHash: "newer" });
 
-    await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 0, topics: [starterTopic] })).resolves.toMatchObject({
+    await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 1, topics: [starterTopic] })).resolves.toMatchObject({
       status: "stale",
     });
   });

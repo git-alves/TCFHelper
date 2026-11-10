@@ -127,10 +127,10 @@ export async function syncSeedTopics(
 const SEED_TOPIC_SYNC_LOCK_KEY = "deploy-seed-topics";
 
 /**
- * The entrypoint every caller (the manual `npm run db:seed` script and the
- * guarded production deploy wrapper alike) should use, so neither can race
- * the other: syncSeedTopics's per-topic findFirst-then-write is only safe
- * run by one caller at a time.
+ * The unfenced local/maintenance entrypoint used by `npm run db:seed`.
+ * It shares the advisory lock with the guarded production wrapper and lazy
+ * sync, so syncSeedTopics's per-topic findFirst-then-write remains serialized
+ * without this legacy path reading or writing StarterTopicBankState.
  */
 export async function runLockedSeedTopicSync(
   prisma: PrismaClient,
@@ -156,8 +156,8 @@ export async function runLockedStarterTopicBankSync(
   prisma: PrismaClient,
   bank: StarterTopicBank,
 ): Promise<StarterTopicBankSyncResult> {
-  if (!Number.isSafeInteger(bank.version) || bank.version < 0) {
-    throw new Error("Starter-topic bank version must be a non-negative integer.");
+  if (!Number.isSafeInteger(bank.version) || bank.version < 1) {
+    throw new Error("Starter-topic bank version must be a positive integer.");
   }
 
   const contentHash = getStarterTopicBankHash(bank.topics);
@@ -180,13 +180,19 @@ export async function runLockedStarterTopicBankSync(
             `Starter-topic bank version ${bank.version} has different content than the bank already in the database. Increment STARTER_TOPIC_BANK_VERSION before deploying a changed bank.`,
           );
         }
-        // A matching state row normally makes this a constant-size health
-        // check. It also heals an interrupted/manual data edit without
-        // weakening the version fence: syncSeedTopics remains idempotent.
-        const activeCount = await tx.topic.count({
-          where: { source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
-        });
-        if (activeCount === bank.topics.length) {
+        // A matching state row normally makes this three-query health check.
+        // Check each task independently: an orphaned retired-title row (or a
+        // compensating extra row in another task) still triggers the
+        // idempotent reconciliation without weakening the version fence.
+        const taskTypes = [...new Set(bank.topics.map((topic) => topic.taskType))];
+        const counts = await Promise.all(taskTypes.map(async (taskType) => ({
+          taskType,
+          active: await tx.topic.count({
+            where: { taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+          }),
+          expected: bank.topics.filter((topic) => topic.taskType === taskType).length,
+        })));
+        if (counts.every(({ active, expected }) => active === expected)) {
           return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
         }
 

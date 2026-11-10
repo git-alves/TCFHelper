@@ -10,6 +10,18 @@ const forTask = (task: TaskType) => STARTER_TOPICS.filter((topic) => topic.taskT
 
 describe("starter-topic bank version contract", () => {
   const historyInstructions = "bump the version and add a new entry, never edit an old one.";
+  let originMainSource: string | undefined;
+  try {
+    originMainSource = execFileSync("git", ["show", "origin/main:src/lib/starter-topics.ts"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    // The skipped test below makes an intentionally shallow/no-git checkout
+    // visible in the test report instead of disguising it as a pass.
+  }
+  const originMainHasHistory = originMainSource?.includes("STARTER_TOPIC_BANK_HASHES") ?? false;
 
   it("pins the current bank content to its monotonic version", () => {
     const expectedHash = STARTER_TOPIC_BANK_HASHES[STARTER_TOPIC_BANK_VERSION];
@@ -27,26 +39,12 @@ describe("starter-topic bank version contract", () => {
     expect(versions.at(-1), historyInstructions).toBe(STARTER_TOPIC_BANK_VERSION);
   });
 
-  it("never changes a hash already recorded on origin/main", () => {
-    let source: string;
-    try {
-      source = execFileSync("git", ["show", "origin/main:src/lib/starter-topics.ts"], {
-        cwd: process.cwd(),
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      });
-    } catch {
-      console.info("Skipping immutable starter-topic history comparison: origin/main is unavailable.");
-      return;
-    }
+  it.skipIf(!originMainHasHistory)("never changes a hash already recorded on origin/main", () => {
+    const mapMatch = originMainSource!.match(/STARTER_TOPIC_BANK_HASHES[^=]*=\s*\{([\s\S]*?)\n\};/);
+    expect(mapMatch, historyInstructions).not.toBeNull();
 
-    const mapMatch = source.match(/STARTER_TOPIC_BANK_HASHES[^=]*=\s*\{([\s\S]*?)\n\};/);
-    if (!mapMatch) {
-      console.info("Skipping immutable starter-topic history comparison: origin/main predates STARTER_TOPIC_BANK_HASHES.");
-      return;
-    }
-
-    const originEntries = [...mapMatch[1].matchAll(/(\d+)\s*:\s*["']([a-f0-9]{64})["']/g)];
+    const originEntries = [...mapMatch![1].matchAll(/(\d+)\s*:\s*["']([a-f0-9]{64})["']/g)];
+    expect(originEntries, historyInstructions).not.toHaveLength(0);
     for (const [, version, hash] of originEntries) {
       expect(STARTER_TOPIC_BANK_HASHES[Number(version)], historyInstructions).toBe(hash);
     }

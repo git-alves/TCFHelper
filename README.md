@@ -265,6 +265,11 @@ version whenever `STARTER_TOPICS` changes and record the new hash in
 checks both the current hash and the immutable history when `origin/main` is
 available.
 
+For the opt-in real-Postgres rollout check, run `npm run test:db`. It installs
+`embedded-postgres` into a temporary directory for that command (rather than
+adding its roughly 60 MB platform binary to devDependencies), applies the
+committed migrations to that scratch database, and removes it afterwards.
+
 This deliberately remains outside `vercel-build` and `deploy.yml`. It runs
 after promotion rather than during a pre-promotion build. The duplicate-row
 risk described in the original rollout is closed only for deployments whose
