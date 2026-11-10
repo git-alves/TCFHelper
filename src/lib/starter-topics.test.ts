@@ -1,10 +1,55 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { TaskType } from "@prisma/client";
-import { STARTER_TOPICS } from "@/lib/starter-topics";
+import { STARTER_TOPIC_BANK_HASHES, STARTER_TOPIC_BANK_VERSION, STARTER_TOPICS } from "@/lib/starter-topics";
+import { getStarterTopicBankHash } from "@/lib/seed-topic-sync";
 import { hasTaskThreeDocuments, splitTaskThreeDocuments } from "@/lib/task-three-topic";
 
 const TASKS = [TaskType.TASK_1, TaskType.TASK_2, TaskType.TASK_3] as const;
 const forTask = (task: TaskType) => STARTER_TOPICS.filter((topic) => topic.taskType === task);
+
+describe("starter-topic bank version contract", () => {
+  const historyInstructions = "bump the version and add a new entry, never edit an old one.";
+  let originMainSource: string | undefined;
+  try {
+    originMainSource = execFileSync("git", ["show", "origin/main:src/lib/starter-topics.ts"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    // The skipped test below makes an intentionally shallow/no-git checkout
+    // visible in the test report instead of disguising it as a pass.
+  }
+  const originMainHasHistory = originMainSource?.includes("STARTER_TOPIC_BANK_HASHES") ?? false;
+
+  it("pins the current bank content to its monotonic version", () => {
+    const expectedHash = STARTER_TOPIC_BANK_HASHES[STARTER_TOPIC_BANK_VERSION];
+    const instructions =
+      "STARTER_TOPICS changed: increment STARTER_TOPIC_BANK_VERSION and record the new getStarterTopicBankHash value in STARTER_TOPIC_BANK_HASHES.";
+
+    expect(expectedHash, instructions).toBeDefined();
+    expect(getStarterTopicBankHash(STARTER_TOPICS), instructions).toBe(expectedHash);
+  });
+
+  it("keeps bank-history versions contiguous and ends at the current version", () => {
+    const versions = Object.keys(STARTER_TOPIC_BANK_HASHES).map(Number).sort((a, b) => a - b);
+
+    expect(versions, historyInstructions).toEqual(Array.from({ length: STARTER_TOPIC_BANK_VERSION }, (_, index) => index + 1));
+    expect(versions.at(-1), historyInstructions).toBe(STARTER_TOPIC_BANK_VERSION);
+  });
+
+  it.skipIf(!originMainHasHistory)("never changes a hash already recorded on origin/main", () => {
+    const mapMatch = originMainSource!.match(/STARTER_TOPIC_BANK_HASHES[^=]*=\s*\{([\s\S]*?)\n\};/);
+    expect(mapMatch, historyInstructions).not.toBeNull();
+
+    const originEntries = [...mapMatch![1].matchAll(/(\d+)\s*:\s*["']([a-f0-9]{64})["']/g)];
+    expect(originEntries, historyInstructions).not.toHaveLength(0);
+    for (const [, version, hash] of originEntries) {
+      expect(STARTER_TOPIC_BANK_HASHES[Number(version)], historyInstructions).toBe(hash);
+    }
+  });
+});
 
 describe("starter topic bank", () => {
   it.each(TASKS)("holds 30 topics for %s", (task) => {

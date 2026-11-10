@@ -1,5 +1,6 @@
 import type { GuideProfile, PrismaClient, TaskType } from "@prisma/client";
 import { TopicSource } from "@prisma/client";
+import { createHash } from "node:crypto";
 
 export interface SeedTopic {
   taskType: TaskType;
@@ -17,6 +18,38 @@ export interface SeedTopicSyncResult {
   // A retired-and-replaced pair, not an in-place update -- see syncSeedTopics.
   retired: number;
   unchanged: number;
+}
+
+export interface StarterTopicBank {
+  version: number;
+  topics: readonly SeedTopic[];
+}
+
+export interface StarterTopicBankSyncResult extends SeedTopicSyncResult {
+  status: "adopted" | "applied" | "unchanged" | "stale";
+}
+
+const STARTER_TOPIC_BANK_STATE_ID = 1;
+
+/**
+ * A deterministic fingerprint detects accidental reuse of a bank version.
+ * Version ordering, rather than this hash, is the deployment-order fence.
+ * The hash is deliberately order-sensitive: bank order is part of its
+ * immutable release artifact, not an incidental implementation detail.
+ */
+export function getStarterTopicBankHash(topics: readonly SeedTopic[]) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify(
+        topics.map((topic) => ({
+          taskType: topic.taskType,
+          title: topic.title,
+          prompt: topic.prompt,
+          guideContext: topic.guideContext ?? null,
+        })),
+      ),
+    )
+    .digest("hex");
 }
 
 /**
@@ -94,10 +127,10 @@ export async function syncSeedTopics(
 const SEED_TOPIC_SYNC_LOCK_KEY = "deploy-seed-topics";
 
 /**
- * The entrypoint every caller (the manual `npm run db:seed` script and the
- * guarded production deploy wrapper alike) should use, so neither can race
- * the other: syncSeedTopics's per-topic findFirst-then-write is only safe
- * run by one caller at a time.
+ * The unfenced local/maintenance entrypoint used by `npm run db:seed`.
+ * It shares the advisory lock with the guarded production wrapper and lazy
+ * sync, so syncSeedTopics's per-topic findFirst-then-write remains serialized
+ * without this legacy path reading or writing StarterTopicBankState.
  */
 export async function runLockedSeedTopicSync(
   prisma: PrismaClient,
@@ -107,6 +140,82 @@ export async function runLockedSeedTopicSync(
     async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SEED_TOPIC_SYNC_LOCK_KEY})::bigint)`;
       return syncSeedTopics(tx, topics);
+    },
+    { timeout: 30_000 },
+  );
+}
+
+/**
+ * Reconciles a versioned starter bank under the same advisory lock used by
+ * manual seeding. A higher version may replace prompts; an equal version must
+ * have identical content; a lower version is a no-op. This prevents an
+ * out-of-order, older live bundle from rolling production back after a newer
+ * bundle has already served traffic.
+ */
+export async function runLockedStarterTopicBankSync(
+  prisma: PrismaClient,
+  bank: StarterTopicBank,
+): Promise<StarterTopicBankSyncResult> {
+  if (!Number.isSafeInteger(bank.version) || bank.version < 1) {
+    throw new Error("Starter-topic bank version must be a positive integer.");
+  }
+
+  const contentHash = getStarterTopicBankHash(bank.topics);
+
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${SEED_TOPIC_SYNC_LOCK_KEY})::bigint)`;
+
+      const current = await tx.starterTopicBankState.findUnique({
+        where: { id: STARTER_TOPIC_BANK_STATE_ID },
+      });
+
+      if (current && current.version > bank.version) {
+        return { created: 0, retired: 0, unchanged: 0, status: "stale" };
+      }
+
+      if (current && current.version === bank.version) {
+        if (current.contentHash !== contentHash) {
+          throw new Error(
+            `Starter-topic bank version ${bank.version} has different content than the bank already in the database. Increment STARTER_TOPIC_BANK_VERSION before deploying a changed bank.`,
+          );
+        }
+        // A matching state row normally makes this three-query health check.
+        // Check each task independently: an orphaned retired-title row (or a
+        // compensating extra row in another task) still triggers the
+        // idempotent reconciliation without weakening the version fence.
+        const taskTypes = [...new Set(bank.topics.map((topic) => topic.taskType))];
+        const counts: Array<{ active: number; expected: number }> = [];
+        for (const taskType of taskTypes) {
+          counts.push({
+            active: await tx.topic.count({
+              where: { taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+            }),
+            expected: bank.topics.filter((topic) => topic.taskType === taskType).length,
+          });
+        }
+        if (counts.every(({ active, expected }) => active === expected)) {
+          return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
+        }
+
+        const synced = await syncSeedTopics(tx, bank.topics);
+        return { ...synced, status: "applied" };
+      }
+
+      const synced = await syncSeedTopics(tx, bank.topics);
+      await tx.starterTopicBankState.upsert({
+        where: { id: STARTER_TOPIC_BANK_STATE_ID },
+        create: { id: STARTER_TOPIC_BANK_STATE_ID, version: bank.version, contentHash },
+        update: { version: bank.version, contentHash },
+      });
+
+      // A pre-versioning manual seed may already have put these exact rows in
+      // production. Record the fence without claiming that this call changed
+      // any Topic rows.
+      return {
+        ...synced,
+        status: !current && synced.created === 0 && synced.retired === 0 ? "adopted" : "applied",
+      };
     },
     { timeout: 30_000 },
   );

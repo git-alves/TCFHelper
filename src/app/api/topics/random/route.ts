@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyWritingContext } from "@/lib/guided-writing-classifier";
+import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
@@ -40,6 +41,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400, headers: NO_STORE_HEADERS });
   }
   const taskType = requestedTaskType as TaskType;
+
+  // after() runs the reconciliation after this response has been sent. The
+  // first request is allowed to use the previous active bank rather than wait
+  // for an advisory lock or a replacement transaction.
+  after(ensureStarterTopicBankSynced);
 
   const topics = await prisma.topic.findMany({
     // A retired starter topic stays gradeable for whoever already has its id

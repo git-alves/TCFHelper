@@ -88,4 +88,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // row's meaning changes: null means "no sign-in recorded yet", which is true
   // of every existing row.
   "20261023120000_add_user_last_sign_in",
+  // An empty singleton deployment-order fence for the starter-topic bank.
+  // It does not touch Topic rows; the first live topic request reconciles
+  // them transactionally after this compatible table exists.
+  "20261110120000_add_starter_topic_bank_state",
 ]);

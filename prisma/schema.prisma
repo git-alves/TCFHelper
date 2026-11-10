@@ -246,6 +246,17 @@ model Topic {
   @@index([taskType])
 }
 
+/// Singleton recording which immutable starter-topic bank has reached this
+/// database.  It is deliberately separate from Topic: a bank version is a
+/// deployment-order fence, while Topic rows remain immutable assignment
+/// history (retiredAt preserves an essay's original prompt).
+model StarterTopicBankState {
+  id          Int      @id
+  version     Int
+  contentHash String
+  updatedAt   DateTime @updatedAt
+}
+
 model Essay {
   id                String      @id @default(cuid())
   userId            String

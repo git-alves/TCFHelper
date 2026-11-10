@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
+import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
 
 const TASK_TYPES = Object.values(TaskType);
 
@@ -32,6 +33,11 @@ export async function GET(request: Request) {
   if (!taskType || !TASK_TYPES.includes(taskType as TaskType)) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400 });
   }
+
+  // after() runs the reconciliation after this response has been sent. The
+  // first request is allowed to use the previous active bank rather than wait
+  // for an advisory lock or a replacement transaction.
+  after(ensureStarterTopicBankSynced);
 
   const topics = await prisma.topic.findMany({
     // A learner-supplied prompt is stored so its essay has durable context,

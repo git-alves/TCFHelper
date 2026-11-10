@@ -1,6 +1,9 @@
 /**
- * Production wrapper around syncSeedTopics, run by a human operator once a
- * deploy carrying a corrected starter-topic prompt is confirmed live. Exact
+ * Production fallback around the versioned starter-topic-bank sync. Live
+ * topic routes now reconcile once after a promoted deployment receives
+ * traffic; use this only to recover a failed lazy sync or for deliberate
+ * maintenance. The same advisory lock and monotonic bank-version fence make
+ * a stale checkout a safe no-op rather than a rollback. Exact
  * invocation (see README's "Starter-topic bank rollout"), from a fresh
  * checkout at the exact commit shown as live in the Vercel dashboard:
  *
@@ -73,16 +76,12 @@
  * in ways not yet identified) reach the child process in the first place,
  * rather than unsetting only the specific names already known to matter.
  *
- * Deliberately not part of the automated deploy path (README's "Starter-topic
- * bank rollout"): vercel-build runs entirely *before* Vercel promotes the new
- * build to production traffic, so retiring a row from inside it would be
- * invisible to the new deployment's retiredAt-aware picker while the
- * previous deployment -- still live and serving requests until cutover
- * completes -- has no such filter and would list both the retired and
- * replacement topic as duplicates. Running this only after the operator has
- * confirmed the new code is actually live avoids that window entirely, and
- * needs no scheduler, works identically for either documented Vercel deploy
- * path, and has no dependency on GitHub Actions build ordering.
+ * Deliberately not part of the automated build/deploy path (README's
+ * "Starter-topic bank rollout"): vercel-build happens before promotion, and
+ * Git integration has no Actions hook. The supported live topic pickers both
+ * filter retiredAt and lazy sync runs after traffic reaches the deployment;
+ * the database version fence also prevents a late older deployment from
+ * replacing a newer bank.
  *
  * `VERCEL_ENV=production` is required explicitly, not merely allowed, unlike
  * the production migration script's own gate: that script runs *inside*
@@ -94,16 +93,12 @@
  * `npm run db:seed` (scripts/seed-topics.ts) remains the fully unguarded
  * manual entrypoint for local/maintenance use against any database.
  *
- * Run this from a fresh checkout of the exact commit that is live in
- * production (check the Vercel dashboard's deployment commit SHA). Running
- * it from a stale local checkout would retire the current, corrected
- * starter-topic bank back to whatever `STARTER_TOPICS` looked like at that
- * older commit.
+ * Prefer a fresh checkout of the intended bank version. A stale checkout is
+ * refused as stale after a newer version has reached the database.
  *
- * Run this once per prompt correction, not repeatedly: two operators running
- * it back to back, or one running it twice, is still safe (runLockedSeedTopicSync
- * serializes via the same advisory lock `npm run db:seed` uses), but each run
- * after the first is a no-op against unchanged prompts.
+ * Re-running this fallback is safe: the versioned sync shares the same
+ * advisory lock as lazy traffic-triggered sync, and an unchanged bank is a
+ * no-op.
  *
  * No `dotenv/config` here, deliberately: this script's own env loading would
  * be redundant at best (`vercel env run` already injects DATABASE_URL
@@ -120,8 +115,8 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { assertNoLocalEnvFiles } from "../src/lib/local-env-guard";
-import { runLockedSeedTopicSync } from "../src/lib/seed-topic-sync";
-import { STARTER_TOPICS } from "../src/lib/starter-topics";
+import { runLockedStarterTopicBankSync } from "../src/lib/seed-topic-sync";
+import { STARTER_TOPICS, STARTER_TOPIC_BANK_VERSION } from "../src/lib/starter-topics";
 
 async function main() {
   if (process.env.RUN_PRODUCTION_MIGRATIONS !== "1") {
@@ -144,10 +139,13 @@ async function main() {
   const prisma = new PrismaClient();
 
   try {
-    const { created, retired, unchanged } = await runLockedSeedTopicSync(prisma, STARTER_TOPICS);
+    const { created, retired, unchanged, status } = await runLockedStarterTopicBankSync(prisma, {
+      version: STARTER_TOPIC_BANK_VERSION,
+      topics: STARTER_TOPICS,
+    });
 
     console.log(
-      `Starter-topic seed complete: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`,
+      `Starter-topic seed ${status}: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`,
     );
   } finally {
     await prisma.$disconnect();
