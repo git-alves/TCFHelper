@@ -2,8 +2,9 @@ import { GuideProfile, TaskType } from "@prisma/client";
 import type { SeedTopic } from "@/lib/seed-topic-sync";
 
 // Increment this integer whenever STARTER_TOPICS changes, then record the new
-// hash in STARTER_TOPIC_BANK_HASHES below. The test that checks this map turns
-// a forgotten bump into a CI failure instead of a production sync failure.
+// hash in STARTER_TOPIC_BANK_HASHES below. Add a new entry; never edit an old
+// one. The tests turn either omission into a CI failure instead of a
+// production sync failure.
 // It is a monotonic deployment-order fence, not a content hash: a later bank
 // must have a higher version so a delayed older deployment cannot roll back.
 export const STARTER_TOPIC_BANK_VERSION = 1;

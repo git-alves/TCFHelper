@@ -1,13 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, ensureStarterTopicBankSyncedMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, ensureStarterTopicBankSyncedMock, afterMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   return {
     getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findManyMock: vi.fn(),
     ensureStarterTopicBankSyncedMock: vi.fn(),
+    afterMock: vi.fn(),
   };
+});
+
+vi.mock("next/server", async () => {
+  const actual = await vi.importActual<typeof import("next/server")>("next/server");
+  return { ...actual, after: afterMock };
 });
 
 vi.mock("@/lib/activated-app-user", () => ({ getCurrentActivatedAppUser: getCurrentActivatedAppUserMock }));
@@ -32,6 +38,7 @@ beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   findManyMock.mockReset();
   ensureStarterTopicBankSyncedMock.mockReset();
+  afterMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   findManyMock.mockResolvedValue([bank("t1"), bank("t2"), bank("t3")]);
   ensureStarterTopicBankSyncedMock.mockResolvedValue(undefined);
@@ -82,13 +89,25 @@ describe("GET /api/topics/random", () => {
     );
   });
 
-  it("triggers the lazy deployed-bank reconciliation before reading topics", async () => {
+  it("schedules the lazy deployed-bank reconciliation after the response", async () => {
     await GET(request());
 
-    expect(ensureStarterTopicBankSyncedMock).toHaveBeenCalledOnce();
-    expect(ensureStarterTopicBankSyncedMock.mock.invocationCallOrder[0]).toBeLessThan(
-      findManyMock.mock.invocationCallOrder[0],
-    );
+    expect(afterMock).toHaveBeenCalledWith(ensureStarterTopicBankSyncedMock);
+    expect(ensureStarterTopicBankSyncedMock).not.toHaveBeenCalled();
+  });
+
+  it("returns even when the scheduled synchronization never resolves", async () => {
+    ensureStarterTopicBankSyncedMock.mockImplementation(() => new Promise<void>(() => undefined));
+    afterMock.mockImplementation((callback: () => Promise<void>) => {
+      void callback();
+    });
+
+    const response = await Promise.race([
+      GET(request()),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("GET waited for sync")), 100)),
+    ]);
+
+    expect(response.status).toBe(200);
   });
 
   it("falls back to the deterministic guide classifier when the topic has no editorial profile", async () => {

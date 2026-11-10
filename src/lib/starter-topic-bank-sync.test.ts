@@ -57,6 +57,23 @@ describe("ensureStarterTopicBankSynced", () => {
     expect(consoleInfo).toHaveBeenCalledWith("Skipping starter-topic bank synchronization in Vercel preview.");
   });
 
+  it("is a no-op in a Vercel development deployment", async () => {
+    vi.stubEnv("VERCEL_ENV", "development");
+
+    await ensureStarterTopicBankSynced();
+
+    expect(runLockedStarterTopicBankSyncMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let a local opt-in override a Vercel Preview fence", async () => {
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("AUTO_SYNC_STARTER_TOPICS", "1");
+
+    await ensureStarterTopicBankSynced();
+
+    expect(runLockedStarterTopicBankSyncMock).not.toHaveBeenCalled();
+  });
+
   it("requires an explicit local opt-in when VERCEL_ENV is unset", async () => {
     vi.unstubAllEnvs();
     const consoleInfo = vi.spyOn(console, "info").mockImplementation(() => undefined);

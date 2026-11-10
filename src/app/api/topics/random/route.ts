@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { TaskType, TopicSource } from "@prisma/client";
 import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
 import { AppUserProvisioningError } from "@/lib/app-user";
@@ -42,9 +42,10 @@ export async function GET(request: Request) {
   }
   const taskType = requestedTaskType as TaskType;
 
-  // Runs only once per warm instance after this deployment receives traffic.
-  // It catches/logs its own failure so the last active DB bank remains usable.
-  await ensureStarterTopicBankSynced();
+  // after() runs the reconciliation after this response has been sent. The
+  // first request is allowed to use the previous active bank rather than wait
+  // for an advisory lock or a replacement transaction.
+  after(ensureStarterTopicBankSynced);
 
   const topics = await prisma.topic.findMany({
     // A retired starter topic stays gradeable for whoever already has its id

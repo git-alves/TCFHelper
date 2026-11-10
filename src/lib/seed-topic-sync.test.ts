@@ -10,6 +10,7 @@ import {
 const findFirst = vi.fn();
 const create = vi.fn();
 const update = vi.fn();
+const count = vi.fn();
 
 const prisma = {
   topic: { findFirst, create, update },
@@ -25,6 +26,7 @@ beforeEach(() => {
   findFirst.mockReset();
   create.mockReset();
   update.mockReset();
+  count.mockReset();
 });
 
 describe("syncSeedTopics", () => {
@@ -160,7 +162,7 @@ describe("runLockedStarterTopicBankSync", () => {
     const findUnique = vi.fn().mockResolvedValue(current);
     const upsert = vi.fn().mockResolvedValue(undefined);
     const transactionClient = {
-      topic: { findFirst, create, update },
+      topic: { findFirst, create, update, count },
       starterTopicBankState: { findUnique, upsert },
       $executeRaw: executeRaw,
     };
@@ -200,7 +202,7 @@ describe("runLockedStarterTopicBankSync", () => {
       created: 0,
       retired: 0,
       unchanged: 1,
-      status: "applied",
+      status: "adopted",
     });
 
     expect(upsert).toHaveBeenCalledWith({
@@ -213,6 +215,7 @@ describe("runLockedStarterTopicBankSync", () => {
   it("is idempotent for the same bank version and content", async () => {
     const hash = getStarterTopicBankHash([starterTopic]);
     const { prisma: lockedPrisma, upsert } = versionedPrisma({ version: 2, contentHash: hash });
+    count.mockResolvedValue(1);
 
     await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 2, topics: [starterTopic] })).resolves.toEqual({
       created: 0,
@@ -222,6 +225,23 @@ describe("runLockedStarterTopicBankSync", () => {
     });
 
     expect(findFirst).not.toHaveBeenCalled();
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("self-heals a missing active row even when version and hash already match", async () => {
+    const hash = getStarterTopicBankHash([starterTopic]);
+    const { prisma: lockedPrisma, upsert } = versionedPrisma({ version: 2, contentHash: hash });
+    count.mockResolvedValue(0);
+    findFirst.mockResolvedValue(null);
+
+    await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 2, topics: [starterTopic] })).resolves.toEqual({
+      created: 1,
+      retired: 0,
+      unchanged: 0,
+      status: "applied",
+    });
+
+    expect(count).toHaveBeenCalledWith({ where: { source: TopicSource.OFFICIAL_EXAM, retiredAt: null } });
     expect(upsert).not.toHaveBeenCalled();
   });
 
@@ -239,6 +259,14 @@ describe("runLockedStarterTopicBankSync", () => {
     expect(create).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
     expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("treats a version-0 bank as stale once version 1 is recorded", async () => {
+    const { prisma: lockedPrisma } = versionedPrisma({ version: 1, contentHash: "newer" });
+
+    await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 0, topics: [starterTopic] })).resolves.toMatchObject({
+      status: "stale",
+    });
   });
 
   it("rejects a changed bank that reuses a version", async () => {

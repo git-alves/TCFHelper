@@ -26,7 +26,7 @@ export interface StarterTopicBank {
 }
 
 export interface StarterTopicBankSyncResult extends SeedTopicSyncResult {
-  status: "applied" | "unchanged" | "stale";
+  status: "adopted" | "applied" | "unchanged" | "stale";
 }
 
 const STARTER_TOPIC_BANK_STATE_ID = 1;
@@ -34,6 +34,8 @@ const STARTER_TOPIC_BANK_STATE_ID = 1;
 /**
  * A deterministic fingerprint detects accidental reuse of a bank version.
  * Version ordering, rather than this hash, is the deployment-order fence.
+ * The hash is deliberately order-sensitive: bank order is part of its
+ * immutable release artifact, not an incidental implementation detail.
  */
 export function getStarterTopicBankHash(topics: readonly SeedTopic[]) {
   return createHash("sha256")
@@ -154,8 +156,8 @@ export async function runLockedStarterTopicBankSync(
   prisma: PrismaClient,
   bank: StarterTopicBank,
 ): Promise<StarterTopicBankSyncResult> {
-  if (!Number.isSafeInteger(bank.version) || bank.version < 1) {
-    throw new Error("Starter-topic bank version must be a positive integer.");
+  if (!Number.isSafeInteger(bank.version) || bank.version < 0) {
+    throw new Error("Starter-topic bank version must be a non-negative integer.");
   }
 
   const contentHash = getStarterTopicBankHash(bank.topics);
@@ -178,7 +180,18 @@ export async function runLockedStarterTopicBankSync(
             `Starter-topic bank version ${bank.version} has different content than the bank already in the database. Increment STARTER_TOPIC_BANK_VERSION before deploying a changed bank.`,
           );
         }
-        return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
+        // A matching state row normally makes this a constant-size health
+        // check. It also heals an interrupted/manual data edit without
+        // weakening the version fence: syncSeedTopics remains idempotent.
+        const activeCount = await tx.topic.count({
+          where: { source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+        });
+        if (activeCount === bank.topics.length) {
+          return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
+        }
+
+        const synced = await syncSeedTopics(tx, bank.topics);
+        return { ...synced, status: "applied" };
       }
 
       const synced = await syncSeedTopics(tx, bank.topics);
@@ -188,7 +201,13 @@ export async function runLockedStarterTopicBankSync(
         update: { version: bank.version, contentHash },
       });
 
-      return { ...synced, status: "applied" };
+      // A pre-versioning manual seed may already have put these exact rows in
+      // production. Record the fence without claiming that this call changed
+      // any Topic rows.
+      return {
+        ...synced,
+        status: !current && synced.created === 0 && synced.retired === 0 ? "adopted" : "applied",
+      };
     },
     { timeout: 30_000 },
   );

@@ -254,22 +254,27 @@ rubric per topic is an open product decision, not something `retiredAt`
 attempts to solve.
 
 The live topic routes now reconcile the bank lazily, only after the new
-deployment is actually serving an authenticated topic request. Each warm
-instance has a cached completion flag (and a short failure cooldown), while
+deployment is actually serving an authenticated topic request. Each route
+bundle has a cached completion flag (and a short failure cooldown), while
 Postgres's existing advisory lock serializes cold starts across instances.
 `STARTER_TOPIC_BANK_VERSION` is a monotonic deployment-order fence stored
 with a content hash in `StarterTopicBankState`: a lower-version bundle is a
 no-op, and reusing a version with changed content fails loudly. Increment the
 version whenever `STARTER_TOPICS` changes and record the new hash in
-`STARTER_TOPIC_BANK_HASHES`; its CI test fails with those exact instructions
-if either step is forgotten.
+`STARTER_TOPIC_BANK_HASHES`. Add a new entry and never edit an old one: CI
+checks both the current hash and the immutable history when `origin/main` is
+available.
 
 This deliberately remains outside `vercel-build` and `deploy.yml`. It runs
 after promotion rather than during a pre-promotion build. The duplicate-row
-risk described in the original rollout is now closed for the supported live
-versions because **both** topic routes filter `retiredAt: null`, and the
-retire/create operation plus state update commit atomically; nevertheless a
-failed build cannot mutate rows because it never receives traffic. Lazy live
+risk described in the original rollout is closed only for deployments whose
+**both** topic routes filter `retiredAt: null`; the retire/create operation
+plus state update commit atomically. A rollback to a versioned older
+deployment leaves the database on the newer bank because its lower version is
+fenced off. Rolling back to code that predates the `retiredAt` filter would
+show retired and replacement rows as duplicates, so do not use that rollback
+path. A failed build cannot mutate rows because it never receives traffic.
+Lazy live
 sync also works for Vercel Git integration (which has no Actions hook), and
 the stored monotonic version prevents a late older deployment from replacing
 a newer bank. A synchronization failure is logged and topic serving continues
@@ -363,10 +368,12 @@ become one if this script were ever invoked through such a wrapper. Use a
 checkout with the intended bank version: a stale checkout is now safely a
 no-op once a higher version is recorded, rather than being allowed to retire
 the current bank backwards.
-`npm run db:seed` (`scripts/seed-topics.ts`)
-remains the fully unguarded local/maintenance entrypoint. Both go through
-the same Postgres advisory lock and version fence as lazy sync, so re-running
-the same bank is a no-op and an older bank cannot overwrite a newer one.
+`npm run db:seed` (`scripts/seed-topics.ts`) remains the fully unguarded
+local/maintenance entrypoint. It uses the legacy locked sync deliberately and
+does not read or write `StarterTopicBankState`; it can therefore repair or
+replace rows from any checkout. It shares the same Postgres advisory lock but
+not the version fence. The production fallback and live-route fence apply
+only from this commit onward: an older checkout's legacy script bypasses it.
 
 The one-time `npm run onboarding:backfill-pre-gate` command is intentionally a
 reviewed maintenance operation rather than an automatic deployment migration:

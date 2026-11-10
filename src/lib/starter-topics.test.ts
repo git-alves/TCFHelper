@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { TaskType } from "@prisma/client";
 import { STARTER_TOPIC_BANK_HASHES, STARTER_TOPIC_BANK_VERSION, STARTER_TOPICS } from "@/lib/starter-topics";
@@ -8,6 +9,8 @@ const TASKS = [TaskType.TASK_1, TaskType.TASK_2, TaskType.TASK_3] as const;
 const forTask = (task: TaskType) => STARTER_TOPICS.filter((topic) => topic.taskType === task);
 
 describe("starter-topic bank version contract", () => {
+  const historyInstructions = "bump the version and add a new entry, never edit an old one.";
+
   it("pins the current bank content to its monotonic version", () => {
     const expectedHash = STARTER_TOPIC_BANK_HASHES[STARTER_TOPIC_BANK_VERSION];
     const instructions =
@@ -15,6 +18,38 @@ describe("starter-topic bank version contract", () => {
 
     expect(expectedHash, instructions).toBeDefined();
     expect(getStarterTopicBankHash(STARTER_TOPICS), instructions).toBe(expectedHash);
+  });
+
+  it("keeps bank-history versions contiguous and ends at the current version", () => {
+    const versions = Object.keys(STARTER_TOPIC_BANK_HASHES).map(Number).sort((a, b) => a - b);
+
+    expect(versions, historyInstructions).toEqual(Array.from({ length: STARTER_TOPIC_BANK_VERSION }, (_, index) => index + 1));
+    expect(versions.at(-1), historyInstructions).toBe(STARTER_TOPIC_BANK_VERSION);
+  });
+
+  it("never changes a hash already recorded on origin/main", () => {
+    let source: string;
+    try {
+      source = execFileSync("git", ["show", "origin/main:src/lib/starter-topics.ts"], {
+        cwd: process.cwd(),
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+    } catch {
+      console.info("Skipping immutable starter-topic history comparison: origin/main is unavailable.");
+      return;
+    }
+
+    const mapMatch = source.match(/STARTER_TOPIC_BANK_HASHES[^=]*=\s*\{([\s\S]*?)\n\};/);
+    if (!mapMatch) {
+      console.info("Skipping immutable starter-topic history comparison: origin/main predates STARTER_TOPIC_BANK_HASHES.");
+      return;
+    }
+
+    const originEntries = [...mapMatch[1].matchAll(/(\d+)\s*:\s*["']([a-f0-9]{64})["']/g)];
+    for (const [, version, hash] of originEntries) {
+      expect(STARTER_TOPIC_BANK_HASHES[Number(version)], historyInstructions).toBe(hash);
+    }
   });
 });
 

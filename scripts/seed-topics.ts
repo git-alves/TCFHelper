@@ -5,26 +5,23 @@
  * Safe to re-run: it preserves learner/recent/AI topics and keeps the
  * managed OFFICIAL_EXAM starter prompts aligned with this bank.
  *
- * This always runs against whatever DATABASE_URL is configured, with no
- * production/environment guard -- for the guarded wrapper Vercel's build
- * actually invokes, see deploy-seed-topics.ts. It still goes through the
- * same advisory-lock helper that wrapper uses, so a manual run can't race a
- * concurrent deploy (or another manual run).
+ * This is intentionally the unfenced local/maintenance path: it always runs
+ * against whatever DATABASE_URL is configured and does not read or write the
+ * versioned StarterTopicBankState fence. For the guarded production fallback,
+ * see deploy-seed-topics.ts. It still takes the same advisory lock, so it
+ * cannot race a concurrent deploy or another manual run.
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import { runLockedStarterTopicBankSync } from "../src/lib/seed-topic-sync";
-import { STARTER_TOPICS, STARTER_TOPIC_BANK_VERSION } from "../src/lib/starter-topics";
+import { runLockedSeedTopicSync } from "../src/lib/seed-topic-sync";
+import { STARTER_TOPICS } from "../src/lib/starter-topics";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  const { created, retired, unchanged, status } = await runLockedStarterTopicBankSync(prisma, {
-    version: STARTER_TOPIC_BANK_VERSION,
-    topics: STARTER_TOPICS,
-  });
+  const { created, retired, unchanged } = await runLockedSeedTopicSync(prisma, STARTER_TOPICS);
 
-  console.log(`Seed ${status}: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`);
+  console.log(`Seed complete: ${created} created, ${retired} retired & replaced, ${unchanged} already current.`);
 }
 
 main()
