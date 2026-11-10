@@ -20,6 +20,7 @@ const prisma = new PrismaClient();
 
 describe.skipIf(process.env.RUN_DB_TESTS !== "1")("real PostgreSQL starter-topic rollout", () => {
   beforeAll(async () => {
+    assertScratchDatabase();
     await prisma.topic.deleteMany();
     await prisma.starterTopicBankState.deleteMany();
     getCurrentActivatedAppUserMock.mockResolvedValue({ id: "db-test-user" });
@@ -50,9 +51,21 @@ describe.skipIf(process.env.RUN_DB_TESTS !== "1")("real PostgreSQL starter-topic
     const concurrent = await Promise.all([runLockedStarterTopicBankSync(one, { version: 2, topics: STARTER_TOPICS }), runLockedStarterTopicBankSync(two, { version: 2, topics: STARTER_TOPICS })]);
     await Promise.all([one.$disconnect(), two.$disconnect()]);
     expect(concurrent.filter((result) => result.status === "applied")).toHaveLength(1);
+    expect(concurrent.filter((result) => result.status === "unchanged")).toHaveLength(1);
 
     const row = await prisma.topic.findFirstOrThrow({ where: { taskType: TaskType.TASK_3, source: TopicSource.OFFICIAL_EXAM, retiredAt: null } });
     await prisma.topic.update({ where: { id: row.id }, data: { retiredAt: new Date() } });
     await expect(runLockedStarterTopicBankSync(prisma, { version: 2, topics: STARTER_TOPICS })).resolves.toMatchObject({ status: "applied", created: 1 });
   });
 });
+
+function assertScratchDatabase() {
+  if (process.env.TCFHELPER_DB_TEST_SCRATCH !== "1") {
+    throw new Error("Refusing DB rollout test: TCFHELPER_DB_TEST_SCRATCH=1 is required before deleting data.");
+  }
+  const url = new URL(process.env.DATABASE_URL ?? "");
+  const expectedPort = process.env.TCFHELPER_DB_TEST_PORT;
+  if (!expectedPort || !["127.0.0.1", "localhost"].includes(url.hostname) || url.port !== expectedPort) {
+    throw new Error("Refusing DB rollout test: DATABASE_URL must target this runner's localhost scratch port.");
+  }
+}

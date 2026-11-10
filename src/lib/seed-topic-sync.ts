@@ -185,13 +185,15 @@ export async function runLockedStarterTopicBankSync(
         // compensating extra row in another task) still triggers the
         // idempotent reconciliation without weakening the version fence.
         const taskTypes = [...new Set(bank.topics.map((topic) => topic.taskType))];
-        const counts = await Promise.all(taskTypes.map(async (taskType) => ({
-          taskType,
-          active: await tx.topic.count({
-            where: { taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
-          }),
-          expected: bank.topics.filter((topic) => topic.taskType === taskType).length,
-        })));
+        const counts: Array<{ active: number; expected: number }> = [];
+        for (const taskType of taskTypes) {
+          counts.push({
+            active: await tx.topic.count({
+              where: { taskType, source: TopicSource.OFFICIAL_EXAM, retiredAt: null },
+            }),
+            expected: bank.topics.filter((topic) => topic.taskType === taskType).length,
+          });
+        }
         if (counts.every(({ active, expected }) => active === expected)) {
           return { created: 0, retired: 0, unchanged: bank.topics.length, status: "unchanged" };
         }

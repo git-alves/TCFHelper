@@ -1,7 +1,8 @@
 import { gunzipSync } from "node:zlib";
 import type { SeedTopic } from "@/lib/seed-topic-sync";
 
-// Exact #238 starter bank, retained only for the real-Postgres rollout test.
+// Exact #238 starter bank (source commit b529bb1), retained only for the
+// real-Postgres rollout test.
 // It deliberately has the original one-sentence Tâche 3 documents.
 const COMPRESSED_STARTER_TOPICS_238 = [
   "H4sIAAAAAAAAA71dy64bOXp+FcIbJYB6gJnsvDvpdg+cuNuG7W4gyAQGVUVJ9LDIOrxUzvEgDzBvMejNWL3IqndZ1osF/4WsKqlKR+dYns1M+4iqIn/+1++/",
