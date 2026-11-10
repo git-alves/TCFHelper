@@ -1,10 +1,16 @@
 import { GuideProfile, TaskType } from "@prisma/client";
 import type { SeedTopic } from "@/lib/seed-topic-sync";
 
-// Increment this integer whenever STARTER_TOPICS changes. It is a monotonic
-// deployment-order fence, not a content hash: a later bank must have a higher
-// version so a delayed older deployment can never retire it back to old text.
+// Increment this integer whenever STARTER_TOPICS changes, then record the new
+// hash in STARTER_TOPIC_BANK_HASHES below. The test that checks this map turns
+// a forgotten bump into a CI failure instead of a production sync failure.
+// It is a monotonic deployment-order fence, not a content hash: a later bank
+// must have a higher version so a delayed older deployment cannot roll back.
 export const STARTER_TOPIC_BANK_VERSION = 1;
+
+export const STARTER_TOPIC_BANK_HASHES: Readonly<Record<number, string>> = {
+  1: "fb30793e8260f4e1ddaf52212d79b19cf824d941fd1de26022a38bbdf4ce2234",
+};
 
 // The app-managed OFFICIAL_EXAM starter bank, shared between the manual seed
 // entrypoint (scripts/seed-topics.ts, `npm run db:seed`) and the

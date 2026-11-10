@@ -192,6 +192,24 @@ describe("runLockedStarterTopicBankSync", () => {
     });
   });
 
+  it("records version 1 without changing rows already manually synchronized by pre-version code", async () => {
+    findFirst.mockResolvedValue({ id: "seed_topic_1", prompt: starterTopic.prompt, guideContext: null });
+    const { prisma: lockedPrisma, upsert } = versionedPrisma(null);
+
+    await expect(runLockedStarterTopicBankSync(lockedPrisma, { version: 1, topics: [starterTopic] })).resolves.toEqual({
+      created: 0,
+      retired: 0,
+      unchanged: 1,
+      status: "applied",
+    });
+
+    expect(upsert).toHaveBeenCalledWith({
+      where: { id: 1 },
+      create: { id: 1, version: 1, contentHash: getStarterTopicBankHash([starterTopic]) },
+      update: { version: 1, contentHash: getStarterTopicBankHash([starterTopic]) },
+    });
+  });
+
   it("is idempotent for the same bank version and content", async () => {
     const hash = getStarterTopicBankHash([starterTopic]);
     const { prisma: lockedPrisma, upsert } = versionedPrisma({ version: 2, contentHash: hash });

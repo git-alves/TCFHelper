@@ -260,7 +260,9 @@ Postgres's existing advisory lock serializes cold starts across instances.
 `STARTER_TOPIC_BANK_VERSION` is a monotonic deployment-order fence stored
 with a content hash in `StarterTopicBankState`: a lower-version bundle is a
 no-op, and reusing a version with changed content fails loudly. Increment the
-version whenever `STARTER_TOPICS` changes.
+version whenever `STARTER_TOPICS` changes and record the new hash in
+`STARTER_TOPIC_BANK_HASHES`; its CI test fails with those exact instructions
+if either step is forgotten.
 
 This deliberately remains outside `vercel-build` and `deploy.yml`. It runs
 after promotion rather than during a pre-promotion build. The duplicate-row
@@ -644,6 +646,12 @@ retention and HubSpot support-sync retry crons to authenticate; see
 `.env.example`), `HUBSPOT_ACCESS_TOKEN` and, if needed,
 `HUBSPOT_TICKET_PIPELINE_ID` / `HUBSPOT_TICKET_PIPELINE_STAGE_ID` (see
 "HubSpot support sync" above).
+
+Starter-topic lazy synchronization is runtime-gated separately from build
+migrations: it runs only when `VERCEL_ENV=production`. Preview deployments
+are a logged no-op even if they have `DATABASE_URL`. Local development and
+tests are also no-ops unless `AUTO_SYNC_STARTER_TOPICS=1` is explicitly set,
+so opening the topic picker cannot mutate an arbitrary developer database.
 
 For an existing production database, complete any pending contract/destructive
 migration through its explicit maintenance runbook before enabling ordinary

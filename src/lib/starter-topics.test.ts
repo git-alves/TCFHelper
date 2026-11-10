@@ -1,10 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { TaskType } from "@prisma/client";
-import { STARTER_TOPICS } from "@/lib/starter-topics";
+import { STARTER_TOPIC_BANK_HASHES, STARTER_TOPIC_BANK_VERSION, STARTER_TOPICS } from "@/lib/starter-topics";
+import { getStarterTopicBankHash } from "@/lib/seed-topic-sync";
 import { hasTaskThreeDocuments, splitTaskThreeDocuments } from "@/lib/task-three-topic";
 
 const TASKS = [TaskType.TASK_1, TaskType.TASK_2, TaskType.TASK_3] as const;
 const forTask = (task: TaskType) => STARTER_TOPICS.filter((topic) => topic.taskType === task);
+
+describe("starter-topic bank version contract", () => {
+  it("pins the current bank content to its monotonic version", () => {
+    const expectedHash = STARTER_TOPIC_BANK_HASHES[STARTER_TOPIC_BANK_VERSION];
+    const instructions =
+      "STARTER_TOPICS changed: increment STARTER_TOPIC_BANK_VERSION and record the new getStarterTopicBankHash value in STARTER_TOPIC_BANK_HASHES.";
+
+    expect(expectedHash, instructions).toBeDefined();
+    expect(getStarterTopicBankHash(STARTER_TOPICS), instructions).toBe(expectedHash);
+  });
+});
 
 describe("starter topic bank", () => {
   it.each(TASKS)("holds 30 topics for %s", (task) => {
