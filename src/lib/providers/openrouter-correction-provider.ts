@@ -1,7 +1,10 @@
 import { z } from "zod";
 import { freshEssayFeedbackSchema } from "@/lib/essay-feedback";
 import {
+  CorrectionProviderFormatUnsupportedError,
+  CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
+  CorrectionProviderOutputTruncatedError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -13,12 +16,38 @@ import {
   OpenRouterRateLimitedError,
   OpenRouterRequestError,
   OpenRouterTransportError,
-  requestOpenRouterChatCompletion,
+  requestOpenRouterChatCompletionDetailed,
+  type OpenRouterChatCompletionResult,
 } from "@/lib/providers/openrouter-client";
 
 // Full grading responses run far longer than a short chat reply -- mirrors
 // CORRECTION_REQUEST_TIMEOUT_MS in gemini.ts.
 const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
+
+// OpenRouter normalizes a max_tokens cut-off to finish_reason "length"; the
+// routed provider's own value (e.g. Gemini's "MAX_TOKENS") can also surface
+// as native_finish_reason.
+function wasCutOffAtOutputLimit(result: OpenRouterChatCompletionResult) {
+  return [result.finishReason, result.nativeFinishReason].some(
+    (reason) => reason === "length" || reason === "MAX_TOKENS",
+  );
+}
+
+function formatCount(value: number | undefined) {
+  return value === undefined ? "unknown" : String(value);
+}
+
+// One platform-log line with only the finish reason and token counts --
+// never the model's text or anything from the learner's essay.
+function logOutputTruncated(result: OpenRouterChatCompletionResult, hadContent: boolean) {
+  const reason = result.finishReason ?? result.nativeFinishReason;
+  const safeReason = reason && /^[A-Za-z_]{1,40}$/.test(reason) ? reason : "other";
+  console.error(
+    `OpenRouter correction output truncated${hadContent ? "" : " (no text)"} ` +
+      `finishReason=${safeReason} promptTokens=${formatCount(result.promptTokens)} ` +
+      `completionTokens=${formatCount(result.completionTokens)} reasoningTokens=${formatCount(result.reasoningTokens)}`,
+  );
+}
 
 function resolveApiKey(overrides?: CorrectionProviderOverrides) {
   return overrides?.apiKey?.trim() || process.env.OPENROUTER_API_KEY?.trim();
@@ -60,16 +89,24 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
       throw new CorrectionProviderNotConfiguredError("OPENROUTER_API_KEY or a model is not set.");
     }
 
-    let content: string;
+    let result: OpenRouterChatCompletionResult;
     try {
-      content = await requestOpenRouterChatCompletion({
+      result = await requestOpenRouterChatCompletionDetailed({
         apiKey,
         model,
         messages: [
           { role: "system", content: params.systemPrompt },
           { role: "user", content: params.userPrompt },
         ],
-        maxTokens: 4096,
+        // A full correction returns the corrected text, a model version,
+        // every reported error and the CEFR commentary, which for a long
+        // Tâche 3 essay can exceed the previous 4096-token cap. 8192 is an
+        // operational choice that gives headroom over the estimated
+        // worst-case correction; thinking/reasoning tokens count toward this
+        // cap on a reasoning model. A larger generation also raises latency
+        // and timeout risk, so watch the "output truncated" log line before
+        // raising it further. Matches gradeEssayWithGemini's budget.
+        maxTokens: 8192,
         timeoutMs: CORRECTION_REQUEST_TIMEOUT_MS,
         responseFormat: {
           type: "json_schema",
@@ -84,7 +121,27 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
       throw error;
     }
 
-    return parseCorrectionJson(content);
+    const truncated = wasCutOffAtOutputLimit(result);
+    if (!result.content) {
+      if (truncated) {
+        logOutputTruncated(result, false);
+        throw new CorrectionProviderOutputTruncatedError();
+      }
+      throw new CorrectionProviderRequestError(result.status);
+    }
+
+    try {
+      return parseCorrectionJson(result.content);
+    } catch (error) {
+      if (
+        truncated &&
+        (error instanceof CorrectionProviderInvalidJsonError || error instanceof CorrectionProviderFormatUnsupportedError)
+      ) {
+        logOutputTruncated(result, true);
+        throw new CorrectionProviderOutputTruncatedError();
+      }
+      throw error;
+    }
   },
 
   resolveModel(overrides) {
