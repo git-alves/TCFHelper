@@ -588,6 +588,48 @@ export async function getAdminEventLogPage(
   };
 }
 
+// The most events one .txt export will contain. A block is a few hundred
+// bytes (about 400 on average, under 800 even with every field present), so
+// the cap keeps the file at roughly 2 MB and always under the 4.5 MB a Vercel
+// function response may carry, and keeps the export to one cheap indexed read
+// of at most cap + 1 rows. Past it the export refuses rather than truncating.
+export const MAX_ADMIN_LOG_EXPORT_ROWS = 5_000;
+
+export type AdminEventLogExport =
+  | { truncated: true }
+  | { truncated: false; events: AdminEventLogItem[]; retentionCutoff: string };
+
+/**
+ * Every event the filters select, across all pages (page and limit are
+ * ignored), newest first, for the .txt export. One bounded read: cap + 1 rows
+ * over the same window, filter and index the page uses, so exceeding the cap
+ * is detected without counting or scanning more. It reports `truncated`
+ * instead of ever returning a partial list.
+ */
+export async function getAdminEventLogForExport(
+  query: AdminEventLogQuery,
+  now = new Date(),
+): Promise<AdminEventLogExport> {
+  const where = await adminEventWhere(query, now);
+  const records = await prisma.adminEvent.findMany({
+    where,
+    select: ADMIN_EVENT_SELECT,
+    orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+    take: MAX_ADMIN_LOG_EXPORT_ROWS + 1,
+  });
+  if (records.length > MAX_ADMIN_LOG_EXPORT_ROWS) return { truncated: true };
+
+  const emailByUserId = await emailsForUserIds(
+    records.map((record) => safeOpaqueId(record.userId)).filter((userId): userId is string => userId !== null),
+  );
+
+  return {
+    truncated: false,
+    events: records.map((record) => serializeAdminEvent(record, emailByUserId)),
+    retentionCutoff: getAdminEventRetentionCutoff(now).toISOString(),
+  };
+}
+
 const RECENT_ADMIN_EVENTS_LIMIT = 8;
 
 /**
@@ -624,3 +666,22 @@ export function adminEventLogHref(filters: AdminEventLogFilterValues, page: numb
   }
   return `/admin/logs?${params.toString()}`;
 }
+
+/**
+ * The export link for the current filters: the same parameters as the page,
+ * minus pagination (an export always covers every page).
+ */
+export function adminEventLogExportHref(filters: AdminEventLogFilterValues) {
+  const params = new URLSearchParams({
+    range: filters.range,
+    severity: filters.severity ?? "all",
+    module: filters.module ?? "all",
+  });
+  if (filters.q) params.set("q", filters.q);
+  if (filters.range === "custom" && filters.from && filters.to) {
+    params.set("from", filters.from);
+    params.set("to", filters.to);
+  }
+  return `/api/admin/logs/export?${params.toString()}`;
+}
+
