@@ -2,6 +2,7 @@ import { adminJsonResponse, adminNotFoundResponse, getAdminApiUser } from "@/lib
 import {
   AdminEventLogQueryError,
   AdminEventLogSearchTooBroadError,
+  MAX_ADMIN_LOG_EXPORT_BYTES,
   MAX_ADMIN_LOG_EXPORT_ROWS,
   adminEventLogSearchParamsFromUrl,
   getAdminEventLogForExport,
@@ -44,6 +45,20 @@ export async function GET(request: Request) {
       generatedAt: now,
       retentionCutoff: result.retentionCutoff,
     });
+
+    // The row cap is only the first guard: how large the file is depends on
+    // the values in it, and a character can be up to four UTF-8 bytes. Measure
+    // what will actually be sent, so an export that would fail at the platform's
+    // response-size limit is refused here, cleanly, instead.
+    if (Buffer.byteLength(text, "utf8") > MAX_ADMIN_LOG_EXPORT_BYTES) {
+      return adminJsonResponse(
+        {
+          error: `This export would be larger than ${(MAX_ADMIN_LOG_EXPORT_BYTES / 1_000_000).toLocaleString("en-US")} MB, the export limit. Narrow the date range or filters before exporting.`,
+        },
+        413,
+      );
+    }
+
     return new Response(text, {
       status: 200,
       headers: {

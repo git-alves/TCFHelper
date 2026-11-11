@@ -588,12 +588,18 @@ export async function getAdminEventLogPage(
   };
 }
 
-// The most events one .txt export will contain. A block is a few hundred
-// bytes (about 400 on average, under 800 even with every field present), so
-// the cap keeps the file at roughly 2 MB and always under the 4.5 MB a Vercel
-// function response may carry, and keeps the export to one cheap indexed read
-// of at most cap + 1 rows. Past it the export refuses rather than truncating.
+// The most events one .txt export will contain. This is the first, cheap
+// guard: it keeps the export to one indexed read of at most cap + 1 rows. It
+// does NOT by itself bound the file's size (a row's text depends on its
+// values, and a multi-byte character is up to four bytes), so the route also
+// measures the finished body against MAX_ADMIN_LOG_EXPORT_BYTES.
 export const MAX_ADMIN_LOG_EXPORT_ROWS = 5_000;
+
+// The most UTF-8 bytes one .txt export may be. A Vercel function response is
+// limited to 4.5 MB; stopping at 4,000,000 leaves headroom for headers and
+// encoding. An ordinary 5,000-event export is about 2 MB, so this only ever
+// refuses an export that would otherwise have failed at the platform.
+export const MAX_ADMIN_LOG_EXPORT_BYTES = 4_000_000;
 
 export type AdminEventLogExport =
   | { truncated: true }

@@ -18,7 +18,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 const { GET } = await import("./route");
-const { MAX_ADMIN_LOG_EXPORT_ROWS } = await import("@/lib/admin-event-log");
+const { MAX_ADMIN_LOG_EXPORT_BYTES, MAX_ADMIN_LOG_EXPORT_ROWS } = await import("@/lib/admin-event-log");
+const { formatAdminEventLogTxt } = await import("@/lib/admin-event-log-export");
 
 const NOW = new Date("2026-11-14T10:32:05.789Z");
 // An opaque row id is "c" plus 24 lowercase letters or digits.
@@ -154,6 +155,75 @@ describe("GET /api/admin/logs/export", () => {
 
     expect(response.status).toBe(200);
     expect(await response.text()).toContain("Events: 5,000 (newest first)");
+  });
+
+  describe("the byte cap (the response-size limit the row cap cannot guarantee)", () => {
+    // Three-byte characters: 200 of them are 200 UTF-16 units (the model column's
+    // limit) but 600 bytes.
+    const MULTIBYTE_MODEL = "日".repeat(200);
+
+    it("an ordinary 5,000-event ASCII export is far below the byte cap and succeeds", async () => {
+      adminEventFindManyMock.mockResolvedValue(Array.from({ length: MAX_ADMIN_LOG_EXPORT_ROWS }, () => record()));
+
+      const response = await get();
+      const text = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThan(MAX_ADMIN_LOG_EXPORT_BYTES);
+    });
+
+    it("measures UTF-8 bytes, not characters: a file under the cap in characters but over it in bytes is refused", async () => {
+      const rows = Array.from({ length: MAX_ADMIN_LOG_EXPORT_ROWS }, () => record({ model: MULTIBYTE_MODEL }));
+      adminEventFindManyMock.mockResolvedValue(rows);
+
+      // Check the premise first, on the same formatter the route uses.
+      const premise = formatAdminEventLogTxt({
+        events: rows.map((row) => ({
+          ...row,
+          occurredAt: row.occurredAt as unknown as string,
+          firstOccurredAt: row.firstOccurredAt as unknown as string,
+          message: "Correction generation failed (gemini): output truncated.",
+          userEmail: "learner@example.com",
+        })) as never,
+        filters: { range: "today", severity: null, module: null, q: "", start: new Date(NOW), end: NOW },
+        generatedAt: NOW,
+        retentionCutoff: NOW,
+      });
+      expect(premise.length).toBeLessThan(MAX_ADMIN_LOG_EXPORT_BYTES);
+      expect(Buffer.byteLength(premise, "utf8")).toBeGreaterThan(MAX_ADMIN_LOG_EXPORT_BYTES);
+
+      const response = await get();
+
+      expect(response.status).toBe(413);
+      expect(response.headers.get("Content-Disposition")).toBeNull();
+      expect(response.headers.get("Cache-Control")).toBe("private, no-store");
+      const body = (await response.json()) as { error: string };
+      expect(body.error).toContain("4 MB");
+      expect(body.error).toContain("Narrow the date range");
+    });
+
+    it("5,000 rows with the longest multi-byte model and email values are refused with no file", async () => {
+      adminEventFindManyMock.mockResolvedValue(
+        Array.from({ length: MAX_ADMIN_LOG_EXPORT_ROWS }, () => record({ model: MULTIBYTE_MODEL })),
+      );
+      userFindManyMock.mockResolvedValue([{ id: USER_ID, email: `${"日".repeat(1_000)}@example.com` }]);
+
+      const response = await get();
+
+      expect(response.status).toBe(413);
+      await expect(response.json()).resolves.toHaveProperty("error");
+    });
+
+    it("a file just under the byte cap is still delivered", async () => {
+      // Multi-byte rows are about 1 KB each, so 2,000 of them (about 2 MB) stay under the cap.
+      adminEventFindManyMock.mockResolvedValue(Array.from({ length: 2_000 }, () => record({ model: MULTIBYTE_MODEL })));
+
+      const response = await get();
+      const text = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(Buffer.byteLength(text, "utf8")).toBeLessThan(MAX_ADMIN_LOG_EXPORT_BYTES);
+    });
   });
 
   it.each([

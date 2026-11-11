@@ -21,10 +21,18 @@ function utc(value: Date | string) {
   return `${iso.slice(0, 19).replace("T", " ")} UTC`;
 }
 
+// No real value comes near this (an email address is at most 254 characters
+// and a model name is capped at 200 by the database), so it only bounds a
+// pathological one: the file's size must not be set by a single field.
+export const MAX_EXPORT_VALUE_CHARS = 320;
+
 // Every value sits on one line, so a stray line break can never fake a new
-// field or a new block.
+// field or a new block, and no value is longer than MAX_EXPORT_VALUE_CHARS
+// characters (counted as whole characters, so a surrogate pair is never split).
 function oneLine(value: string) {
-  return value.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
+  const line = value.replace(/[\r\n\u2028\u2029]+/g, " ").trim();
+  const characters = Array.from(line);
+  return characters.length > MAX_EXPORT_VALUE_CHARS ? `${characters.slice(0, MAX_EXPORT_VALUE_CHARS - 1).join("")}…` : line;
 }
 
 /** tcflab-logs-YYYY-MM-DD-HHmm.txt, in UTC. */

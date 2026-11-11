@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdminEventLogItem } from "@/lib/admin-event-log";
-import { adminEventLogExportFilename, formatAdminEventLogTxt } from "./admin-event-log-export";
+import { MAX_EXPORT_VALUE_CHARS, adminEventLogExportFilename, formatAdminEventLogTxt } from "./admin-event-log-export";
 
 function event(overrides: Partial<AdminEventLogItem> = {}): AdminEventLogItem {
   return {
@@ -166,6 +166,25 @@ describe("formatAdminEventLogTxt", () => {
 
     expect(text).toContain("Events: 0 (newest first)");
     expect(text).toContain("No events match these filters.");
+  });
+
+  it("bounds a pathological value so one field cannot set the file's size, without splitting a character", () => {
+    const text = format([event({ userEmail: `${"x".repeat(5_000)}@example.com`, model: "😀".repeat(400) })]);
+    const user = text.split("\n").find((line) => line.startsWith("User: "))!;
+    const model = text.split("\n").find((line) => line.startsWith("Model: "))!;
+
+    expect(Array.from(user.slice("User: ".length))).toHaveLength(MAX_EXPORT_VALUE_CHARS);
+    expect(user.endsWith("…")).toBe(true);
+    expect(Array.from(model.slice("Model: ".length))).toHaveLength(MAX_EXPORT_VALUE_CHARS);
+    // Every emoji is whole: no lone surrogate was left behind by the cut.
+    expect(model).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+  });
+
+  it("leaves a value of exactly the limit untouched", () => {
+    const email = `${"x".repeat(MAX_EXPORT_VALUE_CHARS - 12)}@example.com`;
+    expect(Array.from(email)).toHaveLength(MAX_EXPORT_VALUE_CHARS);
+
+    expect(format([event({ userEmail: email })])).toContain(`User: ${email}\n`);
   });
 
   it("stays well under the size budget the cap assumes, even with every field present", () => {
