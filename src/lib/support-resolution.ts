@@ -1,7 +1,9 @@
 import type { SupportResolutionFeedback } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { SUPPORT_NOTICE_EXPIRY_DAYS, supportNoticeExpiryCutoff } from "@/lib/support-notice-expiry";
 
 export { SUPPORT_RESOLUTION_NOTE_MAX_CHARS } from "@/lib/support-resolution-limits";
+export { SUPPORT_NOTICE_EXPIRY_DAYS, supportNoticeExpiryCutoff };
 export const SUPPORT_RESOLUTION_FEEDBACK_VALUES = ["WORKED", "STILL_BROKEN"] as const satisfies readonly SupportResolutionFeedback[];
 
 /**
@@ -20,10 +22,17 @@ const NOTICE_SELECT = { id: true, ticketNumber: true, resolutionNote: true, reso
 
 // Served by the partial index SupportRequest_pendingNotice_idx
 // (userId, resolvedAt, ticketNumber) WHERE status = 'RESOLVED' AND
-// noticeDismissedAt IS NULL: the oldest resolution first, then the lowest
-// ticket number.
-const PENDING_NOTICE_WHERE = (userId: string) =>
-  ({ userId, status: "RESOLVED", noticeDismissedAt: null }) as const;
+// noticeDismissedAt IS NULL: the index's own filter holds the status and
+// dismissal conditions, and the expiry is a range on its second column, so the
+// lookup still reads straight from the index, oldest resolution first, then
+// the lowest ticket number.
+const PENDING_NOTICE_WHERE = (userId: string, now: Date) =>
+  ({
+    userId,
+    status: "RESOLVED",
+    noticeDismissedAt: null,
+    resolvedAt: { gt: supportNoticeExpiryCutoff(now) },
+  }) as const;
 const PENDING_NOTICE_ORDER = [{ resolvedAt: "asc" }, { ticketNumber: "asc" }] as const;
 
 function toNotice(row: { id: string; ticketNumber: number; resolutionNote: string | null; resolvedAt: Date | null }) {
@@ -38,10 +47,14 @@ function toNotice(row: { id: string; ticketNumber: number; resolutionNote: strin
   } satisfies SupportResolutionNotice;
 }
 
-/** The learner's oldest unanswered resolution notice, or null when none is pending. */
-export async function getPendingSupportNotice(userId: string): Promise<SupportResolutionNotice | null> {
+/**
+ * The learner's oldest unanswered resolution notice, or null when none is
+ * pending. A notice is pending until it is answered or declined, and only for
+ * SUPPORT_NOTICE_EXPIRY_DAYS after the ticket was resolved.
+ */
+export async function getPendingSupportNotice(userId: string, now = new Date()): Promise<SupportResolutionNotice | null> {
   const row = await prisma.supportRequest.findFirst({
-    where: PENDING_NOTICE_WHERE(userId),
+    where: PENDING_NOTICE_WHERE(userId, now),
     orderBy: [...PENDING_NOTICE_ORDER],
     select: NOTICE_SELECT,
   });
@@ -88,8 +101,8 @@ export type NoticeActionOutcome =
   // Not the caller's request (or no such request): reported as 404 so a
   // learner cannot probe for other people's ticket ids.
   | { kind: "notFound" }
-  // The caller's own request, but it is not RESOLVED or its notice was
-  // already answered or dismissed.
+  // The caller's own request, but it is not RESOLVED, its notice was already
+  // answered or declined, or the notice has expired.
   | { kind: "notPending" };
 
 async function classifyMissedUpdate(userId: string, requestId: string): Promise<NoticeActionOutcome> {
@@ -100,14 +113,14 @@ async function classifyMissedUpdate(userId: string, requestId: string): Promise<
 /** Records that the learner opened the notice. Idempotent: a repeat is a no-op, not an error. */
 export async function markSupportNoticeSeen(userId: string, requestId: string, now = new Date()): Promise<NoticeActionOutcome> {
   const updated = await prisma.supportRequest.updateMany({
-    where: { ...PENDING_NOTICE_WHERE(userId), id: requestId, noticeSeenAt: null },
+    where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId, noticeSeenAt: null },
     data: { noticeSeenAt: now },
   });
   if (updated.count === 1) return { kind: "ok", next: null };
 
   // Either already seen (fine) or not pending / not theirs.
   const pending = await prisma.supportRequest.findFirst({
-    where: { ...PENDING_NOTICE_WHERE(userId), id: requestId },
+    where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId },
     select: { id: true },
   });
   if (pending) return { kind: "ok", next: null };
@@ -127,7 +140,7 @@ export async function answerSupportNotice(
   now = new Date(),
 ): Promise<NoticeActionOutcome> {
   const updated = await prisma.supportRequest.updateMany({
-    where: { ...PENDING_NOTICE_WHERE(userId), id: requestId },
+    where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId },
     data: {
       resolutionFeedback: feedback,
       feedbackAt: now,
@@ -136,15 +149,18 @@ export async function answerSupportNotice(
     },
   });
   if (updated.count === 0) return classifyMissedUpdate(userId, requestId);
-  return { kind: "ok", next: await getPendingSupportNotice(userId) };
+  return { kind: "ok", next: await getPendingSupportNotice(userId, now) };
 }
 
-/** The X: closes the notice without an answer, for good. */
+/**
+ * "I don't want to answer": declines the notice with no feedback, for good.
+ * (The X only closes the modal; it never reaches this.)
+ */
 export async function dismissSupportNotice(userId: string, requestId: string, now = new Date()): Promise<NoticeActionOutcome> {
   const updated = await prisma.supportRequest.updateMany({
-    where: { ...PENDING_NOTICE_WHERE(userId), id: requestId },
+    where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId },
     data: { noticeDismissedAt: now },
   });
   if (updated.count === 0) return classifyMissedUpdate(userId, requestId);
-  return { kind: "ok", next: await getPendingSupportNotice(userId) };
+  return { kind: "ok", next: await getPendingSupportNotice(userId, now) };
 }

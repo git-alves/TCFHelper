@@ -10,6 +10,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: pushMock, prefetch: vi.fn() }),
 }));
 
+vi.mock("next/link", () => ({
+  default: ({ href, onClick, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { prefetch?: boolean }) => {
+    // The real Link consumes prefetch; a plain anchor must not receive it.
+    const { prefetch, ...rest } = props;
+    void prefetch;
+    return (
+      <a href={href} onClick={onClick} {...rest}>
+        {children}
+      </a>
+    );
+  },
+}));
+
 vi.mock("@clerk/nextjs", () => {
   const UserButton = Object.assign(({ children }: { children?: React.ReactNode }) => <>{children}</>, {
     MenuItems: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -155,11 +168,65 @@ describe("NavBar support-resolution notice", () => {
     expect(dot()).toBeNull();
   });
 
-  it("the X dismisses with no feedback and the dot goes away for good", async () => {
+  it("the X only closes the notice (answer later): nothing is dismissed and the dot stays", async () => {
     render(NOTICE);
     clickSupport();
 
     await clickButton("Close");
+
+    expect(dialog()).toBeNull();
+    expect(dot()).not.toBeNull();
+    expect(postsTo("/dismiss")).toHaveLength(0);
+    expect(postsTo("/feedback")).toHaveLength(0);
+  });
+
+  it("Escape closes it the same way, without dismissing", async () => {
+    render(NOTICE);
+    clickSupport();
+
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    });
+
+    expect(dialog()).toBeNull();
+    expect(dot()).not.toBeNull();
+    expect(postsTo("/dismiss")).toHaveLength(0);
+  });
+
+  it("clicking the support icon again after closing reopens the same notice with both answers", async () => {
+    render(NOTICE);
+    clickSupport();
+    await clickButton("Close");
+
+    const event = clickSupport();
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(dialog()!.textContent).toContain("Ticket #7 was resolved");
+    expect(dialog()!.textContent).toContain("We fixed the editor.");
+    expect(Array.from(dialog()!.querySelectorAll("button")).map((b) => b.textContent)).toEqual(
+      expect.arrayContaining(["It worked", "I still have the problem"]),
+    );
+    // Reporting that it was seen once is enough; a reopen does not ask again.
+    expect(postsTo("/seen")).toHaveLength(1);
+  });
+
+  it("can still be answered after being closed and reopened", async () => {
+    render(NOTICE);
+    clickSupport();
+    await clickButton("Close");
+    clickSupport();
+
+    await clickButton("It worked");
+
+    expect(JSON.parse((postsTo("/feedback")[0][1] as RequestInit).body as string)).toEqual({ feedback: "WORKED" });
+    expect(dot()).toBeNull();
+  });
+
+  it('"I don’t want to answer" dismisses the notice with no feedback and the dot goes away for good', async () => {
+    render(NOTICE);
+    clickSupport();
+
+    await clickButton("I don’t want to answer");
 
     expect(postsTo("/dismiss")).toHaveLength(1);
     expect(postsTo("/dismiss")[0][0]).toBe("/api/support/req_7/dismiss");
@@ -167,6 +234,25 @@ describe("NavBar support-resolution notice", () => {
     expect(dialog()).toBeNull();
     expect(dot()).toBeNull();
     expect(clickSupport().defaultPrevented).toBe(false);
+  });
+
+  it('"Open a new ticket" goes to Support and closes the notice without dismissing it', async () => {
+    render(NOTICE);
+    clickSupport();
+    const link = Array.from(dialog()!.querySelectorAll("a")).find((a) => a.textContent === "Open a new ticket")!;
+    expect(link.getAttribute("href")).toBe("/support");
+
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    await act(async () => {
+      link.dispatchEvent(event);
+    });
+
+    // Not prevented: the link navigates the normal way.
+    expect(event.defaultPrevented).toBe(false);
+    expect(dialog()).toBeNull();
+    expect(dot()).not.toBeNull();
+    expect(postsTo("/dismiss")).toHaveLength(0);
+    expect(postsTo("/feedback")).toHaveLength(0);
   });
 
   it("with another ticket pending, shows one notice at a time: the dot stays and the next click opens the next one", async () => {

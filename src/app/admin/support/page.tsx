@@ -6,6 +6,7 @@ import { AdminSupportRetryButton } from "@/components/admin-support-retry-button
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyNewTicket, getSupportInboxSeenAt } from "@/lib/support-inbox";
+import { getSupportNoticeStatus, type SupportNoticeStatus } from "@/lib/support-notice-status";
 import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
 
 const CATEGORY_LABELS = {
@@ -20,6 +21,22 @@ const FEEDBACK_LABELS = {
   WORKED: "Worked",
   STILL_BROKEN: "Still has the problem",
 } as const;
+
+// One of four states per resolved ticket: answered (with what they said),
+// not answered yet (still within the notice's 7 days), declined, or expired.
+function describeNoticeStatus(status: SupportNoticeStatus | null) {
+  if (!status) return "none";
+  switch (status.kind) {
+    case "answered":
+      return `Answered: ${FEEDBACK_LABELS[status.feedback]} (${formatDate(status.at)})`;
+    case "pending":
+      return status.seenAt ? `Not answered yet (seen ${formatDate(status.seenAt)})` : "Not answered yet";
+    case "declined":
+      return `Declined to answer (${formatDate(status.at)})`;
+    case "expired":
+      return "No answer (expired)";
+  }
+}
 
 function formatDate(value: Date) {
   return new Intl.DateTimeFormat("en-US", {
@@ -165,20 +182,8 @@ export default async function AdminSupportPage() {
                         Note: {request.resolutionNote}
                       </p>
                     )}
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Learner notice:{" "}
-                      {request.noticeDismissedAt
-                        ? `dismissed ${formatDate(request.noticeDismissedAt)}`
-                        : request.noticeSeenAt
-                          ? `seen ${formatDate(request.noticeSeenAt)}, not answered`
-                          : "not seen yet"}
-                      {request.noticeDismissedAt && request.noticeSeenAt ? ` (seen ${formatDate(request.noticeSeenAt)})` : ""}
-                    </p>
-                    <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                      Learner feedback:{" "}
-                      {request.resolutionFeedback && request.feedbackAt
-                        ? `${FEEDBACK_LABELS[request.resolutionFeedback]} (${formatDate(request.feedbackAt)})`
-                        : "none"}
+                    <p data-testid="ticket-learner-response" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                      Learner response: {describeNoticeStatus(getSupportNoticeStatus(request, visitStartedAt))}
                     </p>
                   </div>
                 )}

@@ -240,7 +240,13 @@ export interface AppCopy {
       noteLabel: string;
       worked: string;
       stillBroken: string;
+      // The X and Escape: close the notice to answer later (it is not dismissed).
       close: string;
+      // A discreet link: declines the notice with no answer, for good.
+      decline: string;
+      // A link to the support form, since the support icon opens this notice
+      // while one is pending.
+      newTicket: string;
       error: string;
     };
     discardDraftTitle: string;
@@ -764,11 +770,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Your support ticket was resolved — open to confirm",
         title: ({ number }) => `Ticket #${number} was resolved`,
-        body: ({ number }) => `Support marked your ticket #${number} as resolved. Please test it and let us know whether it worked.`,
+        body: ({ number }) => `Support marked your ticket #${number} as resolved. Test it when you can, then tell us whether it worked. You can close this and answer later from the support icon.`,
         noteLabel: "Note from support",
         worked: "It worked",
         stillBroken: "I still have the problem",
         close: "Close",
+        decline: "I don’t want to answer",
+        newTicket: "Open a new ticket",
         error: "We couldn’t save your answer. Please try again.",
       },
       discardDraftTitle: "Discard this message?",
@@ -1439,11 +1447,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Votre ticket d’assistance a été résolu — ouvrez pour confirmer",
         title: ({ number }) => `Le ticket nº ${number} a été résolu`,
-        body: ({ number }) => `L’assistance a marqué votre ticket nº ${number} comme résolu. Testez, puis dites-nous si cela a fonctionné.`,
+        body: ({ number }) => `L’assistance a marqué votre ticket nº ${number} comme résolu. Testez quand vous pouvez, puis dites-nous si cela a fonctionné. Vous pouvez fermer et répondre plus tard depuis l’icône d’assistance.`,
         noteLabel: "Note de l’assistance",
         worked: "Ça a fonctionné",
         stillBroken: "J’ai toujours le problème",
         close: "Fermer",
+        decline: "Je ne souhaite pas répondre",
+        newTicket: "Ouvrir un nouveau ticket",
         error: "Nous n’avons pas pu enregistrer votre réponse. Réessayez.",
       },
       discardDraftTitle: "Abandonner ce message ?",
@@ -2122,11 +2132,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Tu ticket de soporte se ha resuelto: ábrelo para confirmar",
         title: ({ number }) => `El ticket nº ${number} se ha resuelto`,
-        body: ({ number }) => `El soporte ha marcado tu ticket nº ${number} como resuelto. Pruébalo y dinos si ha funcionado.`,
+        body: ({ number }) => `El soporte ha marcado tu ticket nº ${number} como resuelto. Pruébalo cuando puedas y luego dinos si ha funcionado. Puedes cerrar esto y responder más tarde desde el icono de soporte.`,
         noteLabel: "Nota del soporte",
         worked: "Funcionó",
         stillBroken: "Sigo teniendo el problema",
         close: "Cerrar",
+        decline: "No quiero responder",
+        newTicket: "Abrir un nuevo ticket",
         error: "No pudimos guardar tu respuesta. Inténtalo de nuevo.",
       },
       discardDraftTitle: "¿Descartar este mensaje?",
@@ -2805,11 +2817,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Seu chamado de suporte foi resolvido — abra para confirmar",
         title: ({ number }) => `O chamado nº ${number} foi resolvido`,
-        body: ({ number }) => `O suporte marcou o seu chamado nº ${number} como resolvido. Teste e nos diga se funcionou.`,
+        body: ({ number }) => `O suporte marcou o seu chamado nº ${number} como resolvido. Teste quando puder e depois nos diga se funcionou. Você pode fechar e responder depois pelo ícone de suporte.`,
         noteLabel: "Nota do suporte",
         worked: "Funcionou",
         stillBroken: "Ainda tenho o problema",
         close: "Fechar",
+        decline: "Não quero responder",
+        newTicket: "Abrir um novo chamado",
         error: "Não foi possível salvar sua resposta. Tente novamente.",
       },
       discardDraftTitle: "Descartar esta mensagem?",

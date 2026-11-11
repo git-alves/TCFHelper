@@ -1,5 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getCurrentAdminUserMock, findManyMock, userFindUniqueMock, userWriteMocks, notFoundMock } = vi.hoisted(() => ({
   getCurrentAdminUserMock: vi.fn(),
@@ -40,6 +40,10 @@ vi.mock("next/navigation", () => ({ notFound: notFoundMock }));
 
 const { default: AdminSupportPage } = await import("./page");
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 const BASE = {
   senderEmail: "learner@example.com",
   category: "BUG",
@@ -63,7 +67,12 @@ async function render(rows: object[]) {
   return renderToStaticMarkup(await AdminSupportPage());
 }
 
+const PAGE_NOW = new Date("2026-11-13T10:00:00.000Z");
+
 beforeEach(() => {
+  // Only the clock: the notice states depend on how long ago a ticket was resolved.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(PAGE_NOW);
   getCurrentAdminUserMock.mockReset();
   findManyMock.mockReset();
   userFindUniqueMock.mockReset();
@@ -124,8 +133,8 @@ describe("AdminSupportPage", () => {
     expect(markup).toContain("Ticket #7");
     expect(markup).toContain("Resolved");
     expect(markup).toContain("Note: We fixed the editor.");
-    expect(markup).toContain("Learner notice: not seen yet");
-    expect(markup).toContain("Learner feedback: none");
+    expect(markup).toContain("Learner response: Not answered yet");
+    expect(markup).not.toContain("(seen");
     expect(markup).not.toContain("resolve-button");
   });
 
@@ -141,10 +150,10 @@ describe("AdminSupportPage", () => {
       },
     ]);
 
-    expect(markup).toMatch(/Learner notice: seen .*, not answered/);
+    expect(markup).toMatch(/Learner response: Not answered yet \(seen [^)]*\)/);
   });
 
-  it("shows dismissal and the Worked answer with its time", async () => {
+  it("shows the Worked answer with its time", async () => {
     const markup = await render([
       {
         ...BASE,
@@ -159,8 +168,7 @@ describe("AdminSupportPage", () => {
       },
     ]);
 
-    expect(markup).toMatch(/Learner notice: dismissed .* \(seen .*\)/);
-    expect(markup).toMatch(/Learner feedback: Worked \(/);
+    expect(markup).toMatch(/Learner response: Answered: Worked \(/);
   });
 
   it("a reopened ticket is visibly Open again, still showing its earlier resolution and the learner's answer, with the button back", async () => {
@@ -182,7 +190,7 @@ describe("AdminSupportPage", () => {
     expect(markup).toMatch(/data-testid="ticket-status"[^>]*>Open</);
     expect(markup).toContain("Reopened — earlier resolution");
     expect(markup).toContain("Note: Cleared your cache.");
-    expect(markup).toMatch(/Learner feedback: Still has the problem \(/);
+    expect(markup).toMatch(/Learner response: Answered: Still has the problem \(/);
     expect(markup).toContain('data-testid="resolve-button"');
   });
 });
@@ -204,16 +212,11 @@ describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
   });
 
   it("hands the render time to the client component that records the visit after mount", async () => {
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date("2026-11-12T09:30:00.000Z"));
+    vi.setSystemTime(new Date("2026-11-12T09:30:00.000Z"));
 
-      const markup = await render([]);
+    const markup = await render([]);
 
-      expect(markup).toContain('data-visit-started-at="2026-11-12T09:30:00.000Z"');
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(markup).toContain('data-visit-started-at="2026-11-12T09:30:00.000Z"');
   });
 
   it("reads the previous visit for the tags (not the render time it hands to the client)", async () => {
@@ -273,6 +276,75 @@ describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
 
     expect(tags(markup)).toEqual(["New", "New"]);
     expect(markup).toContain('data-testid="inbox-seen-sync"');
+  });
+});
+
+describe("AdminSupportPage learner response to a resolved ticket", () => {
+  const response = (markup: string) =>
+    [...markup.matchAll(/data-testid="ticket-learner-response"[^>]*>([^<]*(?:<!-- -->[^<]*)*)</g)].map((m) =>
+      m[1].replaceAll("<!-- -->", ""),
+    );
+
+  const RESOLVED = {
+    ...BASE,
+    status: "RESOLVED",
+    resolvedAt: new Date("2026-11-12T10:00:00.000Z"), // a day before PAGE_NOW
+    resolutionNote: "Fixed.",
+  };
+
+  it("shows each of the four states", async () => {
+    const markup = await render([
+      // Answered
+      {
+        ...RESOLVED,
+        id: "r_answered",
+        ticketNumber: 1,
+        resolutionFeedback: "WORKED",
+        feedbackAt: new Date("2026-11-12T12:00:00.000Z"),
+        noticeDismissedAt: new Date("2026-11-12T12:00:00.000Z"),
+      },
+      // Not answered yet, opened but not answered
+      { ...RESOLVED, id: "r_pending_seen", ticketNumber: 2, noticeSeenAt: new Date("2026-11-12T11:00:00.000Z") },
+      // Not answered yet, never opened
+      { ...RESOLVED, id: "r_pending", ticketNumber: 3 },
+      // Declined: dismissed with no feedback
+      { ...RESOLVED, id: "r_declined", ticketNumber: 4, noticeDismissedAt: new Date("2026-11-12T13:00:00.000Z") },
+      // No answer (expired): more than 7 days, never answered or dismissed
+      { ...RESOLVED, id: "r_expired", ticketNumber: 5, resolvedAt: new Date("2026-11-05T09:00:00.000Z") },
+    ]);
+
+    const lines = response(markup);
+    expect(lines).toHaveLength(5);
+    expect(lines[0]).toMatch(/^Learner response: Answered: Worked \(/);
+    expect(lines[1]).toMatch(/^Learner response: Not answered yet \(seen /);
+    expect(lines[2]).toBe("Learner response: Not answered yet");
+    expect(lines[3]).toMatch(/^Learner response: Declined to answer \(/);
+    expect(lines[4]).toBe("Learner response: No answer (expired)");
+  });
+
+  it("the 7-day line: 6 days 23 hours is still pending, a little over 7 days is expired", async () => {
+    const markup = await render([
+      { ...RESOLVED, id: "r_a", ticketNumber: 1, resolvedAt: new Date(PAGE_NOW.getTime() - (6 * 24 + 23) * 60 * 60 * 1000) },
+      { ...RESOLVED, id: "r_b", ticketNumber: 2, resolvedAt: new Date(PAGE_NOW.getTime() - (7 * 24 * 60 + 1) * 60 * 1000) },
+    ]);
+
+    expect(response(markup)).toEqual(["Learner response: Not answered yet", "Learner response: No answer (expired)"]);
+  });
+
+  it("an answer that reopened the ticket reads as answered, not declined or expired", async () => {
+    const markup = await render([
+      {
+        ...RESOLVED,
+        id: "r_reopened",
+        ticketNumber: 6,
+        status: "OPEN",
+        resolutionFeedback: "STILL_BROKEN",
+        feedbackAt: new Date("2026-11-12T12:00:00.000Z"),
+        noticeDismissedAt: new Date("2026-11-12T12:00:00.000Z"),
+      },
+    ]);
+
+    expect(response(markup)[0]).toMatch(/^Learner response: Answered: Still has the problem \(/);
   });
 });
 
