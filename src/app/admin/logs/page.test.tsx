@@ -16,6 +16,13 @@ const {
 vi.mock("@/components/admin-event-log-filters", () => ({
   AdminEventLogFilters: ({ filters }: { filters: { q: string } }) => <div data-testid="event-log-filters" data-query={filters.q} />,
 }));
+vi.mock("@/components/admin-export-csv-button", () => ({
+  AdminExportCsvButton: ({ href, label, hint }: { href: string; label: string; hint: string }) => (
+    <button data-testid="export-button" data-href={href} data-hint={hint}>
+      {label}
+    </button>
+  ),
+}));
 vi.mock("@/components/admin-event-log-table", () => ({
   AdminEventLogTable: () => <div data-testid="event-log-table" />,
 }));
@@ -30,6 +37,8 @@ vi.mock("@/lib/admin-event-log", () => {
     AdminEventLogQueryError,
     AdminEventLogSearchTooBroadError,
     adminEventLogHref: (filters: { q: string }, page: number) => `/admin/logs?q=${filters.q}&page=${page}`,
+    adminEventLogExportHref: (filters: { q: string; severity: string | null }) =>
+      `/api/admin/logs/export?severity=${filters.severity ?? "all"}&q=${filters.q}`,
     getAdminEventLogPage: getAdminEventLogPageMock,
     parseAdminEventLogQuery: parseAdminEventLogQueryMock,
   };
@@ -94,4 +103,45 @@ describe("/admin/logs", () => {
     expect(markup).toContain("returning in an existing session does not create another row");
     expect(markup).toContain("raw IP addresses, user agents, and session IDs are never stored");
   });
+
+  describe("Export .txt", () => {
+    function pageWith(total: number, filters: object = QUERY) {
+      getAdminEventLogPageMock.mockResolvedValue({
+        events: total > 0 ? [{ id: "e1" }] : [],
+        total,
+        page: 1,
+        pageCount: 1,
+        filters,
+        retentionCutoff: "2026-07-12T12:00:00.000Z",
+      });
+    }
+
+    it("is offered with the current filters in its href, and says what it covers", async () => {
+      pageWith(3, { ...QUERY, severity: "ERROR", q: "gemini" });
+
+      const markup = renderToStaticMarkup(await AdminLogsPage({ searchParams: Promise.resolve({ severity: "ERROR", q: "gemini" }) }));
+
+      expect(markup).toContain('data-testid="export-button"');
+      expect(markup).toContain('data-href="/api/admin/logs/export?severity=ERROR&amp;q=gemini"');
+      expect(markup).toContain("Export .txt");
+      expect(markup).toContain("Exports all events matching the current filters.");
+    });
+
+    it("is not offered when no event matches", async () => {
+      pageWith(0);
+
+      const markup = renderToStaticMarkup(await AdminLogsPage({ searchParams: Promise.resolve({}) }));
+
+      expect(markup).not.toContain('data-testid="export-button"');
+    });
+
+    it("is not offered when the search was too broad to show results", async () => {
+      getAdminEventLogPageMock.mockRejectedValue(new AdminEventLogSearchTooBroadError());
+
+      const markup = renderToStaticMarkup(await AdminLogsPage({ searchParams: Promise.resolve({ q: "a" }) }));
+
+      expect(markup).not.toContain('data-testid="export-button"');
+    });
+  });
 });
+

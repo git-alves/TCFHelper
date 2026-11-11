@@ -11,6 +11,19 @@ describe("AdminExportCsvButton", () => {
     expect(markup).not.toContain('role="alert"');
   });
 
+  it("shows a hint under the button when given one", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminExportCsvButton, {
+        href: "/api/admin/logs/export",
+        label: "Export .txt",
+        hint: "Exports all events matching the current filters.",
+      }),
+    );
+
+    expect(markup).toContain("Export .txt");
+    expect(markup).toContain("Exports all events matching the current filters.");
+  });
+
   it("supports a custom label", () => {
     const markup = renderToStaticMarkup(
       createElement(AdminExportCsvButton, { href: "/api/admin/access-codes/export", label: "Download codes" }),
@@ -21,6 +34,30 @@ describe("AdminExportCsvButton", () => {
 });
 
 describe("requestCsvExport", () => {
+  it("uses the caller's fallback file name (a .txt export) when Content-Disposition is missing", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response("log\n", { status: 200 }));
+
+    const outcome = await requestCsvExport("/api/admin/logs/export", fetchImpl, "tcflab-logs.txt");
+
+    expect(outcome).toMatchObject({ ok: true, filename: "tcflab-logs.txt" });
+  });
+
+  it("downloads a .txt export under the file name the server chose", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response("log\n", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Content-Disposition": 'attachment; filename="tcflab-logs-2026-11-14-1032.txt"',
+        },
+      }),
+    );
+
+    const outcome = await requestCsvExport("/api/admin/logs/export", fetchImpl, "tcflab-logs.txt");
+
+    expect(outcome).toMatchObject({ ok: true, filename: "tcflab-logs-2026-11-14-1032.txt" });
+  });
+
   it("resolves the CSV blob and filename from a successful response", async () => {
     const csv = "Email\r\nlearner@example.com\r\n";
     const fetchImpl = vi.fn().mockResolvedValue(
