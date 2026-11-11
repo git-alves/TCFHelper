@@ -240,7 +240,13 @@ export interface AppCopy {
       noteLabel: string;
       worked: string;
       stillBroken: string;
+      // The X and Escape: close the notice to answer later (it is not dismissed).
       close: string;
+      // A discreet link: declines the notice with no answer, for good.
+      decline: string;
+      // A link to the support form, since the support icon opens this notice
+      // while one is pending.
+      newTicket: string;
       error: string;
     };
     discardDraftTitle: string;
@@ -764,11 +770,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Your support ticket was resolved — open to confirm",
         title: ({ number }) => `Ticket #${number} was resolved`,
-        body: ({ number }) => `Support marked your ticket #${number} as resolved. Please test it and let us know whether it worked.`,
+        body: ({ number }) => `Support marked your ticket #${number} as resolved. Test it when you can, then tell us whether it worked. You can close this and answer later from the support icon.`,
         noteLabel: "Note from support",
         worked: "It worked",
         stillBroken: "I still have the problem",
         close: "Close",
+        decline: "I don’t want to answer",
+        newTicket: "Open a new ticket",
         error: "We couldn’t save your answer. Please try again.",
       },
       discardDraftTitle: "Discard this message?",
@@ -793,7 +801,7 @@ export const APP_COPY = {
       settingsTitle: "Make the app yours",
       settingsBody: "Open the account menu and choose Settings to change the interface language and appearance.",
       supportTitle: "Need help?",
-      supportBody: "Report a bug, ask a question, or share an idea. We use the email on your signed-in account so the team can reply.",
+      supportBody: "Report a bug, ask a question, or share an idea. We use the email on your signed-in account so the team can reply. A red dot on this icon means support answered or resolved your ticket: click it to see the answer and tell us whether it worked.",
       dashboardPracticeTitle: "Build each section before writing the whole response",
       dashboardPracticeBody: "Train breaks a TCF task into short sections, each with its own word range, so you can rehearse them before you attempt a complete response.",
       dashboardStartWritingTitle: "Ready to Simulate a Task?",
@@ -1439,11 +1447,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Votre ticket d’assistance a été résolu — ouvrez pour confirmer",
         title: ({ number }) => `Le ticket nº ${number} a été résolu`,
-        body: ({ number }) => `L’assistance a marqué votre ticket nº ${number} comme résolu. Testez, puis dites-nous si cela a fonctionné.`,
+        body: ({ number }) => `L’assistance a marqué votre ticket nº ${number} comme résolu. Testez quand vous pouvez, puis dites-nous si cela a fonctionné. Vous pouvez fermer et répondre plus tard depuis l’icône d’assistance.`,
         noteLabel: "Note de l’assistance",
         worked: "Ça a fonctionné",
         stillBroken: "J’ai toujours le problème",
         close: "Fermer",
+        decline: "Je ne souhaite pas répondre",
+        newTicket: "Ouvrir un nouveau ticket",
         error: "Nous n’avons pas pu enregistrer votre réponse. Réessayez.",
       },
       discardDraftTitle: "Abandonner ce message ?",
@@ -1468,7 +1478,7 @@ export const APP_COPY = {
       settingsTitle: "Personnalisez l’application",
       settingsBody: "Ouvrez le menu du compte et choisissez Paramètres pour changer la langue et l’apparence de l’interface.",
       supportTitle: "Besoin d’aide ?",
-      supportBody: "Signalez un bug, posez une question ou partagez une idée. Nous utilisons l’adresse e-mail de votre compte connecté pour que l’équipe puisse vous répondre.",
+      supportBody: "Signalez un bug, posez une question ou partagez une idée. Nous utilisons l’adresse e-mail de votre compte connecté pour que l’équipe puisse vous répondre. Un point rouge sur cette icône signifie que l’assistance a répondu à votre ticket ou l’a résolu : cliquez pour le voir et nous dire si cela a fonctionné.",
       dashboardPracticeTitle: "Travaillez chaque section avant de rédiger la réponse complète",
       dashboardPracticeBody: "Entraînement découpe une tâche TCF en courtes sections, chacune avec sa fourchette de mots, pour les travailler avant de rédiger une réponse complète.",
       dashboardStartWritingTitle: "Prêt·e à simuler une tâche ?",
@@ -2122,11 +2132,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Tu ticket de soporte se ha resuelto: ábrelo para confirmar",
         title: ({ number }) => `El ticket nº ${number} se ha resuelto`,
-        body: ({ number }) => `El soporte ha marcado tu ticket nº ${number} como resuelto. Pruébalo y dinos si ha funcionado.`,
+        body: ({ number }) => `El soporte ha marcado tu ticket nº ${number} como resuelto. Pruébalo cuando puedas y luego dinos si ha funcionado. Puedes cerrar esto y responder más tarde desde el icono de soporte.`,
         noteLabel: "Nota del soporte",
         worked: "Funcionó",
         stillBroken: "Sigo teniendo el problema",
         close: "Cerrar",
+        decline: "No quiero responder",
+        newTicket: "Abrir un nuevo ticket",
         error: "No pudimos guardar tu respuesta. Inténtalo de nuevo.",
       },
       discardDraftTitle: "¿Descartar este mensaje?",
@@ -2151,7 +2163,7 @@ export const APP_COPY = {
       settingsTitle: "Personaliza la aplicación",
       settingsBody: "Abre el menú de la cuenta y elige Configuración para cambiar el idioma y la apariencia de la interfaz.",
       supportTitle: "¿Necesitas ayuda?",
-      supportBody: "Informa un error, haz una pregunta o comparte una idea. Usamos el correo de tu cuenta conectada para que el equipo pueda responderte.",
+      supportBody: "Informa un error, haz una pregunta o comparte una idea. Usamos el correo de tu cuenta conectada para que el equipo pueda responderte. Un punto rojo en este icono significa que el soporte ha respondido o resuelto tu ticket: haz clic para verlo y decirnos si ha funcionado.",
       dashboardPracticeTitle: "Practica cada sección antes de escribir la respuesta completa",
       dashboardPracticeBody: "Entrenar divide una tarea TCF en secciones breves, cada una con su rango de palabras, para ensayarlas antes de escribir una respuesta completa.",
       dashboardStartWritingTitle: "¿Listo para simular una tarea?",
@@ -2805,11 +2817,13 @@ export const APP_COPY = {
       resolution: {
         dotLabel: "Seu chamado de suporte foi resolvido — abra para confirmar",
         title: ({ number }) => `O chamado nº ${number} foi resolvido`,
-        body: ({ number }) => `O suporte marcou o seu chamado nº ${number} como resolvido. Teste e nos diga se funcionou.`,
+        body: ({ number }) => `O suporte marcou o seu chamado nº ${number} como resolvido. Teste quando puder e depois nos diga se funcionou. Você pode fechar e responder depois pelo ícone de suporte.`,
         noteLabel: "Nota do suporte",
         worked: "Funcionou",
         stillBroken: "Ainda tenho o problema",
         close: "Fechar",
+        decline: "Não quero responder",
+        newTicket: "Abrir um novo chamado",
         error: "Não foi possível salvar sua resposta. Tente novamente.",
       },
       discardDraftTitle: "Descartar esta mensagem?",
@@ -2834,7 +2848,7 @@ export const APP_COPY = {
       settingsTitle: "Personalize o aplicativo",
       settingsBody: "Abra o menu da conta e escolha Configurações para mudar o idioma e a aparência da interface.",
       supportTitle: "Precisa de ajuda?",
-      supportBody: "Relate um bug, faça uma pergunta ou compartilhe uma ideia. Usamos o e-mail da sua conta conectada para que a equipe possa responder.",
+      supportBody: "Relate um bug, faça uma pergunta ou compartilhe uma ideia. Usamos o e-mail da sua conta conectada para que a equipe possa responder. Quando aparecer uma bolinha vermelha neste ícone, é porque o suporte respondeu ao seu chamado: clique para ver e nos dizer se funcionou.",
       dashboardPracticeTitle: "Treine cada seção antes de redigir a resposta completa",
       dashboardPracticeBody: "Treinar divide uma tarefa TCF em seções curtas, cada uma com sua faixa de palavras, para você ensaiá-las antes de escrever uma resposta completa.",
       dashboardStartWritingTitle: "Pronto para simular uma tarefa?",

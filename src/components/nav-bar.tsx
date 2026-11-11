@@ -384,47 +384,56 @@ export function NavBar({
                * It uses the same intercepted-route pattern as Settings, so
                * opening it never abandons work in progress. */}
               {/* The admin's bell: only for the owner account, always outside
-               * the account menu, next to the support icon. Calm by design:
-               * it stays put at zero (no badge), so the inbox is always one
-               * click away and the bar does not shift when a ticket arrives.
+               * the account menu, next to the support icon, and only while
+               * there are new tickets: at zero, or when the count could not
+               * be read, there is no bell at all.
+               * The bell sits in a slot the width of an icon button (36px),
+               * reserved for the admin whether or not the bell is showing.
+               * The right-hand cluster is right-aligned, so the support icon
+               * and the account button never move; the slot keeps the
+               * Dashboard / Train / Simulate links from sliding left and
+               * right either, each time the bell appears or goes away
+               * (as it does the moment /admin/support is opened).
                * Same unsaved-draft guard as the Admin menu item; while that
                * guard cannot run (a modal is open or a correction is in
                * flight) it is disabled with the reason, like Dashboard.
                * prefetch={false}: opening /admin/support is what marks the
                * inbox seen, so it must only happen on a real visit. */}
-              {isAdmin &&
-                (onTasks && isDashboardBlocked ? (
-                  <button
-                    type="button"
-                    disabled
-                    title={dashboardBlockedReason}
-                    aria-label={`${copy.nav.adminSupportInbox({ count: newTicketCount })} — ${dashboardBlockedReason}`}
-                    className={`${ICON_BUTTON_CLASS} relative disabled:cursor-not-allowed disabled:opacity-50`}
-                  >
-                    <BellIcon />
-                  </button>
-                ) : (
-                  <Link
-                    href="/admin/support"
-                    prefetch={false}
-                    data-testid="admin-support-bell"
-                    title={copy.nav.adminSupportInbox({ count: newTicketCount })}
-                    aria-label={copy.nav.adminSupportInbox({ count: newTicketCount })}
-                    onClick={guardedNavigationHandler("/admin/support")}
-                    className={`${ICON_BUTTON_CLASS} relative`}
-                  >
-                    <BellIcon />
-                    {newTicketCount > 0 && (
-                      <span
-                        data-testid="admin-support-bell-badge"
-                        aria-hidden="true"
-                        className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-background"
+              {isAdmin && (
+                <span data-testid="admin-support-bell-slot" className="inline-flex h-9 w-9 shrink-0 items-center justify-center">
+                  {newTicketCount > 0 &&
+                    (onTasks && isDashboardBlocked ? (
+                      <button
+                        type="button"
+                        disabled
+                        title={dashboardBlockedReason}
+                        aria-label={`${copy.nav.adminSupportInbox({ count: newTicketCount })} — ${dashboardBlockedReason}`}
+                        className={`${ICON_BUTTON_CLASS} relative disabled:cursor-not-allowed disabled:opacity-50`}
                       >
-                        {formatBellCount(newTicketCount)}
-                      </span>
-                    )}
-                  </Link>
-                ))}
+                        <BellIcon />
+                      </button>
+                    ) : (
+                      <Link
+                        href="/admin/support"
+                        prefetch={false}
+                        data-testid="admin-support-bell"
+                        title={copy.nav.adminSupportInbox({ count: newTicketCount })}
+                        aria-label={copy.nav.adminSupportInbox({ count: newTicketCount })}
+                        onClick={guardedNavigationHandler("/admin/support")}
+                        className={`${ICON_BUTTON_CLASS} relative`}
+                      >
+                        <BellIcon />
+                        <span
+                          data-testid="admin-support-bell-badge"
+                          aria-hidden="true"
+                          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-background"
+                        >
+                          {formatBellCount(newTicketCount)}
+                        </span>
+                      </Link>
+                    ))}
+                </span>
+              )}
               {/* While a resolved ticket is waiting for the learner's answer
                * the icon carries a red dot and a click opens that notice
                * instead of Support. Once nothing is pending it is exactly the
@@ -461,7 +470,9 @@ export function NavBar({
                   isBusy={resolutionNotice.isBusy}
                   hasError={resolutionNotice.hasError}
                   onAnswer={(feedback) => void resolutionNotice.answer(feedback)}
-                  onDismiss={() => void resolutionNotice.dismiss()}
+                  onClose={resolutionNotice.close}
+                  onDecline={() => void resolutionNotice.decline()}
+                  onOpenSupport={resolutionNotice.close}
                 />
               )}
               {/* Settings and Admin are account/role utilities, not learning

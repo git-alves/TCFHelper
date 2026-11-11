@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { SupportResolutionNotice } from "@/lib/support-resolution";
 
 export type SupportResolutionAnswer = "WORKED" | "STILL_BROKEN";
@@ -21,6 +21,11 @@ interface NoticeState {
  * a dismissal the route returns the learner's next pending notice (or null),
  * which becomes the new state, so a second pending ticket needs no extra
  * request either.
+ *
+ * Closing the modal (`close`) only hides it: the notice stays pending and the
+ * red dot stays, so the learner can go and test the fix and answer later. A
+ * notice ends only through `answer` (WORKED / STILL_BROKEN) or `decline`
+ * ("I don't want to answer"), which both go to the server.
  */
 export function useSupportResolutionNotice(initialNotice: SupportResolutionNotice | null) {
   const serverNoticeId = initialNotice?.id ?? null;
@@ -34,14 +39,24 @@ export function useSupportResolutionNotice(initialNotice: SupportResolutionNotic
   const [hasError, setHasError] = useState(false);
   const notice = state.notice;
 
+  // Tell the server a notice was seen once, not on every reopen.
+  const reportedSeen = useRef(new Set<string>());
+
   const open = useCallback(() => {
     if (!notice) return;
     setHasError(false);
     setIsOpen(true);
+    if (reportedSeen.current.has(notice.id)) return;
+    reportedSeen.current.add(notice.id);
     // Best effort: lets the admin see the notice was opened. Never blocks the
     // modal and a failure changes nothing for the learner.
     void fetch(`/api/support/${notice.id}/seen`, { method: "POST" }).catch(() => undefined);
   }, [notice]);
+
+  const close = useCallback(() => {
+    setIsOpen(false);
+    setHasError(false);
+  }, []);
 
   const send = useCallback(
     async (route: ActionRoute, body?: { feedback: SupportResolutionAnswer }) => {
@@ -82,7 +97,8 @@ export function useSupportResolutionNotice(initialNotice: SupportResolutionNotic
     isBusy,
     hasError,
     open,
+    close,
     answer: useCallback((feedback: SupportResolutionAnswer) => send("feedback", { feedback }), [send]),
-    dismiss: useCallback(() => send("dismiss"), [send]),
+    decline: useCallback(() => send("dismiss"), [send]),
   };
 }
