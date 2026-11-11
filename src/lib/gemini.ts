@@ -541,11 +541,14 @@ export async function gradeEssayWithGemini(
         generationConfig: {
           // A full correction returns the corrected text, a model version,
           // every reported error and the CEFR commentary. For a Tâche 3 essay
-          // of 200+ words that exceeds 4096 tokens (and a model that spends
-          // part of the budget on reasoning exceeds it sooner), which cut the
-          // JSON off mid-string. 8192 leaves headroom while still being
-          // reachable inside CORRECTION_REQUEST_TIMEOUT_MS; a higher value
-          // would only turn a truncation into a timeout.
+          // of 200+ words that can exceed the previous 4096-token cap, which
+          // cut the JSON off mid-string. 8192 is an operational choice: it
+          // gives headroom over the estimated worst-case Tâche 3 correction.
+          // gemini-3.5-flash-lite thinks minimally by default, and thinking
+          // tokens count toward this cap. The model's own ceiling is 65,536.
+          // A larger generation also raises request latency and timeout risk
+          // (see CORRECTION_REQUEST_TIMEOUT_MS and the 503 retry below), so
+          // watch the truncation/latency log line before raising it further.
           maxOutputTokens: 8192,
           responseMimeType: "application/json",
           responseSchema: CORRECTION_RESPONSE_SCHEMA,
