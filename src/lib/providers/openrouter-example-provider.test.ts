@@ -17,6 +17,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   global.fetch = originalFetch;
   if (originalApiKey === undefined) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = originalApiKey;
@@ -130,9 +132,13 @@ describe("openRouterExampleProvider.generateExample", () => {
     ).rejects.toBeInstanceOf(ExampleProviderTransportError);
   });
 
-  it("retries once on a 503 before succeeding", async () => {
+  it("retries a 503 with growing waits and succeeds on the third attempt", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce({ status: 503, ok: false } as Response)
       .mockResolvedValueOnce({ status: 503, ok: false } as Response)
       .mockResolvedValueOnce({
         status: 200,
@@ -141,10 +147,36 @@ describe("openRouterExampleProvider.generateExample", () => {
       } as Response);
     global.fetch = fetchMock;
 
-    await expect(
-      openRouterExampleProvider.generateExample(params, { apiKey: "k", model: "m" }),
-    ).resolves.toBe("Un exemple généré.");
+    const promise = openRouterExampleProvider.generateExample(params, { apiKey: "k", model: "m" });
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(promise).resolves.toBe("Un exemple généré.");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(consoleError).toHaveBeenCalledWith(
+      "OpenRouter example generation overloaded (503), retrying (attempt 2) in 5000ms",
+    );
+  });
+
+  it("gives up after three attempts on a persistent 503", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn().mockResolvedValue({ status: 503, ok: false } as Response);
+    global.fetch = fetchMock;
+
+    const outcome = openRouterExampleProvider
+      .generateExample(params, { apiKey: "k", model: "m" })
+      .catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(7_000);
+
+    expect(await outcome).toMatchObject({ status: 503 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
 

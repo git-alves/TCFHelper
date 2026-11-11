@@ -4,10 +4,9 @@
 // content (JSON.parse it, or use it as plain text). Kept provider-agnostic
 // (no CorrectionProvider/ExampleProvider-specific error types here); each
 // adapter translates these into its own error hierarchy.
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MAX_OVERLOAD_ATTEMPTS = 2;
-const OVERLOAD_RETRY_DELAY_MS = 1_000;
+import { sendWithOverloadRetry } from "@/lib/provider-retry";
 
+const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 export class OpenRouterRateLimitedError extends Error {}
 
 /**
@@ -147,25 +146,17 @@ export async function requestOpenRouterChatCompletion(options: OpenRouterChatCom
 export async function requestOpenRouterChatCompletionDetailed(
   options: OpenRouterChatCompletionOptions,
 ): Promise<OpenRouterChatCompletionResult> {
+  // A 503 usually means the routed model is transiently overloaded -- the
+  // same shared retry policy as the equivalent Gemini calls (provider-retry.ts).
   let response: Response;
   try {
-    response = await request(options);
+    response = await sendWithOverloadRetry(() => request(options), {
+      label: `OpenRouter ${options.logLabel}`,
+      attemptTimeoutMs: options.timeoutMs,
+    });
   } catch (error) {
     console.error(`OpenRouter ${options.logLabel} transport failure`, error);
     throw new OpenRouterTransportError();
-  }
-
-  // A 503 usually means the routed model is transiently overloaded -- mirrors
-  // gemini.ts's own single retry for the equivalent Gemini call.
-  for (let attempt = 1; response.status === 503 && attempt < MAX_OVERLOAD_ATTEMPTS; attempt++) {
-    console.error(`OpenRouter ${options.logLabel} overloaded (503), retrying (attempt ${attempt})`);
-    await new Promise((resolve) => setTimeout(resolve, OVERLOAD_RETRY_DELAY_MS));
-    try {
-      response = await request(options);
-    } catch (error) {
-      console.error(`OpenRouter ${options.logLabel} transport failure`, error);
-      throw new OpenRouterTransportError();
-    }
   }
 
   if (response.status === 429) {

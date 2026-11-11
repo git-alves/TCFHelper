@@ -178,6 +178,13 @@ function post(body: unknown) {
   );
 }
 
+describe("route segment config", () => {
+  it("allows up to 90s so a 503 backoff (3 x 20s attempts plus waits) can finish; relies on Fluid Compute", async () => {
+    const routeModule = await import("./route");
+    expect(routeModule.maxDuration).toBe(90);
+  });
+});
+
 describe("POST /api/essays/example", () => {
   it("requires an authenticated learner", async () => {
     getCurrentActivatedAppUserMock.mockResolvedValue(null);

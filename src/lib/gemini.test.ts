@@ -26,6 +26,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   global.fetch = originalFetch;
   if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
   else process.env.GEMINI_API_KEY = originalApiKey;
@@ -52,6 +54,40 @@ const TASK_ONE_PARAMS = {
 function mockFetchOnce(response: Partial<Response> & { json?: () => Promise<unknown> }) {
   global.fetch = vi.fn().mockResolvedValue(response as Response);
 }
+
+// Drives a call that retries a 503 under fake timers with zero jitter, and
+// checks the fetch count at each boundary: waits of exactly 2s then 5s.
+async function expectBackoffThenSuccess(start: () => Promise<unknown>, logLabel: string) {
+  vi.useFakeTimers();
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
+  const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+
+  const promise = start();
+  await vi.advanceTimersByTimeAsync(1_999);
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(4_999);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+  await vi.advanceTimersByTimeAsync(1);
+  expect(fetchMock).toHaveBeenCalledTimes(3);
+
+  expect(consoleError).toHaveBeenCalledWith(`${logLabel} overloaded (503), retrying (attempt 1) in 2000ms`);
+  expect(consoleError).toHaveBeenCalledWith(`${logLabel} overloaded (503), retrying (attempt 2) in 5000ms`);
+  return promise;
+}
+
+async function runPersistent503(start: () => Promise<unknown>) {
+  vi.useFakeTimers();
+  vi.spyOn(Math, "random").mockReturnValue(0.5);
+  vi.spyOn(console, "error").mockImplementation(() => undefined);
+  const outcome = start().catch((caught: unknown) => caught);
+  await vi.advanceTimersByTimeAsync(7_000);
+  return outcome;
+}
+
+const overloaded = () => ({ ok: false, status: 503, json: async () => ({}) }) as Response;
 
 describe("buildExamplePrompt", () => {
   it("uses the default structure and level description when no overrides are given", () => {
@@ -206,28 +242,40 @@ describe("generateModelAnswer", () => {
     await expect(generateModelAnswer(params)).rejects.toThrow(/Gemini request failed \(500\)/);
   });
 
-  it("retries once and succeeds after a transient 503 (model overloaded)", async () => {
+  it("retries a 503 with growing waits and succeeds on the third attempt (model answer)", async () => {
     global.fetch = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as Response)
+      .mockResolvedValueOnce(overloaded())
+      .mockResolvedValueOnce(overloaded())
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
       } as Response);
 
-    await expect(generateModelAnswer(params)).resolves.toBe("Réponse.");
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    await expect(
+      expectBackoffThenSuccess(() => generateModelAnswer(params), "Gemini example generation"),
+    ).resolves.toBe("Réponse.");
   });
 
-  it("gives up after exhausting retries on a persistent 503", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as Response);
+  it("gives up after three attempts on a persistent 503 (model answer)", async () => {
+    global.fetch = vi.fn().mockResolvedValue(overloaded());
 
-    const error: unknown = await generateModelAnswer(params).catch((caught: unknown) => caught);
+    const error = await runPersistent503(() => generateModelAnswer(params));
 
     expect(error).toBeInstanceOf(GeminiRequestError);
     expect((error as GeminiRequestError).status).toBe(503);
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a 429 or a 400 (model answer)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({}) } as Response);
+    await expect(generateModelAnswer(params)).rejects.toBeInstanceOf(GeminiRateLimitedError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({}) } as Response);
+    await expect(generateModelAnswer(params)).rejects.toBeInstanceOf(GeminiRequestError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("carries only the HTTP status, never Google's own error message", async () => {
@@ -706,27 +754,52 @@ describe("gradeEssayWithGemini", () => {
     await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRateLimitedError);
   });
 
-  it("retries once and succeeds after a transient 503 (model overloaded)", async () => {
+  it("retries a 503 with growing waits and succeeds on the third attempt (correction)", async () => {
     global.fetch = vi
       .fn()
-      .mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) } as Response)
+      .mockResolvedValueOnce(overloaded())
+      .mockResolvedValueOnce(overloaded())
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
         json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(feedback) }] } }] }),
       } as Response);
 
-    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
-    expect(global.fetch).toHaveBeenCalledTimes(2);
+    await expect(
+      expectBackoffThenSuccess(() => gradeEssayWithGemini(correctionParams), "Gemini correction"),
+    ).resolves.toEqual(feedback);
   });
 
-  it("gives up after exhausting retries on a persistent 503", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 503, json: async () => ({}) } as Response);
+  it("gives up after three attempts on a persistent 503 (correction), as the same 503 request error", async () => {
+    global.fetch = vi.fn().mockResolvedValue(overloaded());
 
-    const error: unknown = await gradeEssayWithGemini(correctionParams).catch((caught: unknown) => caught);
+    const error = await runPersistent503(() => gradeEssayWithGemini(correctionParams));
 
     expect(error).toBeInstanceOf(GeminiRequestError);
     expect((error as GeminiRequestError).status).toBe(503);
+    expect(global.fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a 429 or a 400 (correction)", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({}) } as Response);
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRateLimitedError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 400, json: async () => ({}) } as Response);
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRequestError);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("still reports a transport failure on a retry as a transport error", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    global.fetch = vi.fn().mockResolvedValueOnce(overloaded()).mockRejectedValueOnce(new Error("network down"));
+
+    const outcome = gradeEssayWithGemini(correctionParams).catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(2_000);
+
+    expect(await outcome).toBeInstanceOf(GeminiTransportError);
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
