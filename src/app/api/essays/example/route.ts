@@ -33,6 +33,12 @@ import {
 } from "@/lib/model-answer-generator";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 
+// Covers three 20s provider attempts plus two backoff waits on a 503 (about
+// 68s worst case, see provider-retry.ts) with room to persist the result.
+// This relies on Fluid Compute (Hobby plan cap: 300s). If Fluid is turned off,
+// functions are capped at 60s and this value must be lowered with it.
+export const maxDuration = 90;
+
 const TASK_TYPES = Object.values(TaskType) as [TaskType, ...TaskType[]];
 const EXAMPLE_LEVELS = ["B2", "C1", "C2"] as const;
 const SHARED_TOPIC_SOURCES = new Set<TopicSource>([

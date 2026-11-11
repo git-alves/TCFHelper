@@ -20,6 +20,8 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   global.fetch = originalFetch;
   if (originalApiKey === undefined) delete process.env.OPENROUTER_API_KEY;
   else process.env.OPENROUTER_API_KEY = originalApiKey;
@@ -281,9 +283,13 @@ describe("openRouterCorrectionProvider.gradeEssay", () => {
     ).rejects.toBeInstanceOf(CorrectionProviderTransportError);
   });
 
-  it("retries once on a 503 before succeeding", async () => {
+  it("retries a 503 with growing waits and succeeds on the third attempt", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetchMock = vi
       .fn()
+      .mockResolvedValueOnce({ status: 503, ok: false } as Response)
       .mockResolvedValueOnce({ status: 503, ok: false } as Response)
       .mockResolvedValueOnce({
         status: 200,
@@ -292,10 +298,53 @@ describe("openRouterCorrectionProvider.gradeEssay", () => {
       } as Response);
     global.fetch = fetchMock;
 
+    const promise = openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" });
+    await vi.advanceTimersByTimeAsync(1_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(4_999);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(1);
+
+    await expect(promise).resolves.toEqual({ correctedText: "ok" });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(consoleError).toHaveBeenCalledWith("OpenRouter correction overloaded (503), retrying (attempt 1) in 2000ms");
+    expect(consoleError).toHaveBeenCalledWith("OpenRouter correction overloaded (503), retrying (attempt 2) in 5000ms");
+  });
+
+  it("gives up after three attempts on a persistent 503, as the same 503 request error", async () => {
+    vi.useFakeTimers();
+    vi.spyOn(Math, "random").mockReturnValue(0.5);
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn().mockResolvedValue({ status: 503, ok: false } as Response);
+    global.fetch = fetchMock;
+
+    const outcome = openRouterCorrectionProvider
+      .gradeEssay(params, { apiKey: "k", model: "m" })
+      .catch((caught: unknown) => caught);
+    await vi.advanceTimersByTimeAsync(7_000);
+
+    const error = await outcome;
+    expect(error).toBeInstanceOf(CorrectionProviderRequestError);
+    expect((error as InstanceType<typeof CorrectionProviderRequestError>).status).toBe(503);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not retry a 429 or a 400", async () => {
+    const rateLimited = vi.fn().mockResolvedValue({ status: 429, ok: false } as Response);
+    global.fetch = rateLimited;
     await expect(
       openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" }),
-    ).resolves.toEqual({ correctedText: "ok" });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    ).rejects.toBeInstanceOf(CorrectionProviderRateLimitedError);
+    expect(rateLimited).toHaveBeenCalledTimes(1);
+
+    const badRequest = vi.fn().mockResolvedValue({ status: 400, ok: false } as Response);
+    global.fetch = badRequest;
+    await expect(
+      openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" }),
+    ).rejects.toBeInstanceOf(CorrectionProviderRequestError);
+    expect(badRequest).toHaveBeenCalledTimes(1);
   });
 });
 
