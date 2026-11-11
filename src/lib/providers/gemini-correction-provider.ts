@@ -2,6 +2,7 @@ import {
   DEFAULT_GEMINI_CORRECTION_MODEL,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
+  GeminiOutputTruncatedError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
@@ -11,6 +12,7 @@ import {
 import {
   CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
+  CorrectionProviderOutputTruncatedError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -41,6 +43,11 @@ export const geminiCorrectionProvider: CorrectionProvider = {
       if (error instanceof GeminiRateLimitedError) {
         throw new CorrectionProviderRateLimitedError(error.message);
       }
+      if (error instanceof GeminiOutputTruncatedError) {
+        // Cut off at maxOutputTokens (finishReason MAX_TOKENS): its own
+        // failure, so the admin log shows "output truncated", not "invalid json".
+        throw new CorrectionProviderOutputTruncatedError();
+      }
       if (error instanceof GeminiCorrectionParseError) {
         // Gemini's own responseSchema/responseMimeType:"application/json"
         // enforcement means it essentially never just ignores the
@@ -48,7 +55,8 @@ export const geminiCorrectionProvider: CorrectionProvider = {
         // OpenRouter-routed model without native support might -- an
         // unparseable body here is a malformed/truncated JSON attempt, not
         // a "didn't try" case, so this always maps to the more specific
-        // invalid-JSON classification, never format-unsupported.
+        // invalid-JSON classification, never format-unsupported. A response
+        // cut off at the output-token limit is handled just above.
         throw new CorrectionProviderInvalidJsonError();
       }
       if (error instanceof GeminiRequestError) {

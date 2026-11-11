@@ -50,6 +50,18 @@ describe("openRouterExampleProvider.hasConfiguredCredentials", () => {
 });
 
 describe("openRouterExampleProvider.generateExample", () => {
+  it("still treats an empty completion as a request failure, even when it stopped at the token limit", async () => {
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ finish_reason: "length", message: { content: "" } }] }),
+    });
+
+    await expect(
+      openRouterExampleProvider.generateExample(params, { apiKey: "k", model: "m" }),
+    ).rejects.toMatchObject({ status: 200 });
+  });
+
   it("throws ExampleProviderNotConfiguredError without a model", async () => {
     await expect(
       openRouterExampleProvider.generateExample(params, { apiKey: "k", model: null }),
@@ -73,6 +85,8 @@ describe("openRouterExampleProvider.generateExample", () => {
     expect(body.model).toBe("openai/gpt-5-mini");
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
+    // The correction budget change must not leak into the example generator.
+    expect(body.max_tokens).toBe(2048);
     expect(body.messages[0].content).toContain("Le télétravail est-il bénéfique ?");
     expect(body.response_format).toBeUndefined();
   });

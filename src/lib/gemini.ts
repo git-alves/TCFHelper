@@ -82,6 +82,18 @@ export class GeminiCorrectionParseError extends Error {
   }
 }
 
+/**
+ * Gemini stopped because it hit maxOutputTokens (finishReason MAX_TOKENS), so
+ * the correction JSON was cut off or never started. Distinct from a plain
+ * parse failure so the cause is visible in platform logs; the provider layer
+ * still reports it as the existing invalid-JSON failure.
+ */
+export class GeminiOutputTruncatedError extends Error {
+  constructor() {
+    super("Gemini's correction response was cut off at the output token limit.");
+  }
+}
+
 // Admin overrides for the 12 independently-editable example-generation
 // blocks (see /admin/prompts and prompt-overrides.ts): one structural note
 // per task type, plus one level description per (task type, CEFR level)
@@ -260,6 +272,35 @@ function extractText(payload: unknown): string {
     .filter((part): part is JsonRecord => isRecord(part) && part.thought !== true && typeof part.text === "string")
     .map((part) => part.text as string)
     .join("");
+}
+
+function extractFinishReason(payload: unknown): string | undefined {
+  if (!isRecord(payload) || !Array.isArray(payload.candidates)) return undefined;
+  const candidate = payload.candidates[0];
+  if (!isRecord(candidate) || typeof candidate.finishReason !== "string") return undefined;
+  return candidate.finishReason;
+}
+
+function tokenCount(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? String(value) : "unknown";
+}
+
+/**
+ * One platform-log line describing why a correction response was unusable.
+ * Only the finish reason and token counts are included -- never the model's
+ * text or anything from the learner's essay.
+ */
+function describeCorrectionResponse(payload: unknown, finishReason: string | undefined): string {
+  const usage = isRecord(payload) && isRecord(payload.usageMetadata) ? payload.usageMetadata : {};
+  // finishReason is a short enum string; anything else is reported as "other"
+  // rather than echoed into the log.
+  const safeFinishReason = finishReason && /^[A-Z_]{1,40}$/.test(finishReason) ? finishReason : finishReason ? "other" : "unknown";
+  return (
+    `finishReason=${safeFinishReason} ` +
+    `candidatesTokenCount=${tokenCount(usage.candidatesTokenCount)} ` +
+    `thoughtsTokenCount=${tokenCount(usage.thoughtsTokenCount)} ` +
+    `totalTokenCount=${tokenCount(usage.totalTokenCount)}`
+  );
 }
 
 /**
@@ -498,7 +539,17 @@ export async function gradeEssayWithGemini(
         // family (an error in a future release) -- omit it rather than send
         // a parameter that could start failing requests later.
         generationConfig: {
-          maxOutputTokens: 4096,
+          // A full correction returns the corrected text, a model version,
+          // every reported error and the CEFR commentary. For a Tâche 3 essay
+          // of 200+ words that can exceed the previous 4096-token cap, which
+          // cut the JSON off mid-string. 8192 is an operational choice: it
+          // gives headroom over the estimated worst-case Tâche 3 correction.
+          // gemini-3.5-flash-lite thinks minimally by default, and thinking
+          // tokens count toward this cap. The model's own ceiling is 65,536.
+          // A larger generation also raises request latency and timeout risk
+          // (see CORRECTION_REQUEST_TIMEOUT_MS and the 503 retry below), so
+          // watch the truncation/latency log line before raising it further.
+          maxOutputTokens: 8192,
           responseMimeType: "application/json",
           responseSchema: CORRECTION_RESPONSE_SCHEMA,
         },
@@ -554,13 +605,24 @@ export async function gradeEssayWithGemini(
   }
 
   const text = extractText(payload).trim();
+  const finishReason = extractFinishReason(payload);
   if (!text) {
+    // A thinking model can spend the whole budget before emitting any answer.
+    if (finishReason === "MAX_TOKENS") {
+      console.error(`Gemini correction output truncated (no text) ${describeCorrectionResponse(payload, finishReason)}`);
+      throw new GeminiOutputTruncatedError();
+    }
     throw new GeminiRequestError(response.status);
   }
 
   try {
     return JSON.parse(text);
   } catch {
+    if (finishReason === "MAX_TOKENS") {
+      console.error(`Gemini correction output truncated ${describeCorrectionResponse(payload, finishReason)}`);
+      throw new GeminiOutputTruncatedError();
+    }
+    console.error(`Gemini correction response was not valid JSON ${describeCorrectionResponse(payload, finishReason)}`);
     throw new GeminiCorrectionParseError();
   }
 }

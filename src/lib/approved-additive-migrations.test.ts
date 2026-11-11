@@ -114,6 +114,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261023120000_add_user_last_sign_in");
   });
 
+  it("allows the additive output_truncated AdminEvent reason-code migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261111120000_add_correction_output_truncated_reason");
+  });
+
   it("allows the additive starter-topic bank deployment-order fence", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261110120000_add_starter_topic_bank_state");
   });

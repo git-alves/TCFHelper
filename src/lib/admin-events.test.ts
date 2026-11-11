@@ -273,7 +273,7 @@ describe("recordAdminEvent", () => {
     expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
   });
 
-  it.each(["format_unsupported", "invalid_json", "schema_invalid"] as const)(
+  it.each(["format_unsupported", "invalid_json", "schema_invalid", "output_truncated"] as const)(
     "persists a correction-provider failure with the %s reason code",
     async (reasonCode) => {
       await recordAdminEvent(
@@ -298,6 +298,30 @@ describe("recordAdminEvent", () => {
       });
     },
   );
+
+  it("rejects output_truncated under EXAMPLE_PROVIDER_FAILED and other unrelated event types", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await recordAdminEvent({
+      eventType: "EXAMPLE_PROVIDER_FAILED",
+      userId: USER_ID,
+      provider: "gemini",
+      reasonCode: "output_truncated" as never,
+      httpStatus: 502,
+    });
+    await recordAdminEvent({
+      eventType: "TRANSLATION_PROVIDER_FAILED",
+      userId: USER_ID,
+      provider: "deepl",
+      reasonCode: "output_truncated" as never,
+      httpStatus: 502,
+    });
+
+    expect(createMock).not.toHaveBeenCalled();
+    expect(upsertMock).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(2);
+    expect(errorSpy).toHaveBeenCalledWith("Admin event rejected by validation");
+  });
 
   it("rejects the retired invalid_response reason code under CORRECTION_PROVIDER_FAILED -- callers now use a more specific one", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);

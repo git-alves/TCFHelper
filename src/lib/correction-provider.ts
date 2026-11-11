@@ -84,6 +84,19 @@ export class CorrectionProviderInvalidJsonError extends Error {
 }
 
 /**
+ * The provider stopped because it hit its output-token limit, so the
+ * structured response was cut off (or never started). Distinct from
+ * CorrectionProviderInvalidJsonError, which is malformed JSON from a
+ * response that finished normally: the remedy here is a larger output
+ * budget, not a different model or prompt.
+ */
+export class CorrectionProviderOutputTruncatedError extends Error {
+  constructor() {
+    super("Correction provider's response was cut off at the output token limit.");
+  }
+}
+
+/**
  * Cheap heuristic shared by every JSON-parsing adapter: does this content
  * even look like an attempted JSON object/array? Never inspects anything
  * beyond the first non-whitespace character, so it can't echo any of the

@@ -70,6 +70,41 @@ function extractContent(payload: unknown): string {
   return typeof content === "string" ? content : "";
 }
 
+/** Why generation stopped and how many tokens it used -- never any content. */
+export interface OpenRouterChatCompletionResult {
+  content: string;
+  /** HTTP status of the response, for callers that treat an empty body as a request failure. */
+  status: number;
+  /** choices[0].finish_reason: OpenRouter's normalized value ("stop", "length", ...). */
+  finishReason?: string;
+  /** choices[0].native_finish_reason: the routed provider's own value (e.g. "MAX_TOKENS"). */
+  nativeFinishReason?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  /** usage.completion_tokens_details.reasoning_tokens, when the routed model reports it. */
+  reasoningTokens?: number;
+}
+
+function extractChoiceString(payload: unknown, key: "finish_reason" | "native_finish_reason"): string | undefined {
+  if (!isRecord(payload) || !Array.isArray(payload.choices)) return undefined;
+  const choice = payload.choices[0];
+  return isRecord(choice) && typeof choice[key] === "string" ? (choice[key] as string) : undefined;
+}
+
+function tokenCountOrUndefined(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function extractUsage(payload: unknown) {
+  const usage = isRecord(payload) && isRecord(payload.usage) ? payload.usage : {};
+  const details = isRecord(usage.completion_tokens_details) ? usage.completion_tokens_details : {};
+  return {
+    promptTokens: tokenCountOrUndefined(usage.prompt_tokens),
+    completionTokens: tokenCountOrUndefined(usage.completion_tokens),
+    reasoningTokens: tokenCountOrUndefined(details.reasoning_tokens),
+  };
+}
+
 function request(options: OpenRouterChatCompletionOptions) {
   // The key is sent only via the Authorization header, never embedded in the
   // request body or URL: a URL- or body-adjacent secret is more likely to
@@ -91,9 +126,27 @@ function request(options: OpenRouterChatCompletionOptions) {
 /**
  * Sends one OpenRouter chat/completions request and returns the raw
  * `choices[0].message.content` string. The caller decides what that content
- * means (structured JSON to parse, or plain example text).
+ * means (structured JSON to parse, or plain example text). An empty content
+ * is a request failure here.
  */
 export async function requestOpenRouterChatCompletion(options: OpenRouterChatCompletionOptions): Promise<string> {
+  const result = await requestOpenRouterChatCompletionDetailed(options);
+  if (!result.content) {
+    throw new OpenRouterRequestError(result.status);
+  }
+  return result.content;
+}
+
+/**
+ * Same request, retries and error handling as requestOpenRouterChatCompletion,
+ * but also returns the finish reason and token usage, and does not treat an
+ * empty content as a failure -- a response cut off at max_tokens can arrive
+ * with no content at all, and the caller needs to see why. Used by the
+ * correction adapter; the example adapter keeps the string-only variant.
+ */
+export async function requestOpenRouterChatCompletionDetailed(
+  options: OpenRouterChatCompletionOptions,
+): Promise<OpenRouterChatCompletionResult> {
   let response: Response;
   try {
     response = await request(options);
@@ -141,10 +194,11 @@ export async function requestOpenRouterChatCompletion(options: OpenRouterChatCom
     throw new OpenRouterRequestError(extractErrorStatus(payload) ?? 502);
   }
 
-  const content = extractContent(payload).trim();
-  if (!content) {
-    throw new OpenRouterRequestError(response.status);
-  }
-
-  return content;
+  return {
+    content: extractContent(payload).trim(),
+    status: response.status,
+    finishReason: extractChoiceString(payload, "finish_reason"),
+    nativeFinishReason: extractChoiceString(payload, "native_finish_reason"),
+    ...extractUsage(payload),
+  };
 }

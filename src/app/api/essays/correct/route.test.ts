@@ -3,6 +3,7 @@ import {
   CorrectionProviderFormatUnsupportedError,
   CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
+  CorrectionProviderOutputTruncatedError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -834,6 +835,30 @@ describe("POST /api/essays/correct", () => {
     expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
   });
 
+  it("answers 502 and records output_truncated when a Tâche 3 correction is cut off at the token limit", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_t3",
+      taskType: "TASK_3",
+      source: "OFFICIAL_EXAM",
+      prompt: "Le télétravail généralisé\n\nDocument 1 :\nPour.\n\nDocument 2 :\nContre.",
+    });
+    gradeEssayMock.mockRejectedValue(new CorrectionProviderOutputTruncatedError());
+
+    const response = await post({ taskType: "TASK_3", topicId: "topic_t3", content: VALID_TASK_3_CONTENT });
+
+    expect(response.status).toBe(502);
+    // The learner-facing message does not change with the admin reason code.
+    await expect(response.json()).resolves.toEqual({ error: "Something went wrong while grading your essay." });
+    expect(recordAdminEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        reasonCode: "output_truncated",
+        httpStatus: 502,
+      }),
+    );
+    expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
   it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {
     findUniqueMock.mockResolvedValue({
       id: "generated_topic_1",
@@ -1038,6 +1063,12 @@ describe("POST /api/essays/correct", () => {
       await post({ taskType: "TASK_1", topicId: "topic_1", content: VALID_TASK_1_CONTENT });
       expect(recordAdminEventMock).toHaveBeenLastCalledWith(
         expect.objectContaining({ reasonCode: "invalid_json" }),
+      );
+
+      gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderOutputTruncatedError());
+      await post({ taskType: "TASK_1", topicId: "topic_1", content: VALID_TASK_1_CONTENT });
+      expect(recordAdminEventMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({ reasonCode: "output_truncated" }),
       );
 
       gradeEssayMock.mockRejectedValueOnce(new CorrectionProviderRequestError(502));
