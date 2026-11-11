@@ -476,4 +476,43 @@ describe("APP_COPY", () => {
       expect(copy.workspace.topic.recentExamDescription).not.toMatch(claims);
     }
   });
+
+  describe("the tour's support step (nav-support)", () => {
+    const REPORTS_TO_SUPPORT = {
+      en: /Report a bug/,
+      fr: /Signalez un bug/,
+      es: /Informa un error/,
+      pt: /Relate um bug/,
+    } as const;
+    // How the red dot is named in each language.
+    const RED_DOT = {
+      en: /red dot/i,
+      fr: /point rouge/i,
+      es: /punto rojo/i,
+      pt: /bolinha vermelha/i,
+    } as const;
+    // The overlay's own regression test (walkthrough-overlay.responsive.test.tsx)
+    // exercises a ~335-character body: its panel scrolls independently of
+    // Skip/Back/Next and is capped to the room below it, so a body inside that
+    // bound fits the tooltip.
+    const LONGEST_BODY_THE_TOOLTIP_IS_TESTED_WITH = 335;
+
+    it.each(APP_LOCALES)("%s keeps its original sentences and explains the red dot on the support icon", (locale) => {
+      const { supportBody } = getAppCopy(locale).walkthrough;
+
+      expect(supportBody).toMatch(REPORTS_TO_SUPPORT[locale]);
+      expect(supportBody).toMatch(RED_DOT[locale]);
+    });
+
+    it.each(APP_LOCALES)("%s stays within the body length the tooltip is tested with", (locale) => {
+      expect(getAppCopy(locale).walkthrough.supportBody.length).toBeLessThan(LONGEST_BODY_THE_TOOLTIP_IS_TESTED_WITH);
+    });
+
+    it("explains it in Portuguese the way the product asked", () => {
+      expect(getAppCopy("pt").walkthrough.supportBody).toContain(
+        "Quando aparecer uma bolinha vermelha neste ícone, é porque o suporte respondeu ao seu chamado: clique para ver e nos dizer se funcionou.",
+      );
+    });
+  });
 });
+
