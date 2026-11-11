@@ -153,6 +153,10 @@ const LANDING_LANGUAGE_OPTION_CLASS =
 const ICON_BUTTON_CLASS =
   "rounded-full p-2 text-zinc-600 transition-colors hover:bg-black/[.04] hover:text-foreground dark:text-zinc-300 dark:hover:bg-white/[.08]";
 
+// The admin's bell: the same look as the other icon buttons, in a 44px target
+// (the glyph stays 20px) with a visible keyboard focus ring.
+const BELL_BUTTON_CLASS = `${ICON_BUTTON_CLASS} relative inline-flex h-11 w-11 shrink-0 items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2`;
+
 // Plain text, not a bordered pill: with only the three learning destinations
 // left at this tier, one underlined active state reads clearly on its own --
 // outlining every inactive item too just added visual weight for no reason.
@@ -287,7 +291,10 @@ export function NavBar({
             My<span className={wordmarkAccentClassName}>TCF</span>Lab
           </span>
         </Link>
-        <div className="flex items-center gap-2 text-sm sm:gap-3">
+        {/* shrink-0: when the bar wraps on a narrow screen this whole group (the
+         * optional bell, Support and the account button) moves together instead
+         * of splitting across lines. */}
+        <div className="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
           {isHome && (
             <ThemedSelect<AppLocale>
               id="landing-language"
@@ -384,56 +391,50 @@ export function NavBar({
                * It uses the same intercepted-route pattern as Settings, so
                * opening it never abandons work in progress. */}
               {/* The admin's bell: only for the owner account, always outside
-               * the account menu, next to the support icon, and only while
-               * there are new tickets: at zero, or when the count could not
-               * be read, there is no bell at all.
-               * The bell sits in a slot the width of an icon button (36px),
-               * reserved for the admin whether or not the bell is showing.
-               * The right-hand cluster is right-aligned, so the support icon
-               * and the account button never move; the slot keeps the
-               * Dashboard / Train / Simulate links from sliding left and
-               * right either, each time the bell appears or goes away
-               * (as it does the moment /admin/support is opened).
+               * the account menu, right before the support icon, and only
+               * while there are new tickets. At zero, or when the count could
+               * not be read, there is no bell node at all and no empty space:
+               * it is a plain flex child that is inserted and removed, with no
+               * enter/exit animation, so the row simply reflows (Support and
+               * the account button keep their adjacency; the links to the left
+               * may shift a little).
                * Same unsaved-draft guard as the Admin menu item; while that
                * guard cannot run (a modal is open or a correction is in
                * flight) it is disabled with the reason, like Dashboard.
                * prefetch={false}: opening /admin/support is what marks the
                * inbox seen, so it must only happen on a real visit. */}
-              {isAdmin && (
-                <span data-testid="admin-support-bell-slot" className="inline-flex h-9 w-9 shrink-0 items-center justify-center">
-                  {newTicketCount > 0 &&
-                    (onTasks && isDashboardBlocked ? (
-                      <button
-                        type="button"
-                        disabled
-                        title={dashboardBlockedReason}
-                        aria-label={`${copy.nav.adminSupportInbox({ count: newTicketCount })} — ${dashboardBlockedReason}`}
-                        className={`${ICON_BUTTON_CLASS} relative disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        <BellIcon />
-                      </button>
-                    ) : (
-                      <Link
-                        href="/admin/support"
-                        prefetch={false}
-                        data-testid="admin-support-bell"
-                        title={copy.nav.adminSupportInbox({ count: newTicketCount })}
-                        aria-label={copy.nav.adminSupportInbox({ count: newTicketCount })}
-                        onClick={guardedNavigationHandler("/admin/support")}
-                        className={`${ICON_BUTTON_CLASS} relative`}
-                      >
-                        <BellIcon />
-                        <span
-                          data-testid="admin-support-bell-badge"
-                          aria-hidden="true"
-                          className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-background"
-                        >
-                          {formatBellCount(newTicketCount)}
-                        </span>
-                      </Link>
-                    ))}
-                </span>
-              )}
+              {isAdmin &&
+                newTicketCount > 0 &&
+                (onTasks && isDashboardBlocked ? (
+                  <button
+                    type="button"
+                    disabled
+                    title={dashboardBlockedReason}
+                    aria-label={`${copy.nav.adminSupportInbox({ count: newTicketCount })} — ${dashboardBlockedReason}`}
+                    className={`${BELL_BUTTON_CLASS} disabled:cursor-not-allowed disabled:opacity-50`}
+                  >
+                    <BellIcon />
+                  </button>
+                ) : (
+                  <Link
+                    href="/admin/support"
+                    prefetch={false}
+                    data-testid="admin-support-bell"
+                    title={copy.nav.adminSupportInbox({ count: newTicketCount })}
+                    aria-label={copy.nav.adminSupportInbox({ count: newTicketCount })}
+                    onClick={guardedNavigationHandler("/admin/support")}
+                    className={BELL_BUTTON_CLASS}
+                  >
+                    <BellIcon />
+                    <span
+                      data-testid="admin-support-bell-badge"
+                      aria-hidden="true"
+                      className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-background"
+                    >
+                      {formatBellCount(newTicketCount)}
+                    </span>
+                  </Link>
+                ))}
               {/* While a resolved ticket is waiting for the learner's answer
                * the icon carries a red dot and a click opens that notice
                * instead of Support. Once nothing is pending it is exactly the

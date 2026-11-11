@@ -138,13 +138,15 @@ export function SupportResolutionModal({
             {resolution.error}
           </p>
         )}
-        <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+        {/* Sized like ConfirmDialog's actions: compact and right-aligned from
+            sm up, full width and stacked on a narrow screen. No flex-1. */}
+        <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
           <button
             ref={firstButtonRef}
             type="button"
             onClick={() => onAnswer("WORKED")}
             disabled={isBusy}
-            className="flex-1 rounded-xl bg-violet-700 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400"
+            className="w-full rounded-full bg-violet-700 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-violet-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-violet-500 dark:hover:bg-violet-400 sm:w-auto"
           >
             {resolution.worked}
           </button>
@@ -152,7 +154,7 @@ export function SupportResolutionModal({
             type="button"
             onClick={() => onAnswer("STILL_BROKEN")}
             disabled={isBusy}
-            className="flex-1 rounded-xl border border-black/[.15] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.08]"
+            className="w-full rounded-full border border-black/[.15] px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.08] sm:w-auto"
           >
             {resolution.stillBroken}
           </button>
