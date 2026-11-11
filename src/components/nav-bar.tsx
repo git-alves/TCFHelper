@@ -8,9 +8,12 @@ import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { BrandMark } from "@/components/brand-mark";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { LocaleFlag } from "@/components/locale-flag";
+import { SupportResolutionModal } from "@/components/support-resolution-modal";
 import { ThemedSelect } from "@/components/themed-select";
+import { useSupportResolutionNotice } from "@/components/use-support-resolution-notice";
 import { useWalkthroughTrigger } from "@/components/walkthrough-trigger";
 import { APP_LOCALES, APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
+import type { SupportResolutionNotice } from "@/lib/support-resolution";
 import { FULL_WALKTHROUGH_PARAM, FULL_WALKTHROUGH_VALUE } from "@/lib/walkthrough";
 
 // Sized for Clerk's UserButton menu rows (16px), not the larger standalone
@@ -129,8 +132,16 @@ const NAV_LINK_CLASS =
 const ACTIVE_NAV_LINK_CLASS =
   "shrink-0 px-1 py-1.5 text-sm font-medium text-foreground underline decoration-2 underline-offset-4";
 
-export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
+export function NavBar({
+  isAdmin = false,
+  supportNotice = null,
+}: {
+  isAdmin?: boolean;
+  /** The learner's oldest unanswered support-resolution notice, resolved by the layout on the server. */
+  supportNotice?: SupportResolutionNotice | null;
+}) {
   const copy = useAppCopy();
+  const resolutionNotice = useSupportResolutionNotice(supportNotice);
   const { locale, setLocale } = useAppLocale();
   const { isSignedIn, isLoaded } = useAuth();
   const pathname = usePathname();
@@ -341,16 +352,45 @@ export function NavBar({ isAdmin = false }: { isAdmin?: boolean }) {
                * Settings/Tour), not one of the primary destinations above.
                * It uses the same intercepted-route pattern as Settings, so
                * opening it never abandons work in progress. */}
+              {/* While a resolved ticket is waiting for the learner's answer
+               * the icon carries a red dot and a click opens that notice
+               * instead of Support. Once nothing is pending it is exactly the
+               * plain link it always was. */}
               <Link
                 href="/support"
                 prefetch={false}
                 data-walkthrough="nav-support"
-                title={copy.nav.support}
-                aria-label={copy.nav.support}
-                className={ICON_BUTTON_CLASS}
+                title={resolutionNotice.notice ? copy.support.resolution.dotLabel : copy.nav.support}
+                aria-label={
+                  resolutionNotice.notice
+                    ? `${copy.nav.support} — ${copy.support.resolution.dotLabel}`
+                    : copy.nav.support
+                }
+                onClick={(event) => {
+                  if (!resolutionNotice.notice) return;
+                  event.preventDefault();
+                  resolutionNotice.open();
+                }}
+                className={resolutionNotice.notice ? `${ICON_BUTTON_CLASS} relative` : ICON_BUTTON_CLASS}
               >
                 <SupportIcon />
+                {resolutionNotice.notice && (
+                  <span
+                    data-testid="support-notice-dot"
+                    aria-hidden="true"
+                    className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-background"
+                  />
+                )}
               </Link>
+              {resolutionNotice.isOpen && resolutionNotice.notice && (
+                <SupportResolutionModal
+                  notice={resolutionNotice.notice}
+                  isBusy={resolutionNotice.isBusy}
+                  hasError={resolutionNotice.hasError}
+                  onAnswer={(feedback) => void resolutionNotice.answer(feedback)}
+                  onDismiss={() => void resolutionNotice.dismiss()}
+                />
+              )}
               {/* Settings and Admin are account/role utilities, not learning
                * destinations, so they live in the account menu instead of
                * the persistent bar. The wrapper (not UserButton itself)

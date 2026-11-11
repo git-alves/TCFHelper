@@ -227,8 +227,20 @@ export interface AppCopy {
     submitting: string;
     submitError: string;
     successTitle: string;
+    successTicketTitle: (values: { number: number }) => string;
     successDescription: string;
     sendAnother: string;
+    // The notice shown when an admin marks the learner's ticket resolved.
+    resolution: {
+      dotLabel: string;
+      title: (values: { number: number }) => string;
+      body: (values: { number: number }) => string;
+      noteLabel: string;
+      worked: string;
+      stillBroken: string;
+      close: string;
+      error: string;
+    };
     discardDraftTitle: string;
     discardDraftDescription: string;
     discardDraftConfirm: string;
@@ -742,8 +754,19 @@ export const APP_COPY = {
       submitting: "Sending…",
       submitError: "We couldn’t send your message. Please try again.",
       successTitle: "Thanks for reaching out",
+      successTicketTitle: ({ number }) => `Ticket #${number} sent`,
       successDescription: "Your message has been sent to the MyTCFLab team.",
       sendAnother: "Send another message",
+      resolution: {
+        dotLabel: "Your support ticket was resolved — open to confirm",
+        title: ({ number }) => `Ticket #${number} was resolved`,
+        body: ({ number }) => `Support marked your ticket #${number} as resolved. Please test it and let us know whether it worked.`,
+        noteLabel: "Note from support",
+        worked: "It worked",
+        stillBroken: "I still have the problem",
+        close: "Close",
+        error: "We couldn’t save your answer. Please try again.",
+      },
       discardDraftTitle: "Discard this message?",
       discardDraftDescription: "Closing now will discard what you've written. This can't be undone.",
       discardDraftConfirm: "Discard message",
@@ -1404,8 +1427,19 @@ export const APP_COPY = {
       submitting: "Envoi…",
       submitError: "Nous n’avons pas pu envoyer votre message. Réessayez.",
       successTitle: "Merci de nous avoir contactés",
+      successTicketTitle: ({ number }) => `Ticket nº ${number} envoyé`,
       successDescription: "Votre message a été envoyé à l’équipe MyTCFLab.",
       sendAnother: "Envoyer un autre message",
+      resolution: {
+        dotLabel: "Votre ticket d’assistance a été résolu — ouvrez pour confirmer",
+        title: ({ number }) => `Le ticket nº ${number} a été résolu`,
+        body: ({ number }) => `L’assistance a marqué votre ticket nº ${number} comme résolu. Testez, puis dites-nous si cela a fonctionné.`,
+        noteLabel: "Note de l’assistance",
+        worked: "Ça a fonctionné",
+        stillBroken: "J’ai toujours le problème",
+        close: "Fermer",
+        error: "Nous n’avons pas pu enregistrer votre réponse. Réessayez.",
+      },
       discardDraftTitle: "Abandonner ce message ?",
       discardDraftDescription: "Fermer maintenant supprimera ce que vous avez écrit. Cette action est irréversible.",
       discardDraftConfirm: "Abandonner le message",
@@ -2074,8 +2108,19 @@ export const APP_COPY = {
       submitting: "Enviando…",
       submitError: "No pudimos enviar tu mensaje. Inténtalo de nuevo.",
       successTitle: "Gracias por escribirnos",
+      successTicketTitle: ({ number }) => `Ticket nº ${number} enviado`,
       successDescription: "Tu mensaje se envió al equipo de MyTCFLab.",
       sendAnother: "Enviar otro mensaje",
+      resolution: {
+        dotLabel: "Tu ticket de soporte se ha resuelto: ábrelo para confirmar",
+        title: ({ number }) => `El ticket nº ${number} se ha resuelto`,
+        body: ({ number }) => `El soporte ha marcado tu ticket nº ${number} como resuelto. Pruébalo y dinos si ha funcionado.`,
+        noteLabel: "Nota del soporte",
+        worked: "Funcionó",
+        stillBroken: "Sigo teniendo el problema",
+        close: "Cerrar",
+        error: "No pudimos guardar tu respuesta. Inténtalo de nuevo.",
+      },
       discardDraftTitle: "¿Descartar este mensaje?",
       discardDraftDescription: "Si cierras ahora se descartará lo que escribiste. Esta acción no se puede deshacer.",
       discardDraftConfirm: "Descartar mensaje",
@@ -2744,8 +2789,19 @@ export const APP_COPY = {
       submitting: "Enviando…",
       submitError: "Não foi possível enviar sua mensagem. Tente novamente.",
       successTitle: "Obrigado por entrar em contato",
+      successTicketTitle: ({ number }) => `Chamado nº ${number} enviado`,
       successDescription: "Sua mensagem foi enviada para a equipe MyTCFLab.",
       sendAnother: "Enviar outra mensagem",
+      resolution: {
+        dotLabel: "Seu chamado de suporte foi resolvido — abra para confirmar",
+        title: ({ number }) => `O chamado nº ${number} foi resolvido`,
+        body: ({ number }) => `O suporte marcou o seu chamado nº ${number} como resolvido. Teste e nos diga se funcionou.`,
+        noteLabel: "Nota do suporte",
+        worked: "Funcionou",
+        stillBroken: "Ainda tenho o problema",
+        close: "Fechar",
+        error: "Não foi possível salvar sua resposta. Tente novamente.",
+      },
       discardDraftTitle: "Descartar esta mensagem?",
       discardDraftDescription: "Fechar agora vai descartar o que você escreveu. Essa ação não pode ser desfeita.",
       discardDraftConfirm: "Descartar mensagem",

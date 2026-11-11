@@ -11,7 +11,7 @@ vi.mock("@/components/app-locale-provider", async () => {
   };
 });
 
-const { SupportForm } = await import("./support-form");
+const { SupportForm, SupportSentConfirmation } = await import("./support-form");
 
 describe("SupportForm", () => {
   it("shows the signed-in sender, details, and an optional file control", () => {
@@ -43,3 +43,29 @@ describe("SupportForm", () => {
     ]);
   });
 });
+
+describe("SupportSentConfirmation", () => {
+  it("confirms the submission with its ticket number", () => {
+    const markup = renderToStaticMarkup(<SupportSentConfirmation ticketNumber={42} onSendAnother={() => {}} />);
+
+    expect(markup).toContain("Ticket #42 sent");
+    expect(markup).toContain("Your message has been sent to the MyTCFLab team.");
+  });
+
+  it("falls back to the plain confirmation when the response carried no ticket number", () => {
+    const markup = renderToStaticMarkup(<SupportSentConfirmation ticketNumber={null} onSendAnother={() => {}} />);
+
+    expect(markup).toContain("Thanks for reaching out");
+    expect(markup).not.toContain("#");
+  });
+
+  it.each([
+    ["en", "Ticket #42 sent"],
+    ["fr", "Ticket nº 42 envoyé"],
+    ["es", "Ticket nº 42 enviado"],
+    ["pt", "Chamado nº 42 enviado"],
+  ] as const)("words the confirmation for %s", (locale, expected) => {
+    expect(getAppCopy(locale).support.successTicketTitle({ number: 42 })).toBe(expected);
+  });
+});
+

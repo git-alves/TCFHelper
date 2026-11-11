@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { AdminSupportDeleteButton } from "@/components/admin-support-delete-button";
+import { AdminSupportResolveButton } from "@/components/admin-support-resolve-button";
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
@@ -11,6 +12,11 @@ const CATEGORY_LABELS = {
   FEATURE_REQUEST_FEEDBACK: "Feature request / feedback",
   ACCOUNT_ACCESS: "Account & access",
   OTHER: "Other",
+} as const;
+
+const FEEDBACK_LABELS = {
+  WORKED: "Worked",
+  STILL_BROKEN: "Still has the problem",
 } as const;
 
 function formatDate(value: Date) {
@@ -36,6 +42,14 @@ export default async function AdminSupportPage() {
     take: 100,
     select: {
       id: true,
+      ticketNumber: true,
+      status: true,
+      resolvedAt: true,
+      resolutionNote: true,
+      noticeSeenAt: true,
+      noticeDismissedAt: true,
+      resolutionFeedback: true,
+      feedbackAt: true,
       senderEmail: true,
       category: true,
       details: true,
@@ -73,7 +87,21 @@ export default async function AdminSupportPage() {
             <li key={request.id} className="rounded-xl border border-black/[.1] p-5 dark:border-white/[.15]">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="font-medium">{CATEGORY_LABELS[request.category]}</p>
+                  <p className="font-medium">
+                    <span data-testid="ticket-number">Ticket #{request.ticketNumber}</span>
+                    <span className="text-zinc-400 dark:text-zinc-500"> · </span>
+                    {CATEGORY_LABELS[request.category]}
+                    <span
+                      data-testid="ticket-status"
+                      className={`ml-2 rounded-full px-2 py-0.5 text-xs font-medium ${
+                        request.status === "RESOLVED"
+                          ? "bg-emerald-500/10 text-emerald-800 dark:text-emerald-300"
+                          : "bg-amber-500/10 text-amber-800 dark:text-amber-300"
+                      }`}
+                    >
+                      {request.status === "RESOLVED" ? "Resolved" : "Open"}
+                    </span>
+                  </p>
                   <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">{request.senderEmail}</p>
                 </div>
                 <time dateTime={request.createdAt.toISOString()} className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -91,6 +119,39 @@ export default async function AdminSupportPage() {
                     ({Math.ceil(request.attachment.byteSize / 1024).toLocaleString("en-US")} KB)
                   </span>
                 </a>
+              )}
+              {request.resolvedAt && (
+                <div data-testid="ticket-resolution" className="mt-4 rounded-lg bg-black/[.03] px-4 py-3 text-sm dark:bg-white/[.05]">
+                  <p className="font-medium">
+                    {request.status === "OPEN" ? "Reopened — earlier resolution" : "Resolved"}{" "}
+                    <time dateTime={request.resolvedAt.toISOString()} className="font-normal text-zinc-500 dark:text-zinc-400">
+                      {formatDate(request.resolvedAt)}
+                    </time>
+                  </p>
+                  {request.resolutionNote && (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-zinc-700 dark:text-zinc-300">
+                      Note: {request.resolutionNote}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Learner notice:{" "}
+                    {request.noticeDismissedAt
+                      ? `dismissed ${formatDate(request.noticeDismissedAt)}`
+                      : request.noticeSeenAt
+                        ? `seen ${formatDate(request.noticeSeenAt)}, not answered`
+                        : "not seen yet"}
+                    {request.noticeDismissedAt && request.noticeSeenAt ? ` (seen ${formatDate(request.noticeSeenAt)})` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    Learner feedback:{" "}
+                    {request.resolutionFeedback && request.feedbackAt
+                      ? `${FEEDBACK_LABELS[request.resolutionFeedback]} (${formatDate(request.feedbackAt)})`
+                      : "none"}
+                  </p>
+                </div>
+              )}
+              {request.status === "OPEN" && (
+                <AdminSupportResolveButton requestId={request.id} ticketNumber={request.ticketNumber} />
               )}
               {request.hubspotSyncedAt ? (
                 <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">

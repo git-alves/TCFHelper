@@ -11,8 +11,9 @@ import { NavBar } from "@/components/nav-bar";
 import { TimezoneReporter } from "@/components/timezone-reporter";
 import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
-import { getCurrentAdminUser } from "@/lib/app-user";
+import { getCurrentAppUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
+import { getPendingSupportNotice } from "@/lib/support-resolution";
 import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
 import { REVEAL_INIT_SCRIPT } from "@/lib/reveal-init-script";
 
@@ -47,14 +48,20 @@ export default async function RootLayout({
   settings: React.ReactNode;
   support: React.ReactNode;
 }>) {
-  const [locale, adminUser] = await Promise.all([
+  const [locale, appUser] = await Promise.all([
     getRequestLocale(),
     // A temporary lookup failure must not take down every page in the app --
     // just hide the nav's Admin link, same as the home page's blocked-user
-    // check fails closed rather than failing the render.
-    getCurrentAdminUser().catch(() => null),
+    // check fails closed rather than failing the render. The one lookup also
+    // answers the Admin-link question (what getCurrentAdminUser does).
+    getCurrentAppUser().catch(() => null),
   ]);
-  const isAdmin = adminUser !== null;
+  const isAdmin = appUser?.isAdmin === true;
+  // The support-resolution notice rides on this render instead of a request
+  // from the browser: one indexed lookup per full page load, nothing on
+  // client-side navigations and no polling. It fails soft like the lookup
+  // above: no dot is better than no page.
+  const supportNotice = appUser ? await getPendingSupportNotice(appUser.id).catch(() => null) : null;
 
   return (
     <html
@@ -89,7 +96,7 @@ export default async function RootLayout({
                   <Show when="signed-in">
                     <TimezoneReporter />
                   </Show>
-                  <NavBar isAdmin={isAdmin} />
+                  <NavBar isAdmin={isAdmin} supportNotice={supportNotice} />
                   <div className="flex flex-1 flex-col">{children}</div>
                   {settings}
                   {support}
