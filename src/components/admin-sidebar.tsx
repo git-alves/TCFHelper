@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { AdminPromptsNavLink } from "@/components/admin-prompts-nav-guard";
+import { useAdminSupportInbox } from "@/components/admin-support-inbox-count";
 
 interface AdminSection {
   href: string;
@@ -41,6 +42,9 @@ function isActive(pathname: string, href: string) {
  */
 export function AdminSidebar() {
   const pathname = usePathname();
+  // The same count as the nav bell. It drops to zero as soon as the support
+  // inbox is opened, without waiting for a full page load.
+  const newSupportTickets = useAdminSupportInbox().count ?? 0;
 
   return (
     <aside className="shrink-0 border-b border-black/[.1] bg-zinc-50 md:w-60 md:border-b-0 md:border-r dark:border-white/[.15] dark:bg-zinc-900/50">
@@ -70,6 +74,18 @@ export function AdminSidebar() {
                       }`}
                     >
                       {section.label}
+                      {section.href === "/admin/support" && newSupportTickets > 0 && (
+                        <>
+                          <span
+                            data-testid="admin-sidebar-support-badge"
+                            aria-hidden="true"
+                            className="ml-2 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 align-middle text-[10px] font-semibold leading-none text-white"
+                          >
+                            {newSupportTickets > 9 ? "9+" : newSupportTickets}
+                          </span>
+                          <span className="sr-only">, {newSupportTickets} new</span>
+                        </>
+                      )}
                     </AdminPromptsNavLink>
                   );
                 })}

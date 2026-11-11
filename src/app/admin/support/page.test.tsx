@@ -1,9 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentAdminUserMock, findManyMock, notFoundMock } = vi.hoisted(() => ({
+const { getCurrentAdminUserMock, findManyMock, userFindUniqueMock, userUpdateMock, notFoundMock } = vi.hoisted(() => ({
   getCurrentAdminUserMock: vi.fn(),
   findManyMock: vi.fn(),
+  userFindUniqueMock: vi.fn(),
+  userUpdateMock: vi.fn(),
   notFoundMock: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -23,7 +25,10 @@ vi.mock("@/lib/app-user", () => {
   class AppUserProvisioningError extends Error {}
   return { AppUserProvisioningError, getCurrentAdminUser: getCurrentAdminUserMock };
 });
-vi.mock("@/lib/prisma", () => ({ prisma: { supportRequest: { findMany: findManyMock } } }));
+vi.mock("@/components/admin-support-inbox-count", () => ({ AdminSupportInboxSeen: () => <i data-testid="inbox-seen-sync" /> }));
+vi.mock("@/lib/prisma", () => ({
+  prisma: { supportRequest: { findMany: findManyMock }, user: { findUnique: userFindUniqueMock, update: userUpdateMock } },
+}));
 vi.mock("next/navigation", () => ({ notFound: notFoundMock }));
 
 const { default: AdminSupportPage } = await import("./page");
@@ -54,8 +59,12 @@ async function render(rows: object[]) {
 beforeEach(() => {
   getCurrentAdminUserMock.mockReset();
   findManyMock.mockReset();
+  userFindUniqueMock.mockReset();
+  userUpdateMock.mockReset();
   notFoundMock.mockClear();
   getCurrentAdminUserMock.mockResolvedValue({ id: "cuid_owner" });
+  userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: null });
+  userUpdateMock.mockResolvedValue({});
 });
 
 describe("AdminSupportPage", () => {
@@ -64,6 +73,9 @@ describe("AdminSupportPage", () => {
 
     await expect(AdminSupportPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(findManyMock).not.toHaveBeenCalled();
+    // A non-admin can never reach the visit-recording path.
+    expect(userFindUniqueMock).not.toHaveBeenCalled();
+    expect(userUpdateMock).not.toHaveBeenCalled();
   });
 
   it("selects the ticket number and resolution fields", async () => {
@@ -169,3 +181,112 @@ describe("AdminSupportPage", () => {
     expect(markup).toContain('data-testid="resolve-button"');
   });
 });
+
+describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
+  const LAST_VISIT = new Date("2026-11-10T12:00:00.000Z");
+  const tags = (markup: string) => [...markup.matchAll(/data-testid="ticket-new-tag"[^>]*>([^<]*)</g)].map((m) => m[1]);
+
+  it("marks the inbox seen as of the moment the visit began, after the tickets were read", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-12T09:30:00.000Z"));
+      const order: string[] = [];
+      findManyMock.mockImplementation(async () => {
+        order.push("tickets");
+        return [];
+      });
+      userUpdateMock.mockImplementation(async () => {
+        order.push("mark seen");
+        return {};
+      });
+
+      renderToStaticMarkup(await AdminSupportPage());
+
+      expect(userUpdateMock).toHaveBeenCalledWith({
+        where: { id: "cuid_owner" },
+        data: { supportInboxSeenAt: new Date("2026-11-12T09:30:00.000Z") },
+      });
+      expect(order).toEqual(["tickets", "mark seen"]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads the previous visit before replacing it", async () => {
+    const calls: string[] = [];
+    userFindUniqueMock.mockImplementation(async () => {
+      calls.push("read previous");
+      return { supportInboxSeenAt: LAST_VISIT };
+    });
+    userUpdateMock.mockImplementation(async () => {
+      calls.push("write new");
+      return {};
+    });
+    findManyMock.mockResolvedValue([]);
+
+    renderToStaticMarkup(await AdminSupportPage());
+
+    expect(calls).toEqual(["read previous", "write new"]);
+  });
+
+  it("tags the tickets that were new before this visit as New or Reopened, and no others", async () => {
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: LAST_VISIT });
+    const markup = await render([
+      { ...BASE, id: "r_new", ticketNumber: 12, status: "OPEN", createdAt: new Date("2026-11-11T08:00:00.000Z") },
+      {
+        ...BASE,
+        id: "r_reopened",
+        ticketNumber: 8,
+        status: "OPEN",
+        createdAt: new Date("2026-11-01T08:00:00.000Z"),
+        resolvedAt: new Date("2026-11-05T08:00:00.000Z"),
+        resolutionFeedback: "STILL_BROKEN",
+        feedbackAt: new Date("2026-11-11T09:00:00.000Z"),
+      },
+      { ...BASE, id: "r_old", ticketNumber: 3, status: "OPEN", createdAt: new Date("2026-11-02T08:00:00.000Z") },
+      {
+        ...BASE,
+        id: "r_reopened_before",
+        ticketNumber: 4,
+        status: "OPEN",
+        createdAt: new Date("2026-11-01T08:00:00.000Z"),
+        resolvedAt: new Date("2026-11-03T08:00:00.000Z"),
+        resolutionFeedback: "STILL_BROKEN",
+        feedbackAt: new Date("2026-11-04T09:00:00.000Z"),
+      },
+      {
+        ...BASE,
+        id: "r_resolved",
+        ticketNumber: 13,
+        status: "RESOLVED",
+        createdAt: new Date("2026-11-11T08:00:00.000Z"),
+        resolvedAt: new Date("2026-11-11T09:00:00.000Z"),
+      },
+    ]);
+
+    expect(tags(markup)).toEqual(["New", "Reopened"]);
+    expect(markup).toContain("bg-red-500/[.04]");
+  });
+
+  it("with no earlier visit tags every open ticket, and the badges are told to clear", async () => {
+    const markup = await render([
+      { ...BASE, id: "r_1", ticketNumber: 1, status: "OPEN" },
+      { ...BASE, id: "r_2", ticketNumber: 2, status: "OPEN" },
+      { ...BASE, id: "r_3", ticketNumber: 3, status: "RESOLVED", resolvedAt: new Date("2026-11-02T08:00:00.000Z") },
+    ]);
+
+    expect(tags(markup)).toEqual(["New", "New"]);
+    expect(markup).toContain('data-testid="inbox-seen-sync"');
+  });
+
+  it("still renders the page, with its tags, when recording the visit fails", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    userUpdateMock.mockRejectedValue(new Error("db down"));
+
+    const markup = await render([{ ...BASE, id: "r_1", ticketNumber: 1, status: "OPEN" }]);
+
+    expect(tags(markup)).toEqual(["New"]);
+    errorSpy.mockRestore();
+  });
+});
+

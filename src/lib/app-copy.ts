@@ -59,6 +59,8 @@ export interface AppCopy {
     logIn: string;
     closeSettingsFirst: string;
     closeSupportFirst: string;
+    // The admin's bell: the support inbox, with how many tickets are new.
+    adminSupportInbox: (values: { count: number }) => string;
   };
   home: {
     title: string;
@@ -560,6 +562,8 @@ export const APP_COPY = {
       logIn: "Log in",
       closeSettingsFirst: "Close Settings first",
       closeSupportFirst: "Close Support first",
+      adminSupportInbox: ({ count }) =>
+        count === 0 ? "Support inbox" : count === 1 ? "Support inbox — 1 new ticket" : `Support inbox — ${count} new tickets`,
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to C2.",
@@ -1229,6 +1233,8 @@ export const APP_COPY = {
       logIn: "Se connecter",
       closeSettingsFirst: "Fermez d’abord les paramètres",
       closeSupportFirst: "Fermez d’abord l’assistance",
+      adminSupportInbox: ({ count }) =>
+        count === 0 ? "Boîte de réception du support" : count === 1 ? "Boîte de réception du support — 1 nouveau ticket" : `Boîte de réception du support — ${count} nouveaux tickets`,
     },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau C2.",
@@ -1912,6 +1918,8 @@ export const APP_COPY = {
       logIn: "Iniciar sesión",
       closeSettingsFirst: "Cierra primero la configuración",
       closeSupportFirst: "Cierra primero el soporte",
+      adminSupportInbox: ({ count }) =>
+        count === 0 ? "Bandeja de soporte" : count === 1 ? "Bandeja de soporte — 1 ticket nuevo" : `Bandeja de soporte — ${count} tickets nuevos`,
     },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar C2.",
@@ -2593,6 +2601,8 @@ export const APP_COPY = {
       logIn: "Entrar",
       closeSettingsFirst: "Feche as configurações primeiro",
       closeSupportFirst: "Feche o suporte primeiro",
+      adminSupportInbox: ({ count }) =>
+        count === 0 ? "Caixa de suporte" : count === 1 ? "Caixa de suporte — 1 chamado novo" : `Caixa de suporte — ${count} chamados novos`,
     },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar C2.",

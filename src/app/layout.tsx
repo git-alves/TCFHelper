@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Show } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AdminSupportInboxProvider } from "@/components/admin-support-inbox-count";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
@@ -13,7 +14,7 @@ import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
 import { getCurrentAppUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
-import { getPendingSupportNotice } from "@/lib/support-resolution";
+import { getNavSupportState } from "@/lib/support-inbox";
 import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
 import { REVEAL_INIT_SCRIPT } from "@/lib/reveal-init-script";
 
@@ -57,11 +58,12 @@ export default async function RootLayout({
     getCurrentAppUser().catch(() => null),
   ]);
   const isAdmin = appUser?.isAdmin === true;
-  // The support-resolution notice rides on this render instead of a request
-  // from the browser: one indexed lookup per full page load, nothing on
-  // client-side navigations and no polling. It fails soft like the lookup
-  // above: no dot is better than no page.
-  const supportNotice = appUser ? await getPendingSupportNotice(appUser.id).catch(() => null) : null;
+  // The learner's support-resolution notice and the admin's new-ticket count
+  // ride on this render instead of requests from the browser: a few indexed
+  // lookups per full page load, nothing on client-side navigations and no
+  // polling. The count query runs for the admin account only. Each fails soft
+  // like the lookup above: no dot or badge is better than no page.
+  const { supportNotice, adminSupportCount } = await getNavSupportState(appUser);
 
   return (
     <html
@@ -96,10 +98,12 @@ export default async function RootLayout({
                   <Show when="signed-in">
                     <TimezoneReporter />
                   </Show>
-                  <NavBar isAdmin={isAdmin} supportNotice={supportNotice} />
-                  <div className="flex flex-1 flex-col">{children}</div>
-                  {settings}
-                  {support}
+                  <AdminSupportInboxProvider initialCount={adminSupportCount}>
+                    <NavBar isAdmin={isAdmin} supportNotice={supportNotice} />
+                    <div className="flex flex-1 flex-col">{children}</div>
+                    {settings}
+                    {support}
+                  </AdminSupportInboxProvider>
                 </WalkthroughTriggerProvider>
               </DashboardNavGuardProvider>
             </ClerkLocaleProvider>
