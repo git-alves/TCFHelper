@@ -65,7 +65,6 @@ function render(props: { isAdmin?: boolean; count?: number | null }) {
 
 const bell = () => container.querySelector('[data-testid="admin-support-bell"]') as HTMLAnchorElement | null;
 const badge = () => container.querySelector('[data-testid="admin-support-bell-badge"]');
-const slot = () => container.querySelector('[data-testid="admin-support-bell-slot"]') as HTMLElement | null;
 
 beforeEach(() => {
   pushMock.mockClear();
@@ -93,16 +92,32 @@ describe("NavBar admin support bell", () => {
     expect(container.querySelector('a[href="/admin/support"]')).toBeNull();
   });
 
-  it("is rendered for the admin when there are new tickets, outside the account menu, right before the learner support icon", () => {
+  it("renders the bell itself, a flex child right before the Support icon, when there are new tickets", () => {
     render({ isAdmin: true, count: 2 });
 
+    const support = container.querySelector('a[href="/support"]')!;
     expect(bell()).not.toBeNull();
     expect(bell()!.getAttribute("href")).toBe("/admin/support");
-    const support = container.querySelector('a[href="/support"]')!;
-    // The bell lives in its slot, and the slot is the support icon's previous sibling.
-    expect(bell()!.parentElement!.nextElementSibling).toBe(support);
+    // Directly before Support, with no wrapper or placeholder in between.
+    expect(bell()!.nextElementSibling).toBe(support);
+    expect(bell()!.parentElement).toBe(support.parentElement);
     // The Admin entry in the account menu is a separate, existing control.
     expect(bell()!.closest('[data-walkthrough="nav-settings"]')).toBeNull();
+  });
+
+  it("is a 44px target with a 20px glyph, the icon-button look and a visible keyboard focus ring", () => {
+    render({ isAdmin: true, count: 2 });
+
+    const classes = bell()!.className;
+    expect(classes).toContain("h-11");
+    expect(classes).toContain("w-11");
+    expect(classes).toContain("rounded-full");
+    expect(classes).toContain("text-zinc-600");
+    expect(classes).toContain("hover:bg-black/[.04]");
+    expect(classes).toContain("focus-visible:ring-2");
+    expect(classes).toContain("focus-visible:ring-violet-500");
+    expect(classes).toContain("focus-visible:ring-offset-2");
+    expect(bell()!.querySelector("svg")!.getAttribute("class")).toContain("h-5 w-5");
   });
 
   it("shows no bell at all when there are no new tickets", () => {
@@ -122,24 +137,34 @@ describe("NavBar admin support bell", () => {
     expect(container.querySelector('[role="alert"]')).toBeNull();
   });
 
-  it("keeps the bell's room reserved for the admin so the nav does not shift when it appears or goes", () => {
-    render({ isAdmin: true, count: 0 });
-    const slotWithoutBell = slot()!;
-    expect(slotWithoutBell.className).toContain("w-9");
-    expect(slotWithoutBell.className).toContain("h-9");
-    expect(slotWithoutBell.children).toHaveLength(0);
+  it("leaves no bell node, slot or empty space at 0 or unknown, so Support sits where it always does", () => {
+    for (const count of [0, null]) {
+      render({ isAdmin: true, count });
 
-    render({ isAdmin: true, count: 3 });
-    const slotWithBell = slot()!;
-    // The very same slot, the same size, now holding the bell.
-    expect(slotWithBell.className).toBe(slotWithoutBell.className);
-    expect(slotWithBell.querySelector('[data-testid="admin-support-bell"]')).not.toBeNull();
+      expect(container.querySelector('[data-testid="admin-support-bell"]')).toBeNull();
+      expect(container.querySelector('[data-testid="admin-support-bell-slot"]')).toBeNull();
+      expect(container.querySelector('a[href="/admin/support"]')).toBeNull();
+      // Nothing sits between the Support icon and the node before it except the normal gap.
+      const support = container.querySelector('a[href="/support"]')!;
+      expect(support.previousElementSibling?.getAttribute("data-testid") ?? null).toBeNull();
+      expect(support.previousElementSibling?.className ?? "").not.toContain("w-9");
+    }
   });
 
-  it("reserves no room, and renders no slot, for a non-admin", () => {
-    render({ isAdmin: false, count: 0 });
+  it("reserves nothing for a non-admin either", () => {
+    render({ isAdmin: false, count: 3 });
 
-    expect(slot()).toBeNull();
+    expect(container.querySelector('[data-testid="admin-support-bell-slot"]')).toBeNull();
+    expect(bell()).toBeNull();
+  });
+
+  it("puts the right-hand group on shrink-0 so Bell, Support and the account button wrap together", () => {
+    render({ isAdmin: true, count: 2 });
+
+    const group = bell()!.parentElement!;
+    expect(group.className).toContain("shrink-0");
+    expect(group.className).toContain("gap-2");
+    expect(group.className).toContain("sm:gap-3");
   });
 
   it("shows the count in a badge and in the accessible label", () => {
@@ -147,6 +172,10 @@ describe("NavBar admin support bell", () => {
 
     expect(badge()!.textContent).toBe("3");
     expect(badge()!.getAttribute("aria-hidden")).toBe("true");
+    // Inside the 44px target, readable on both themes.
+    for (const klass of ["right-1", "top-1", "h-4", "min-w-4", "px-1", "text-[10px]", "ring-2", "ring-background"]) {
+      expect(badge()!.className).toContain(klass);
+    }
     expect(bell()!.getAttribute("aria-label")).toBe("Support inbox — 3 new tickets");
     expect(bell()!.getAttribute("title")).toBe("Support inbox — 3 new tickets");
   });
@@ -233,8 +262,7 @@ describe("NavBar admin support bell", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(bell()).toBeNull();
     expect(badge()).toBeNull();
-    // The reserved slot stays, empty, so nothing around it moves.
-    expect(slot()!.children).toHaveLength(0);
+    expect(container.querySelector('[data-testid="admin-support-bell-slot"]')).toBeNull();
   });
 
   it("the bell stays when the visit could not be recorded", async () => {

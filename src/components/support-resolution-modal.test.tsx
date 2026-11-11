@@ -122,6 +122,36 @@ describe("SupportResolutionModal", () => {
     expect(document.activeElement).toBe(button("It worked"));
   });
 
+  it("sizes the answers like ConfirmDialog: compact, right-aligned from sm up, full width and stacked below it", () => {
+    render();
+
+    const row = button("It worked").parentElement!;
+    expect(row.className).toBe("mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end");
+
+    const primary = button("It worked").className;
+    const secondary = button("I still have the problem").className;
+    for (const classes of [primary, secondary]) {
+      expect(classes).not.toContain("flex-1");
+      expect(classes).not.toContain("rounded-xl");
+      expect(classes).not.toContain("py-2.5");
+      for (const klass of ["w-full", "sm:w-auto", "rounded-full", "px-4", "py-1.5", "text-sm", "font-medium"]) {
+        expect(classes.split(" ")).toContain(klass);
+      }
+      for (const klass of [
+        "focus-visible:outline-none",
+        "focus-visible:ring-2",
+        "focus-visible:ring-violet-500",
+        "focus-visible:ring-offset-2",
+      ]) {
+        expect(classes.split(" ")).toContain(klass);
+      }
+    }
+    // Primary stays the violet fill; the second stays outlined.
+    expect(primary).toContain("bg-violet-700");
+    expect(secondary).toContain("border");
+    expect(secondary).not.toContain("bg-violet-700");
+  });
+
   it('"It worked" and "I still have the problem" report their own answer and nothing else', () => {
     render();
 
