@@ -49,6 +49,38 @@ function FileIcon() {
   );
 }
 
+/** The confirmation shown right after a request is stored, with its ticket number. */
+export function SupportSentConfirmation({
+  ticketNumber,
+  onSendAnother,
+}: {
+  ticketNumber: number | null;
+  onSendAnother: () => void;
+}) {
+  const copy = useAppCopy();
+
+  return (
+    <section className="flex min-h-72 flex-col items-start justify-center py-8" aria-live="polite">
+      <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6">
+          <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4.5 4.5L19 7" />
+        </svg>
+      </div>
+      <h2 className="mt-4 text-xl font-semibold tracking-tight">
+        {ticketNumber === null ? copy.support.successTitle : copy.support.successTicketTitle({ number: ticketNumber })}
+      </h2>
+      <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-600 dark:text-zinc-400">{copy.support.successDescription}</p>
+      <button
+        type="button"
+        onClick={onSendAnother}
+        className="mt-6 rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+      >
+        {copy.support.sendAnother}
+      </button>
+    </section>
+  );
+}
+
 export function SupportForm({ email, name }: SupportFormProps) {
   const copy = useAppCopy();
   const { locale } = useAppLocale();
@@ -65,6 +97,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
   const [invalidField, setInvalidField] = useState<InvalidField>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [ticketNumber, setTicketNumber] = useState<number | null>(null);
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
 
   const isDirty = category !== "" || details.trim() !== "" || attachment !== null || draft.attachmentName !== null;
@@ -155,6 +188,10 @@ export function SupportForm({ email, name }: SupportFormProps) {
       const response = await fetch("/api/support", { method: "POST", body });
       if (!response.ok) throw new Error("Support request failed");
 
+      // The number is only a nicety on the confirmation: a response without
+      // one (or an unreadable body) must not turn a stored request into an error.
+      const created = (await response.json().catch(() => null)) as { ticketNumber?: unknown } | null;
+      setTicketNumber(typeof created?.ticketNumber === "number" ? created.ticketNumber : null);
       setIsSent(true);
       writeDraft(EMPTY_SUPPORT_DRAFT);
       clearAttachment();
@@ -166,24 +203,7 @@ export function SupportForm({ email, name }: SupportFormProps) {
   }
 
   if (isSent) {
-    return (
-      <section className="flex min-h-72 flex-col items-start justify-center py-8" aria-live="polite">
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" className="h-6 w-6">
-            <path strokeLinecap="round" strokeLinejoin="round" d="m5 12 4.5 4.5L19 7" />
-          </svg>
-        </div>
-        <h2 className="mt-4 text-xl font-semibold tracking-tight">{copy.support.successTitle}</h2>
-        <p className="mt-2 max-w-lg text-sm leading-6 text-zinc-600 dark:text-zinc-400">{copy.support.successDescription}</p>
-        <button
-          type="button"
-          onClick={() => setIsSent(false)}
-          className="mt-6 rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
-        >
-          {copy.support.sendAnother}
-        </button>
-      </section>
-    );
+    return <SupportSentConfirmation ticketNumber={ticketNumber} onSendAnother={() => setIsSent(false)} />;
   }
 
   return (

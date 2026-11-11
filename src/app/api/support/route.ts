@@ -204,9 +204,9 @@ export async function POST(request: Request) {
             details: parsed.data.details.trim(),
             ...(attachment ? { attachment: { create: attachment } } : {}),
           },
-          select: { id: true },
+          select: { id: true, ticketNumber: true },
         });
-        return { kind: "created", id: created.id } as const;
+        return { kind: "created", id: created.id, ticketNumber: created.ticketNumber } as const;
       },
       { timeout: RATE_LIMIT_TRANSACTION_TIMEOUT_MS },
     );
@@ -237,7 +237,7 @@ export async function POST(request: Request) {
       }
     }
 
-    return response({ id: created.id }, 201);
+    return response({ id: created.id, ticketNumber: created.ticketNumber }, 201);
   } catch {
     return unavailableResponse();
   }

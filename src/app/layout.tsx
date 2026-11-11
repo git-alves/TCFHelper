@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Show } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AdminSupportInboxProvider } from "@/components/admin-support-inbox-count";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
@@ -11,8 +12,9 @@ import { NavBar } from "@/components/nav-bar";
 import { TimezoneReporter } from "@/components/timezone-reporter";
 import { WalkthroughTriggerProvider } from "@/components/walkthrough-trigger";
 import { getAppCopy } from "@/lib/app-copy";
-import { getCurrentAdminUser } from "@/lib/app-user";
+import { getCurrentAppUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
+import { getNavSupportState } from "@/lib/support-inbox";
 import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
 import { REVEAL_INIT_SCRIPT } from "@/lib/reveal-init-script";
 
@@ -47,14 +49,21 @@ export default async function RootLayout({
   settings: React.ReactNode;
   support: React.ReactNode;
 }>) {
-  const [locale, adminUser] = await Promise.all([
+  const [locale, appUser] = await Promise.all([
     getRequestLocale(),
     // A temporary lookup failure must not take down every page in the app --
     // just hide the nav's Admin link, same as the home page's blocked-user
-    // check fails closed rather than failing the render.
-    getCurrentAdminUser().catch(() => null),
+    // check fails closed rather than failing the render. The one lookup also
+    // answers the Admin-link question (what getCurrentAdminUser does).
+    getCurrentAppUser().catch(() => null),
   ]);
-  const isAdmin = adminUser !== null;
+  const isAdmin = appUser?.isAdmin === true;
+  // The learner's support-resolution notice and the admin's new-ticket count
+  // ride on this render instead of requests from the browser: a few indexed
+  // lookups per full page load, nothing on client-side navigations and no
+  // polling. The count query runs for the admin account only. Each fails soft
+  // like the lookup above: no dot or badge is better than no page.
+  const { supportNotice, adminSupportCount } = await getNavSupportState(appUser);
 
   return (
     <html
@@ -89,10 +98,12 @@ export default async function RootLayout({
                   <Show when="signed-in">
                     <TimezoneReporter />
                   </Show>
-                  <NavBar isAdmin={isAdmin} />
-                  <div className="flex flex-1 flex-col">{children}</div>
-                  {settings}
-                  {support}
+                  <AdminSupportInboxProvider initialCount={adminSupportCount}>
+                    <NavBar isAdmin={isAdmin} supportNotice={supportNotice} />
+                    <div className="flex flex-1 flex-col">{children}</div>
+                    {settings}
+                    {support}
+                  </AdminSupportInboxProvider>
                 </WalkthroughTriggerProvider>
               </DashboardNavGuardProvider>
             </ClerkLocaleProvider>

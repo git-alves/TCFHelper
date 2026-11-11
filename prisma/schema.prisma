@@ -108,6 +108,20 @@ enum SupportRequestCategory {
   OTHER
 }
 
+// Whether an admin has marked a support request resolved. A learner who says
+// the problem is still there (SupportResolutionFeedback.STILL_BROKEN) puts it
+// back to OPEN; resolvedAt, resolutionNote and the feedback are kept so the
+// admin still sees the earlier resolution.
+enum SupportRequestStatus {
+  OPEN
+  RESOLVED
+}
+
+enum SupportResolutionFeedback {
+  WORKED
+  STILL_BROKEN
+}
+
 model User {
   id                          String    @id @default(cuid())
   email                       String    @unique
@@ -160,6 +174,10 @@ model User {
   // column shipped, so admin displays must fall back to UTC rather than
   // assume every row has one.
   timezone                    String?
+  // When the admin last opened /admin/support. Tickets opened, or reopened by
+  // the learner, after this are "new" for the admin's nav bell; null means
+  // every open ticket is new. Only the owner account ever has a value.
+  supportInboxSeenAt          DateTime?
 
   subscriptions           Subscription[]
   essays                  Essay[]
@@ -656,13 +674,32 @@ model PromptOverride {
 /// submission-time snapshot: the owner can answer the address the learner saw
 /// in "Send as", even if the account profile changes before triage.
 model SupportRequest {
-  id          String                 @id @default(cuid())
-  userId      String
-  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  senderEmail String
-  category    SupportRequestCategory
-  details     String
-  createdAt   DateTime               @default(now())
+  id                        String                     @id @default(cuid())
+  userId                    String
+  user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  senderEmail               String
+  category                  SupportRequestCategory
+  details                   String
+  createdAt                 DateTime                   @default(now())
+  // The human-readable, sequential ticket number ("nº 42"). Backed by a
+  // database sequence so concurrent requests, and a deployment that does not
+  // know about this column yet, still get unique values; existing rows were
+  // numbered by createdAt order when the column was added. A rolled-back
+  // insert can leave a gap, but a number is never reused.
+  ticketNumber              Int                        @unique @default(autoincrement())
+  status                    SupportRequestStatus       @default(OPEN)
+  // The most recent resolution. All of these survive a reopen (the learner
+  // saying STILL_BROKEN) so the admin keeps seeing what was tried; resolving
+  // again starts a fresh cycle (see resolveSupportRequest).
+  resolvedAt                DateTime?
+  resolutionNote            String?
+  // When the learner first opened the resolution notice.
+  noticeSeenAt              DateTime?
+  // When the notice stopped being pending: the learner answered it or closed
+  // it with the X. A dismissed notice never comes back.
+  noticeDismissedAt         DateTime?
+  resolutionFeedback        SupportResolutionFeedback?
+  feedbackAt                DateTime?
   // Set once the request has been fully mirrored to HubSpot (ticket, contact
   // association, and attachment note if any). Null means either sync hasn't
   // run yet, HubSpot isn't configured, or every attempt so far has failed --
@@ -670,21 +707,27 @@ model SupportRequest {
   // blocks anything the learner or admin does here. The retry cron
   // (/api/cron/hubspot-support-sync-retry) re-attempts rows where this is
   // still null.
-  hubspotTicketId String?
+  hubspotTicketId           String?
   // Set once the attachment has been uploaded to HubSpot, independently of
   // hubspotAttachmentSyncedAt below, so a retry after a failure creating the
   // attachment note never re-uploads the file (HubSpot's Files API has no
   // dedupe key of its own to prevent that).
-  hubspotAttachmentFileId String?
+  hubspotAttachmentFileId   String?
   // Set once the ticket's attachment note has been created, independently of
   // hubspotSyncedAt, so a retry after a failure elsewhere in the sync never
   // creates a duplicate note.
   hubspotAttachmentSyncedAt DateTime?
   hubspotSyncedAt           DateTime?
-  hubspotSyncAttempts       Int        @default(0)
+  hubspotSyncAttempts       Int                        @default(0)
   hubspotLastSyncError      String?
 
   attachment SupportAttachment?
+  // The learner's pending-notice lookup also has a partial index,
+  // "SupportRequest_pendingNotice_idx" ON ("userId", "resolvedAt",
+  // "ticketNumber") WHERE "status" = 'RESOLVED' AND "noticeDismissedAt" IS NULL.
+  // Prisma cannot express a partial index, so it is created in the migration
+  // only (see 20261112120000_add_support_ticket_resolution); only tickets
+  // with a pending notice ever sit in it.
 
   @@index([createdAt, id])
   @@index([userId, createdAt])

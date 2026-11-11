@@ -76,7 +76,7 @@ beforeEach(() => {
   getCurrentAppUserMock.mockResolvedValue({ id: "learner_1", email: "learner@example.com", name: "Ada Lovelace" });
   countMock.mockResolvedValue(0);
   txCountMock.mockResolvedValue(0);
-  txCreateMock.mockResolvedValue({ id: "support_1" });
+  txCreateMock.mockResolvedValue({ id: "support_1", ticketNumber: 42 });
   executeRawMock.mockResolvedValue(undefined);
   // Sequential by default: runs the callback against a tx stub immediately.
   // The concurrency test below replaces this with a real serializing
@@ -161,7 +161,7 @@ describe("POST /api/support", () => {
     });
     txCreateMock.mockImplementation(async () => {
       calls.push("create");
-      return { id: "support_1" };
+      return { id: "support_1", ticketNumber: 42 };
     });
 
     const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
@@ -267,7 +267,7 @@ describe("POST /api/support", () => {
     );
 
     expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toEqual({ id: "support_1" });
+    await expect(response.json()).resolves.toEqual({ id: "support_1", ticketNumber: 42 });
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(txCreateMock).toHaveBeenCalledWith({
       data: {
@@ -276,7 +276,7 @@ describe("POST /api/support", () => {
         category: "FEATURE_REQUEST_FEEDBACK",
         details: "Add keyboard shortcuts.",
       },
-      select: { id: true },
+      select: { id: true, ticketNumber: true },
     });
   });
 
@@ -443,7 +443,7 @@ describe("POST /api/support", () => {
     const response = await POST(supportRequest({ category: ["BUG"], details: ["The editor freezes."] }));
 
     expect(response.status).toBe(201);
-    await expect(response.json()).resolves.toEqual({ id: "support_1" });
+    await expect(response.json()).resolves.toEqual({ id: "support_1", ticketNumber: 42 });
     expect(consoleErrorSpy).toHaveBeenCalledWith("HubSpot support sync failed", "HubSpot is down");
 
     consoleErrorSpy.mockRestore();
