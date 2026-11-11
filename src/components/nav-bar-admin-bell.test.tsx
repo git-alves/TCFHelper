@@ -65,6 +65,7 @@ function render(props: { isAdmin?: boolean; count?: number | null }) {
 
 const bell = () => container.querySelector('[data-testid="admin-support-bell"]') as HTMLAnchorElement | null;
 const badge = () => container.querySelector('[data-testid="admin-support-bell-badge"]');
+const slot = () => container.querySelector('[data-testid="admin-support-bell-slot"]') as HTMLElement | null;
 
 beforeEach(() => {
   pushMock.mockClear();
@@ -92,31 +93,53 @@ describe("NavBar admin support bell", () => {
     expect(container.querySelector('a[href="/admin/support"]')).toBeNull();
   });
 
-  it("is rendered for the admin, outside the account menu, right before the learner support icon", () => {
-    render({ isAdmin: true, count: 0 });
+  it("is rendered for the admin when there are new tickets, outside the account menu, right before the learner support icon", () => {
+    render({ isAdmin: true, count: 2 });
 
     expect(bell()).not.toBeNull();
     expect(bell()!.getAttribute("href")).toBe("/admin/support");
     const support = container.querySelector('a[href="/support"]')!;
-    expect(bell()!.nextElementSibling).toBe(support);
+    // The bell lives in its slot, and the slot is the support icon's previous sibling.
+    expect(bell()!.parentElement!.nextElementSibling).toBe(support);
     // The Admin entry in the account menu is a separate, existing control.
     expect(bell()!.closest('[data-walkthrough="nav-settings"]')).toBeNull();
   });
 
-  it("stays calm at zero: still there, labelled, but no badge", () => {
+  it("shows no bell at all when there are no new tickets", () => {
     render({ isAdmin: true, count: 0 });
 
-    expect(bell()).not.toBeNull();
+    expect(bell()).toBeNull();
     expect(badge()).toBeNull();
-    expect(bell()!.getAttribute("aria-label")).toBe("Support inbox");
+    expect(container.querySelector('a[href="/admin/support"]')).toBeNull();
+    expect(container.querySelector('button[aria-label^="Support inbox"]')).toBeNull();
   });
 
-  it("shows no badge and no error when the count is unknown (the lookup failed)", () => {
+  it("shows no bell, and no error, when the count is unknown (the lookup failed)", () => {
     render({ isAdmin: true, count: null });
 
-    expect(bell()).not.toBeNull();
-    expect(badge()).toBeNull();
-    expect(bell()!.getAttribute("aria-label")).toBe("Support inbox");
+    expect(bell()).toBeNull();
+    expect(container.querySelector('a[href="/admin/support"]')).toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
+  it("keeps the bell's room reserved for the admin so the nav does not shift when it appears or goes", () => {
+    render({ isAdmin: true, count: 0 });
+    const slotWithoutBell = slot()!;
+    expect(slotWithoutBell.className).toContain("w-9");
+    expect(slotWithoutBell.className).toContain("h-9");
+    expect(slotWithoutBell.children).toHaveLength(0);
+
+    render({ isAdmin: true, count: 3 });
+    const slotWithBell = slot()!;
+    // The very same slot, the same size, now holding the bell.
+    expect(slotWithBell.className).toBe(slotWithoutBell.className);
+    expect(slotWithBell.querySelector('[data-testid="admin-support-bell"]')).not.toBeNull();
+  });
+
+  it("reserves no room, and renders no slot, for a non-admin", () => {
+    render({ isAdmin: false, count: 0 });
+
+    expect(slot()).toBeNull();
   });
 
   it("shows the count in a badge and in the accessible label", () => {
@@ -192,7 +215,7 @@ describe("NavBar admin support bell", () => {
     expect(disabled.getAttribute("aria-label")).toContain("Support inbox — 2 new tickets — ");
   });
 
-  it("drops to zero once the inbox visit is recorded, without a reload", async () => {
+  it("the bell disappears once the inbox visit is recorded, without a reload", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) } as Response);
     global.fetch = fetchMock as unknown as typeof fetch;
     render({ isAdmin: true, count: 5 });
@@ -208,8 +231,26 @@ describe("NavBar admin support bell", () => {
     });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(bell()).toBeNull();
     expect(badge()).toBeNull();
-    expect(bell()!.getAttribute("aria-label")).toBe("Support inbox");
+    // The reserved slot stays, empty, so nothing around it moves.
+    expect(slot()!.children).toHaveLength(0);
+  });
+
+  it("the bell stays when the visit could not be recorded", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: async () => ({}) } as Response) as unknown as typeof fetch;
+
+    await act(async () => {
+      root.render(
+        <AdminSupportInboxProvider initialCount={5}>
+          <NavBar isAdmin />
+          <AdminSupportInboxSeen visitStartedAt="2026-11-12T09:30:00.000Z" />
+        </AdminSupportInboxProvider>,
+      );
+    });
+
+    expect(bell()).not.toBeNull();
+    expect(badge()!.textContent).toBe("5");
   });
 });
 
