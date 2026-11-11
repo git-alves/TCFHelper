@@ -105,4 +105,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // previous deployment's inserts keep working because every new column is
   // nullable or has a permanent default.
   "20261112120000_add_support_ticket_resolution",
+  // A single nullable User column recording when the admin last opened the
+  // support inbox. No existing row is touched: null means "never opened",
+  // which is true of every existing account.
+  "20261113120000_add_user_support_inbox_seen_at",
 ]);
