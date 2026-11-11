@@ -10,6 +10,18 @@ function response(status: number, headers: Record<string, string> = {}) {
   return { status, ok: status >= 200 && status < 300, headers: new Headers(headers) } as Response;
 }
 
+// A 503 whose body can be observed: cancel() is recorded, never read.
+function responseWithBody(status: number, cancel: () => Promise<void> = async () => undefined) {
+  const cancelSpy = vi.fn(cancel);
+  const res = {
+    status,
+    ok: status >= 200 && status < 300,
+    headers: new Headers(),
+    body: { cancel: cancelSpy },
+  } as unknown as Response;
+  return { res, cancelSpy };
+}
+
 // A deterministic clock: sleeping advances it, and each send can take time.
 function makeClock() {
   let current = 1_000_000;
@@ -266,6 +278,89 @@ describe("sendWithOverloadRetry", () => {
       }),
     ).rejects.toBe(failure);
     expect(send).toHaveBeenCalledTimes(2);
+  });
+
+  describe("response bodies", () => {
+    const options = (clock: ReturnType<typeof makeClock>, extra: object = {}) => ({
+      label: "Test call",
+      attemptTimeoutMs,
+      now: clock.now,
+      sleep: clock.sleep,
+      random: () => 0.5,
+      ...extra,
+    });
+
+    it("cancels the body of each 503 a retry replaces, but not the final response", async () => {
+      const clock = makeClock();
+      const first = responseWithBody(503);
+      const second = responseWithBody(503);
+      const third = responseWithBody(503);
+      const send = vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(first.res)
+        .mockResolvedValueOnce(second.res)
+        .mockResolvedValueOnce(third.res);
+
+      const result = await sendWithOverloadRetry(send, options(clock));
+
+      expect(result).toBe(third.res);
+      expect(first.cancelSpy).toHaveBeenCalledTimes(1);
+      expect(second.cancelSpy).toHaveBeenCalledTimes(1);
+      expect(third.cancelSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not cancel the 503 returned when a retry is skipped for the time budget", async () => {
+      const clock = makeClock();
+      const only = responseWithBody(503);
+      const send = vi.fn<() => Promise<Response>>().mockResolvedValue(only.res);
+
+      const result = await sendWithOverloadRetry(send, options(clock, { totalBudgetMs: 46_000 }));
+
+      expect(result).toBe(only.res);
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(only.cancelSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not cancel a successful or non-503 response", async () => {
+      const clock = makeClock();
+      const ok = responseWithBody(200);
+      await sendWithOverloadRetry(vi.fn<() => Promise<Response>>().mockResolvedValue(ok.res), options(clock));
+      const rateLimited = responseWithBody(429);
+      await sendWithOverloadRetry(vi.fn<() => Promise<Response>>().mockResolvedValue(rateLimited.res), options(clock));
+
+      expect(ok.cancelSpy).not.toHaveBeenCalled();
+      expect(rateLimited.cancelSpy).not.toHaveBeenCalled();
+    });
+
+    it("does not throw, and still retries, when cancelling a body rejects or throws", async () => {
+      const clock = makeClock();
+      const rejecting = responseWithBody(503, () => Promise.reject(new Error("locked")));
+      const throwing = responseWithBody(503, () => {
+        throw new Error("sync failure");
+      });
+      const send = vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce(rejecting.res)
+        .mockResolvedValueOnce(throwing.res)
+        .mockResolvedValueOnce(response(200));
+
+      const result = await sendWithOverloadRetry(send, options(clock));
+
+      expect(result.status).toBe(200);
+      expect(send).toHaveBeenCalledTimes(3);
+      expect(rejecting.cancelSpy).toHaveBeenCalledTimes(1);
+      expect(throwing.cancelSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("tolerates a response with no body", async () => {
+      const clock = makeClock();
+      const send = vi
+        .fn<() => Promise<Response>>()
+        .mockResolvedValueOnce({ status: 503, ok: false, headers: new Headers() } as Response)
+        .mockResolvedValueOnce(response(200));
+
+      await expect(sendWithOverloadRetry(send, options(clock))).resolves.toMatchObject({ status: 200 });
+    });
   });
 
   it("waits on real timers by default, 2s then 5s, under fake timers", async () => {

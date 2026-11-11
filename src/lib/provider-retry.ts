@@ -48,10 +48,20 @@ function parseRetryAfterMs(response: Response, now: number): number | undefined 
   return Number.isNaN(date) ? undefined : Math.max(0, date - now);
 }
 
+/** Best-effort, never throws and never reads the body. */
+function discardBody(response: Response) {
+  try {
+    void Promise.resolve(response.body?.cancel()).catch(() => undefined);
+  } catch {
+    // A body that cannot be cancelled is not worth failing the retry for.
+  }
+}
+
 /**
  * Calls `send` and, while the response is a 503, retries per the policy above.
  * Resolves with the last response (still a 503 when every retry was used up or
- * skipped); never inspects or consumes a body.
+ * skipped), whose body is left untouched for the caller. Only a 503 that a retry
+ * replaces has its body cancelled, unread.
  */
 export async function sendWithOverloadRetry(
   send: () => Promise<Response>,
@@ -75,6 +85,12 @@ export async function sendWithOverloadRetry(
     }
 
     console.error(`${options.label} overloaded (503), retrying (attempt ${attempt}) in ${waitMs}ms`);
+    // This response is about to be replaced and will never be read. Release
+    // its body without reading it so the connection is freed promptly, which
+    // matters most while the provider is overloaded. Only a response that a
+    // retry replaces is cancelled: the last one is returned to the caller,
+    // who still reads it.
+    discardBody(response);
     await sleep(waitMs);
     response = await send();
   }
