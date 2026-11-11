@@ -98,4 +98,11 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // changes meaning, and the previous deployment, which never writes it, is
   // unaffected.
   "20261111120000_add_correction_output_truncated_reason",
+  // New nullable columns, a status column defaulting to 'OPEN', and a
+  // sequence-backed ticketNumber on SupportRequest. The only data write fills
+  // the new ticketNumber column from existing createdAt order; no existing
+  // column of any row changes, so no row changes meaning. The still-live
+  // previous deployment's inserts keep working because every new column is
+  // nullable or has a permanent default.
+  "20261112120000_add_support_ticket_resolution",
 ]);

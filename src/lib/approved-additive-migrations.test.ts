@@ -114,6 +114,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261023120000_add_user_last_sign_in");
   });
 
+  it("allows the additive support-ticket resolution migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261112120000_add_support_ticket_resolution");
+  });
+
   it("allows the additive output_truncated AdminEvent reason-code migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261111120000_add_correction_output_truncated_reason");
   });
