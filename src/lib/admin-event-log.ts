@@ -588,6 +588,54 @@ export async function getAdminEventLogPage(
   };
 }
 
+// The most events one .txt export will contain. This is the first, cheap
+// guard: it keeps the export to one indexed read of at most cap + 1 rows. It
+// does NOT by itself bound the file's size (a row's text depends on its
+// values, and a multi-byte character is up to four bytes), so the route also
+// measures the finished body against MAX_ADMIN_LOG_EXPORT_BYTES.
+export const MAX_ADMIN_LOG_EXPORT_ROWS = 5_000;
+
+// The most UTF-8 bytes one .txt export may be. A Vercel function response is
+// limited to 4.5 MB; stopping at 4,000,000 leaves headroom for headers and
+// encoding. An ordinary 5,000-event export is about 2 MB, so this only ever
+// refuses an export that would otherwise have failed at the platform.
+export const MAX_ADMIN_LOG_EXPORT_BYTES = 4_000_000;
+
+export type AdminEventLogExport =
+  | { truncated: true }
+  | { truncated: false; events: AdminEventLogItem[]; retentionCutoff: string };
+
+/**
+ * Every event the filters select, across all pages (page and limit are
+ * ignored), newest first, for the .txt export. One bounded read: cap + 1 rows
+ * over the same window, filter and index the page uses, so exceeding the cap
+ * is detected without counting or scanning more. It reports `truncated`
+ * instead of ever returning a partial list.
+ */
+export async function getAdminEventLogForExport(
+  query: AdminEventLogQuery,
+  now = new Date(),
+): Promise<AdminEventLogExport> {
+  const where = await adminEventWhere(query, now);
+  const records = await prisma.adminEvent.findMany({
+    where,
+    select: ADMIN_EVENT_SELECT,
+    orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
+    take: MAX_ADMIN_LOG_EXPORT_ROWS + 1,
+  });
+  if (records.length > MAX_ADMIN_LOG_EXPORT_ROWS) return { truncated: true };
+
+  const emailByUserId = await emailsForUserIds(
+    records.map((record) => safeOpaqueId(record.userId)).filter((userId): userId is string => userId !== null),
+  );
+
+  return {
+    truncated: false,
+    events: records.map((record) => serializeAdminEvent(record, emailByUserId)),
+    retentionCutoff: getAdminEventRetentionCutoff(now).toISOString(),
+  };
+}
+
 const RECENT_ADMIN_EVENTS_LIMIT = 8;
 
 /**
@@ -624,3 +672,22 @@ export function adminEventLogHref(filters: AdminEventLogFilterValues, page: numb
   }
   return `/admin/logs?${params.toString()}`;
 }
+
+/**
+ * The export link for the current filters: the same parameters as the page,
+ * minus pagination (an export always covers every page).
+ */
+export function adminEventLogExportHref(filters: AdminEventLogFilterValues) {
+  const params = new URLSearchParams({
+    range: filters.range,
+    severity: filters.severity ?? "all",
+    module: filters.module ?? "all",
+  });
+  if (filters.q) params.set("q", filters.q);
+  if (filters.range === "custom" && filters.from && filters.to) {
+    params.set("from", filters.from);
+    params.set("to", filters.to);
+  }
+  return `/api/admin/logs/export?${params.toString()}`;
+}
+

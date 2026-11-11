@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { AdminEventLogFilters } from "@/components/admin-event-log-filters";
 import { AdminEventLogTable } from "@/components/admin-event-log-table";
+import { AdminExportCsvButton } from "@/components/admin-export-csv-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import {
   AdminEventLogQueryError,
   AdminEventLogSearchTooBroadError,
+  adminEventLogExportHref,
   adminEventLogHref,
   getAdminEventLogPage,
   parseAdminEventLogQuery,
@@ -76,6 +78,14 @@ export default async function AdminLogsPage({ searchParams }: AdminLogsPageProps
             <div className="flex flex-wrap items-center gap-3 text-sm text-zinc-600 dark:text-zinc-400">
               <span>Retention cutoff: {formatUtc(eventPage.retentionCutoff)} UTC</span>
               {eventPage.pageCount > 1 && <span>Page {eventPage.page} of {eventPage.pageCount}</span>}
+              {eventPage.total > 0 && (
+                <AdminExportCsvButton
+                  href={adminEventLogExportHref(eventPage.filters)}
+                  label="Export .txt"
+                  fallbackFilename="tcflab-logs.txt"
+                  hint="Exports all events matching the current filters."
+                />
+              )}
             </div>
           </div>
 

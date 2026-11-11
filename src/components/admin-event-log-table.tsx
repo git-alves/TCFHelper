@@ -1,12 +1,6 @@
 import Link from "next/link";
 import type { AdminEventLogItem } from "@/lib/admin-event-log";
-
-const MODULE_LABELS: Record<string, string> = {
-  ESSAY_SERVICE: "AI services",
-  QUOTA_ACCESS: "Quotas & access",
-  AUTH_SECURITY: "Authentication",
-  SYSTEM_INTEGRATION: "System & integrations",
-};
+import { ADMIN_EVENT_MODULE_LABELS, adminEventContextItems } from "@/lib/admin-event-log-display";
 
 const SEVERITY_CLASSES: Record<string, string> = {
   INFO: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
@@ -28,43 +22,6 @@ function formatUtc(iso: string) {
   }).format(new Date(iso));
 }
 
-function contextItems(event: AdminEventLogItem) {
-  const items: { label: string; value: string; href?: string }[] = [];
-  if (event.userId) {
-    items.push({
-      label: "User",
-      value: event.userEmail ?? event.userId,
-      href: `/admin/users/${encodeURIComponent(event.userId)}`,
-    });
-  }
-  if (event.essayId) items.push({ label: "Essay", value: event.essayId });
-  if (event.accessCodeId) items.push({ label: "Access-code record", value: event.accessCodeId });
-  if (event.provider) items.push({ label: "Provider", value: event.provider });
-  if (event.model) items.push({ label: "Model", value: event.model });
-  if (event.reasonCode) items.push({ label: "Reason", value: event.reasonCode.replaceAll("_", " ") });
-  if (event.httpStatus !== null) items.push({ label: "HTTP", value: String(event.httpStatus) });
-  if (event.quotaWindow) {
-    const usage = event.usageValue === null ? "—" : event.usageValue.toLocaleString("en-US");
-    const limit = event.quotaLimit === null ? "—" : event.quotaLimit.toLocaleString("en-US");
-    items.push({ label: `${event.quotaWindow} quota`, value: `${usage} / ${limit}` });
-  }
-  if (event.maskedIp) {
-    items.push({ label: "Network", value: event.maskedIp });
-  }
-  if (event.browserFamily || event.deviceClass) {
-    const browser = event.browserFamily ?? "Other browser";
-    const device = event.deviceClass ? event.deviceClass.toLowerCase() : "other device";
-    items.push({ label: "Device", value: `${browser} on ${device}` });
-  }
-  if (event.distinctIpCount !== null && event.distinctIpCount !== undefined) {
-    items.push({ label: "Distinct IP addresses", value: String(event.distinctIpCount) });
-  }
-  if (event.securityWindowMinutes !== null && event.securityWindowMinutes !== undefined) {
-    items.push({ label: "Review window", value: `${event.securityWindowMinutes} minutes` });
-  }
-  return items;
-}
-
 export function AdminEventLogTable({ events }: { events: AdminEventLogItem[] }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-black/[.1] dark:border-white/[.15]">
@@ -81,7 +38,7 @@ export function AdminEventLogTable({ events }: { events: AdminEventLogItem[] }) 
         </thead>
         <tbody className="divide-y divide-black/[.08] dark:divide-white/[.1]">
           {events.map((event) => {
-            const context = contextItems(event);
+            const context = adminEventContextItems(event);
             return (
               <tr key={event.id}>
                 <td className="whitespace-nowrap px-4 py-3 align-top text-zinc-600 dark:text-zinc-400">
@@ -99,7 +56,7 @@ export function AdminEventLogTable({ events }: { events: AdminEventLogItem[] }) 
                   </span>
                 </td>
                 <td className="px-4 py-3 align-top text-zinc-600 dark:text-zinc-400">
-                  {MODULE_LABELS[event.module] ?? event.module}
+                  {ADMIN_EVENT_MODULE_LABELS[event.module] ?? event.module}
                 </td>
                 <td className="max-w-md px-4 py-3 align-top">
                   <p>{event.message}</p>
