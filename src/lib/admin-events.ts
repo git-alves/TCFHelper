@@ -56,10 +56,13 @@ export const ADMIN_EVENT_REASON_CODES = [
   // provider's content didn't even look like an attempted JSON
   // object/array (format_unsupported), looked like one but failed to
   // parse (invalid_json), or parsed but didn't match the production
-  // feedback schema (schema_invalid). See correction-provider.ts.
+  // feedback schema (schema_invalid). See correction-provider.ts. A response
+  // that was cut off at the provider's output-token limit is its own reason
+  // (output_truncated): the fix is a larger budget, not a different model.
   "format_unsupported",
   "invalid_json",
   "schema_invalid",
+  "output_truncated",
   "fallback_circuit_open",
   "provider_unavailable",
 ] as const;
@@ -375,6 +378,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
             "format_unsupported",
             "invalid_json",
             "schema_invalid",
+            "output_truncated",
             "provider_unavailable",
           ] as const,
           input.reasonCode,

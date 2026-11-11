@@ -92,4 +92,10 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // It does not touch Topic rows; the first live topic request reconciles
   // them transactionally after this compatible table exists.
   "20261110120000_add_starter_topic_bank_state",
+  // Widens the same AdminEvent closed-vocabulary check constraints to add one
+  // reasonCode value (output_truncated) for CORRECTION_PROVIDER_FAILED. Every
+  // previously valid value stays valid, so no existing row is rewritten or
+  // changes meaning, and the previous deployment, which never writes it, is
+  // unaffected.
+  "20261111120000_add_correction_output_truncated_reason",
 ]);

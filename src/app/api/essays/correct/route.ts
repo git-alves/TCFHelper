@@ -10,6 +10,7 @@ import {
   CorrectionProviderFormatUnsupportedError,
   CorrectionProviderInvalidJsonError,
   CorrectionProviderNotConfiguredError,
+  CorrectionProviderOutputTruncatedError,
   CorrectionProviderRateLimitedError,
   CorrectionProviderRequestError,
   CorrectionProviderTransportError,
@@ -138,6 +139,7 @@ function classifyCorrectionProviderFailure(error: unknown): AdminEventReasonCode
   // incompatible model apart from a transient/one-off malformed response.
   if (error instanceof CorrectionProviderFormatUnsupportedError) return "format_unsupported";
   if (error instanceof CorrectionProviderInvalidJsonError) return "invalid_json";
+  if (error instanceof CorrectionProviderOutputTruncatedError) return "output_truncated";
   if (error instanceof CorrectionProviderRequestError) return "upstream_http_error";
   if (error instanceof CorrectionProviderTransportError) return "transport_error";
   return "provider_unavailable";
