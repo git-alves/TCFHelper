@@ -2,6 +2,7 @@ import {
   DEFAULT_GEMINI_CORRECTION_MODEL,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
+  GeminiOutputTruncatedError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
@@ -41,14 +42,17 @@ export const geminiCorrectionProvider: CorrectionProvider = {
       if (error instanceof GeminiRateLimitedError) {
         throw new CorrectionProviderRateLimitedError(error.message);
       }
-      if (error instanceof GeminiCorrectionParseError) {
+      if (error instanceof GeminiCorrectionParseError || error instanceof GeminiOutputTruncatedError) {
         // Gemini's own responseSchema/responseMimeType:"application/json"
         // enforcement means it essentially never just ignores the
         // structured-output request and returns prose the way an
         // OpenRouter-routed model without native support might -- an
         // unparseable body here is a malformed/truncated JSON attempt, not
         // a "didn't try" case, so this always maps to the more specific
-        // invalid-JSON classification, never format-unsupported.
+        // invalid-JSON classification, never format-unsupported. An
+        // output-token cut-off (GeminiOutputTruncatedError) is reported the
+        // same way until it has a reason code of its own; the cause is in the
+        // platform log line gemini.ts writes.
         throw new CorrectionProviderInvalidJsonError();
       }
       if (error instanceof GeminiRequestError) {

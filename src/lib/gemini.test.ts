@@ -5,6 +5,7 @@ import {
   DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE,
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
+  GeminiOutputTruncatedError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
@@ -580,6 +581,111 @@ describe("gradeEssayWithGemini", () => {
 
     const [calledUrl] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(String(calledUrl)).toContain("/models/gemini-3.5-flash-lite:generateContent");
+  });
+
+  it("asks Gemini for 8192 output tokens so a long Tâche 3 correction is not cut off", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await gradeEssayWithGemini(correctionParams);
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(String(requestInit.body)).generationConfig.maxOutputTokens).toBe(8192);
+  });
+
+  it("does not log anything for a normal STOP response", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: JSON.stringify(feedback) }] } }],
+      }),
+    });
+
+    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  describe("output cut off at the token limit", () => {
+    const essaySentence = "Je pense que le télétravail change profondément notre façon de vivre ensemble.";
+
+    it("throws GeminiOutputTruncatedError and logs only the finish reason and token counts", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const truncated = JSON.stringify({ ...feedback, correctedText: essaySentence, modelVersion: essaySentence }).slice(0, 180);
+      mockFetchOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: truncated }] } }],
+          usageMetadata: { candidatesTokenCount: 4090, thoughtsTokenCount: 1200, totalTokenCount: 6900 },
+        }),
+      });
+
+      await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiOutputTruncatedError);
+
+      expect(consoleError).toHaveBeenCalledTimes(1);
+      const [line] = consoleError.mock.calls[0];
+      expect(line).toBe(
+        "Gemini correction output truncated finishReason=MAX_TOKENS candidatesTokenCount=4090 thoughtsTokenCount=1200 totalTokenCount=6900",
+      );
+      expect(consoleError.mock.calls.flat().join(" ")).not.toContain("télétravail");
+      expect(consoleError.mock.calls.flat().join(" ")).not.toContain("Marie");
+      consoleError.mockRestore();
+    });
+
+    it("throws GeminiOutputTruncatedError when MAX_TOKENS leaves no text at all", async () => {
+      const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      mockFetchOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          candidates: [{ finishReason: "MAX_TOKENS", content: { parts: [{ text: "", thought: false }] } }],
+          usageMetadata: { candidatesTokenCount: 0, thoughtsTokenCount: 4096, totalTokenCount: 5000 },
+        }),
+      });
+
+      await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiOutputTruncatedError);
+      expect(consoleError).toHaveBeenCalledWith(
+        "Gemini correction output truncated (no text) finishReason=MAX_TOKENS candidatesTokenCount=0 thoughtsTokenCount=4096 totalTokenCount=5000",
+      );
+      consoleError.mockRestore();
+    });
+
+    it("still reports empty text with a normal finish reason as a request failure", async () => {
+      mockFetchOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ candidates: [{ finishReason: "STOP", content: { parts: [{ text: "" }] } }] }),
+      });
+
+      await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiRequestError);
+    });
+  });
+
+  it("throws GeminiCorrectionParseError, and logs the finish reason, when non-JSON text ends with STOP", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: "not json: Bonjour Marie" }] } }],
+        usageMetadata: { candidatesTokenCount: 12, totalTokenCount: 700 },
+      }),
+    });
+
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiCorrectionParseError);
+    expect(consoleError).toHaveBeenCalledWith(
+      "Gemini correction response was not valid JSON finishReason=STOP candidatesTokenCount=12 thoughtsTokenCount=unknown totalTokenCount=700",
+    );
+    expect(consoleError.mock.calls.flat().join(" ")).not.toContain("Bonjour");
+    consoleError.mockRestore();
   });
 
   it("throws GeminiCorrectionParseError when Gemini's text isn't valid JSON", async () => {

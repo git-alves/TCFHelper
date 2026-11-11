@@ -834,6 +834,29 @@ describe("POST /api/essays/correct", () => {
     expect(completeCorrectionClaimMock).not.toHaveBeenCalled();
   });
 
+  it("answers 502 and records invalid_json when a Tâche 3 correction is cut off at the token limit", async () => {
+    findUniqueMock.mockResolvedValue({
+      id: "topic_t3",
+      taskType: "TASK_3",
+      source: "OFFICIAL_EXAM",
+      prompt: "Le télétravail généralisé\n\nDocument 1 :\nPour.\n\nDocument 2 :\nContre.",
+    });
+    // The Gemini provider reports a MAX_TOKENS truncation as this existing error.
+    gradeEssayMock.mockRejectedValue(new CorrectionProviderInvalidJsonError());
+
+    const response = await post({ taskType: "TASK_3", topicId: "topic_t3", content: VALID_TASK_3_CONTENT });
+
+    expect(response.status).toBe(502);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: "CORRECTION_PROVIDER_FAILED",
+        reasonCode: "invalid_json",
+        httpStatus: 502,
+      }),
+    );
+    expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
   it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {
     findUniqueMock.mockResolvedValue({
       id: "generated_topic_1",

@@ -17,6 +17,7 @@ vi.mock("@/lib/gemini", async () => {
 const {
   GeminiCorrectionParseError,
   GeminiNotConfiguredError,
+  GeminiOutputTruncatedError,
   GeminiRateLimitedError,
   GeminiRequestError,
   GeminiTransportError,
@@ -71,6 +72,8 @@ describe("geminiCorrectionProvider", () => {
     // enforcement means an unparseable body is a malformed/truncated JSON
     // attempt, not a "didn't try" case (see gemini-correction-provider.ts).
     [new GeminiCorrectionParseError(), CorrectionProviderInvalidJsonError],
+    // Reported as the existing invalid-JSON failure until it has its own reason code.
+    [new GeminiOutputTruncatedError(), CorrectionProviderInvalidJsonError],
     [new GeminiTransportError(), CorrectionProviderTransportError],
   ])("translates %s into the provider-agnostic error type", async (thrown, expectedType) => {
     gradeEssayWithGeminiMock.mockRejectedValue(thrown);
