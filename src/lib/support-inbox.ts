@@ -59,9 +59,33 @@ export async function getSupportInboxCount(adminUserId: string): Promise<number>
   return prisma.supportRequest.count({ where: supportInboxNewWhere(seenAt) });
 }
 
-/** Marks the inbox seen as of `at` (the moment the visit began, so a ticket sent mid-render stays new). */
-export async function markSupportInboxSeen(adminUserId: string, at: Date): Promise<void> {
-  await prisma.user.update({ where: { id: adminUserId }, data: { supportInboxSeenAt: at } });
+/**
+ * Records a committed visit to the support inbox and returns the stored
+ * last-visit time.
+ *
+ * `requested` is the render timestamp the page handed to the browser: using it
+ * (rather than the moment this runs) keeps a ticket that arrived while the
+ * page was rendering counted as new. It is never trusted blindly: it cannot be
+ * in the future (it is clamped to `now`), and the update is conditional, so a
+ * stale or repeated request can never move the stored time backwards. With no
+ * `requested` the visit is stamped `now`. Repeating a request is harmless.
+ */
+export async function recordSupportInboxVisit(
+  adminUserId: string,
+  requested: Date | null,
+  now = new Date(),
+): Promise<Date> {
+  const visitedAt = requested !== null && requested < now ? requested : now;
+
+  await prisma.user.updateMany({
+    where: {
+      id: adminUserId,
+      OR: [{ supportInboxSeenAt: null }, { supportInboxSeenAt: { lt: visitedAt } }],
+    },
+    data: { supportInboxSeenAt: visitedAt },
+  });
+
+  return (await getSupportInboxSeenAt(adminUserId)) ?? visitedAt;
 }
 
 export interface NavSupportState {

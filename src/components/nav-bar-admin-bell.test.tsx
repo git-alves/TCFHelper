@@ -192,19 +192,22 @@ describe("NavBar admin support bell", () => {
     expect(disabled.getAttribute("aria-label")).toContain("Support inbox — 2 new tickets — ");
   });
 
-  it("drops to zero when the inbox is opened, without a reload", () => {
+  it("drops to zero once the inbox visit is recorded, without a reload", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({}) } as Response);
+    global.fetch = fetchMock as unknown as typeof fetch;
     render({ isAdmin: true, count: 5 });
     expect(badge()!.textContent).toBe("5");
 
-    act(() => {
+    await act(async () => {
       root.render(
         <AdminSupportInboxProvider initialCount={5}>
           <NavBar isAdmin />
-          <AdminSupportInboxSeen />
+          <AdminSupportInboxSeen visitStartedAt="2026-11-12T09:30:00.000Z" />
         </AdminSupportInboxProvider>,
       );
     });
 
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(badge()).toBeNull();
     expect(bell()!.getAttribute("aria-label")).toBe("Support inbox");
   });

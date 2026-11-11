@@ -1,15 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { userFindUniqueMock, userUpdateMock, requestCountMock, getPendingSupportNoticeMock } = vi.hoisted(() => ({
+const { userFindUniqueMock, userUpdateManyMock, requestCountMock, getPendingSupportNoticeMock } = vi.hoisted(() => ({
   userFindUniqueMock: vi.fn(),
-  userUpdateMock: vi.fn(),
+  userUpdateManyMock: vi.fn(),
   requestCountMock: vi.fn(),
   getPendingSupportNoticeMock: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    user: { findUnique: userFindUniqueMock, update: userUpdateMock },
+    user: { findUnique: userFindUniqueMock, updateMany: userUpdateManyMock },
     supportRequest: { count: requestCountMock },
   },
 }));
@@ -19,7 +19,7 @@ const {
   classifyNewTicket,
   getNavSupportState,
   getSupportInboxCount,
-  markSupportInboxSeen,
+  recordSupportInboxVisit,
   supportInboxNewWhere,
 } = await import("./support-inbox");
 
@@ -39,7 +39,7 @@ function ticket(overrides: Partial<Parameters<typeof classifyNewTicket>[0]> = {}
 
 beforeEach(() => {
   userFindUniqueMock.mockReset();
-  userUpdateMock.mockReset();
+  userUpdateManyMock.mockReset();
   requestCountMock.mockReset();
   getPendingSupportNoticeMock.mockReset();
 });
@@ -122,11 +122,52 @@ describe("getSupportInboxCount", () => {
   });
 });
 
-describe("markSupportInboxSeen", () => {
-  it("records the moment the visit began", async () => {
-    await markSupportInboxSeen("admin_1", SEEN);
+describe("recordSupportInboxVisit", () => {
+  const NOW = new Date("2026-11-12T10:00:00.000Z");
 
-    expect(userUpdateMock).toHaveBeenCalledWith({ where: { id: "admin_1" }, data: { supportInboxSeenAt: SEEN } });
+  it("stores the render timestamp the page handed back, so a ticket that arrived during the render stays new", async () => {
+    const renderedAt = new Date("2026-11-12T09:59:58.000Z");
+    userUpdateManyMock.mockResolvedValue({ count: 1 });
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: renderedAt });
+
+    await expect(recordSupportInboxVisit("admin_1", renderedAt, NOW)).resolves.toEqual(renderedAt);
+
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: "admin_1", OR: [{ supportInboxSeenAt: null }, { supportInboxSeenAt: { lt: renderedAt } }] },
+      data: { supportInboxSeenAt: renderedAt },
+    });
+  });
+
+  it("never stores a time in the future: a later timestamp is clamped to now", async () => {
+    userUpdateManyMock.mockResolvedValue({ count: 1 });
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: NOW });
+
+    await recordSupportInboxVisit("admin_1", new Date("2030-01-01T00:00:00.000Z"), NOW);
+
+    expect(userUpdateManyMock.mock.calls[0][0].data).toEqual({ supportInboxSeenAt: NOW });
+  });
+
+  it("stamps now when no render time is given", async () => {
+    userUpdateManyMock.mockResolvedValue({ count: 1 });
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: NOW });
+
+    await recordSupportInboxVisit("admin_1", null, NOW);
+
+    expect(userUpdateManyMock.mock.calls[0][0].data).toEqual({ supportInboxSeenAt: NOW });
+  });
+
+  it("is conditional on being newer than what is stored, so a stale timestamp changes nothing and the stored time is returned", async () => {
+    const stored = new Date("2026-11-12T09:00:00.000Z");
+    userUpdateManyMock.mockResolvedValue({ count: 0 });
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: stored });
+
+    await expect(recordSupportInboxVisit("admin_1", new Date("2026-11-01T00:00:00.000Z"), NOW)).resolves.toEqual(stored);
+
+    // The guard lives in the WHERE clause: an older value can never match the row.
+    expect(userUpdateManyMock.mock.calls[0][0].where.OR).toEqual([
+      { supportInboxSeenAt: null },
+      { supportInboxSeenAt: { lt: new Date("2026-11-01T00:00:00.000Z") } },
+    ]);
   });
 });
 

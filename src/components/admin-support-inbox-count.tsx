@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 interface AdminSupportInboxValue {
   /** New support tickets since the admin's last visit; null when unknown or not an admin. */
@@ -34,11 +34,33 @@ export function useAdminSupportInbox(): AdminSupportInboxValue {
   return useContext(AdminSupportInboxContext);
 }
 
-/** Rendered by /admin/support: the visit itself is what clears the badges. */
-export function AdminSupportInboxSeen() {
+/**
+ * Rendered by /admin/support. After it mounts (a committed visit, not a
+ * server render that a prefetch or refresh could run on its own) it tells the
+ * server the inbox was seen, handing back the page's render timestamp so a
+ * ticket that arrived during the render still counts as new. Only a
+ * successful answer clears the shared badge count; a failure leaves the badge
+ * as it was, with no error UI, and the next visit tries again.
+ */
+export function AdminSupportInboxSeen({ visitStartedAt }: { visitStartedAt: string }) {
   const { clear } = useAdminSupportInbox();
+  // React may run an effect twice in development; one POST per visit is plenty.
+  const sent = useRef(false);
+
   useEffect(() => {
-    clear();
-  }, [clear]);
+    if (sent.current) return;
+    sent.current = true;
+
+    void fetch("/api/admin/support/inbox/seen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ seenAt: visitStartedAt }),
+    })
+      .then((response) => {
+        if (response.ok) clear();
+      })
+      .catch(() => undefined);
+  }, [clear, visitStartedAt]);
+
   return null;
 }

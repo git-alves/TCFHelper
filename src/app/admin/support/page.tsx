@@ -5,7 +5,7 @@ import { AdminSupportResolveButton } from "@/components/admin-support-resolve-bu
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
-import { classifyNewTicket, getSupportInboxSeenAt, markSupportInboxSeen } from "@/lib/support-inbox";
+import { classifyNewTicket, getSupportInboxSeenAt } from "@/lib/support-inbox";
 import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
 
 const CATEGORY_LABELS = {
@@ -36,12 +36,15 @@ export default async function AdminSupportPage() {
     if (error instanceof AppUserProvisioningError) notFound();
     throw error;
   }
-  // Everything below, including recording the visit, is for the owner only.
+  // Everything below is for the owner only.
   if (!admin) notFound();
 
-  // The visit starts here: tickets sent after this moment were not shown, so
-  // they must still count as new next time. The previous visit is read before
-  // it is replaced, because it decides which tickets get the "New" tag.
+  // This render only READS. It must stay free of writes: a render can be run
+  // by a link prefetch or a router refresh with no visit behind it. The visit
+  // is recorded by AdminSupportInboxSeen once this page has actually mounted
+  // in the browser; the render time handed to it keeps a ticket that arrives
+  // while this page renders counted as new. The previous visit decides which
+  // tickets get the "New" tag below.
   const visitStartedAt = new Date();
   const previousSeenAt = await getSupportInboxSeenAt(admin.id);
 
@@ -75,16 +78,9 @@ export default async function AdminSupportPage() {
     },
   });
 
-  // Opening the inbox marks everything seen. Done after the tickets loaded, so
-  // a failed render does not swallow the "New" tags. A failure here only means
-  // the tags and badges show again on the next visit.
-  await markSupportInboxSeen(admin.id, visitStartedAt).catch((error) => {
-    console.error("Marking the support inbox seen failed", error);
-  });
-
   return (
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
-      <AdminSupportInboxSeen />
+      <AdminSupportInboxSeen visitStartedAt={visitStartedAt.toISOString()} />
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Admin</p>

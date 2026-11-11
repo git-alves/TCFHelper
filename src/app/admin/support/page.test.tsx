@@ -1,11 +1,11 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentAdminUserMock, findManyMock, userFindUniqueMock, userUpdateMock, notFoundMock } = vi.hoisted(() => ({
+const { getCurrentAdminUserMock, findManyMock, userFindUniqueMock, userWriteMocks, notFoundMock } = vi.hoisted(() => ({
   getCurrentAdminUserMock: vi.fn(),
   findManyMock: vi.fn(),
   userFindUniqueMock: vi.fn(),
-  userUpdateMock: vi.fn(),
+  userWriteMocks: { update: vi.fn(), updateMany: vi.fn(), upsert: vi.fn(), create: vi.fn() },
   notFoundMock: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
   }),
@@ -25,9 +25,16 @@ vi.mock("@/lib/app-user", () => {
   class AppUserProvisioningError extends Error {}
   return { AppUserProvisioningError, getCurrentAdminUser: getCurrentAdminUserMock };
 });
-vi.mock("@/components/admin-support-inbox-count", () => ({ AdminSupportInboxSeen: () => <i data-testid="inbox-seen-sync" /> }));
+vi.mock("@/components/admin-support-inbox-count", () => ({
+  AdminSupportInboxSeen: ({ visitStartedAt }: { visitStartedAt: string }) => (
+    <i data-testid="inbox-seen-sync" data-visit-started-at={visitStartedAt} />
+  ),
+}));
 vi.mock("@/lib/prisma", () => ({
-  prisma: { supportRequest: { findMany: findManyMock }, user: { findUnique: userFindUniqueMock, update: userUpdateMock } },
+  prisma: {
+    supportRequest: { findMany: findManyMock },
+    user: { findUnique: userFindUniqueMock, ...userWriteMocks },
+  },
 }));
 vi.mock("next/navigation", () => ({ notFound: notFoundMock }));
 
@@ -60,11 +67,10 @@ beforeEach(() => {
   getCurrentAdminUserMock.mockReset();
   findManyMock.mockReset();
   userFindUniqueMock.mockReset();
-  userUpdateMock.mockReset();
+  for (const mock of Object.values(userWriteMocks)) mock.mockReset();
   notFoundMock.mockClear();
   getCurrentAdminUserMock.mockResolvedValue({ id: "cuid_owner" });
   userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: null });
-  userUpdateMock.mockResolvedValue({});
 });
 
 describe("AdminSupportPage", () => {
@@ -73,9 +79,8 @@ describe("AdminSupportPage", () => {
 
     await expect(AdminSupportPage()).rejects.toThrow("NEXT_NOT_FOUND");
     expect(findManyMock).not.toHaveBeenCalled();
-    // A non-admin can never reach the visit-recording path.
+    // A non-admin reads nothing about the inbox.
     expect(userFindUniqueMock).not.toHaveBeenCalled();
-    expect(userUpdateMock).not.toHaveBeenCalled();
   });
 
   it("selects the ticket number and resolution fields", async () => {
@@ -186,47 +191,38 @@ describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
   const LAST_VISIT = new Date("2026-11-10T12:00:00.000Z");
   const tags = (markup: string) => [...markup.matchAll(/data-testid="ticket-new-tag"[^>]*>([^<]*)</g)].map((m) => m[1]);
 
-  it("marks the inbox seen as of the moment the visit began, after the tickets were read", async () => {
+  it("only reads while rendering: no write of any kind, however many times it renders", async () => {
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: LAST_VISIT });
+    findManyMock.mockResolvedValue([{ ...BASE, id: "r_1", ticketNumber: 1, status: "OPEN" }]);
+
+    renderToStaticMarkup(await AdminSupportPage());
+    renderToStaticMarkup(await AdminSupportPage());
+
+    for (const [name, mock] of Object.entries(userWriteMocks)) {
+      expect(mock, `user.${name}`).not.toHaveBeenCalled();
+    }
+  });
+
+  it("hands the render time to the client component that records the visit after mount", async () => {
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date("2026-11-12T09:30:00.000Z"));
-      const order: string[] = [];
-      findManyMock.mockImplementation(async () => {
-        order.push("tickets");
-        return [];
-      });
-      userUpdateMock.mockImplementation(async () => {
-        order.push("mark seen");
-        return {};
-      });
 
-      renderToStaticMarkup(await AdminSupportPage());
+      const markup = await render([]);
 
-      expect(userUpdateMock).toHaveBeenCalledWith({
-        where: { id: "cuid_owner" },
-        data: { supportInboxSeenAt: new Date("2026-11-12T09:30:00.000Z") },
-      });
-      expect(order).toEqual(["tickets", "mark seen"]);
+      expect(markup).toContain('data-visit-started-at="2026-11-12T09:30:00.000Z"');
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it("reads the previous visit before replacing it", async () => {
-    const calls: string[] = [];
-    userFindUniqueMock.mockImplementation(async () => {
-      calls.push("read previous");
-      return { supportInboxSeenAt: LAST_VISIT };
-    });
-    userUpdateMock.mockImplementation(async () => {
-      calls.push("write new");
-      return {};
-    });
+  it("reads the previous visit for the tags (not the render time it hands to the client)", async () => {
+    userFindUniqueMock.mockResolvedValue({ supportInboxSeenAt: LAST_VISIT });
     findManyMock.mockResolvedValue([]);
 
     renderToStaticMarkup(await AdminSupportPage());
 
-    expect(calls).toEqual(["read previous", "write new"]);
+    expect(userFindUniqueMock).toHaveBeenCalledWith({ where: { id: "cuid_owner" }, select: { supportInboxSeenAt: true } });
   });
 
   it("tags the tickets that were new before this visit as New or Reopened, and no others", async () => {
@@ -268,7 +264,7 @@ describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
     expect(markup).toContain("bg-red-500/[.04]");
   });
 
-  it("with no earlier visit tags every open ticket, and the badges are told to clear", async () => {
+  it("with no earlier visit tags every open ticket", async () => {
     const markup = await render([
       { ...BASE, id: "r_1", ticketNumber: 1, status: "OPEN" },
       { ...BASE, id: "r_2", ticketNumber: 2, status: "OPEN" },
@@ -277,16 +273,6 @@ describe("AdminSupportPage new-ticket tags and the inbox visit", () => {
 
     expect(tags(markup)).toEqual(["New", "New"]);
     expect(markup).toContain('data-testid="inbox-seen-sync"');
-  });
-
-  it("still renders the page, with its tags, when recording the visit fails", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    userUpdateMock.mockRejectedValue(new Error("db down"));
-
-    const markup = await render([{ ...BASE, id: "r_1", ticketNumber: 1, status: "OPEN" }]);
-
-    expect(tags(markup)).toEqual(["New"]);
-    errorSpy.mockRestore();
   });
 });
 

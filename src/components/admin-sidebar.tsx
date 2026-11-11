@@ -66,6 +66,10 @@ export function AdminSidebar() {
                     <AdminPromptsNavLink
                       key={section.href}
                       href={section.href}
+                      // Defence in depth: the inbox is recorded by a client
+                      // POST after a real visit, but nothing should render
+                      // this page speculatively either.
+                      prefetch={section.href === "/admin/support" ? false : undefined}
                       aria-current={active ? "page" : undefined}
                       className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                         active

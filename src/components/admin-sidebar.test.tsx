@@ -4,6 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { usePathnameMock } = vi.hoisted(() => ({ usePathnameMock: vi.fn() }));
 
 vi.mock("next/navigation", () => ({ usePathname: usePathnameMock }));
+// Exposes the prefetch prop (which a real Link consumes) as a data attribute.
+vi.mock("next/link", () => ({
+  default: ({ prefetch, children, ...rest }: { prefetch?: boolean; children: React.ReactNode } & Record<string, unknown>) => (
+    <a data-prefetch={prefetch === undefined ? "default" : String(prefetch)} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 const { AdminSidebar } = await import("./admin-sidebar");
 const { AdminPromptsNavGuardProvider } = await import("./admin-prompts-nav-guard");
@@ -66,6 +74,22 @@ describe("AdminSidebar support badge", () => {
 
   it("keeps the Support item's link text when current, badge or not", () => {
     expect(currentLinks(render("/admin/support", 0))).toEqual(["Support requests"]);
+  });
+});
+
+describe("AdminSidebar prefetching", () => {
+  const prefetchOf = (html: string, href: string) =>
+    html.match(new RegExp(`<a data-prefetch="([^"]*)"[^>]*href="${href.replaceAll("/", "\\/")}"`))?.[1];
+
+  it("never prefetches the support inbox, so nothing can render it speculatively", () => {
+    expect(prefetchOf(render("/admin"), "/admin/support")).toBe("false");
+  });
+
+  it("leaves every other section on the default prefetching", () => {
+    const html = render("/admin");
+    for (const href of ["/admin", "/admin/users", "/admin/access-codes", "/admin/logs", "/admin/api-keys", "/admin/prompts"]) {
+      expect(prefetchOf(html, href)).toBe("default");
+    }
   });
 });
 
