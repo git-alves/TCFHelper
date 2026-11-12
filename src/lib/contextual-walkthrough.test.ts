@@ -50,4 +50,3 @@ describe("contextual walkthrough with unusable storage", () => {
     expect(shouldShowContextualWalkthrough(null, "practice")).toBe(true);
   });
 });
-

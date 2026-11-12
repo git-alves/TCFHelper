@@ -146,7 +146,7 @@ describe("correction lease against a slow provider", () => {
   it("saves, and charges once, a correct answer that arrives after the old 75s lease would have expired", async () => {
     expect(LEASE_DURATION_MS).toBeGreaterThan(100_000);
 
-    
+
 
     const pending = post();
     await vi.advanceTimersByTimeAsync(0);

@@ -13,7 +13,8 @@ import { CORRECTION_SLOW_LOADING_MS } from "@/components/correction-modal";
 import { getAppCopy } from "@/lib/app-copy";
 import type { AppLocale } from "@/lib/app-locale";
 import {
-  DRAFT_STORAGE_KEY,
+  LEGACY_DRAFT_STORAGE_KEY,
+  draftStorageKey,
   loadDrafts,
   resetDraftMemoryForTest,
   saveDraft,
@@ -45,6 +46,8 @@ let root: Root;
 let correctResponse: () => Promise<Response>;
 let correctCalls: number;
 let restoreStorage: (() => void) | undefined;
+// The signed-in learner's internal id, as the tasks page passes it.
+let currentUser: string | undefined;
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -59,6 +62,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   window.localStorage.clear();
   resetDraftMemoryForTest();
+  currentUser = "user_a";
   mountContainer();
   correctCalls = 0;
   correctResponse = async () => json(502, {});
@@ -91,7 +95,7 @@ function render(locale: AppLocale = "en") {
       <AppLocaleProvider initialLocale={locale}>
         <DashboardNavGuardProvider>
           <WalkthroughWorkspaceScriptProvider>
-            <WritingWorkspace />
+            <WritingWorkspace key={currentUser} userId={currentUser} />
           </WalkthroughWorkspaceScriptProvider>
         </DashboardNavGuardProvider>
       </AppLocaleProvider>,
@@ -132,7 +136,9 @@ function type(value: string) {
   });
 }
 const advance = (ms: number) => act(async () => void (await vi.advanceTimersByTimeAsync(ms)));
-const stored = () => JSON.parse(window.localStorage.getItem(DRAFT_STORAGE_KEY) ?? '{"drafts":[]}').drafts as SavedDraft[];
+const storedFor = (userId: string) =>
+  JSON.parse(window.localStorage.getItem(draftStorageKey(userId)) ?? '{"drafts":[]}').drafts as SavedDraft[];
+const stored = () => storedFor("user_a");
 
 /** A learner on Tâche 2 with a random topic and a typed draft. */
 async function startWriting(locale: AppLocale = "en") {
@@ -211,17 +217,17 @@ describe("draft autosave and restore", () => {
       taskType: "TASK_2",
       topic: { kind: "recent", id: "topic_t2_1", title: TOPIC.title, prompt: TOPIC.prompt, guideContext: TOPIC.guideContext as never },
       content: "Brouillon ancien pour la tâche deux.",
-      savedAt: 1_000,
+      savedAt: Date.now() - 2_000,
     };
     const newer: SavedDraft = {
       key: "TASK_1:custom:abc",
       taskType: "TASK_1",
       topic: { kind: "custom", prompt: "Écrivez à votre voisin." },
       content: "Brouillon récent pour la tâche un.",
-      savedAt: 2_000,
+      savedAt: Date.now() - 1_000,
     };
-    saveDraft(older);
-    saveDraft(newer);
+    saveDraft("user_a", older);
+    saveDraft("user_a", newer);
     const copy = getAppCopy("en");
 
     render();
@@ -241,12 +247,12 @@ describe("draft autosave and restore", () => {
   });
 
   it("does not offer a draft that belongs to a different topic once a topic is chosen", async () => {
-    saveDraft({
+    saveDraft("user_a", {
       key: "TASK_1:custom:abc",
       taskType: "TASK_1",
       topic: { kind: "custom", prompt: "Écrivez à votre voisin." },
       content: DRAFT,
-      savedAt: 1_000,
+      savedAt: Date.now() - 1_000,
     });
     const copy = getAppCopy("en");
     render();
@@ -327,7 +333,7 @@ describe("draft autosave and restore", () => {
     expect(fake.calls.getItem).toBeGreaterThan(0);
     expect(fake.calls.setItem).toBeGreaterThan(0); // the blocked store really was tried
     expect(editor()!.value).toBe(DRAFT); // typing and autosaving did not break the editor
-    expect(loadDrafts()).toHaveLength(1); // the per-tab copy
+    expect(loadDrafts("user_a")).toHaveLength(1); // the per-tab copy
 
     remount();
     await click(button(copy.workspace.editor.draftRestoreAction));
@@ -342,8 +348,109 @@ describe("draft autosave and restore", () => {
 
     expect(fake.calls.setItem).toBeGreaterThan(0);
     expect(editor()!.value).toBe(DRAFT);
-    expect(loadDrafts()[0]?.content).toBe(DRAFT);
+    expect(loadDrafts("user_a")[0]?.content).toBe(DRAFT);
   });
+});
+
+describe("a browser shared by two learners", () => {
+  async function writeAsUserA() {
+    currentUser = "user_a";
+    const copy = await startWriting();
+    await advance(700);
+    expect(storedFor("user_a")).toHaveLength(1);
+    return copy;
+  }
+  function signInAs(userId: string | undefined) {
+    currentUser = userId;
+    remount();
+  }
+
+  it("offers learner B nothing of learner A's text, and gives A their own back", async () => {
+    const copy = await writeAsUserA();
+
+    signInAs("user_b");
+    expect(draftRestore()).toBeNull();
+    expect(editor()).toBeNull();
+    expect(container.textContent).not.toContain("Je vous écris pour vous parler de mon quartier");
+    // B's own work is stored apart and never touches A's.
+    await click(button("Tâche 2"));
+    await click(button(copy.workspace.topic.recentExamTitle));
+    type("Le brouillon de B, qui est tout à fait différent.");
+    await advance(700);
+    expect(storedFor("user_b")[0]?.content).toBe("Le brouillon de B, qui est tout à fait différent.");
+    expect(storedFor("user_a")[0]?.content).toBe(DRAFT);
+
+    signInAs("user_a");
+    expect(draftRestore()).not.toBeNull();
+    await click(button(copy.workspace.editor.draftRestoreAction));
+    expect(editor()!.value).toBe(DRAFT);
+  });
+
+  it("offers a draft only to a known learner: with no user id there is no restore offer and no autosave", async () => {
+    await writeAsUserA();
+
+    signInAs(undefined);
+    expect(draftRestore()).toBeNull();
+
+    const copy = getAppCopy("en");
+    await click(button("Tâche 2"));
+    await click(button(copy.workspace.topic.recentExamTitle));
+    type("Du texte sans propriétaire connu.");
+    await advance(700);
+    act(() => root.unmount());
+    mountContainer();
+
+    expect(window.localStorage.getItem(draftStorageKey("undefined"))).toBeNull();
+    expect(Object.keys({ ...window.localStorage }).filter((key) => key.startsWith("mytcflab:drafts"))).toEqual([
+      draftStorageKey("user_a"),
+    ]);
+  });
+
+  it("deletes the first version's ownerless drafts instead of offering them", async () => {
+    window.localStorage.setItem(
+      LEGACY_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        drafts: [
+          {
+            key: TOPIC_KEY,
+            taskType: "TASK_2",
+            topic: { kind: "recent", id: "topic_t2_1", title: TOPIC.title, prompt: TOPIC.prompt, guideContext: TOPIC.guideContext },
+            content: "Texte d'un apprenant inconnu.",
+            savedAt: Date.now(),
+          },
+        ],
+      }),
+    );
+
+    render();
+    await advance(0);
+
+    expect(draftRestore()).toBeNull();
+    expect(window.localStorage.getItem(LEGACY_DRAFT_STORAGE_KEY)).toBeNull();
+  });
+
+  it("keeps the in-memory copy per learner when storage is blocked, across a user switch", async () => {
+    const fake = installFakeLocalStorage({ failReads: true, failWrites: true });
+    restoreStorage = fake.restore;
+    const copy = await writeAsUserAWithBlockedStorage();
+
+    signInAs("user_b");
+    expect(draftRestore()).toBeNull();
+    expect(container.textContent).not.toContain("Je vous écris pour vous parler de mon quartier");
+
+    signInAs("user_a");
+    await click(button(copy.workspace.editor.draftRestoreAction));
+    expect(editor()!.value).toBe(DRAFT);
+  });
+
+  async function writeAsUserAWithBlockedStorage() {
+    currentUser = "user_a";
+    const copy = await startWriting();
+    await advance(700);
+    expect(loadDrafts("user_a")).toHaveLength(1);
+    return copy;
+  }
 });
 
 describe("correction errors", () => {

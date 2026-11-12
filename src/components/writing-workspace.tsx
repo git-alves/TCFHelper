@@ -40,6 +40,7 @@ import { TaskThreeDocumentsView } from "@/components/task-three-documents";
 import { classifyCorrectionFailure, type CorrectionErrorState } from "@/lib/correction-error";
 import {
   deleteDraft,
+  discardLegacyDrafts,
   draftKey,
   fingerprintTopicPrompt,
   getDraftsSnapshot,
@@ -549,7 +550,10 @@ function StepHeading({
   );
 }
 
-export function WritingWorkspace() {
+// `userId` is the signed-in learner's internal app user id. Drafts are saved
+// and offered only for a known user, and only that user's own (see
+// draft-autosave.ts): without an id there is no autosave and no restore offer.
+export function WritingWorkspace({ userId }: { userId?: string } = {}) {
   const { locale } = useAppLocale();
   const copy = useAppCopy();
   const router = useRouter();
@@ -801,18 +805,27 @@ export function WritingWorkspace() {
     return null;
   }, [topicMode, recentTopic, customTopic]);
   const currentDraftKey = taskType && draftTopic ? draftKey(taskType, draftTopic) : null;
-  const savedDrafts = useSyncExternalStore(subscribeToDrafts, getDraftsSnapshot, getServerDraftsSnapshot);
-  const pendingDraftRef = useRef<SavedDraft | null>(null);
+  const subscribeToUserDrafts = useCallback(
+    (listener: () => void) => subscribeToDrafts(userId, listener),
+    [userId],
+  );
+  const getUserDraftsSnapshot = useCallback(() => getDraftsSnapshot(userId), [userId]);
+  const savedDrafts = useSyncExternalStore(subscribeToUserDrafts, getUserDraftsSnapshot, getServerDraftsSnapshot);
+  // The pending write remembers whose draft it is, so it can never land in
+  // another user's store.
+  const pendingDraftRef = useRef<{ userId: string; draft: SavedDraft } | null>(null);
   const flushPendingDraft = useCallback(() => {
-    const draft = pendingDraftRef.current;
+    const pending = pendingDraftRef.current;
     pendingDraftRef.current = null;
     // The scripted tour writes sample text that is not the learner's work.
-    if (draft && !walkthroughDemoActiveRef.current) saveDraft({ ...draft, savedAt: Date.now() });
+    if (pending && !walkthroughDemoActiveRef.current) {
+      saveDraft(pending.userId, { ...pending.draft, savedAt: Date.now() });
+    }
   }, []);
   function forgetDraft(key: string | null) {
     pendingDraftRef.current = null;
     if (!key) return;
-    deleteDraft(key);
+    deleteDraft(userId, key);
   }
   const isCurrentDraftAlreadyCorrected =
     correctionRequestKey !== null && correctionRequestKey === lastSuccessfulCorrectionKey;
@@ -834,20 +847,29 @@ export function WritingWorkspace() {
     (content !== submittedCorrectionText || existingCorrectionEssayId !== null);
 
   useEffect(() => {
-    if (!taskType || !draftTopic || !content.trim()) {
+    if (!userId || !taskType || !draftTopic || !content.trim()) {
       pendingDraftRef.current = null;
       return;
     }
     pendingDraftRef.current = {
-      key: draftKey(taskType, draftTopic),
-      taskType,
-      topic: draftTopic,
-      content,
-      savedAt: Date.now(),
+      userId,
+      draft: {
+        key: draftKey(taskType, draftTopic),
+        taskType,
+        topic: draftTopic,
+        content,
+        savedAt: Date.now(),
+      },
     };
     const timer = window.setTimeout(flushPendingDraft, DRAFT_AUTOSAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [taskType, draftTopic, content, flushPendingDraft]);
+  }, [userId, taskType, draftTopic, content, flushPendingDraft]);
+
+  // The first version kept every learner's drafts under one ownerless key.
+  // They cannot be attributed to anyone, so they are deleted, never offered.
+  useEffect(() => {
+    discardLegacyDrafts();
+  }, []);
 
   useEffect(() => {
     const flushWhenHidden = () => {
@@ -1164,7 +1186,7 @@ export function WritingWorkspace() {
   // nothing in the editor to overwrite. With no topic chosen it is the newest
   // saved draft; once a topic is chosen it is that task + topic's own draft.
   const restoreCandidate =
-    !content.trim() && !isTopicLoading && !isCorrecting
+    userId && !content.trim() && !isTopicLoading && !isCorrecting
       ? topicMode === null
         ? (savedDrafts[0] ?? null)
         : (savedDrafts.find((draft) => draft.key === currentDraftKey) ?? null)
