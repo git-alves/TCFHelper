@@ -65,32 +65,33 @@ export interface GeminiRequestsToday {
 }
 
 /**
- * Shared by the overview stats below and the admin settings API's
- * per-key consumption bar (src/lib/app-config.ts), so both read the exact
- * same reservation-time counters instead of drifting on what "today's
- * Gemini requests" means.
+ * Feeds the admin settings API's per-key consumption bar
+ * (src/lib/app-config.ts): how many provider calls this app made today, per
+ * feature. It sums each table's never-refunded attempt count, not the
+ * request count: a call that failed (or whose result could not be saved) is
+ * refunded out of the request count but still reached the provider and can
+ * still have cost tokens, and a call refused before the provider was reached
+ * is never counted in either. The counters do not record which provider a call
+ * went to, so the figure is per feature, for whichever provider that feature
+ * had configured when each call was made.
  */
 export async function getGeminiRequestsToday(now = new Date()): Promise<GeminiRequestsToday> {
   const currentDayStart = startOfUtcDay(now);
 
   const [exampleDayAgg, correctionDayAgg] = await Promise.all([
     prisma.exampleGenerationQuota.aggregate({
-      // Failed provider calls refund dailyRequestCount but leave a cooldown
-      // row behind. Do not report zero-work rows as active learners.
-      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
-      _sum: { dailyRequestCount: true },
-      _count: { _all: true },
+      where: { dayStartedAt: currentDayStart },
+      _sum: { dailyAttemptCount: true },
     }),
     prisma.correctionUsage.aggregate({
       where: { dayStartedAt: currentDayStart },
-      _sum: { dailyRequestCount: true },
-      _count: { _all: true },
+      _sum: { dailyAttemptCount: true },
     }),
   ]);
 
   return {
-    correctionRequestsToday: correctionDayAgg._sum.dailyRequestCount ?? 0,
-    exampleRequestsToday: exampleDayAgg._sum.dailyRequestCount ?? 0,
+    correctionRequestsToday: correctionDayAgg._sum.dailyAttemptCount ?? 0,
+    exampleRequestsToday: exampleDayAgg._sum.dailyAttemptCount ?? 0,
   };
 }
 

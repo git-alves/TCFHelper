@@ -163,7 +163,8 @@ export interface AppConfigDisplay {
  * Combines the stored overrides with today's actual request counts (see
  * getGeminiRequestsToday) into the shape the admin settings API and page
  * both render. requestsToday is a self-tracked approximation from our own
- * reservation counters, not a number reported by Google.
+ * attempt counters (every provider call, including failed ones), not a number
+ * reported by Google.
  */
 export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
   const [config, requestsToday] = await Promise.all([getAppConfig(), getGeminiRequestsToday()]);

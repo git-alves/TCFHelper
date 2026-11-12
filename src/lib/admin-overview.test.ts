@@ -237,21 +237,46 @@ describe("getAdminOverviewStats", () => {
 });
 
 describe("getGeminiRequestsToday", () => {
-  it("sums today's correction and example request counts", async () => {
-    exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: 12 }, _count: { _all: 3 } });
+  it("sums today's provider calls from the never-refunded attempt counts", async () => {
+    exampleAggregateMock.mockReset();
+    exampleAggregateMock.mockResolvedValue({ _sum: { dailyAttemptCount: 12 } });
     correctionAggregateMock.mockReset();
-    correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: 7 }, _count: { _all: 2 } });
+    correctionAggregateMock.mockResolvedValue({ _sum: { dailyAttemptCount: 9 } });
 
     await expect(getGeminiRequestsToday(NOW)).resolves.toEqual({
-      correctionRequestsToday: 7,
+      correctionRequestsToday: 9,
       exampleRequestsToday: 12,
     });
   });
 
-  it("treats missing sums as zero", async () => {
-    exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
+  it("counts failed calls: reads the attempt count, not the refundable request count", async () => {
+    // 7 corrections received and 2 that failed and were refunded: the request
+    // count says 7, but the key was called 9 times.
+    exampleAggregateMock.mockReset();
+    exampleAggregateMock.mockResolvedValue({ _sum: { dailyAttemptCount: 0 } });
     correctionAggregateMock.mockReset();
-    correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
+    correctionAggregateMock.mockImplementation(async (args: { _sum: Record<string, boolean> }) =>
+      args._sum.dailyAttemptCount ? { _sum: { dailyAttemptCount: 9 } } : { _sum: { dailyRequestCount: 7 } },
+    );
+
+    const today = await getGeminiRequestsToday(NOW);
+
+    expect(today.correctionRequestsToday).toBe(9);
+    expect(correctionAggregateMock).toHaveBeenCalledWith({
+      where: { dayStartedAt: new Date("2026-08-10T00:00:00.000Z") },
+      _sum: { dailyAttemptCount: true },
+    });
+    expect(exampleAggregateMock).toHaveBeenCalledWith({
+      where: { dayStartedAt: new Date("2026-08-10T00:00:00.000Z") },
+      _sum: { dailyAttemptCount: true },
+    });
+  });
+
+  it("treats missing sums as zero", async () => {
+    exampleAggregateMock.mockReset();
+    exampleAggregateMock.mockResolvedValue({ _sum: { dailyAttemptCount: null } });
+    correctionAggregateMock.mockReset();
+    correctionAggregateMock.mockResolvedValue({ _sum: { dailyAttemptCount: null } });
 
     await expect(getGeminiRequestsToday(NOW)).resolves.toEqual({
       correctionRequestsToday: 0,
