@@ -10,6 +10,18 @@ interface AdminApiKeysFormProps {
   initialDisplay: AppConfigDisplay;
 }
 
+type TestSection = "correction" | "example";
+
+interface TestOutcome {
+  ok: boolean;
+  message: string;
+  latencyMs: number | null;
+  /** What was tested, in a sentence (which key and model were used). */
+  summary: string | null;
+}
+
+type TestState = { status: "idle" } | { status: "running" } | { status: "done"; outcome: TestOutcome };
+
 interface SectionFormState {
   apiKeyInput: string;
   apiKeyCleared: boolean;
@@ -50,8 +62,13 @@ function parseDailyLimitInput(raw: string): number | null | undefined {
 const INPUT_CLASSES =
   "mt-2 w-full rounded-lg border border-black/[.15] bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-zinc-500 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2]";
 
-function apiKeyStatusLabel(section: AppConfigDisplaySection, apiKeyEnvVarName: string) {
-  if (section.apiKeySet) return `Currently set here: ${section.apiKeyMasked}`;
+function apiKeyStatusLabel(section: AppConfigDisplaySection, apiKeyEnvVarName: string, providerChanged: boolean) {
+  // The saved key belongs to the provider it was saved for; saving a different
+  // provider removes it, so do not present it as this provider's key.
+  if (providerChanged) {
+    return `No key is saved for this provider yet. Paste one below, or set ${apiKeyEnvVarName}.`;
+  }
+  if (section.apiKeySet) return `Currently set here: ${section.apiKeyMasked} (takes precedence over ${apiKeyEnvVarName})`;
   if (section.apiKeyFromEnv) return `Currently using the ${apiKeyEnvVarName} environment variable.`;
   return `Not configured -- requests will fail until a key is set here or via ${apiKeyEnvVarName}.`;
 }
@@ -93,6 +110,9 @@ function AiSettingsSection({
   onChange,
   apiKeyEnvVarName,
   provider,
+  savedProvider,
+  testState,
+  onTest,
 }: {
   title: string;
   description: string;
@@ -100,14 +120,22 @@ function AiSettingsSection({
   state: SectionFormState;
   onChange: (next: SectionFormState) => void;
   apiKeyEnvVarName: string;
-  provider?: { value: ProviderId; onChange: (next: ProviderId) => void };
+  provider: { value: ProviderId; onChange: (next: ProviderId) => void };
+  /** The provider currently saved for this section (what a different choice would replace). */
+  savedProvider: ProviderId;
+  testState: TestState;
+  onTest: () => void;
 }) {
   const apiKeyId = useId();
   const providerId = useId();
   const modelId = useId();
   const dailyLimitId = useId();
   const dailyLimitIsInvalid = parseDailyLimitInput(state.dailyLimitInput) === undefined;
-  const hasModelDefault = section.modelDefault.trim() !== "";
+  const providerChanged = provider.value !== savedProvider;
+  // The defaults on `section` belong to the saved provider; after an unsaved
+  // provider change they would describe the wrong one.
+  const hasModelDefault = !providerChanged && section.modelDefault.trim() !== "";
+  const willRemoveSaved = providerChanged && (section.apiKeySet || Boolean(section.model));
 
   return (
     <fieldset className="flex flex-col gap-4 rounded-xl border border-black/[.1] p-4 dark:border-white/[.15]">
@@ -116,28 +144,32 @@ function AiSettingsSection({
 
       <ConsumptionBar section={section} />
 
-      {provider && (
-        <div>
-          <label htmlFor={providerId} className="block text-sm font-medium">
-            AI Provider
-          </label>
-          <select
-            id={providerId}
-            value={provider.value}
-            onChange={(event) => provider.onChange(event.target.value as ProviderId)}
-            className={INPUT_CLASSES}
-          >
-            {CORRECTION_PROVIDER_IDS.map((id) => (
-              <option key={id} value={id}>
-                {PROVIDER_LABELS[id]}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            Which backend to use. The API key and model below apply to whichever provider is selected here.
+      <div>
+        <label htmlFor={providerId} className="block text-sm font-medium">
+          AI Provider
+        </label>
+        <select
+          id={providerId}
+          value={provider.value}
+          onChange={(event) => provider.onChange(event.target.value as ProviderId)}
+          className={INPUT_CLASSES}
+        >
+          {CORRECTION_PROVIDER_IDS.map((id) => (
+            <option key={id} value={id}>
+              {PROVIDER_LABELS[id]}
+            </option>
+          ))}
+        </select>
+        <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          Which backend to use. The API key and model below apply to whichever provider is selected here.
+        </p>
+        {willRemoveSaved && (
+          <p role="status" className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
+            Switching to {PROVIDER_LABELS[provider.value]} will remove the saved {PROVIDER_LABELS[savedProvider]} key and model for this
+            section when you save. Enter a new key and model below to keep using this section.
           </p>
-        </div>
-      )}
+        )}
+      </div>
 
       <div>
         <label htmlFor={apiKeyId} className="block text-sm font-medium">
@@ -154,9 +186,9 @@ function AiSettingsSection({
           className={INPUT_CLASSES}
         />
         <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-          {apiKeyStatusLabel(section, apiKeyEnvVarName)}
+          {apiKeyStatusLabel(section, apiKeyEnvVarName, providerChanged)}
         </p>
-        {section.apiKeySet && (
+        {section.apiKeySet && !providerChanged && (
           <label className="mt-2 flex items-center gap-2 text-sm">
             <input
               type="checkbox"
@@ -179,14 +211,54 @@ function AiSettingsSection({
           type="text"
           value={state.model}
           onChange={(event) => onChange({ ...state, model: event.target.value })}
-          placeholder={hasModelDefault ? section.modelDefault : "e.g. qwen/qwen3-30b-a3b"}
+          placeholder={hasModelDefault ? section.modelDefault : provider.value === "openrouter" ? "e.g. qwen/qwen3-30b-a3b" : "e.g. gemini-3.5-flash-lite"}
+          autoComplete="off"
+          spellCheck={false}
           className={INPUT_CLASSES}
         />
         <p className="mt-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          {provider.value === "openrouter"
+            ? "Format: vendor/model, optionally :variant (for example qwen/qwen3-30b-a3b or meta-llama/llama-3.3-70b-instruct:free)."
+            : "Format: a single name with no slash (for example gemini-3.5-flash-lite)."}{" "}
           {hasModelDefault
             ? `Default if left blank: ${section.modelDefault}`
-            : "Required -- this provider has no built-in default model."}
+            : provider.value === "openrouter"
+              ? "Required -- this provider has no built-in default model."
+              : "Leave blank to use Gemini's default model."}
         </p>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onTest}
+            disabled={testState.status === "running"}
+            className="rounded-full border border-black/[.15] px-4 py-1.5 text-sm font-medium transition-colors hover:bg-black/[.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 dark:border-white/[.2] dark:hover:bg-white/[.08]"
+          >
+            {testState.status === "running" ? "Testing…" : "Test"}
+          </button>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Makes one small real call with the values above, saved or not.
+          </p>
+        </div>
+        {testState.status === "done" && (
+          <div
+            role={testState.outcome.ok ? "status" : "alert"}
+            data-testid="api-key-test-result"
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              testState.outcome.ok
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-900 dark:text-emerald-200"
+                : "border-red-500/40 bg-red-500/10 text-red-900 dark:text-red-200"
+            }`}
+          >
+            <p>{testState.outcome.message}</p>
+            {testState.outcome.latencyMs !== null && (
+              <p className="mt-1 text-xs opacity-80">Took {testState.outcome.latencyMs.toLocaleString("en-US")} ms.</p>
+            )}
+            {testState.outcome.summary && <p className="mt-1 text-xs opacity-80">{testState.outcome.summary}</p>}
+          </div>
+        )}
       </div>
 
       <div>
@@ -227,12 +299,89 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedJustNow, setSavedJustNow] = useState(false);
+  const [correctionTest, setCorrectionTest] = useState<TestState>({ status: "idle" });
+  const [exampleTest, setExampleTest] = useState<TestState>({ status: "idle" });
   const correctionApiKeyEnvVarName = correctionProvider === "openrouter" ? "OPENROUTER_API_KEY" : "GEMINI_API_KEY";
   const exampleApiKeyEnvVarName = exampleProvider === "openrouter" ? "OPENROUTER_API_KEY" : "GEMINI_API_KEY";
 
   const correctionDailyLimit = useMemo(() => parseDailyLimitInput(correction.dailyLimitInput), [correction.dailyLimitInput]);
   const exampleDailyLimit = useMemo(() => parseDailyLimitInput(example.dailyLimitInput), [example.dailyLimitInput]);
   const canSubmit = !isSubmitting && correctionDailyLimit !== undefined && exampleDailyLimit !== undefined;
+
+  // A test result describes the values that were in the form when it ran, so
+  // any later edit to the section clears it rather than leave a stale answer.
+  function changeSection(section: TestSection, next: SectionFormState) {
+    if (section === "correction") {
+      setCorrection(next);
+      setCorrectionTest({ status: "idle" });
+    } else {
+      setExample(next);
+      setExampleTest({ status: "idle" });
+    }
+  }
+
+  // Choosing a different provider than the saved one starts that section
+  // afresh (the saved key and model belong to the saved provider, and saving
+  // removes them): the key and model inputs are emptied. Choosing the saved
+  // provider again puts the saved values back.
+  function changeProvider(section: TestSection, next: ProviderId) {
+    const savedProvider = section === "correction" ? display.correctionProvider : display.exampleProvider;
+    const savedSection = section === "correction" ? display.correction : display.example;
+    const current = section === "correction" ? correction : example;
+    if (section === "correction") setCorrectionProvider(next);
+    else setExampleProvider(next);
+    changeSection(
+      section,
+      next === savedProvider
+        ? sectionStateFromDisplay(savedSection)
+        : { apiKeyInput: "", apiKeyCleared: false, model: "", dailyLimitInput: current.dailyLimitInput },
+    );
+  }
+
+  // What the Test button sends is what saving would send for this section: the
+  // selected provider, a key only if one was typed (or cleared), and the model
+  // exactly as shown, where blank means "use the default".
+  async function runTest(section: TestSection) {
+    const state = section === "correction" ? correction : example;
+    const provider = section === "correction" ? correctionProvider : exampleProvider;
+    const setTest = section === "correction" ? setCorrectionTest : setExampleTest;
+    const body: Record<string, string> = { section, provider, model: state.model.trim() };
+    if (state.apiKeyCleared) body.apiKey = "";
+    else if (state.apiKeyInput.trim()) body.apiKey = state.apiKeyInput.trim();
+
+    setTest({ status: "running" });
+    try {
+      const response = await fetch("/api/admin/api-keys/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; result?: { ok: boolean; message: string; latencyMs: number | null }; tested?: { summary?: string } }
+        | null;
+      if (!response.ok || !payload?.result) {
+        setTest({
+          status: "done",
+          outcome: { ok: false, message: payload?.error ?? "Could not run the test. Please try again.", latencyMs: null, summary: null },
+        });
+        return;
+      }
+      setTest({
+        status: "done",
+        outcome: {
+          ok: payload.result.ok,
+          message: payload.result.message,
+          latencyMs: payload.result.latencyMs,
+          summary: payload.tested?.summary ?? null,
+        },
+      });
+    } catch {
+      setTest({
+        status: "done",
+        outcome: { ok: false, message: "Could not reach the admin service. Please try again.", latencyMs: null, summary: null },
+      });
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -272,6 +421,8 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
       setExampleProvider(payload.exampleProvider);
       setCorrection(sectionStateFromDisplay(payload.correction));
       setExample(sectionStateFromDisplay(payload.example));
+      setCorrectionTest({ status: "idle" });
+      setExampleTest({ status: "idle" });
       setSavedJustNow(true);
       router.refresh();
     } catch {
@@ -288,18 +439,24 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
         description="Used when grading a submitted essay."
         section={display.correction}
         state={correction}
-        onChange={setCorrection}
+        onChange={(next) => changeSection("correction", next)}
         apiKeyEnvVarName={correctionApiKeyEnvVarName}
-        provider={{ value: correctionProvider, onChange: setCorrectionProvider }}
+        provider={{ value: correctionProvider, onChange: (next) => changeProvider("correction", next) }}
+        savedProvider={display.correctionProvider}
+        testState={correctionTest}
+        onTest={() => void runTest("correction")}
       />
       <AiSettingsSection
         title="Example generation"
         description="Used when generating a model answer for a learner to study."
         section={display.example}
         state={example}
-        onChange={setExample}
+        onChange={(next) => changeSection("example", next)}
         apiKeyEnvVarName={exampleApiKeyEnvVarName}
-        provider={{ value: exampleProvider, onChange: setExampleProvider }}
+        provider={{ value: exampleProvider, onChange: (next) => changeProvider("example", next) }}
+        savedProvider={display.exampleProvider}
+        testState={exampleTest}
+        onTest={() => void runTest("example")}
       />
 
       <div className="flex items-center gap-3">
