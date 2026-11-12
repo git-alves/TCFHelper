@@ -4,7 +4,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { PracticeTrainer } from "@/components/practice-trainer";
-import { PRACTICE_DRAFT_STORAGE_KEY } from "@/lib/practice-draft-storage";
+import { installFakeLocalStorage } from "@/lib/draft-autosave.test-helpers";
+import { LEGACY_PRACTICE_DRAFT_STORAGE_KEY, practiceDraftStorageKey } from "@/lib/practice-draft-storage";
 import { SECTIONED_PRACTICE_EXERCISES, getSectionedPracticeExercise } from "@/lib/sectioned-practice";
 
 let searchParams = new URLSearchParams();
@@ -18,10 +19,13 @@ vi.mock("next/navigation", () => ({
 let container: HTMLDivElement;
 let root: Root;
 let fetchCalls: { url: string; body: unknown }[];
+// The signed-in learner's internal id, as the practice page passes it.
+let currentUser: string | undefined;
 
 beforeEach(() => {
   searchParams = new URLSearchParams();
   window.localStorage.clear();
+  currentUser = "user_a";
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -51,7 +55,7 @@ async function render() {
   await act(async () => {
     root.render(
       <AppLocaleProvider initialLocale="en">
-        <PracticeTrainer exercises={SECTIONED_PRACTICE_EXERCISES} />
+        <PracticeTrainer key={currentUser} userId={currentUser} exercises={SECTIONED_PRACTICE_EXERCISES} />
       </AppLocaleProvider>,
     );
   });
@@ -229,8 +233,8 @@ describe("PracticeTrainer", () => {
 
   it("ignores a saved draft for an exercise that no longer exists", async () => {
     window.localStorage.setItem(
-      PRACTICE_DRAFT_STORAGE_KEY,
-      JSON.stringify({ version: 1, exerciseId: "retired", answers: ["a", "b", "c"], reveals: [null, null, null] }),
+      practiceDraftStorageKey("user_a"),
+      JSON.stringify({ version: 1, userId: "user_a", exerciseId: "retired", answers: ["a", "b", "c"], reveals: [null, null, null] }),
     );
 
     await render();
@@ -251,7 +255,7 @@ describe("PracticeTrainer", () => {
     await click("← Choose another exercise");
     await click("Discard and leave");
     expect(container.textContent).toContain("Choose a task");
-    expect(window.localStorage.getItem(PRACTICE_DRAFT_STORAGE_KEY)).toBeNull();
+    expect(window.localStorage.getItem(practiceDraftStorageKey("user_a"))).toBeNull();
   });
 
   it("leaves immediately when nothing has been written", async () => {
@@ -269,5 +273,90 @@ describe("PracticeTrainer", () => {
     await render();
 
     expect(container.querySelector('[data-walkthrough="practice-stages-preview"]')).not.toBeNull();
+  });
+
+  describe("a browser shared by two learners", () => {
+    async function switchTo(userId: string | undefined) {
+      act(() => {
+        root.unmount();
+      });
+      currentUser = userId;
+      root = createRoot(container);
+      await render();
+    }
+
+    it("never restores one learner's exercise for another, and gives A their own back", async () => {
+      await startTask1B2();
+      await type(1, "Le texte privé de A.");
+      expect(window.localStorage.getItem(practiceDraftStorageKey("user_a"))).toContain("Le texte privé de A.");
+
+      await switchTo("user_b");
+      expect(container.textContent).toContain("Choose a task");
+      expect(container.textContent).not.toContain("Un nouvel appartement");
+      expect(container.querySelectorAll("textarea")).toHaveLength(0);
+      expect(container.textContent).not.toContain("Le texte privé de A.");
+
+      // B writes their own; it is stored apart.
+      await click("Task 1");
+      await click("B2");
+      await click("Start the exercise");
+      await type(0, "Le texte de B.");
+      expect(window.localStorage.getItem(practiceDraftStorageKey("user_b"))).toContain("Le texte de B.");
+      expect(window.localStorage.getItem(practiceDraftStorageKey("user_a"))).not.toContain("Le texte de B.");
+
+      await switchTo("user_a");
+      expect(textarea(1).value).toBe("Le texte privé de A.");
+      expect(textarea(0).value).toBe("");
+    });
+
+    it("saves and restores nothing without a user id", async () => {
+      await startTask1B2();
+      await type(1, "Le texte de A.");
+
+      await switchTo(undefined);
+      expect(container.textContent).toContain("Choose a task");
+
+      await click("Task 1");
+      await click("B2");
+      await click("Start the exercise");
+      await type(0, "Du texte sans propriétaire connu.");
+
+      const keys = Object.keys({ ...window.localStorage }).filter((key) => key.startsWith("tcfhelper.practice"));
+      expect(keys).toEqual([practiceDraftStorageKey("user_a")]);
+    });
+
+    it("deletes the first version's ownerless draft instead of restoring it", async () => {
+      window.localStorage.setItem(
+        LEGACY_PRACTICE_DRAFT_STORAGE_KEY,
+        JSON.stringify({
+          version: 1,
+          exerciseId: SECTIONED_PRACTICE_EXERCISES[0].id,
+          answers: ["Texte d'un apprenant inconnu.", "", ""],
+          reveals: [null, null, null],
+        }),
+      );
+
+      await render();
+
+      expect(container.textContent).toContain("Choose a task");
+      expect(container.querySelectorAll("textarea")).toHaveLength(0);
+      expect(window.localStorage.getItem(LEGACY_PRACTICE_DRAFT_STORAGE_KEY)).toBeNull();
+    });
+
+    it("works with storage blocked, and shows the next learner nothing", async () => {
+      const fake = installFakeLocalStorage({ failReads: true, failWrites: true });
+      try {
+        await startTask1B2();
+        await type(1, "Le texte de A, sans stockage.");
+        expect(textarea(1).value).toBe("Le texte de A, sans stockage."); // the exercise still works
+        expect(fake.calls.setItem).toBeGreaterThan(0); // storage really was tried
+
+        await switchTo("user_b");
+        expect(container.textContent).toContain("Choose a task");
+        expect(container.textContent).not.toContain("Le texte de A, sans stockage.");
+      } finally {
+        fake.restore();
+      }
+    });
   });
 });

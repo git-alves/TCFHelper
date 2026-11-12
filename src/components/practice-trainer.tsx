@@ -7,6 +7,7 @@ import { useAppCopy } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import {
   clearStoredPracticeDraft,
+  discardLegacyPracticeDraft,
   loadStoredPracticeDraft,
   saveStoredPracticeDraft,
   type StoredSectionReveal,
@@ -27,6 +28,12 @@ const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
 interface PracticeTrainerProps {
   /** Serializable, reviewed exercises from the server page. */
   exercises: readonly SectionedPracticeExercise[];
+  /**
+   * The signed-in learner's internal app user id, from the server page. An
+   * unfinished exercise is saved and restored only for a known user, and only
+   * that user's own.
+   */
+  userId?: string;
 }
 
 function ChoiceCard({
@@ -85,7 +92,7 @@ const PRIMARY_BUTTON =
 const SECONDARY_BUTTON =
   "rounded-full border border-black/[.15] px-5 py-2.5 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]";
 
-export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
+export function PracticeTrainer({ exercises, userId }: PracticeTrainerProps) {
   const appCopy = useAppCopy();
   const practice = appCopy.practice;
   const searchParams = useSearchParams();
@@ -123,18 +130,24 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
   useEffect(() => {
     if (hasRestoredRef.current) return;
     hasRestoredRef.current = true;
-    const saved = loadStoredPracticeDraft(getSafeLocalStorage());
+    const saved = loadStoredPracticeDraft(getSafeLocalStorage(), userId);
     const exercise = saved ? exercises.find((candidate) => candidate.id === saved.exerciseId) : null;
     if (!saved || !exercise || saved.answers.length !== PRACTICE_SECTION_BLUEPRINT[exercise.task].length) return;
     progressSessionIdRef.current = saved.progressSessionId ?? null;
     completionRecordedRef.current = saved.completionRecorded ?? false;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time restore from browser storage
     open(exercise, saved);
-  }, [exercises]);
+  }, [exercises, userId]);
+
+  // The first version kept every learner's draft under one ownerless key. It
+  // cannot be attributed to anyone, so it is deleted, never restored.
+  useEffect(() => {
+    discardLegacyPracticeDraft(getSafeLocalStorage());
+  }, []);
 
   useEffect(() => {
     if (!active) return;
-    saveStoredPracticeDraft(getSafeLocalStorage(), {
+    saveStoredPracticeDraft(getSafeLocalStorage(), userId, {
       version: 1,
       exerciseId: active.id,
       answers,
@@ -142,7 +155,7 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
       progressSessionId: progressSessionIdRef.current ?? undefined,
       completionRecorded: completionRecordedRef.current,
     });
-  }, [active, answers, reveals]);
+  }, [userId, active, answers, reveals]);
 
   useEffect(() => {
     if (active) headingRef.current?.focus();
@@ -199,7 +212,7 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
   }
 
   function leaveExercise() {
-    clearStoredPracticeDraft(getSafeLocalStorage());
+    clearStoredPracticeDraft(getSafeLocalStorage(), userId);
     progressSessionIdRef.current = null;
     completionRecordedRef.current = false;
     setIsConfirmingLeave(false);

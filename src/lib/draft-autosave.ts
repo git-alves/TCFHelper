@@ -19,8 +19,7 @@ export function draftStorageKey(userId: string): string {
 // The first version stored every learner's drafts under this one key, with no
 // owner. It cannot be attributed to anyone, so it is deleted, never offered.
 export const LEGACY_DRAFT_STORAGE_KEY = "mytcflab:drafts";
-// A draft left on a device is not kept forever.
-export const DRAFT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
 // Drafts are kept per task + topic. Only the most recently written few are
 // retained so the stored value stays small.
 export const MAX_SAVED_DRAFTS = 5;
@@ -92,10 +91,6 @@ function isSavedDraft(value: unknown): value is SavedDraft {
 // user's entry is emptied as soon as a write for them succeeds.
 const unpersisted = new Map<string, SavedDraft[]>();
 
-function isFresh(draft: SavedDraft, now: number): boolean {
-  return now - draft.savedAt <= DRAFT_MAX_AGE_MS;
-}
-
 function readStored(userId: string): SavedDraft[] | null {
   try {
     const raw = window.localStorage.getItem(draftStorageKey(userId));
@@ -122,10 +117,8 @@ function writeStored(userId: string, drafts: SavedDraft[]): boolean {
 /** This user's saved drafts, newest first. Never throws; empty without a user id. */
 export function loadDrafts(userId: string | null | undefined): SavedDraft[] {
   if (!userId || typeof window === "undefined") return [];
-  const now = Date.now();
   const byKey = new Map<string, SavedDraft>();
   for (const draft of [...(readStored(userId) ?? []), ...(unpersisted.get(userId) ?? [])]) {
-    if (!isFresh(draft, now)) continue;
     const existing = byKey.get(draft.key);
     if (!existing || draft.savedAt >= existing.savedAt) byKey.set(draft.key, draft);
   }

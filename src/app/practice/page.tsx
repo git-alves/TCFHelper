@@ -30,7 +30,9 @@ export default async function PracticePage() {
   return (
     <main className="flex w-full flex-1 flex-col px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <PracticeWalkthroughRunner />
-      <PracticeTrainer exercises={SECTIONED_PRACTICE_EXERCISES} />
+      {/* Keyed by user so a different learner on the same browser never
+          inherits the previous one's in-memory exercise. */}
+      <PracticeTrainer key={user.id} userId={user.id} exercises={SECTIONED_PRACTICE_EXERCISES} />
     </main>
   );
 }

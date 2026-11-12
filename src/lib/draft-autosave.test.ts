@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installFakeLocalStorage } from "./draft-autosave.test-helpers";
 import {
-  DRAFT_MAX_AGE_MS,
   LEGACY_DRAFT_STORAGE_KEY,
   MAX_SAVED_DRAFTS,
   deleteDraft,
@@ -41,17 +40,9 @@ function draft(overrides: Partial<SavedDraft> = {}): SavedDraft {
 }
 
 beforeEach(() => {
-  // A fixed clock: drafts older than their retention are not offered, and the
-  // fixtures below use small savedAt values to order them.
-  vi.useFakeTimers();
-  vi.setSystemTime(10_000);
   vi.restoreAllMocks();
   window.localStorage.clear();
   resetDraftMemoryForTest();
-});
-
-afterEach(() => {
-  vi.useRealTimers();
 });
 
 describe("draftKey", () => {
@@ -259,12 +250,5 @@ describe("a browser shared by two learners", () => {
     } finally {
       fake.restore();
     }
-  });
-
-  it("does not offer a draft left on the device for longer than its retention", () => {
-    saveDraft(A, draft({ key: "old", savedAt: Date.now() - DRAFT_MAX_AGE_MS - 1_000 }));
-    saveDraft(A, draft({ key: "fresh", savedAt: Date.now() }));
-
-    expect(loadDrafts(A).map((saved) => saved.key)).toEqual(["fresh"]);
   });
 });
