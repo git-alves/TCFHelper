@@ -43,6 +43,13 @@ export interface OpenRouterChatCompletionOptions {
   maxTokens: number;
   timeoutMs: number;
   responseFormat?: Record<string, unknown>;
+  /**
+   * Ask OpenRouter to route only to endpoints that honour every parameter in
+   * the request (notably response_format). Without it OpenRouter may route to a
+   * backend that silently ignores a json_schema and returns prose. Sent as
+   * provider.require_parameters only when true.
+   */
+  requireParameters?: boolean;
   /** Distinguishes this call's transport-failure log lines from another adapter's (e.g. "correction" vs "example generation"). */
   logLabel: string;
 }
@@ -115,6 +122,7 @@ function request(options: OpenRouterChatCompletionOptions) {
       model: options.model,
       messages: options.messages,
       ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
+      ...(options.requireParameters ? { provider: { require_parameters: true } } : {}),
       max_tokens: options.maxTokens,
     }),
     cache: "no-store",

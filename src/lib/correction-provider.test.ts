@@ -20,6 +20,28 @@ describe("looksLikeJson", () => {
   });
 });
 
+describe("parseCorrectionJson with a code fence", () => {
+  it("parses a reply that is only a ```json fenced block, and a plain ``` one", () => {
+    expect(parseCorrectionJson('```json\n{"correctedText":"ok"}\n```')).toEqual({ correctedText: "ok" });
+    expect(parseCorrectionJson('```\n{"correctedText":"ok"}\n```')).toEqual({ correctedText: "ok" });
+  });
+
+  it("still rejects prose, including prose around or inside a fence, as format-unsupported", () => {
+    for (const reply of [
+      "Sure! Here is my assessment of the essay.",
+      'Here you go:\n```json\n{"correctedText":"ok"}\n```',
+      '```json\n{"correctedText":"ok"}\n```\nHope that helps',
+      "```json\nI cannot provide a JSON response.\n```",
+    ]) {
+      expect(() => parseCorrectionJson(reply), reply).toThrow(CorrectionProviderFormatUnsupportedError);
+    }
+  });
+
+  it("a fenced block holding malformed JSON is invalid-JSON, not format-unsupported", () => {
+    expect(() => parseCorrectionJson('```json\n{"correctedText": "ok",\n```')).toThrow(CorrectionProviderInvalidJsonError);
+  });
+});
+
 describe("parseCorrectionJson", () => {
   it("returns the parsed value for well-formed JSON", () => {
     expect(parseCorrectionJson('{"correctedText":"ok"}')).toEqual({ correctedText: "ok" });

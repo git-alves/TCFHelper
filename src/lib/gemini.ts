@@ -4,6 +4,7 @@ import { CEFR_CONFIDENCE_LEVELS, CEFR_LEVELS, ERROR_CATEGORIES } from "@/lib/ess
 import { renderGeneratorLevelCriteria } from "@/lib/cefr-level-criteria";
 import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 import { sendWithOverloadRetry } from "@/lib/provider-retry";
+import { unwrapJsonFence } from "@/lib/json-fence";
 
 const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Google AI Studio's free tier (no credit card, no billing) — kept
@@ -598,7 +599,8 @@ export async function gradeEssayWithGemini(
   }
 
   try {
-    return JSON.parse(text);
+    // A reply that is only a ```json fenced block is accepted, like OpenRouter's.
+    return JSON.parse(unwrapJsonFence(text));
   } catch {
     if (finishReason === "MAX_TOKENS") {
       console.error(`Gemini correction output truncated ${describeCorrectionResponse(payload, finishReason)}`);

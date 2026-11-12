@@ -112,6 +112,9 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
           type: "json_schema",
           json_schema: { name: "essay_feedback", schema: CORRECTION_JSON_SCHEMA },
         },
+        // The grading result must be structured JSON, so only route to endpoints
+        // that actually support response_format.
+        requireParameters: true,
         logLabel: "correction",
       });
     } catch (error) {
