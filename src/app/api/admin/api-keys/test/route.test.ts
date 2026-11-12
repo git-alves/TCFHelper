@@ -166,7 +166,10 @@ describe("POST /api/admin/api-keys/test: request validation", () => {
     ["a masked placeholder", "••••1234", /masked key/],
     ["a short key", "short-key", /too short/],
     ["a key with a space", "sk-or-v1-0123456789 abcdefghij", /spaces/],
-    ["a key with an accent", "sk-or-v1-0123456789abcdéfghij", /plain letters/],
+    ["a key with an accent", "sk-or-v1-0123456789abcdéfghij", /letters, digits, dots, underscores and hyphens/],
+    ["a key with a question mark", "sk-or-v1-0123456789abcdef?x=1", /letters, digits, dots, underscores and hyphens/],
+    ["a key with a percent sign", "sk-or-v1-0123456789abcdef%2F", /letters, digits, dots, underscores and hyphens/],
+    ["a key with a slash", "sk-or-v1-0123456789abc/def", /letters, digits, dots, underscores and hyphens/],
   ])("rejects a typed key that is %s, without echoing it", async (_label, apiKey, message) => {
     const response = await post({ section: "correction", provider: "openrouter", apiKey, model: "qwen/qwen3-30b-a3b" });
     const body = (await response.json()) as { error: string };

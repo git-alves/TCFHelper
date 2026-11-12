@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { API_KEY_TEST_MAX_TOKENS, API_KEY_TEST_TIMEOUT_MS, runApiKeyTest, type ApiKeyTestInput } from "./api-key-test";
+import { API_KEY_TEST_MAX_TOKENS, API_KEY_TEST_TIMEOUT_MS, runApiKeyTest, sanitizeProviderMessage, type ApiKeyTestInput } from "./api-key-test";
 
 const OPENROUTER_KEY = "sk-or-v1-SECRETKEYSECRETKEY0123456789";
 const GEMINI_KEY = "AIzaSySECRETGEMINIKEY0123456789abcdef";
@@ -229,38 +229,57 @@ describe("runApiKeyTest: outcomes", () => {
 });
 
 describe("runApiKeyTest: the key is never echoed", () => {
-  it("redacts the exact key and key-shaped tokens from a provider's own message", async () => {
-    const { result } = await run({
-      reply: () =>
-        json(
-          { error: { message: `Invalid key ${OPENROUTER_KEY} and sk-or-v1-ANOTHERKEY123456789 plus Bearer abc.def and AIzaSyABCDEFGHIJKLMNOPQRSTUVWX`, code: 401 } },
-          401,
-        ),
-    });
-    const text = JSON.stringify(result);
+  it.each([
+    ["an OpenRouter 401", 401, { error: { message: `No auth credentials found for key ${OPENROUTER_KEY}`, code: 401 } }, "openrouter"],
+    ["an OpenRouter 403", 403, { error: { message: `Forbidden: ${OPENROUTER_KEY}`, code: 403 } }, "openrouter"],
+    ["a Gemini 400 invalid key", 400, { error: { message: `API key not valid. Please pass a valid API key. (${GEMINI_KEY})`, code: 400 } }, "gemini"],
+    ["a Gemini 403", 403, { error: { message: `Permission denied for ${GEMINI_KEY}`, code: 403 } }, "gemini"],
+  ] as const)("a credential failure (%s) carries no provider text at all", async (_label, status, body, provider) => {
+    const { result } = await run(
+      provider === "gemini"
+        ? { provider: "gemini", apiKey: GEMINI_KEY, model: "gemini-3.5-flash-lite", reply: () => json(body, status) }
+        : { reply: () => json(body, status) },
+    );
 
     expect(result.kind).toBe("invalid_key");
-    expect(text).not.toContain(OPENROUTER_KEY);
-    expect(text).not.toContain("SECRETKEY");
-    expect(text).not.toContain("ANOTHERKEY");
-    expect(text).not.toContain("AIzaSyABCDEF");
-    expect(text).not.toContain("abc.def");
-    expect(result.message).toContain("[redacted]");
+    // Our own sentence only: no quoted provider message, whatever it echoed.
+    expect(result.message).not.toContain("said:");
+    expect(result.message).not.toContain("“");
+    expect(JSON.stringify(result)).not.toContain("SECRETKEY");
+    expect(JSON.stringify(result)).not.toContain("SECRETGEMINI");
+  });
+
+  it("a 401 that arrives as an embedded error in a 200 body is a credential failure too", async () => {
+    const { result } = await run({ reply: () => json({ error: { message: `bad key ${OPENROUTER_KEY}`, code: 401 } }) });
+
+    expect(result.kind).toBe("invalid_key");
+    expect(result.message).not.toContain("said:");
+  });
+
+  it("for the other outcomes, the provider's message is shown but anything of the key in it is redacted", async () => {
+    const { result } = await run({
+      reply: () => json({ error: { message: `Rate limit hit for ${OPENROUTER_KEY} on this account`, code: 429 } }, 429),
+    });
+
+    expect(result.kind).toBe("rate_limited");
+    expect(result.message).toContain("OpenRouter said: “Rate limit hit for [redacted] on this account”");
+    expect(JSON.stringify(result)).not.toContain("SECRETKEY");
   });
 
   it("includes the provider's own short message, trimmed to one line of at most 200 characters", async () => {
-    const { result } = await run({ reply: () => json({ error: { message: `No auth\n credentials ${"x".repeat(400)}`, code: 401 } }, 401) });
+    const { result } = await run({ reply: () => json({ error: { message: `Rate\n limit ${"x".repeat(400)}`, code: 429 } }, 429) });
 
     const said = result.message.match(/said: “([^”]*)”/)![1];
     expect(said.length).toBeLessThanOrEqual(200);
     expect(said).not.toContain("\n");
-    expect(said.startsWith("No auth credentials")).toBe(true);
+    expect(said.startsWith("Rate limit")).toBe(true);
   });
 
   it("no outcome ever contains the key", async () => {
     const replies: (() => Response | Promise<Response>)[] = [
       () => json(orOk('{"ok": true}')),
-      () => json({ error: { message: "x", code: 401 } }, 401),
+      () => json({ error: { message: `x ${OPENROUTER_KEY}`, code: 401 } }, 401),
+      () => json({ error: { message: `x ${OPENROUTER_KEY}`, code: 500 } }, 500),
       () => json(orOk("prose")),
       () => Promise.reject(new TypeError(`fetch failed ${OPENROUTER_KEY}`)),
       () => Promise.reject(Object.assign(new Error(OPENROUTER_KEY), { name: "TimeoutError" })),
@@ -269,6 +288,60 @@ describe("runApiKeyTest: the key is never echoed", () => {
       const { result } = await run({ reply });
       expect(JSON.stringify(result)).not.toContain("SECRETKEY");
     }
+  });
+});
+
+describe("sanitizeProviderMessage", () => {
+  // A key with characters the charset would now refuse, to prove the redactor
+  // does not rely on that: it must still hold for a stored legacy value.
+  const AWKWARD_KEY = 'sk-test/AbCdEf?GhIjKl%Mn+Op="Qr\\St' + "0123456789";
+
+  it("redacts the key as sent, URL-encoded and JSON-escaped", () => {
+    const encoded = encodeURIComponent(AWKWARD_KEY);
+    const escaped = JSON.stringify(AWKWARD_KEY).slice(1, -1);
+    const text = sanitizeProviderMessage(`as sent ${AWKWARD_KEY}; in a URL ?key=${encoded}; in a JSON body ${escaped}.`, AWKWARD_KEY)!;
+
+    expect(text).not.toContain(AWKWARD_KEY);
+    expect(text).not.toContain(encoded);
+    expect(text).not.toContain(escaped);
+    expect(text).not.toContain("GhIjKl");
+    expect(text).not.toContain("AbCdEf");
+    expect(text).toContain("as sent [redacted]");
+  });
+
+  it("redacts a partial echo of eight or more characters, anywhere in the key, whatever its case", () => {
+    const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
+
+    for (const echo of [
+      key.slice(0, 12), // the start
+      key.slice(-12), // the end
+      key.slice(10, 22), // the middle
+      key.slice(3, 11), // exactly eight characters
+      key.slice(10, 22).toUpperCase(), // case-folded
+    ]) {
+      const text = sanitizeProviderMessage(`Provider says the credential beginning ${echo} is wrong`, key)!;
+      expect(text, echo).not.toContain(echo);
+      expect(text, echo).toContain("[redacted]");
+    }
+  });
+
+  it("leaves a run of seven characters alone (too short to be an echo) and ordinary words untouched", () => {
+    const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
+
+    expect(sanitizeProviderMessage(`Rate limit for ${key.slice(0, 7)} reached`, key)).toBe("Rate limit for sk-or-v reached");
+    expect(sanitizeProviderMessage("The model is overloaded, try again later.", key)).toBe("The model is overloaded, try again later.");
+  });
+
+  it("still strips key-shaped tokens and bearer headers that are not this key", () => {
+    const text = sanitizeProviderMessage("x sk-or-v1-OTHERKEYOTHERKEY123 y AIzaSyABCDEFGHIJKLMNOPQRSTUVWX z Bearer abc.def", "some-other-key-0123456789")!;
+
+    expect(text).toBe("x [redacted] y [redacted] z Bearer [redacted]");
+  });
+
+  it("returns null for an empty or non-string message and trims long ones to 200 characters", () => {
+    expect(sanitizeProviderMessage(undefined, "k".repeat(20))).toBeNull();
+    expect(sanitizeProviderMessage("   ", "k".repeat(20))).toBeNull();
+    expect(sanitizeProviderMessage("a".repeat(500), "k".repeat(20))!.length).toBe(200);
   });
 });
 

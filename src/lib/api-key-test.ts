@@ -69,13 +69,56 @@ export interface ApiKeyTestInput {
 
 const PROVIDER_NAME: Record<ModelProvider, string> = { gemini: "Gemini", openrouter: "OpenRouter" };
 
-// Strips anything that looks like a credential from a provider's own message
-// before it is shown: the exact key that was sent, and key-shaped tokens.
-function sanitizeProviderMessage(raw: unknown, apiKey: string): string | null {
+// The shortest run of the key that is treated as an echo of it.
+const MIN_ECHO_LENGTH = 8;
+const MAX_PROVIDER_TEXT_SCANNED = 2_000;
+
+// Every form a provider might echo the key back in: as sent, URL-encoded, and
+// JSON-escaped (the key charset is narrow enough that these usually coincide,
+// but a stored value is never trusted to be as narrow as a freshly typed one).
+function keyForms(apiKey: string): string[] {
+  const forms = new Set([apiKey, encodeURIComponent(apiKey), JSON.stringify(apiKey).slice(1, -1)]);
+  return [...forms].filter((form) => form.length >= MIN_ECHO_LENGTH);
+}
+
+// Replaces every run of at least MIN_ECHO_LENGTH characters that also occurs
+// anywhere inside `form` (so a partial echo, such as a key cut off or quoted in
+// pieces, is caught as well as the whole key). Compared without regard to case.
+function redactEchoesOf(text: string, form: string): string {
+  const haystack = form.toLowerCase();
+  const lowered = text.toLowerCase();
+  const sameLength = lowered.length === text.length;
+  const probe = sameLength ? lowered : text;
+  const target = sameLength ? haystack : form;
+
+  let out = "";
+  let i = 0;
+  while (i < text.length) {
+    if (i + MIN_ECHO_LENGTH <= text.length && target.includes(probe.slice(i, i + MIN_ECHO_LENGTH))) {
+      let end = i + MIN_ECHO_LENGTH;
+      while (end < text.length && target.includes(probe.slice(i, end + 1))) end += 1;
+      out += "[redacted]";
+      i = end;
+    } else {
+      out += text[i];
+      i += 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * Cleans a provider's own message before it can be shown: the key in any form
+ * it might be echoed in (exact, URL-encoded, JSON-escaped, or any run of 8 or
+ * more of its characters), then key-shaped tokens and bearer headers. Exported
+ * for tests. (A credential failure never shows the provider's text at all; this
+ * covers the other outcomes.)
+ */
+export function sanitizeProviderMessage(raw: unknown, apiKey: string): string | null {
   if (typeof raw !== "string") return null;
-  let text = raw.replace(/\s+/g, " ").trim();
+  let text = raw.replace(/\s+/g, " ").trim().slice(0, MAX_PROVIDER_TEXT_SCANNED);
   if (!text) return null;
-  if (apiKey) text = text.split(apiKey).join("[redacted]");
+  for (const form of keyForms(apiKey)) text = redactEchoesOf(text, form);
   text = text
     .replace(/sk-[A-Za-z0-9_-]{10,}/g, "[redacted]")
     .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[redacted]")
@@ -127,7 +170,11 @@ function describeFailure(
 ): string {
   const name = PROVIDER_NAME[provider];
   const http = status === null ? "" : ` (HTTP ${status})`;
-  const said = providerMessage ? ` ${name} said: “${providerMessage}”` : "";
+  // A credential failure never shows the provider's own text: it is the one
+  // outcome where that text is most likely to quote the key (or part of it), and
+  // our plain-language message already says everything the admin can act on.
+  const credentialFailure = kind === "invalid_key" || status === 401 || status === 403;
+  const said = providerMessage && !credentialFailure ? ` ${name} said: “${providerMessage}”` : "";
   switch (kind) {
     case "invalid_key":
       return `${name} rejected the API key${http}. Check that it is correct, still active, and ${/^[AEIOU]/i.test(name) ? "an" : "a"} ${name} key.${said}`;

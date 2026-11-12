@@ -10,17 +10,21 @@ export const MODEL_MAX_LENGTH = 200;
 // contains it is a masked placeholder echoed back, not a key.
 const MASK_CHARACTER = "•";
 
-// Visible ASCII only: letters, digits and punctuation, with no space, tab,
-// newline, control character or non-ASCII character anywhere in the value.
-const VISIBLE_ASCII_ONLY = /^[\x21-\x7E]+$/;
+// Letters, digits, dot, underscore and hyphen only. Real keys fit: an OpenRouter
+// key is "sk-or-v1-" followed by hex, and a Gemini key starts "AIza" and is
+// base64url-like. Anything else (a space, "?", "%", "/", "+", "=", quotes, any
+// accented or other non-ASCII character) is not part of a key, and keeping the
+// set this small means a key never changes when it is URL-encoded or JSON-escaped,
+// which is what lets the Test button redact it reliably from a provider's reply.
+const KEY_CHARACTERS_ONLY = /^[A-Za-z0-9._-]+$/;
 
 /**
- * A key must be at least 20 characters of visible ASCII with no whitespace.
- * Real provider keys are long (a Gemini key is 39 characters, an OpenRouter key
- * about 70), so a shorter value is a typo or placeholder. A masked placeholder,
- * whitespace or a non-ASCII character can never be a key and, sent as an HTTP
- * header, would fail in the browser stack with a confusing network error
- * instead of a clear "invalid key" from the provider.
+ * A key must be at least 20 characters, using only letters, digits, dots,
+ * underscores and hyphens. Real provider keys are long (a Gemini key is 39
+ * characters, an OpenRouter key about 70), so a shorter value is a typo or
+ * placeholder. A masked placeholder, whitespace or any other character can never
+ * be a key and, sent as an HTTP header, would fail in the browser stack with a
+ * confusing network error instead of a clear "invalid key" from the provider.
  * Returns a message for the admin, or null when the value is acceptable.
  */
 export function validateApiKey(value: string): string | null {
@@ -30,8 +34,8 @@ export function validateApiKey(value: string): string | null {
   if (/\s/.test(value)) {
     return "The API key must not contain spaces or line breaks. Paste just the key.";
   }
-  if (!VISIBLE_ASCII_ONLY.test(value)) {
-    return "The API key may only contain plain letters, digits and punctuation (no accents or other special characters).";
+  if (!KEY_CHARACTERS_ONLY.test(value)) {
+    return "The API key may only contain letters, digits, dots, underscores and hyphens (no accents or other special characters such as ? % / + =).";
   }
   if (value.length < API_KEY_MIN_LENGTH) {
     return `The API key looks too short: provider keys are at least ${API_KEY_MIN_LENGTH} characters.`;

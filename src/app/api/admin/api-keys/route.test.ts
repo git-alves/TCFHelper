@@ -202,8 +202,11 @@ describe("PUT /api/admin/api-keys", () => {
       ["a key with a space", "sk-or-v1-0123456789 abcdefghij", /spaces or line breaks/],
       ["a key with a newline", "sk-or-v1-0123456789\nabcdefghij", /spaces or line breaks/],
       ["a key with a tab", "sk-or-v1-0123456789\tabcdefghij", /spaces or line breaks/],
-      ["a key with an accented character", "sk-or-v1-0123456789abcdéfghij", /plain letters/],
-      ["a key with an emoji", "sk-or-v1-0123456789abcdefgh😀", /plain letters/],
+      ["a key with an accented character", "sk-or-v1-0123456789abcdéfghij", /letters, digits, dots, underscores and hyphens/],
+      ["a key with an emoji", "sk-or-v1-0123456789abcdefgh😀", /letters, digits, dots, underscores and hyphens/],
+      ["a key with a question mark", "sk-or-v1-0123456789abcdef?x=1", /letters, digits, dots, underscores and hyphens/],
+      ["a key with a percent sign", "sk-or-v1-0123456789abcdef%2F", /letters, digits, dots, underscores and hyphens/],
+      ["a key with a slash", "sk-or-v1-0123456789abc/def", /letters, digits, dots, underscores and hyphens/],
     ])("rejects %s with a message that does not echo it", async (_label, key, message) => {
       const response = await put({ correctionApiKey: key });
       const body = (await response.json()) as { error: string };
