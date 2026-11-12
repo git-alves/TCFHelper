@@ -5,10 +5,19 @@ import { EssayStatus, TopicSource, type Prisma, type TaskType } from "@prisma/cl
 import { prisma } from "@/lib/prisma";
 
 const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
-// Gemini correction calls can take up to 45 seconds. Leave room for the
-// response to be validated and persisted, while still allowing a learner to
-// recover from a server invocation that disappears without cleanup.
-const LEASE_DURATION_MS = 75_000;
+// The lease must outlive the longest legitimate provider call, or a valid
+// answer arrives after it expired and is thrown away ("lost"). A correction
+// can spend up to MAX_ATTEMPTS attempts of 45 seconds each plus the 503 backoff
+// waits, which provider-retry.ts caps at 150 seconds in total (3 x 45s plus
+// 15s of slack), and the route may run for 180 seconds (maxDuration in
+// src/app/api/essays/correct/route.ts). 170 seconds covers the 150s budget
+// with 20s left to validate and persist, and stays below maxDuration, so the
+// lease of a request the platform has killed expires before the platform's own
+// limit would let it be forgotten. The price is that after a genuine crash the
+// same correction (same text and topic) reports "in progress" for up to this
+// long; its retryAt is this expiry, so the learner is told the truth, and
+// editing the text starts a new correction immediately.
+export const LEASE_DURATION_MS = 170_000;
 
 export type CorrectionTopicContext =
   | { kind: "shared"; id: string }

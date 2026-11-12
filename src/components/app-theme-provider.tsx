@@ -8,6 +8,7 @@ import {
   type AppTheme,
   type ResolvedTheme,
 } from "@/lib/app-theme";
+import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
 
 interface AppThemeContextValue {
   theme: AppTheme;
@@ -46,8 +47,18 @@ function subscribe(listener: () => void) {
   };
 }
 
+// A choice that could not be written (storage blocked or full) still has to
+// take effect, so it is held here for the rest of the page session.
+let unsavedTheme: AppTheme | null = null;
+
+/** Test seam: forgets a choice that was held only for the page session. */
+export function resetUnsavedThemeForTest() {
+  unsavedTheme = null;
+}
+
 function getStoredTheme(): AppTheme {
-  const stored = window.localStorage.getItem(APP_THEME_STORAGE_KEY);
+  if (unsavedTheme) return unsavedTheme;
+  const stored = safeGetLocalItem(APP_THEME_STORAGE_KEY);
   return isAppTheme(stored) ? stored : DEFAULT_APP_THEME;
 }
 
@@ -84,7 +95,7 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
 
   const setTheme = useCallback((next: AppTheme) => {
     if (!isAppTheme(next)) return;
-    window.localStorage.setItem(APP_THEME_STORAGE_KEY, next);
+    unsavedTheme = safeSetLocalItem(APP_THEME_STORAGE_KEY, next) ? null : next;
     notifyListeners();
   }, []);
 

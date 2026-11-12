@@ -22,7 +22,7 @@ import {
 
 // Full grading responses run far longer than a short chat reply -- mirrors
 // CORRECTION_REQUEST_TIMEOUT_MS in gemini.ts.
-const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
+export const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
 
 // OpenRouter normalizes a max_tokens cut-off to finish_reason "length"; the
 // routed provider's own value (e.g. Gemini's "MAX_TOKENS") can also surface

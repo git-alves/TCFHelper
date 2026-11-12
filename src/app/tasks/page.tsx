@@ -31,7 +31,9 @@ export default async function TasksPage() {
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
       <WalkthroughWorkspaceScriptProvider>
         <TasksWalkthroughRunner />
-        <WritingWorkspace />
+        {/* Keyed by user so a different learner on the same browser never inherits
+            the previous one's in-memory draft. */}
+        <WritingWorkspace key={user.id} userId={user.id} />
       </WalkthroughWorkspaceScriptProvider>
     </main>
   );

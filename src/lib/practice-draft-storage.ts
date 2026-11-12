@@ -1,4 +1,13 @@
-export const PRACTICE_DRAFT_STORAGE_KEY = "tcfhelper.practice.sectioned-draft.v1";
+// A browser can be shared, so a draft belongs to one app user: it is stored
+// under a key that includes the user's internal id, carries that id in the
+// stored value, and is never read, written or restored without a known id.
+const PRACTICE_DRAFT_STORAGE_PREFIX = "tcfhelper.practice.sectioned-draft.v1:";
+export function practiceDraftStorageKey(userId: string): string {
+  return `${PRACTICE_DRAFT_STORAGE_PREFIX}${userId}`;
+}
+// The first version stored every learner's draft under this one key, with no
+// owner. It cannot be attributed to anyone, so it is deleted unread.
+export const LEGACY_PRACTICE_DRAFT_STORAGE_KEY = "tcfhelper.practice.sectioned-draft.v1";
 
 /**
  * How a model answer was reached for one section: "written" if the learner
@@ -37,30 +46,55 @@ function isStoredPracticeDraft(value: unknown): value is StoredPracticeDraft {
   );
 }
 
-export function loadStoredPracticeDraft(storage: Pick<Storage, "getItem">): StoredPracticeDraft | null {
+export function loadStoredPracticeDraft(
+  storage: Pick<Storage, "getItem">,
+  userId: string | null | undefined,
+): StoredPracticeDraft | null {
+  if (!userId) return null;
   try {
-    const serialized = storage.getItem(PRACTICE_DRAFT_STORAGE_KEY);
+    const serialized = storage.getItem(practiceDraftStorageKey(userId));
     if (!serialized) return null;
     const parsed: unknown = JSON.parse(serialized);
-    return isStoredPracticeDraft(parsed) ? parsed : null;
+    if (!isStoredPracticeDraft(parsed)) return null;
+    const { userId: owner, ...draft } = parsed as StoredPracticeDraft & { userId?: unknown };
+    // Even under this user's key, only a draft they own counts.
+    return owner === userId ? draft : null;
   } catch {
     return null;
   }
 }
 
-export function saveStoredPracticeDraft(storage: Pick<Storage, "setItem">, draft: StoredPracticeDraft): boolean {
+export function saveStoredPracticeDraft(
+  storage: Pick<Storage, "setItem">,
+  userId: string | null | undefined,
+  draft: StoredPracticeDraft,
+): boolean {
+  if (!userId) return false;
   try {
-    storage.setItem(PRACTICE_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    storage.setItem(practiceDraftStorageKey(userId), JSON.stringify({ ...draft, userId }));
     return true;
   } catch {
     return false;
   }
 }
 
-export function clearStoredPracticeDraft(storage: Pick<Storage, "removeItem">): void {
+export function clearStoredPracticeDraft(
+  storage: Pick<Storage, "removeItem">,
+  userId: string | null | undefined,
+): void {
+  if (!userId) return;
   try {
-    storage.removeItem(PRACTICE_DRAFT_STORAGE_KEY);
+    storage.removeItem(practiceDraftStorageKey(userId));
   } catch {
     // Storage may be disabled in private browsing; the live exercise still works.
+  }
+}
+
+/** Deletes the first version's ownerless draft without reading it. */
+export function discardLegacyPracticeDraft(storage: Pick<Storage, "removeItem">): void {
+  try {
+    storage.removeItem(LEGACY_PRACTICE_DRAFT_STORAGE_KEY);
+  } catch {
+    // Nothing reachable to delete.
   }
 }

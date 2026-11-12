@@ -516,3 +516,79 @@ describe("APP_COPY", () => {
   });
 });
 
+describe("correction failure and draft-restore copy", () => {
+  const stringsOf = (copy: ReturnType<typeof getAppCopy>) => {
+    const editor = copy.workspace.editor;
+    return {
+      genericCorrectionError: editor.genericCorrectionError,
+      correctionBusyError: editor.correctionBusyError,
+      correctionSessionExpiredError: editor.correctionSessionExpiredError,
+      correctionDailyLimitError: editor.correctionDailyLimitError({ time: "21:30" }),
+      correctionDailyLimitErrorNoTime: editor.correctionDailyLimitErrorNoTime,
+      correctionStillTrying: editor.correctionStillTrying,
+      draftRestoreMessage: editor.draftRestoreMessage,
+      draftRestoreAction: editor.draftRestoreAction,
+      draftDiscardAction: editor.draftDiscardAction,
+    };
+  };
+
+  it("exists, and differs from English, in every locale", () => {
+    const english = stringsOf(getAppCopy("en"));
+    for (const locale of APP_LOCALES) {
+      const strings = stringsOf(getAppCopy(locale));
+      for (const [name, value] of Object.entries(strings)) {
+        expect(value.trim(), `${locale}.${name}`).not.toBe("");
+        if (locale !== "en") expect(value, `${locale}.${name}`).not.toBe(english[name as keyof typeof english]);
+      }
+    }
+  });
+
+  it("puts the reset time in the daily-limit message in every locale", () => {
+    for (const locale of APP_LOCALES) {
+      expect(getAppCopy(locale).workspace.editor.correctionDailyLimitError({ time: "21:30" })).toContain("21:30");
+    }
+  });
+
+  it("never calls the system an AI, in any language", () => {
+    for (const locale of APP_LOCALES) {
+      for (const [name, value] of Object.entries(stringsOf(getAppCopy(locale)))) {
+        expect(value, `${locale}.${name}`).not.toMatch(/\b(AI|IA|KI)\b|artificial|artificielle|artificial|inteligencia|inteligência|intelligence/i);
+      }
+    }
+  });
+
+  it("calls it the system, in each language", () => {
+    expect(getAppCopy("en").workspace.editor.correctionBusyError).toContain("system");
+    expect(getAppCopy("fr").workspace.editor.correctionBusyError).toContain("système");
+    expect(getAppCopy("es").workspace.editor.correctionBusyError).toContain("sistema");
+    expect(getAppCopy("pt").workspace.editor.correctionBusyError).toContain("sistema");
+  });
+
+  it("marks emphasis with balanced ** pairs, and says the text is kept wherever it mentions the draft", () => {
+    for (const locale of APP_LOCALES) {
+      const editor = getAppCopy(locale).workspace.editor;
+      for (const value of [editor.genericCorrectionError, editor.correctionBusyError, editor.correctionSessionExpiredError]) {
+        expect((value.match(/\*\*/g) ?? []).length % 2).toBe(0);
+        expect(value).toMatch(/\*\*[^*]+\*\*/);
+      }
+    }
+  });
+
+  it("uses the product's exact Portuguese wording", () => {
+    const editor = getAppCopy("pt").workspace.editor;
+    expect(editor.correctionDailyLimitError({ time: "21:00" })).toBe(
+      "Você esgotou seu limite de correções de hoje. Ele voltará às 21:00.",
+    );
+    expect(editor.correctionBusyError.replaceAll("**", "")).toBe(
+      "O sistema está ocupado. Seu texto está salvo, tente de novo em um minuto.",
+    );
+    expect(editor.correctionBusyError).toBe("O sistema está ocupado. **Seu texto está salvo**, tente de novo em um minuto.");
+    expect(editor.correctionSessionExpiredError.replaceAll("**", "")).toBe(
+      "Sua sessão expirou. Entre de novo para corrigir; seu texto está salvo.",
+    );
+    expect(editor.correctionStillTrying).toBe("O sistema está ocupado, ainda tentando…");
+    expect(editor.draftRestoreMessage).toBe("Encontramos um rascunho não enviado. Recuperar?");
+    expect(editor.draftRestoreAction).toBe("Recuperar");
+    expect(editor.draftDiscardAction).toBe("Descartar");
+  });
+});
