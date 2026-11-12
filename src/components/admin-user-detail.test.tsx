@@ -26,7 +26,7 @@ const baseUser = {
       currentMonthCharacters: 4_000,
     },
     examples: { currentDayRequests: 3 },
-    corrections: { currentDayRequests: 1, currentMonthRequests: 8 },
+    corrections: { currentDayRequests: 1, currentMonthRequests: 8, currentDayFailed: 0, currentMonthFailed: 0 },
   },
   quotaOverride: {
     translationRequestsPerMinute: null,
@@ -58,6 +58,26 @@ describe("AdminUserDetail", () => {
     expect(markup).toContain("code they used remains permanently spent");
     expect(markup).toContain("Block user");
     expect(markup).toContain("Current API usage");
+  });
+
+  it("shows failed corrections beside the refunded counts on the detail page, omitting a zero", () => {
+    const failed = renderToStaticMarkup(
+      createElement(AdminUserDetail, {
+        user: {
+          ...baseUser,
+          usage: {
+            ...baseUser.usage,
+            corrections: { currentDayRequests: 2, currentMonthRequests: 9, currentDayFailed: 1, currentMonthFailed: 3 },
+          },
+        },
+        currentAdminId: "owner_1",
+      }),
+    );
+    expect(failed).toContain("today (1 failed)");
+    expect(failed).toContain("9 this month (3 failed)");
+
+    const clean = renderToStaticMarkup(createElement(AdminUserDetail, { user: baseUser, currentAdminId: "owner_1" }));
+    expect(clean).not.toContain("failed)");
   });
 
   it("shows the last sign-in and last activity, or says the sign-in is not recorded yet", () => {

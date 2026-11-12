@@ -170,8 +170,10 @@ describe("admin user list helpers", () => {
         correctionUsage: {
           dayStartedAt: new Date("2026-08-09T00:00:00.000Z"),
           dailyRequestCount: 3,
+          dailyFailedCount: 2,
           monthStartedAt: new Date("2026-07-01T00:00:00.000Z"),
           monthlyRequestCount: 21,
+          monthlyFailedCount: 6,
         },
       },
       now,
@@ -184,7 +186,7 @@ describe("admin user list helpers", () => {
         currentMonthCharacters: 0,
       },
       examples: { currentDayRequests: 0 },
-      corrections: { currentDayRequests: 0, currentMonthRequests: 0 },
+      corrections: { currentDayRequests: 0, currentMonthRequests: 0, currentDayFailed: 0, currentMonthFailed: 0 },
     });
   });
 
@@ -206,8 +208,10 @@ describe("admin user list helpers", () => {
         correctionUsage: {
           dayStartedAt: new Date("2026-08-10T00:00:00.000Z"),
           dailyRequestCount: 2,
+          dailyFailedCount: 1,
           monthStartedAt: new Date("2026-08-01T00:00:00.000Z"),
           monthlyRequestCount: 11,
+          monthlyFailedCount: 4,
         },
       },
       now,
@@ -220,7 +224,32 @@ describe("admin user list helpers", () => {
         currentMonthCharacters: 6_400,
       },
       examples: { currentDayRequests: 5 },
-      corrections: { currentDayRequests: 2, currentMonthRequests: 11 },
+      corrections: { currentDayRequests: 2, currentMonthRequests: 11, currentDayFailed: 1, currentMonthFailed: 4 },
+    });
+  });
+
+  it("reports failed corrections per window: a new day clears the day's failures but not the month's", () => {
+    const usage = getCurrentAdminUsage(
+      {
+        translationQuota: null,
+        exampleGenerationQuota: null,
+        correctionUsage: {
+          dayStartedAt: new Date("2026-08-09T00:00:00.000Z"),
+          dailyRequestCount: 3,
+          dailyFailedCount: 2,
+          monthStartedAt: new Date("2026-08-01T00:00:00.000Z"),
+          monthlyRequestCount: 12,
+          monthlyFailedCount: 5,
+        },
+      },
+      new Date("2026-08-10T12:34:45.000Z"),
+    );
+
+    expect(usage.corrections).toEqual({
+      currentDayRequests: 0,
+      currentMonthRequests: 12,
+      currentDayFailed: 0,
+      currentMonthFailed: 5,
     });
   });
 

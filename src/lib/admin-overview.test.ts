@@ -64,9 +64,23 @@ beforeEach(() => {
   });
   translationAggregateMock.mockResolvedValue({ _sum: { monthCharacterCount: 12_345 }, _count: { _all: 8 } });
   exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: 20 }, _count: { _all: 5 } });
-  correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: 7 }, _count: { _all: 3 } });
-  correctionAggregateMock.mockResolvedValueOnce({ _sum: { monthlyRequestCount: 99 } });
+  mockCorrectionAggregates({
+    day: { _sum: { dailyRequestCount: 7 }, _count: { _all: 3 } },
+    month: { _sum: { monthlyRequestCount: 99, monthlyFailedCount: 11 } },
+    failedDay: { _sum: { dailyFailedCount: 4 } },
+  });
 });
+
+// The three correction aggregates are told apart by what they sum, not by call
+// order, so reordering the queries cannot silently swap the figures.
+function mockCorrectionAggregates(results: { day: unknown; month: unknown; failedDay: unknown }) {
+  correctionAggregateMock.mockReset();
+  correctionAggregateMock.mockImplementation(async (args: { _sum: Record<string, boolean> }) => {
+    if (args._sum.monthlyRequestCount) return results.month;
+    if (args._sum.dailyRequestCount) return results.day;
+    return results.failedDay;
+  });
+}
 
 describe("getAdminOverviewStats", () => {
   it("aggregates registered users, access codes, and current-window usage", async () => {
@@ -80,6 +94,8 @@ describe("getAdminOverviewStats", () => {
       requestsToday: 7,
       requestsThisMonth: 99,
       activeUsersToday: 3,
+      failedToday: 4,
+      failedThisMonth: 11,
     });
   });
 
@@ -183,9 +199,11 @@ describe("getAdminOverviewStats", () => {
   it("treats missing sums as zero", async () => {
     translationAggregateMock.mockResolvedValue({ _sum: { monthCharacterCount: null }, _count: { _all: 0 } });
     exampleAggregateMock.mockResolvedValue({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
-    correctionAggregateMock.mockReset();
-    correctionAggregateMock.mockResolvedValueOnce({ _sum: { dailyRequestCount: null }, _count: { _all: 0 } });
-    correctionAggregateMock.mockResolvedValueOnce({ _sum: { monthlyRequestCount: null } });
+    mockCorrectionAggregates({
+      day: { _sum: { dailyRequestCount: null }, _count: { _all: 0 } },
+      month: { _sum: { monthlyRequestCount: null, monthlyFailedCount: null } },
+      failedDay: { _sum: { dailyFailedCount: null } },
+    });
 
     const stats = await getAdminOverviewStats(NOW);
 
@@ -193,6 +211,28 @@ describe("getAdminOverviewStats", () => {
     expect(stats.usage.examples.requestsToday).toBe(0);
     expect(stats.usage.corrections.requestsToday).toBe(0);
     expect(stats.usage.corrections.requestsThisMonth).toBe(0);
+    expect(stats.usage.corrections.failedToday).toBe(0);
+    expect(stats.usage.corrections.failedThisMonth).toBe(0);
+  });
+
+  it("counts a learner whose corrections all failed in the failed total but not as an active learner", async () => {
+    await getAdminOverviewStats(NOW);
+
+    const day = new Date("2026-08-10T00:00:00.000Z");
+    // Active learners and received corrections exclude zero-work rows ...
+    expect(correctionAggregateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { dayStartedAt: day, dailyRequestCount: { gt: 0 } } }),
+    );
+    // ... while the failed total must read every row of the window, because a
+    // learner whose attempts all failed is exactly a row at zero requests.
+    expect(correctionAggregateMock).toHaveBeenCalledWith({
+      where: { dayStartedAt: day },
+      _sum: { dailyFailedCount: true },
+    });
+    expect(correctionAggregateMock).toHaveBeenCalledWith({
+      where: { monthStartedAt: new Date("2026-08-01T00:00:00.000Z") },
+      _sum: { monthlyRequestCount: true, monthlyFailedCount: true },
+    });
   });
 });
 

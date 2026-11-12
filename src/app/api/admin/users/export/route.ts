@@ -14,6 +14,7 @@ const CSV_HEADERS = [
   "Translation chars (month)",
   "Example generations (day)",
   "Corrections (day)",
+  "Failed corrections (day)",
 ];
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
@@ -55,6 +56,7 @@ export async function GET(request: Request) {
       String(user.usage.translation.currentMonthCharacters),
       String(user.usage.examples.currentDayRequests),
       String(user.usage.corrections.currentDayRequests),
+      String(user.usage.corrections.currentDayFailed),
     ]),
   );
 

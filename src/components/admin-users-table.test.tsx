@@ -10,7 +10,7 @@ const { AdminUsersTable } = await import("./admin-users-table");
 const BASE_USAGE = {
   translation: { currentMinuteRequests: 0, currentMinuteCharacters: 0, currentMonthCharacters: 0 },
   examples: { currentDayRequests: 0 },
-  corrections: { currentDayRequests: 0, currentMonthRequests: 0 },
+  corrections: { currentDayRequests: 0, currentMonthRequests: 0, currentDayFailed: 0, currentMonthFailed: 0 },
 };
 
 function user(overrides: Partial<AdminUserListItem>): AdminUserListItem {
@@ -97,13 +97,36 @@ describe("AdminUsersTable", () => {
       user({
         usage: {
           ...BASE_USAGE,
-          corrections: { currentDayRequests: 3, currentMonthRequests: 41 },
+          corrections: { currentDayRequests: 3, currentMonthRequests: 41, currentDayFailed: 0, currentMonthFailed: 0 },
         },
       }),
     ]);
 
-    expect(markup).toContain("Corrections: 3 today");
-    expect(markup).toContain("41 this month");
+    expect(markup).toContain("Corrections: 3 today · 41 this month");
+    expect(markup).not.toContain("failed");
+  });
+
+  it("shows failed corrections next to the counts they were refunded from, omitting a zero", () => {
+    const both = renderUsers([
+      user({
+        usage: {
+          ...BASE_USAGE,
+          corrections: { currentDayRequests: 2, currentMonthRequests: 9, currentDayFailed: 1, currentMonthFailed: 3 },
+        },
+      }),
+    ]);
+    expect(both).toContain("Corrections: 2 today (1 failed) · 9 this month (3 failed)");
+
+    const monthOnly = renderUsers([
+      user({
+        usage: {
+          ...BASE_USAGE,
+          corrections: { currentDayRequests: 0, currentMonthRequests: 5, currentDayFailed: 0, currentMonthFailed: 2 },
+        },
+      }),
+    ]);
+    expect(monthOnly).toContain("Corrections: 0 today · 5 this month (2 failed)");
+    expect(monthOnly).not.toContain("0 failed");
   });
 
   it("prioritizes the Blocked and Owner access badges over live-admission state", () => {

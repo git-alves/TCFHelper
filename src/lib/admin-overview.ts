@@ -38,7 +38,14 @@ export type AdminOverviewStats = {
   usage: {
     translation: { charactersThisMonth: number; activeUsersThisMonth: number };
     examples: { requestsToday: number; activeUsersToday: number };
-    corrections: { requestsToday: number; requestsThisMonth: number; activeUsersToday: number };
+    corrections: {
+      requestsToday: number;
+      requestsThisMonth: number;
+      activeUsersToday: number;
+      // Corrections refunded after an AI-provider failure; not in the request counts.
+      failedToday: number;
+      failedThisMonth: number;
+    };
   };
 };
 
@@ -107,6 +114,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     exampleDayAgg,
     correctionDayAgg,
     correctionMonthAgg,
+    correctionFailedDayAgg,
     recentSignupRecords,
     recentActivity,
   ] = await Promise.all([
@@ -141,13 +149,20 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       _count: { _all: true },
     }),
     prisma.correctionUsage.aggregate({
-      where: { dayStartedAt: currentDayStart },
+      // Refunded failures leave dailyRequestCount at 0; like examples, do not
+      // report a learner whose only attempts failed as an active learner.
+      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
       _sum: { dailyRequestCount: true },
       _count: { _all: true },
     }),
     prisma.correctionUsage.aggregate({
       where: { monthStartedAt: currentMonthStart },
-      _sum: { monthlyRequestCount: true },
+      _sum: { monthlyRequestCount: true, monthlyFailedCount: true },
+    }),
+    // Not filtered on dailyRequestCount: failures are exactly the rows that may be at 0.
+    prisma.correctionUsage.aggregate({
+      where: { dayStartedAt: currentDayStart },
+      _sum: { dailyFailedCount: true },
     }),
     prisma.user.findMany({
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -190,6 +205,8 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
         requestsToday: correctionDayAgg._sum.dailyRequestCount ?? 0,
         requestsThisMonth: correctionMonthAgg._sum.monthlyRequestCount ?? 0,
         activeUsersToday: correctionDayAgg._count._all,
+        failedToday: correctionFailedDayAgg._sum.dailyFailedCount ?? 0,
+        failedThisMonth: correctionMonthAgg._sum.monthlyFailedCount ?? 0,
       },
     },
   };
