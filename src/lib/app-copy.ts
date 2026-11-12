@@ -352,7 +352,18 @@ export interface AppCopy {
       correct: string;
       correcting: string;
       correctingStatus: string;
+      // Correction failures. A segment between ** ** is shown in bold (see
+      // renderEmphasis); every message that mentions the draft says it is kept,
+      // because the draft is autosaved on this device (see draft-autosave.ts).
       genericCorrectionError: string;
+      correctionBusyError: string;
+      correctionSessionExpiredError: string;
+      correctionDailyLimitError: (values: { time: string }) => string;
+      correctionDailyLimitErrorNoTime: string;
+      correctionStillTrying: string;
+      draftRestoreMessage: string;
+      draftRestoreAction: string;
+      draftDiscardAction: string;
       notFrenchText: string;
       alreadyCorrected: string;
       alreadyCorrectedFormattingNote: string;
@@ -896,7 +907,17 @@ export const APP_COPY = {
         correct: "Correct",
         correcting: "Correcting…",
         correctingStatus: "Getting your feedback. This can take a moment.",
-        genericCorrectionError: "Something went wrong.",
+        genericCorrectionError: "Something went wrong. **Your text is kept.**",
+        correctionBusyError: "The system is busy. **Your text is saved**, please try again in a minute.",
+        correctionSessionExpiredError:
+          "Your session expired. Sign in again to get your correction; **your text is saved**.",
+        correctionDailyLimitError: ({ time }) =>
+          `You've used up today's corrections. Your limit comes back at ${time}.`,
+        correctionDailyLimitErrorNoTime: "You've used up today's corrections. Your limit comes back tomorrow.",
+        correctionStillTrying: "The system is busy, still trying…",
+        draftRestoreMessage: "We found an unsent draft. Restore it?",
+        draftRestoreAction: "Restore",
+        draftDiscardAction: "Discard",
         notFrenchText:
           "We couldn’t confidently recognize this text as French, so it wasn’t corrected. Write your response in French and check for unusual characters, then try again.",
         alreadyCorrected:
@@ -1577,7 +1598,18 @@ export const APP_COPY = {
         correct: "Corriger",
         correcting: "Correction en cours…",
         correctingStatus: "Nous préparons vos commentaires. Cela peut prendre un instant.",
-        genericCorrectionError: "Une erreur s’est produite.",
+        genericCorrectionError: "Une erreur s’est produite. **Votre texte est conservé.**",
+        correctionBusyError: "Le système est occupé. **Votre texte est enregistré**, réessayez dans une minute.",
+        correctionSessionExpiredError:
+          "Votre session a expiré. Reconnectez-vous pour obtenir votre correction ; **votre texte est enregistré**.",
+        correctionDailyLimitError: ({ time }) =>
+          `Vous avez épuisé votre limite de corrections pour aujourd’hui. Elle sera de retour à ${time}.`,
+        correctionDailyLimitErrorNoTime:
+          "Vous avez épuisé votre limite de corrections pour aujourd’hui. Elle sera de retour demain.",
+        correctionStillTrying: "Le système est occupé, nouvelle tentative en cours…",
+        draftRestoreMessage: "Nous avons trouvé un brouillon non envoyé. Le récupérer ?",
+        draftRestoreAction: "Récupérer",
+        draftDiscardAction: "Supprimer",
         notFrenchText:
           "Nous n’avons pas pu reconnaître avec certitude ce texte comme du français, il n’a donc pas été corrigé. Rédigez votre réponse en français et vérifiez qu’il n’y a pas de caractères inhabituels, puis réessayez.",
         alreadyCorrected:
@@ -2262,7 +2294,17 @@ export const APP_COPY = {
         correct: "Corregir",
         correcting: "Corrigiendo…",
         correctingStatus: "Estamos preparando tus comentarios. Esto puede tardar un momento.",
-        genericCorrectionError: "Algo salió mal.",
+        genericCorrectionError: "Algo salió mal. **Tu texto se conserva.**",
+        correctionBusyError: "El sistema está ocupado. **Tu texto está guardado**, vuelve a intentarlo en un minuto.",
+        correctionSessionExpiredError:
+          "Tu sesión expiró. Inicia sesión de nuevo para corregir; **tu texto está guardado**.",
+        correctionDailyLimitError: ({ time }) =>
+          `Has agotado tu límite de correcciones de hoy. Volverá a las ${time}.`,
+        correctionDailyLimitErrorNoTime: "Has agotado tu límite de correcciones de hoy. Volverá mañana.",
+        correctionStillTrying: "El sistema está ocupado, sigue intentándolo…",
+        draftRestoreMessage: "Encontramos un borrador sin enviar. ¿Recuperarlo?",
+        draftRestoreAction: "Recuperar",
+        draftDiscardAction: "Descartar",
         notFrenchText:
           "No hemos podido reconocer con seguridad este texto como francés, así que no se ha corregido. Escribe tu respuesta en francés y revisa que no haya caracteres inusuales; luego inténtalo de nuevo.",
         alreadyCorrected:
@@ -2947,7 +2989,17 @@ export const APP_COPY = {
         correct: "Corrigir",
         correcting: "Corrigindo…",
         correctingStatus: "Estamos preparando seus comentários. Isso pode levar um momento.",
-        genericCorrectionError: "Algo deu errado.",
+        genericCorrectionError: "Algo deu errado. **Seu texto foi mantido.**",
+        correctionBusyError: "O sistema está ocupado. **Seu texto está salvo**, tente de novo em um minuto.",
+        correctionSessionExpiredError:
+          "Sua sessão expirou. Entre de novo para corrigir; **seu texto está salvo**.",
+        correctionDailyLimitError: ({ time }) =>
+          `Você esgotou seu limite de correções de hoje. Ele voltará às ${time}.`,
+        correctionDailyLimitErrorNoTime: "Você esgotou seu limite de correções de hoje. Ele voltará amanhã.",
+        correctionStillTrying: "O sistema está ocupado, ainda tentando…",
+        draftRestoreMessage: "Encontramos um rascunho não enviado. Recuperar?",
+        draftRestoreAction: "Recuperar",
+        draftDiscardAction: "Descartar",
         notFrenchText:
           "Não conseguimos reconhecer com segurança este texto como francês, então ele não foi corrigido. Escreva sua resposta em francês e verifique se não há caracteres incomuns; depois tente novamente.",
         alreadyCorrected:

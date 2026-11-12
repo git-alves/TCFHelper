@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -28,6 +28,7 @@ import {
 } from "@/lib/app-locale";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { CorrectionErrorMessage } from "@/components/correction-error-message";
 import { CorrectionModal, type CorrectionModalState } from "@/components/correction-modal";
 import { useDashboardNavGuard } from "@/components/dashboard-nav-guard";
 import { GrammarCheckedEditor, type LanguageCheckStatus } from "@/components/grammar-checked-editor";
@@ -36,6 +37,18 @@ import { TranslationProviderNotice } from "@/components/translation-provider-not
 import { useWalkthroughWorkspaceScript } from "@/components/walkthrough-workspace-script";
 import { WritingGuidePanel } from "@/components/writing-guide-panel";
 import { TaskThreeDocumentsView } from "@/components/task-three-documents";
+import { classifyCorrectionFailure, type CorrectionErrorState } from "@/lib/correction-error";
+import {
+  deleteDraft,
+  draftKey,
+  fingerprintTopicPrompt,
+  getDraftsSnapshot,
+  getServerDraftsSnapshot,
+  saveDraft,
+  subscribeToDrafts,
+  type SavedDraft,
+  type SavedDraftTopic,
+} from "@/lib/draft-autosave";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { getCorrectAttemptOutcome } from "@/lib/correction-attempt";
 import { checkFrenchText } from "@/lib/french-text-check";
@@ -64,6 +77,11 @@ interface BankTopic {
 }
 
 type TopicMode = "recent" | "custom" | null;
+
+// How long the draft must sit unchanged before it is written to the device. A
+// pending write is also flushed when the page is hidden or the workspace
+// unmounts, so the last few keystrokes are not lost to the delay.
+const DRAFT_AUTOSAVE_DEBOUNCE_MS = 600;
 type RecentTopicErrorKind = "fetch" | "unavailable" | "empty";
 type PendingSwitchKind = "task" | "topic" | "dashboard" | "admin" | "clear" | "correct" | "correctNearIdentical";
 type TranslationErrorKind = "rateLimited" | "monthlyQuota" | "unavailable";
@@ -205,17 +223,6 @@ function persistTimedTaskSession(session: TimedTaskSession | null): void {
   } else {
     clearWritingPreference(TIMED_TASK_SESSION_STORAGE_KEY);
   }
-}
-
-function fingerprintTopicPrompt(prompt: string): string {
-  // Keep the persisted timing session tied to an exact custom prompt without
-  // writing the prompt text itself into local storage.
-  let hash = 2_166_136_261;
-  for (let index = 0; index < prompt.length; index += 1) {
-    hash ^= prompt.charCodeAt(index);
-    hash = Math.imul(hash, 16_777_619);
-  }
-  return (hash >>> 0).toString(36);
 }
 
 function subscribeToWritingPreferences(listener: () => void): () => void {
@@ -596,7 +603,7 @@ export function WritingWorkspace() {
   // request started. The learner can change the interface language while a
   // correction is pending, so the visible message must always use the copy
   // from the current render.
-  const [hasCorrectionError, setHasCorrectionError] = useState(false);
+  const [correctionError, setCorrectionError] = useState<CorrectionErrorState | null>(null);
   // Only surfaced after the learner actually tries to correct while short --
   // not shown proactively while they're still typing.
   const [showMinimumWordWarning, setShowMinimumWordWarning] = useState(false);
@@ -778,6 +785,35 @@ export function WritingWorkspace() {
           : null,
     content,
   });
+  // Device-local autosave of the unsent draft (see src/lib/draft-autosave.ts).
+  // The key is the same task + topic identity the timed session uses.
+  const draftTopic = useMemo<SavedDraftTopic | null>(() => {
+    if (topicMode === "recent" && recentTopic) {
+      return {
+        kind: "recent",
+        id: recentTopic.id,
+        title: recentTopic.title,
+        prompt: recentTopic.prompt,
+        guideContext: recentTopic.guideContext,
+      };
+    }
+    if (topicMode === "custom" && customTopic.trim()) return { kind: "custom", prompt: customTopic };
+    return null;
+  }, [topicMode, recentTopic, customTopic]);
+  const currentDraftKey = taskType && draftTopic ? draftKey(taskType, draftTopic) : null;
+  const savedDrafts = useSyncExternalStore(subscribeToDrafts, getDraftsSnapshot, getServerDraftsSnapshot);
+  const pendingDraftRef = useRef<SavedDraft | null>(null);
+  const flushPendingDraft = useCallback(() => {
+    const draft = pendingDraftRef.current;
+    pendingDraftRef.current = null;
+    // The scripted tour writes sample text that is not the learner's work.
+    if (draft && !walkthroughDemoActiveRef.current) saveDraft({ ...draft, savedAt: Date.now() });
+  }, []);
+  function forgetDraft(key: string | null) {
+    pendingDraftRef.current = null;
+    if (!key) return;
+    deleteDraft(key);
+  }
   const isCurrentDraftAlreadyCorrected =
     correctionRequestKey !== null && correctionRequestKey === lastSuccessfulCorrectionKey;
   const isCorrectionInProgressElsewhere =
@@ -796,6 +832,35 @@ export function WritingWorkspace() {
   const showFormattingReuseNote =
     isCurrentDraftAlreadyCorrected &&
     (content !== submittedCorrectionText || existingCorrectionEssayId !== null);
+
+  useEffect(() => {
+    if (!taskType || !draftTopic || !content.trim()) {
+      pendingDraftRef.current = null;
+      return;
+    }
+    pendingDraftRef.current = {
+      key: draftKey(taskType, draftTopic),
+      taskType,
+      topic: draftTopic,
+      content,
+      savedAt: Date.now(),
+    };
+    const timer = window.setTimeout(flushPendingDraft, DRAFT_AUTOSAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [taskType, draftTopic, content, flushPendingDraft]);
+
+  useEffect(() => {
+    const flushWhenHidden = () => {
+      if (document.visibilityState === "hidden") flushPendingDraft();
+    };
+    window.addEventListener("pagehide", flushPendingDraft);
+    document.addEventListener("visibilitychange", flushWhenHidden);
+    return () => {
+      window.removeEventListener("pagehide", flushPendingDraft);
+      document.removeEventListener("visibilitychange", flushWhenHidden);
+      flushPendingDraft();
+    };
+  }, [flushPendingDraft]);
 
   useEffect(() => {
     if (topicMode !== "custom") return;
@@ -1032,7 +1097,11 @@ export function WritingWorkspace() {
   // translated panel honest and avoids requiring an extra learner edit.
   function applyDraftContent(value: string) {
     setContent(value);
-    setHasCorrectionError(false);
+    // Emptying the editor by hand is the learner discarding the text (typing
+    // again, or undoing, saves a new copy), so the device copy goes too and an
+    // empty editor is not met with an offer to bring it back.
+    if (!value.trim()) forgetDraft(currentDraftKey);
+    setCorrectionError(null);
     setShowMinimumWordWarning(false);
     setShowNotFrenchWarning(false);
     // Keep a server-returned history ID while the learner experiments with a
@@ -1056,6 +1125,9 @@ export function WritingWorkspace() {
   }
 
   function resetDraftAndFeedback() {
+    // Every caller is a reset the learner chose (and confirmed when there was
+    // anything to lose), so the device copy of this draft goes with it.
+    forgetDraft(currentDraftKey);
     // Clearing a draft or loading/replacing a subject must not leave a timer
     // running invisibly against work the learner has intentionally reset.
     persistTimedTaskSession(null);
@@ -1074,7 +1146,7 @@ export function WritingWorkspace() {
     setExistingCorrectionEssayId(null);
     setInProgressCorrection(null);
     setSubmittedCorrectionText("");
-    setHasCorrectionError(false);
+    setCorrectionError(null);
     setShowMinimumWordWarning(false);
     setShowNotFrenchWarning(false);
     setExampleError(null);
@@ -1086,6 +1158,42 @@ export function WritingWorkspace() {
     setTranslationFor(null);
     setTranslationError(null);
     setTranslationErrorFor(null);
+  }
+
+  // An unsent draft on this device is offered back only while there is
+  // nothing in the editor to overwrite. With no topic chosen it is the newest
+  // saved draft; once a topic is chosen it is that task + topic's own draft.
+  const restoreCandidate =
+    !content.trim() && !isTopicLoading && !isCorrecting
+      ? topicMode === null
+        ? (savedDrafts[0] ?? null)
+        : (savedDrafts.find((draft) => draft.key === currentDraftKey) ?? null)
+      : null;
+
+  function restoreDraft(draft: SavedDraft) {
+    cancelPendingTopicRequests();
+    clearExample();
+    cancelPendingCorrection();
+    setTaskType(draft.taskType);
+    setRecentTopicError(null);
+    if (draft.topic.kind === "recent") {
+      setTopicMode("recent");
+      setRecentTopic({
+        id: draft.topic.id,
+        taskType: draft.taskType,
+        title: draft.topic.title,
+        prompt: draft.topic.prompt,
+        guideContext: draft.topic.guideContext as WritingContextClassification,
+      });
+      setCustomTopic("");
+    } else {
+      setTopicMode("custom");
+      setRecentTopic(null);
+      setCustomTopic(draft.topic.prompt);
+    }
+    // The offer ends because the editor is no longer empty; the autosave then
+    // keeps the stored copy current.
+    applyDraftContent(draft.content);
   }
 
   function startTimedTask() {
@@ -1638,9 +1746,10 @@ export function WritingWorkspace() {
         ? { topicId: recentTopic.id }
         : { topicPrompt: activeTopicPrompt };
 
+    const submittedDraftKey = currentDraftKey;
     const requestId = ++correctionRequestId.current;
     setIsCorrecting(true);
-    setHasCorrectionError(false);
+    setCorrectionError(null);
     setFeedback(null);
     setFeedbackLocale(null);
     setCorrectionEssayId(null);
@@ -1651,6 +1760,9 @@ export function WritingWorkspace() {
     setCorrectionModalSession((session) => session + 1);
     setIsWalkthroughCorrectionPreview(false);
     setCorrectionModalOpen(true);
+    // What the learner is told if this request fails; a network error or an
+    // unreadable answer stays generic.
+    let failure: CorrectionErrorState = { kind: "generic" };
     try {
       const res = await fetch("/api/essays/correct", {
         method: "POST",
@@ -1707,6 +1819,7 @@ export function WritingWorkspace() {
           setCorrectionModalOpen(false);
           return;
         }
+        failure = classifyCorrectionFailure(res.status, data);
         throw new Error("Correction request failed");
       }
 
@@ -1715,6 +1828,9 @@ export function WritingWorkspace() {
       // request was in flight — a stale response must never write feedback
       // into whatever the learner has moved on to.
       if (requestId !== correctionRequestId.current) return;
+      // The correction is saved server-side, so the device copy of the draft
+      // has done its job.
+      forgetDraft(submittedDraftKey);
       setFeedback(correction.feedback);
       setCorrectionEssayId(correction.essayId);
       setFeedbackLocale(correctionLocale);
@@ -1723,7 +1839,7 @@ export function WritingWorkspace() {
       setCorrectionModalState("result");
     } catch {
       if (requestId === correctionRequestId.current) {
-        setHasCorrectionError(true);
+        setCorrectionError(failure);
         setCorrectionModalState("error");
       }
     } finally {
@@ -1885,6 +2001,32 @@ export function WritingWorkspace() {
 
   return (
     <div className="flex w-full flex-col gap-8">
+      {restoreCandidate && (
+        <div
+          role="group"
+          aria-label={copy.workspace.editor.draftRestoreMessage}
+          data-testid="draft-restore"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-violet-300 bg-violet-50 p-4 text-sm dark:border-violet-800 dark:bg-violet-950/30"
+        >
+          <p className="min-w-0 flex-1 font-medium">{copy.workspace.editor.draftRestoreMessage}</p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => restoreDraft(restoreCandidate)}
+              className="rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+            >
+              {copy.workspace.editor.draftRestoreAction}
+            </button>
+            <button
+              type="button"
+              onClick={() => forgetDraft(restoreCandidate.key)}
+              className="rounded-full border border-black/[.15] px-4 py-2 text-sm font-medium transition-colors hover:bg-black/[.04] dark:border-white/[.2] dark:hover:bg-white/[.06]"
+            >
+              {copy.workspace.editor.draftDiscardAction}
+            </button>
+          </div>
+        </div>
+      )}
 
       <section className="flex flex-col gap-3">
         <StepHeading number={1} stepLabel={copy.workspace.stepLabel}>
@@ -2038,7 +2180,7 @@ export function WritingWorkspace() {
                     cancelPendingTopicRequests();
                     setCustomTopic(e.target.value);
                     if (e.target.value.trim()) setExampleNeedsTopic(false);
-                    setHasCorrectionError(false);
+                    setCorrectionError(null);
                     resizeCustomTopicTextarea(e.target);
                   }}
                   placeholder={copy.workspace.topic.customTopicPlaceholder}
@@ -2478,9 +2620,9 @@ export function WritingWorkspace() {
                 {copy.workspace.editor.correctingStatus}
               </p>
             )}
-            {hasCorrectionError && (
+            {correctionError && (
               <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-                {copy.workspace.editor.genericCorrectionError}
+                <CorrectionErrorMessage error={correctionError} copy={copy} locale={locale} />
               </p>
             )}
             {showNotFrenchWarning && (
@@ -2603,6 +2745,7 @@ export function WritingWorkspace() {
           key={correctionModalSession}
           open={correctionModalOpen}
           state={correctionModalState}
+          error={correctionError}
           task={task}
           submissionId={correctionEssayId}
           originalText={submittedCorrectionText}

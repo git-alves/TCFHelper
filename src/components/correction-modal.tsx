@@ -8,7 +8,9 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
+import { CorrectionErrorMessage } from "@/components/correction-error-message";
 import type { AppCopy, MethodologyBlock } from "@/lib/app-copy";
+import type { CorrectionErrorState } from "@/lib/correction-error";
 import { APP_LOCALE_LABELS, type AppLocale } from "@/lib/app-locale";
 import { CEFR_LEVELS, type EssayFeedback } from "@/lib/essay-feedback";
 import { RADAR_AXIS_COLORS, RADAR_ANGLES, RADAR_CENTER, getRadarPoint, getRadarPolygon } from "@/lib/radar-chart";
@@ -16,9 +18,16 @@ import type { TaskDefinition } from "@/lib/tcf-tasks";
 
 export type CorrectionModalState = "loading" | "result" | "error";
 
+// After this long without an answer the loading text says the system is busy
+// instead of repeating a message that no longer matches a long wait (the
+// server retries an overloaded provider for up to a couple of minutes).
+export const CORRECTION_SLOW_LOADING_MS = 15_000;
+
 interface CorrectionModalProps {
   open: boolean;
   state: CorrectionModalState;
+  // What went wrong when `state` is "error"; absent means a generic failure.
+  error?: CorrectionErrorState | null;
   task: TaskDefinition;
   submissionId: string | null;
   originalText: string;
@@ -326,6 +335,7 @@ function createPrintDocument({
 export function CorrectionModal({
   open,
   state,
+  error = null,
   task,
   submissionId,
   originalText,
@@ -341,6 +351,7 @@ export function CorrectionModal({
 }: CorrectionModalProps) {
   const isLegacyCefrAssessment = cefrAssessment === "legacy";
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  const [isLoadingSlow, setIsLoadingSlow] = useState(false);
   const [expandedCorrectionIndexes, setExpandedCorrectionIndexes] = useState<Set<number>>(() => new Set([0]));
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -353,6 +364,18 @@ export function CorrectionModal({
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
   const dialogId = useId();
   const titleId = `${dialogId}-title`;
+
+  // Only an open, still-waiting modal runs the clock; leaving the loading
+  // state (an answer, an error, a retry) starts the next wait from zero.
+  const isWaiting = open && state === "loading";
+  useEffect(() => {
+    if (!isWaiting) return;
+    const timer = window.setTimeout(() => setIsLoadingSlow(true), CORRECTION_SLOW_LOADING_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setIsLoadingSlow(false);
+    };
+  }, [isWaiting]);
   const modalCopy = copy.workspace.correctionModal;
   const originalWordCount = countWords(originalText);
   const isWordCountInRange = feedback?.meetsWordCount ?? (
@@ -1043,11 +1066,15 @@ export function CorrectionModal({
               <div role="status" aria-live="polite" className="max-w-sm text-center">
                 <div className="mx-auto h-9 w-9 animate-spin rounded-full border-2 border-violet-600 border-t-transparent dark:border-violet-400" aria-hidden="true" />
                 <p className="mt-4 font-medium">{modalCopy.loading}</p>
-                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">{copy.workspace.editor.correctingStatus}</p>
+                <p className="mt-2 text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  {isLoadingSlow ? copy.workspace.editor.correctionStillTrying : copy.workspace.editor.correctingStatus}
+                </p>
               </div>
             ) : (
               <div role="alert" className="max-w-sm text-center">
-                <p className="font-medium">{copy.workspace.editor.genericCorrectionError}</p>
+                <p className="font-medium">
+                  <CorrectionErrorMessage error={error ?? { kind: "generic" }} copy={copy} locale={locale} />
+                </p>
               </div>
             )}
           </div>
@@ -1055,7 +1082,7 @@ export function CorrectionModal({
 
         <footer className="flex flex-none flex-wrap items-center justify-end gap-3 border-t border-black/[.08] px-4 py-4 dark:border-white/[.12] sm:px-6">
           <div className="flex items-center gap-3">
-            {state === "error" && (
+            {state === "error" && error?.kind !== "dailyLimit" && (
               <button
                 type="button"
                 onClick={onRetry}
