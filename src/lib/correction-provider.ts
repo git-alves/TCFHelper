@@ -5,6 +5,8 @@
 // Adding a future adapter (LiteLLM, a native OpenAI/Anthropic integration) is
 // meant to be "add one id + one adapter file + register it" -- no change to
 // this file's shape, the route, or the admin UI structure.
+import { unwrapJsonFence } from "@/lib/json-fence";
+
 export const CORRECTION_PROVIDER_IDS = ["gemini", "openrouter"] as const;
 export type CorrectionProviderId = (typeof CORRECTION_PROVIDER_IDS)[number];
 
@@ -114,11 +116,14 @@ export function looksLikeJson(content: string): boolean {
  * by parsing a raw text response as JSON.
  */
 export function parseCorrectionJson(content: string): unknown {
-  if (!looksLikeJson(content)) {
+  // A reply that is only a ```json fenced block is accepted (see unwrapJsonFence);
+  // anything else that is not a bare JSON object or array still is not.
+  const candidate = unwrapJsonFence(content);
+  if (!looksLikeJson(candidate)) {
     throw new CorrectionProviderFormatUnsupportedError();
   }
   try {
-    return JSON.parse(content);
+    return JSON.parse(candidate);
   } catch {
     throw new CorrectionProviderInvalidJsonError();
   }

@@ -115,6 +115,39 @@ describe("openRouterCorrectionProvider.gradeEssay", () => {
     ).rejects.toBeInstanceOf(CorrectionProviderInvalidJsonError);
   });
 
+  it("asks OpenRouter to route only to endpoints that honour response_format (require_parameters)", async () => {
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ finish_reason: "stop", message: { content: '{"correctedText":"ok"}' } }] }),
+    });
+
+    await openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" });
+
+    const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(JSON.parse(init.body as string).provider).toEqual({ require_parameters: true });
+  });
+
+  it("accepts a reply wrapped in a ```json fence, and still refuses prose", async () => {
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ finish_reason: "stop", message: { content: '```json\n{"correctedText":"ok"}\n```' } }] }),
+    });
+    await expect(openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" })).resolves.toEqual({
+      correctedText: "ok",
+    });
+
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ finish_reason: "stop", message: { content: "Here is my assessment: it is good." } }] }),
+    });
+    await expect(openRouterCorrectionProvider.gradeEssay(params, { apiKey: "k", model: "m" })).rejects.toBeInstanceOf(
+      CorrectionProviderFormatUnsupportedError,
+    );
+  });
+
   it("asks for 8192 completion tokens so a long Tâche 3 correction is not cut off", async () => {
     mockFetchOnce({
       status: 200,

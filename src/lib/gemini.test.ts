@@ -717,6 +717,27 @@ describe("gradeEssayWithGemini", () => {
     });
   });
 
+  it("parses a correction wrapped in a ```json fence, and still rejects prose", async () => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: "```json\n" + JSON.stringify(feedback) + "\n```" }] } }],
+      }),
+    });
+    await expect(gradeEssayWithGemini(correctionParams)).resolves.toEqual(feedback);
+
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ finishReason: "STOP", content: { parts: [{ text: "Voici mon évaluation : très bien." }] } }],
+      }),
+    });
+    await expect(gradeEssayWithGemini(correctionParams)).rejects.toBeInstanceOf(GeminiCorrectionParseError);
+  });
+
   it("throws GeminiCorrectionParseError, and logs the finish reason, when non-JSON text ends with STOP", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockFetchOnce({

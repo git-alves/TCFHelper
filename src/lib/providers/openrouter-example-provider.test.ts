@@ -89,6 +89,9 @@ describe("openRouterExampleProvider.generateExample", () => {
     expect(body.messages[0].role).toBe("user");
     // The correction budget change must not leak into the example generator.
     expect(body.max_tokens).toBe(2048);
+    // require_parameters is for the structured correction call only.
+    expect(body).not.toHaveProperty("provider");
+    expect(body).not.toHaveProperty("response_format");
     expect(body.messages[0].content).toContain("Le télétravail est-il bénéfique ?");
     expect(body.response_format).toBeUndefined();
   });
