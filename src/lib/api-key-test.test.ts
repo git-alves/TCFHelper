@@ -266,6 +266,16 @@ describe("runApiKeyTest: the key is never echoed", () => {
     expect(JSON.stringify(result)).not.toContain("SECRETKEY");
   });
 
+  it("keeps an ordinary 503 message intact even when the key contains one of its words", async () => {
+    const { result } = await run({
+      apiKey: "overload-0123456789abcd",
+      reply: () => json({ error: { message: "The model is overloaded; retry later", code: 503 } }, 503),
+    });
+
+    expect(result.kind).toBe("overloaded");
+    expect(result.message).toContain("OpenRouter said: “The model is overloaded; retry later”");
+  });
+
   it("includes the provider's own short message, trimmed to one line of at most 200 characters", async () => {
     const { result } = await run({ reply: () => json({ error: { message: `Rate\n limit ${"x".repeat(400)}`, code: 429 } }, 429) });
 
@@ -309,23 +319,49 @@ describe("sanitizeProviderMessage", () => {
     expect(text).toContain("as sent [redacted]");
   });
 
-  it("redacts a partial echo of eight or more characters, anywhere in the key, whatever its case", () => {
+  it("redacts a partial echo of 16 or more consecutive characters, anywhere in the key, whatever its case", () => {
     const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
 
     for (const echo of [
-      key.slice(0, 12), // the start
-      key.slice(-12), // the end
-      key.slice(10, 22), // the middle
-      key.slice(3, 11), // exactly eight characters
-      key.slice(10, 22).toUpperCase(), // case-folded
+      key.slice(0, 16), // exactly sixteen, at the start
+      key.slice(-16), // the end
+      key.slice(10, 28), // the middle
+      key.slice(0, 30), // a longer run is replaced whole, with nothing left over
+      key.slice(10, 28).toUpperCase(), // case-folded
     ]) {
       const text = sanitizeProviderMessage(`Provider says the credential beginning ${echo} is wrong`, key)!;
-      expect(text, echo).not.toContain(echo);
-      expect(text, echo).toContain("[redacted]");
+      expect(text, echo).toBe("Provider says the credential beginning [redacted] is wrong");
     }
   });
 
-  it("leaves a run of seven characters alone (too short to be an echo) and ordinary words untouched", () => {
+  it("a 16-character run of a real-format key is redacted and a 15-character run is not", () => {
+    const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
+
+    const sixteen = sanitizeProviderMessage(`bad ${key.slice(5, 21)} credential`, key)!;
+    const fifteen = sanitizeProviderMessage(`bad ${key.slice(5, 20)} credential`, key)!;
+
+    expect(sixteen).toBe("bad [redacted] credential");
+    expect(fifteen).toBe(`bad ${key.slice(5, 20)} credential`);
+  });
+
+  it("does not turn ordinary words into [redacted] because a valid key happens to contain them", () => {
+    const key = "overload-0123456789abcd";
+
+    expect(sanitizeProviderMessage("The model is overloaded; retry later", key)).toBe("The model is overloaded; retry later");
+    expect(sanitizeProviderMessage("overload overloaded overloading", key)).toBe("overload overloaded overloading");
+  });
+
+  it("redacts an upper-cased partial echo that follows unrelated Unicode, without shifting any position", () => {
+    const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
+    const echo = key.slice(9, 31).toUpperCase();
+
+    // Letters such as İ and ß change length when case-folded; the text is never lowercased, so they cannot move the match.
+    const text = sanitizeProviderMessage(`İİßß Fehler: ${echo} ist ungültig İ`, key)!;
+
+    expect(text).toBe("İİßß Fehler: [redacted] ist ungültig İ");
+  });
+
+  it("a short run of the key (below 16) is left alone", () => {
     const key = "sk-or-v1-abcdef0123456789ZYXWVUTSRQPONMLK";
 
     expect(sanitizeProviderMessage(`Rate limit for ${key.slice(0, 7)} reached`, key)).toBe("Rate limit for sk-or-v reached");

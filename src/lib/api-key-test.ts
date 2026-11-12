@@ -69,8 +69,14 @@ export interface ApiKeyTestInput {
 
 const PROVIDER_NAME: Record<ModelProvider, string> = { gemini: "Gemini", openrouter: "OpenRouter" };
 
-// The shortest run of the key that is treated as an echo of it.
-const MIN_ECHO_LENGTH = 8;
+// The shortest run of consecutive key characters treated as an echo of the key.
+// Real keys are 39 characters or more and made of random-looking characters, so
+// a 16-character run (at least 96 bits when drawn from 64 symbols) essentially
+// never occurs in ordinary prose, while a shorter run did: with a threshold of 8
+// a valid key such as "overload-0123456789abcd" turned the plain sentence "The
+// model is overloaded" into "The model is [redacted]ed". Sixteen still catches a
+// key quoted in pieces, cut off, or echoed with its ends trimmed.
+const MIN_ECHO_LENGTH = 16;
 const MAX_PROVIDER_TEXT_SCANNED = 2_000;
 
 // Every form a provider might echo the key back in: as sent, URL-encoded, and
@@ -78,39 +84,55 @@ const MAX_PROVIDER_TEXT_SCANNED = 2_000;
 // but a stored value is never trusted to be as narrow as a freshly typed one).
 function keyForms(apiKey: string): string[] {
   const forms = new Set([apiKey, encodeURIComponent(apiKey), JSON.stringify(apiKey).slice(1, -1)]);
-  return [...forms].filter((form) => form.length >= MIN_ECHO_LENGTH);
+  return [...forms].filter((form) => form.length >= 8);
 }
 
-// Replaces every run of at least MIN_ECHO_LENGTH characters that also occurs
-// anywhere inside `form` (so a partial echo, such as a key cut off or quoted in
-// pieces, is caught as well as the whole key). Compared without regard to case.
-function redactEchoesOf(text: string, form: string): string {
-  const haystack = form.toLowerCase();
-  const lowered = text.toLowerCase();
-  const sameLength = lowered.length === text.length;
-  const probe = sameLength ? lowered : text;
-  const target = sameLength ? haystack : form;
+function escapeForRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 
-  let out = "";
-  let i = 0;
-  while (i < text.length) {
-    if (i + MIN_ECHO_LENGTH <= text.length && target.includes(probe.slice(i, i + MIN_ECHO_LENGTH))) {
-      let end = i + MIN_ECHO_LENGTH;
-      while (end < text.length && target.includes(probe.slice(i, end + 1))) end += 1;
-      out += "[redacted]";
-      i = end;
-    } else {
-      out += text[i];
-      i += 1;
+// Replaces every run of at least MIN_ECHO_LENGTH consecutive characters that
+// also occurs inside `form`, matched without regard to case against the
+// ORIGINAL text. A sliding window over the form finds each place any part of it
+// appears; overlapping and touching matches are merged so a long echo is
+// replaced whole. Nothing is lowercased, so Unicode elsewhere in the message
+// (some letters change length when case-folded) can never shift the positions.
+// The work is bounded: a key is at most 500 characters and the scanned text at
+// most MAX_PROVIDER_TEXT_SCANNED.
+function redactEchoesOf(text: string, form: string): string {
+  const size = Math.min(MIN_ECHO_LENGTH, form.length);
+  const windows = new Set<string>();
+  for (let start = 0; start + size <= form.length; start += 1) windows.add(form.slice(start, start + size));
+
+  const spans: [number, number][] = [];
+  for (const window of windows) {
+    for (const match of text.matchAll(new RegExp(escapeForRegExp(window), "gi"))) {
+      spans.push([match.index, match.index + window.length]);
     }
   }
-  return out;
+  if (spans.length === 0) return text;
+
+  spans.sort((a, b) => a[0] - b[0]);
+  const merged: [number, number][] = [];
+  for (const span of spans) {
+    const last = merged[merged.length - 1];
+    if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1]);
+    else merged.push([...span]);
+  }
+
+  let out = "";
+  let cursor = 0;
+  for (const [from, to] of merged) {
+    out += text.slice(cursor, from) + "[redacted]";
+    cursor = to;
+  }
+  return out + text.slice(cursor);
 }
 
 /**
  * Cleans a provider's own message before it can be shown: the key in any form
- * it might be echoed in (exact, URL-encoded, JSON-escaped, or any run of 8 or
- * more of its characters), then key-shaped tokens and bearer headers. Exported
+ * it might be echoed in (exact, URL-encoded, JSON-escaped, or any run of 16 or
+ * more of its consecutive characters), then key-shaped tokens and bearer headers. Exported
  * for tests. (A credential failure never shows the provider's text at all; this
  * covers the other outcomes.)
  */
