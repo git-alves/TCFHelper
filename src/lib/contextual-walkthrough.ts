@@ -18,14 +18,23 @@ export function shouldShowContextualWalkthrough(
   storage: Pick<WalkthroughStorage, "getItem"> | null,
   page: ContextualWalkthroughPage,
 ): boolean {
-  return storage?.getItem(getStorageKey(page)) !== "seen";
+  try {
+    return storage?.getItem(getStorageKey(page)) !== "seen";
+  } catch {
+    // Unreadable storage: show the guide rather than fail.
+    return true;
+  }
 }
 
 export function markContextualWalkthroughSeen(
   storage: Pick<WalkthroughStorage, "setItem"> | null,
   page: ContextualWalkthroughPage,
 ): void {
-  storage?.setItem(getStorageKey(page), "seen");
+  try {
+    storage?.setItem(getStorageKey(page), "seen");
+  } catch {
+    // The guide may show again next visit; that is better than an error.
+  }
 }
 
 export function getContextualWalkthroughStorage(): WalkthroughStorage | null {

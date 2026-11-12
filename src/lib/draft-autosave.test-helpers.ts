@@ -1,4 +1,4 @@
-// Test helper: swaps window.localStorage for a stand-in and returns a restore
+// Test helpers: swap window.localStorage for a stand-in and return a restore
 // function. Replacing the property is more reliable under happy-dom than
 // spying on the live Storage object.
 
@@ -7,13 +7,8 @@ export interface StorageCalls {
   setItem: number;
 }
 
-/**
- * A storage whose reads and/or writes of `onlyKey` (the drafts by default)
- * throw; everything else works on an in-memory map. Scoped to the drafts key
- * because other code in the app reads localStorage without a guard.
- */
+/** A storage whose reads and/or writes throw, for every key; otherwise an in-memory map. */
 export function installFakeLocalStorage(behaviour: {
-  onlyKey?: string;
   failReads?: boolean;
   failWrites?: boolean | ((writeNumber: number) => boolean);
 }): { calls: StorageCalls; contents: Map<string, string>; restore: () => void } {
@@ -22,16 +17,11 @@ export function installFakeLocalStorage(behaviour: {
   const calls: StorageCalls = { getItem: 0, setItem: 0 };
   const fake = {
     getItem(key: string) {
-      if (key !== (behaviour.onlyKey ?? "mytcflab:drafts")) return contents.get(key) ?? null;
       calls.getItem += 1;
       if (behaviour.failReads) throw new DOMException("blocked", "SecurityError");
       return contents.get(key) ?? null;
     },
     setItem(key: string, value: string) {
-      if (key !== (behaviour.onlyKey ?? "mytcflab:drafts")) {
-        contents.set(key, value);
-        return;
-      }
       calls.setItem += 1;
       const fails =
         typeof behaviour.failWrites === "function" ? behaviour.failWrites(calls.setItem) : behaviour.failWrites;
@@ -39,6 +29,7 @@ export function installFakeLocalStorage(behaviour: {
       contents.set(key, value);
     },
     removeItem(key: string) {
+      if (behaviour.failWrites) throw new DOMException("blocked", "SecurityError");
       contents.delete(key);
     },
     clear() {
@@ -49,6 +40,25 @@ export function installFakeLocalStorage(behaviour: {
   return {
     calls,
     contents,
+    restore: () => {
+      if (original) Object.defineProperty(window, "localStorage", original);
+    },
+  };
+}
+
+/** A browser where merely touching window.localStorage throws, as some do when storage is blocked. */
+export function installUnreachableLocalStorage(): { accesses: () => number; restore: () => void } {
+  const original = Object.getOwnPropertyDescriptor(window, "localStorage");
+  let accesses = 0;
+  Object.defineProperty(window, "localStorage", {
+    configurable: true,
+    get() {
+      accesses += 1;
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    },
+  });
+  return {
+    accesses: () => accesses,
     restore: () => {
       if (original) Object.defineProperty(window, "localStorage", original);
     },

@@ -18,6 +18,7 @@ import {
   type AppLocale,
 } from "@/lib/app-locale";
 import { getAppCopy, type AppCopy } from "@/lib/app-copy";
+import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
 
 interface AppLocaleContextValue {
   locale: AppLocale;
@@ -78,9 +79,11 @@ export function AppLocaleProvider({
     if (hasMigratedLegacyPreference.current) return;
     hasMigratedLegacyPreference.current = true;
 
-    const stored = window.localStorage.getItem(APP_LOCALE_STORAGE_KEY);
+    // Blocked or failing storage reads as "nothing to migrate" and the write
+    // is skipped: the cookie, not this, is the source of truth.
+    const stored = safeGetLocalItem(APP_LOCALE_STORAGE_KEY);
     if (!isAppLocale(stored) || stored === initialLocale) {
-      window.localStorage.setItem(APP_LOCALE_STORAGE_KEY, initialLocale);
+      safeSetLocalItem(APP_LOCALE_STORAGE_KEY, initialLocale);
       return;
     }
 
@@ -115,7 +118,7 @@ export function AppLocaleProvider({
     hasExplicitLocaleSelection.current = true;
     currentLocale.current = next;
     setCurrentLocale(next);
-    window.localStorage.setItem(APP_LOCALE_STORAGE_KEY, next);
+    safeSetLocalItem(APP_LOCALE_STORAGE_KEY, next);
     persistLocale(next);
   }, [persistLocale]);
 

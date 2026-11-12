@@ -19,6 +19,7 @@ import {
   type SectionedPracticeExercise,
 } from "@/lib/sectioned-practice";
 import { FULL_WALKTHROUGH_PARAM, isFullWalkthrough } from "@/lib/walkthrough";
+import { getSafeLocalStorage } from "@/lib/safe-storage";
 
 export type PracticeTask = "TASK_1" | "TASK_2" | "TASK_3";
 const TASKS: readonly PracticeTask[] = ["TASK_1", "TASK_2", "TASK_3"];
@@ -122,7 +123,7 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
   useEffect(() => {
     if (hasRestoredRef.current) return;
     hasRestoredRef.current = true;
-    const saved = loadStoredPracticeDraft(window.localStorage);
+    const saved = loadStoredPracticeDraft(getSafeLocalStorage());
     const exercise = saved ? exercises.find((candidate) => candidate.id === saved.exerciseId) : null;
     if (!saved || !exercise || saved.answers.length !== PRACTICE_SECTION_BLUEPRINT[exercise.task].length) return;
     progressSessionIdRef.current = saved.progressSessionId ?? null;
@@ -133,7 +134,7 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
 
   useEffect(() => {
     if (!active) return;
-    saveStoredPracticeDraft(window.localStorage, {
+    saveStoredPracticeDraft(getSafeLocalStorage(), {
       version: 1,
       exerciseId: active.id,
       answers,
@@ -198,7 +199,7 @@ export function PracticeTrainer({ exercises }: PracticeTrainerProps) {
   }
 
   function leaveExercise() {
-    clearStoredPracticeDraft(window.localStorage);
+    clearStoredPracticeDraft(getSafeLocalStorage());
     progressSessionIdRef.current = null;
     completionRecordedRef.current = false;
     setIsConfirmingLeave(false);
