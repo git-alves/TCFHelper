@@ -26,6 +26,7 @@ const {
   completeCorrectionClaimMock,
   releaseCorrectionClaimMock,
   reserveCorrectionUsageMock,
+  refundCorrectionUsageMock,
   recordAdminEventMock,
 } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
@@ -46,6 +47,7 @@ const {
     completeCorrectionClaimMock: vi.fn(),
     releaseCorrectionClaimMock: vi.fn(),
     reserveCorrectionUsageMock: vi.fn(),
+    refundCorrectionUsageMock: vi.fn(),
     recordAdminEventMock: vi.fn(),
   };
 });
@@ -89,6 +91,7 @@ vi.mock("@/lib/correction-claim", () => ({
 }));
 vi.mock("@/lib/correction-usage", () => ({
   reserveCorrectionUsage: reserveCorrectionUsageMock,
+  refundCorrectionUsage: refundCorrectionUsageMock,
 }));
 vi.mock("@/lib/admin-events", () => ({ recordAdminEvent: recordAdminEventMock }));
 
@@ -157,6 +160,7 @@ beforeEach(() => {
   completeCorrectionClaimMock.mockReset();
   releaseCorrectionClaimMock.mockReset();
   reserveCorrectionUsageMock.mockReset();
+  refundCorrectionUsageMock.mockReset();
   recordAdminEventMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
   hasConfiguredCredentialsMock.mockReturnValue(true);
@@ -197,6 +201,7 @@ beforeEach(() => {
     dayStartedAt: new Date("2026-08-10T00:00:00.000Z"),
     monthStartedAt: new Date("2026-08-01T00:00:00.000Z"),
   });
+  refundCorrectionUsageMock.mockResolvedValue({ refundedDay: true, refundedMonth: true });
   topicCreateMock.mockResolvedValue({ id: "custom_topic_1" });
   essayCreateMock.mockResolvedValue({ id: "essay_1" });
 });
@@ -864,6 +869,112 @@ describe("POST /api/essays/correct", () => {
       }),
     );
     expect(essayCreateMock).not.toHaveBeenCalled();
+  });
+
+  describe("correction usage refund", () => {
+    const RESERVATION = {
+      dayStartedAt: new Date("2026-08-10T00:00:00.000Z"),
+      monthStartedAt: new Date("2026-08-01T00:00:00.000Z"),
+    };
+    const task1 = { taskType: "TASK_1", topicPrompt: "Écrivez à votre voisin.", content: VALID_TASK_1_CONTENT };
+
+    it("refunds the reservation, with its own windows, when the provider throws", async () => {
+      gradeEssayMock.mockRejectedValue(new Error("boom"));
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+      // The claim is still released so the learner can retry the same essay.
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("refunds when the provider answers with a response that fails the feedback schema", async () => {
+      gradeEssayMock.mockResolvedValue({ invalid: true });
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+    });
+
+    it.each([
+      ["not_configured", () => new CorrectionProviderNotConfiguredError()],
+      ["format_unsupported", () => new CorrectionProviderFormatUnsupportedError()],
+      ["invalid_json", () => new CorrectionProviderInvalidJsonError()],
+      ["output_truncated", () => new CorrectionProviderOutputTruncatedError()],
+      ["rate_limited (provider 429)", () => new CorrectionProviderRateLimitedError()],
+      ["upstream_http_error (provider 503)", () => new CorrectionProviderRequestError(503)],
+      ["transport_error", () => new CorrectionProviderTransportError()],
+    ])("refunds for the provider failure reason %s", async (_reason, makeError) => {
+      gradeEssayMock.mockRejectedValue(makeError());
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+    });
+
+    it("does not refund a correction the learner received", async () => {
+      const response = await post(task1);
+
+      expect(response.status).toBe(200);
+      expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+    });
+
+    it("does not refund a request rejected before a reservation was made", async () => {
+      // Below the task's word minimum: rejected before any claim or reservation.
+      const tooShort = await post({ ...task1, content: "Bonjour." });
+      expect(tooShort.status).toBe(422);
+
+      // Provider not configured: answered 503 before the reservation.
+      hasConfiguredCredentialsMock.mockReturnValue(false);
+      const unconfigured = await post(task1);
+      expect(unconfigured.status).toBe(503);
+      hasConfiguredCredentialsMock.mockReturnValue(true);
+
+      // Refused at the daily limit (or attempt cap): the reservation was denied.
+      reserveCorrectionUsageMock.mockResolvedValue({
+        kind: "dailyLimit",
+        resetAt: new Date("2026-08-11T00:00:00.000Z"),
+        usageValue: 21,
+        quotaLimit: 20,
+      });
+      const limited = await post(task1);
+      expect(limited.status).toBe(429);
+
+      expect(reserveCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+    });
+
+    it("does not refund a failure that happens after the provider answered", async () => {
+      // The provider did its work; saving the feedback is what failed, so the
+      // failure is not the provider's and the slot stays used.
+      completeCorrectionClaimMock.mockRejectedValue(new Error("database unavailable"));
+      const failedSave = await post(task1);
+      expect(failedSave.status).toBe(502);
+
+      completeCorrectionClaimMock.mockResolvedValue({ kind: "lost" });
+      const leaseLost = await post(task1);
+      expect(leaseLost.status).toBe(503);
+
+      expect(gradeEssayMock).toHaveBeenCalledTimes(2);
+      expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+    });
+
+    it("still answers the same provider error when the refund itself fails", async () => {
+      gradeEssayMock.mockRejectedValue(new Error("boom"));
+      refundCorrectionUsageMock.mockRejectedValue(new Error("database unavailable"));
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({ error: "Something went wrong while grading your essay." });
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("does not accept an AI-generated topic ID through the retired shared-generator path", async () => {

@@ -27,7 +27,7 @@ import {
   type CorrectionTopicContext,
 } from "@/lib/correction-claim";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
-import { reserveCorrectionUsage } from "@/lib/correction-usage";
+import { refundCorrectionUsage, reserveCorrectionUsage } from "@/lib/correction-usage";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 import { checkFrenchText } from "@/lib/french-text-check";
 
@@ -162,6 +162,23 @@ function boundedCorrectionProviderHttpStatus(error: unknown): number | undefined
   return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
     ? error.status
     : undefined;
+}
+
+/**
+ * A correction that failed because of the AI provider (an error, a bad or
+ * truncated answer) gave the learner nothing, so the slot reserved for it is
+ * given back and the failure is recorded. Never changes the response: a refund
+ * that cannot be written is logged and the learner still sees the same error.
+ */
+async function refundProviderFailure(
+  userId: string,
+  reservation: { dayStartedAt: Date; monthStartedAt: Date },
+) {
+  try {
+    await refundCorrectionUsage(userId, reservation);
+  } catch {
+    console.error("Correction usage refund failed");
+  }
 }
 
 export async function POST(request: Request) {
@@ -381,6 +398,7 @@ export async function POST(request: Request) {
         httpStatus: boundedCorrectionProviderHttpStatus(error) ?? 502,
       });
       console.error("Essay correction provider failed", reasonCode);
+      await refundProviderFailure(user.id, usageReservation);
       return NextResponse.json(
         { error: "Something went wrong while grading your essay." },
         { status: 502, headers: NO_STORE_HEADERS },
@@ -401,6 +419,7 @@ export async function POST(request: Request) {
         reasonCode: "schema_invalid",
         httpStatus: 502,
       });
+      await refundProviderFailure(user.id, usageReservation);
       return NextResponse.json(
         { error: "Could not parse feedback. Please try again." },
         { status: 502 },
