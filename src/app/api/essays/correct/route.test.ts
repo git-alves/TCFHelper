@@ -950,19 +950,60 @@ describe("POST /api/essays/correct", () => {
       expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
     });
 
-    it("does not refund a failure that happens after the provider answered", async () => {
-      // The provider did its work; saving the feedback is what failed, so the
-      // failure is not the provider's and the slot stays used.
+    it("refunds when the provider answered but the feedback could not be saved", async () => {
       completeCorrectionClaimMock.mockRejectedValue(new Error("database unavailable"));
-      const failedSave = await post(task1);
-      expect(failedSave.status).toBe(502);
 
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      await expect(response.json()).resolves.toEqual({ error: "Something went wrong while grading your essay." });
+      expect(gradeEssayMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+      // The provider did not fail, so no provider-failure event is recorded.
+      expect(recordAdminEventMock).not.toHaveBeenCalled();
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("refunds when the lease was lost after the provider answered", async () => {
       completeCorrectionClaimMock.mockResolvedValue({ kind: "lost" });
-      const leaseLost = await post(task1);
-      expect(leaseLost.status).toBe(503);
 
-      expect(gradeEssayMock).toHaveBeenCalledTimes(2);
+      const response = await post(task1);
+
+      expect(response.status).toBe(503);
+      expect(gradeEssayMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+    });
+
+    it("does not refund when the learner did receive a correction or already has one", async () => {
+      // Saved by a concurrent request: the learner is given that correction.
+      completeCorrectionClaimMock.mockResolvedValue({ kind: "existing", essayId: "essay_0" });
+      expect((await post(task1)).status).toBe(409);
+
+      // The unique-key backstop: the correction is already stored.
+      completeCorrectionClaimMock.mockRejectedValue(Object.assign(new Error("duplicate key"), { code: "P2002" }));
+      expect((await post(task1)).status).toBe(409);
+
       expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+    });
+
+    it("refunds a reservation exactly once, whichever failure path ends the request", async () => {
+      // The provider failure is recorded first; if that logging throws, the
+      // request falls through to the catch-all, which must not refund again.
+      gradeEssayMock.mockRejectedValue(new Error("boom"));
+      recordAdminEventMock.mockRejectedValue(new Error("event log unavailable"));
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(502);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+
+      // And a request that fails to save does not refund a second time either.
+      refundCorrectionUsageMock.mockClear();
+      completeCorrectionClaimMock.mockRejectedValue(new Error("database unavailable"));
+      await post(task1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
     });
 
     it("still answers the same provider error when the refund itself fails", async () => {

@@ -165,12 +165,14 @@ function boundedCorrectionProviderHttpStatus(error: unknown): number | undefined
 }
 
 /**
- * A correction that failed because of the AI provider (an error, a bad or
- * truncated answer) gave the learner nothing, so the slot reserved for it is
- * given back and the failure is recorded. Never changes the response: a refund
- * that cannot be written is logged and the learner still sees the same error.
+ * Gives a correction's reserved slot back when the learner ends up with no
+ * correction for a reason that is not theirs: the AI provider failed, or the
+ * provider answered but the feedback could not be saved (or its lease was
+ * lost). The slot is recorded as a failed attempt either way; the admin event
+ * log keeps the distinction. Never changes the response: a refund that cannot
+ * be written is logged and the learner still sees the same error.
  */
-async function refundProviderFailure(
+async function refundCorrectionReservation(
   userId: string,
   reservation: { dayStartedAt: Date; monthStartedAt: Date },
 ) {
@@ -374,6 +376,14 @@ export async function POST(request: Request) {
     return correctionDailyLimitResponse(usageReservation.resetAt);
   }
 
+  // One reservation is refunded at most once, whichever path ends the request.
+  let reservationRefunded = false;
+  const refundReservation = async () => {
+    if (reservationRefunded) return;
+    reservationRefunded = true;
+    await refundCorrectionReservation(user.id, usageReservation);
+  };
+
   const promptOverrides = await getPromptOverrides();
   const systemPrompt = buildCorrectionSystemPrompt(
     feedbackLanguage,
@@ -398,7 +408,7 @@ export async function POST(request: Request) {
         httpStatus: boundedCorrectionProviderHttpStatus(error) ?? 502,
       });
       console.error("Essay correction provider failed", reasonCode);
-      await refundProviderFailure(user.id, usageReservation);
+      await refundReservation();
       return NextResponse.json(
         { error: "Something went wrong while grading your essay." },
         { status: 502, headers: NO_STORE_HEADERS },
@@ -419,7 +429,7 @@ export async function POST(request: Request) {
         reasonCode: "schema_invalid",
         httpStatus: 502,
       });
-      await refundProviderFailure(user.id, usageReservation);
+      await refundReservation();
       return NextResponse.json(
         { error: "Could not parse feedback. Please try again." },
         { status: 502 },
@@ -489,7 +499,9 @@ export async function POST(request: Request) {
 
     // The lease disappeared before this request could persist. Do not return
     // its unpersisted result; a retry will either see the winner or reclaim
-    // the expired key safely.
+    // the expired key safely. The learner gets no correction, and not through
+    // any fault of theirs, so the slot is given back.
+    await refundReservation();
     return NextResponse.json(
       { error: "The correction service is temporarily unavailable. Please try again." },
       { status: 503, headers: NO_STORE_HEADERS },
@@ -503,6 +515,11 @@ export async function POST(request: Request) {
       return duplicateCorrectionResponse();
     }
     console.error("Essay correction failed", error);
+    // Everything that can throw here is the provider answering and then us
+    // failing to save the feedback (the provider's own failures return above,
+    // having refunded already; the guard keeps a second refund from happening).
+    // That is ours, not the learner's.
+    await refundReservation();
     return NextResponse.json(
       { error: "Something went wrong while grading your essay." },
       { status: 502, headers: NO_STORE_HEADERS },
