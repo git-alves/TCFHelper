@@ -22,6 +22,7 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("server-only", () => ({}));
 
 const {
+  LEASE_DURATION_MS,
   claimCorrection,
   completeCorrectionClaim,
   hashCorrectionKey,
@@ -176,7 +177,7 @@ describe("claimCorrection", () => {
           userId: input.userId,
           correctionKeyHash: hashCorrectionKey(input.correctionKey),
           claimToken: result.claimToken,
-          expiresAt: new Date(now.getTime() + 75_000),
+          expiresAt: new Date(now.getTime() + LEASE_DURATION_MS),
         }),
         update: expect.objectContaining({ claimToken: result.claimToken }),
       }),
@@ -267,5 +268,63 @@ describe("releaseCorrectionClaim", () => {
     expect(leaseDeleteManyMock).toHaveBeenCalledWith({
       where: { userId: input.userId, correctionKeyHash, claimToken: "owner_1" },
     });
+  });
+});
+
+describe("claim lease length", () => {
+  it("outlives the longest legitimate provider call and stays under the route's maxDuration", async () => {
+    const { MAX_ATTEMPTS, OVERLOAD_RETRY_BUDGET_SLACK_MS } = await import("./provider-retry");
+    const { CORRECTION_REQUEST_TIMEOUT_MS: geminiTimeout } = await import("./gemini");
+    const { CORRECTION_REQUEST_TIMEOUT_MS: openRouterTimeout } = await import(
+      "./providers/openrouter-correction-provider"
+    );
+    const { maxDuration } = await import("@/app/api/essays/correct/route");
+
+    for (const attemptTimeout of [geminiTimeout, openRouterTimeout]) {
+      const worstCaseProviderTime = MAX_ATTEMPTS * attemptTimeout + OVERLOAD_RETRY_BUDGET_SLACK_MS;
+      expect(LEASE_DURATION_MS).toBeGreaterThan(worstCaseProviderTime);
+    }
+    expect(LEASE_DURATION_MS).toBeLessThan(maxDuration * 1_000);
+  });
+
+  it("keeps a lease valid, and its owner able to save, after the old 75 seconds", async () => {
+    leaseFindUniqueMock.mockResolvedValue(null);
+    const claimed = await claimCorrection(input);
+    if (claimed.kind !== "claimed") throw new Error("expected a claim");
+    const written = leaseUpsertMock.mock.calls[0][0].create as { expiresAt: Date };
+    expect(written.expiresAt.getTime() - now.getTime()).toBe(LEASE_DURATION_MS);
+
+    // 143s later (a full retry run), the owner still holds the lease.
+    vi.setSystemTime(new Date(now.getTime() + 143_000));
+    leaseFindUniqueMock.mockResolvedValue({ claimToken: claimed.claimToken, expiresAt: written.expiresAt });
+    leaseDeleteManyMock.mockResolvedValue({ count: 1 });
+    essayFindFirstMock.mockResolvedValue(null);
+    const persist = vi.fn().mockResolvedValue({ id: "essay_saved" });
+    await expect(
+      completeCorrectionClaim({
+        ...input,
+        correctionKeyHash: claimed.correctionKeyHash,
+        claimToken: claimed.claimToken,
+        persist,
+      }),
+    ).resolves.toEqual({ kind: "completed", value: { id: "essay_saved" } });
+
+    // And a crashed request's lease is gone once it expires.
+    vi.setSystemTime(new Date(written.expiresAt.getTime() + 1));
+    await expect(
+      completeCorrectionClaim({
+        ...input,
+        correctionKeyHash: claimed.correctionKeyHash,
+        claimToken: claimed.claimToken,
+        persist,
+      }),
+    ).resolves.toEqual({ kind: "lost" });
+  });
+
+  it("reports in-progress with a retryAt equal to the lease expiry", async () => {
+    const expiresAt = new Date(now.getTime() + LEASE_DURATION_MS);
+    leaseFindUniqueMock.mockResolvedValue({ expiresAt });
+
+    await expect(claimCorrection(input)).resolves.toMatchObject({ kind: "inProgress", retryAt: expiresAt });
   });
 });

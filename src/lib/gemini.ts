@@ -406,7 +406,7 @@ export async function generateModelAnswer(
 
 // Full grading responses (corrected text, model version, per-criterion
 // feedback) run far longer than a short model answer.
-const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
+export const CORRECTION_REQUEST_TIMEOUT_MS = 45_000;
 
 const CRITERION_SCORE_RESPONSE_SCHEMA = {
   type: "OBJECT",
