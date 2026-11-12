@@ -130,7 +130,7 @@ function describeFailure(
   const said = providerMessage ? ` ${name} said: “${providerMessage}”` : "";
   switch (kind) {
     case "invalid_key":
-      return `${name} rejected the API key${http}. Check that it is correct, still active, and a ${name} key.${said}`;
+      return `${name} rejected the API key${http}. Check that it is correct, still active, and ${/^[AEIOU]/i.test(name) ? "an" : "a"} ${name} key.${said}`;
     case "no_credits":
       return `${name} says this account has no credits left${http}. Add credits, then test again.${said}`;
     case "model_not_found":
