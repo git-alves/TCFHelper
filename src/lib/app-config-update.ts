@@ -66,10 +66,18 @@ export interface PlannedSection {
  * provider's key and model would be sent to the new provider.) Switching to
  * OpenRouter also needs a model, either typed here or from the environment.
  * Typed keys and models are validated against the provider the section ends up
- * on. A provider that is unchanged (including null versus "gemini", which are
+ * on. (`requireOpenRouterModel: false` skips that last check, for a dry run
+ * such as the Test button, which reports a missing model instead of refusing.)
+ * A provider that is unchanged (including null versus "gemini", which are
  * the same provider) is not a switch.
  */
-export function planSectionUpdate(config: AppConfigValue, section: ConfigSection, patch: SectionPatch): PlannedSection {
+export function planSectionUpdate(
+  config: AppConfigValue,
+  section: ConfigSection,
+  patch: SectionPatch,
+  options: { requireOpenRouterModel?: boolean } = {},
+): PlannedSection {
+  const requireOpenRouterModel = options.requireOpenRouterModel ?? true;
   const stored = storedFor(config, section);
   const storedProvider = resolveProvider(stored.provider);
   const provider = patch.provider === undefined ? storedProvider : resolveProvider(patch.provider);
@@ -112,7 +120,7 @@ export function planSectionUpdate(config: AppConfigValue, section: ConfigSection
     update[keys.model] = patch.model;
   }
 
-  if (switched && provider === "openrouter" && !model && !openRouterEnvModel(section)) {
+  if (requireOpenRouterModel && switched && provider === "openrouter" && !model && !openRouterEnvModel(section)) {
     return {
       provider,
       switched,

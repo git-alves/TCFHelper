@@ -6,7 +6,7 @@
 // adapter translates these into its own error hierarchy.
 import { sendWithOverloadRetry } from "@/lib/provider-retry";
 
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+export const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 export class OpenRouterRateLimitedError extends Error {}
 
 /**

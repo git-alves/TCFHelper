@@ -6,7 +6,7 @@ import { hasTaskThreeDocuments } from "@/lib/task-three-topic";
 import { sendWithOverloadRetry } from "@/lib/provider-retry";
 import { unwrapJsonFence } from "@/lib/json-fence";
 
-const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
+export const GEMINI_API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 // Google AI Studio's free tier (no credit card, no billing) — kept
 // overridable via GEMINI_MODEL since free-tier model names are retired and
 // replaced over time.
