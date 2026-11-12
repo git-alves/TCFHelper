@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AdminQuotaOverrideForm } from "@/components/admin-quota-override-form";
 import { AdminUserActivationStatus } from "@/components/admin-user-activation-status";
 import { AdminUserAccountStatus } from "@/components/admin-user-account-status";
+import { failedSuffix } from "@/lib/admin-correction-usage-format";
 import type { AdminUserDetail as AdminUserDetailRecord } from "@/lib/admin-users";
 import { DEFAULT_USER_QUOTA_LIMITS } from "@/lib/user-quota-limits";
 
@@ -94,7 +95,10 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
           <div className="rounded-xl border border-black/[.1] p-4 dark:border-white/[.15]">
             <p className="text-sm font-medium">Corrections</p>
             <p className="mt-2 text-2xl font-semibold">{count(user.usage.corrections.currentDayRequests)}</p>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">today · {count(user.usage.corrections.currentMonthRequests)} this month</p>
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              today{failedSuffix(user.usage.corrections.currentDayFailed)} · {count(user.usage.corrections.currentMonthRequests)} this month
+              {failedSuffix(user.usage.corrections.currentMonthFailed)}
+            </p>
           </div>
         </div>
       </section>

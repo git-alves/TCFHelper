@@ -109,4 +109,9 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // support inbox. No existing row is touched: null means "never opened",
   // which is true of every existing account.
   "20261113120000_add_user_support_inbox_seen_at",
+  // Three NOT NULL DEFAULT 0 counters on CorrectionUsage (attempts per day and
+  // refunded failures per day and month). Existing rows keep every count they
+  // have and the previous deployment's inserts and updates stay valid, so no
+  // row changes meaning and nothing is backfilled.
+  "20261114120000_add_correction_usage_attempt_and_failed_counts",
 ]);

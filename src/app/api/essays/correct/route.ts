@@ -27,7 +27,7 @@ import {
   type CorrectionTopicContext,
 } from "@/lib/correction-claim";
 import { getCorrectionRequestKey } from "@/lib/correction-request-key";
-import { reserveCorrectionUsage } from "@/lib/correction-usage";
+import { refundCorrectionUsage, reserveCorrectionUsage } from "@/lib/correction-usage";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 import { checkFrenchText } from "@/lib/french-text-check";
 
@@ -162,6 +162,25 @@ function boundedCorrectionProviderHttpStatus(error: unknown): number | undefined
   return Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
     ? error.status
     : undefined;
+}
+
+/**
+ * Gives a correction's reserved slot back when the learner ends up with no
+ * correction for a reason that is not theirs: the AI provider failed, or the
+ * provider answered but the feedback could not be saved (or its lease was
+ * lost). The slot is recorded as a failed attempt either way; the admin event
+ * log keeps the distinction. Never changes the response: a refund that cannot
+ * be written is logged and the learner still sees the same error.
+ */
+async function refundCorrectionReservation(
+  userId: string,
+  reservation: { dayStartedAt: Date; monthStartedAt: Date },
+) {
+  try {
+    await refundCorrectionUsage(userId, reservation);
+  } catch {
+    console.error("Correction usage refund failed");
+  }
 }
 
 export async function POST(request: Request) {
@@ -319,6 +338,38 @@ export async function POST(request: Request) {
     );
   }
 
+  // Everything the provider call needs is built BEFORE the quota is reserved,
+  // so nothing that can throw sits between the reservation and the call: a
+  // failure here costs the learner nothing, whereas the same failure after the
+  // reservation would leak the slot (and count an attempt, which means "the
+  // provider call started") with no refund. The claim is released on failure
+  // like every other early exit.
+  let systemPrompt: string;
+  let userPrompt: string;
+  try {
+    const promptOverrides = await getPromptOverrides();
+    systemPrompt = buildCorrectionSystemPrompt(
+      feedbackLanguage,
+      taskType,
+      resolvedTopicPrompt,
+      toCorrectionPromptOverrides(promptOverrides),
+    );
+    userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
+  } catch (error) {
+    console.error("Correction prompt load failed", error);
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable.", code: "CORRECTION_SERVICE_UNAVAILABLE" },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
+
   let usageReservation: Awaited<ReturnType<typeof reserveCorrectionUsage>>;
   try {
     usageReservation = await reserveCorrectionUsage(user.id);
@@ -357,14 +408,14 @@ export async function POST(request: Request) {
     return correctionDailyLimitResponse(usageReservation.resetAt);
   }
 
-  const promptOverrides = await getPromptOverrides();
-  const systemPrompt = buildCorrectionSystemPrompt(
-    feedbackLanguage,
-    taskType,
-    resolvedTopicPrompt,
-    toCorrectionPromptOverrides(promptOverrides),
-  );
-  const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
+  // One reservation is refunded at most once, whichever path ends the request.
+  let reservationRefunded = false;
+  const refundReservation = async () => {
+    if (reservationRefunded) return;
+    reservationRefunded = true;
+    await refundCorrectionReservation(user.id, usageReservation);
+  };
+
   let shouldReleaseClaim = true;
   try {
     let rawFeedback: unknown;
@@ -381,6 +432,7 @@ export async function POST(request: Request) {
         httpStatus: boundedCorrectionProviderHttpStatus(error) ?? 502,
       });
       console.error("Essay correction provider failed", reasonCode);
+      await refundReservation();
       return NextResponse.json(
         { error: "Something went wrong while grading your essay." },
         { status: 502, headers: NO_STORE_HEADERS },
@@ -401,6 +453,7 @@ export async function POST(request: Request) {
         reasonCode: "schema_invalid",
         httpStatus: 502,
       });
+      await refundReservation();
       return NextResponse.json(
         { error: "Could not parse feedback. Please try again." },
         { status: 502 },
@@ -465,12 +518,24 @@ export async function POST(request: Request) {
         { headers: NO_STORE_HEADERS },
       );
     }
-    if (completion.kind === "existing") return duplicateCorrectionResponse(completion.essayId);
-    if (completion.kind === "inProgress") return correctionInProgressResponse(completion.retryAt);
+    // Another request owns, or already saved, the correction for this key (this
+    // request's lease expired during its provider call and was reclaimed). The
+    // learner will get exactly one correction, paid for by that request's
+    // reservation, so this one is given back instead of charging two slots.
+    if (completion.kind === "existing") {
+      await refundReservation();
+      return duplicateCorrectionResponse(completion.essayId);
+    }
+    if (completion.kind === "inProgress") {
+      await refundReservation();
+      return correctionInProgressResponse(completion.retryAt);
+    }
 
     // The lease disappeared before this request could persist. Do not return
     // its unpersisted result; a retry will either see the winner or reclaim
-    // the expired key safely.
+    // the expired key safely. The learner gets no correction, and not through
+    // any fault of theirs, so the slot is given back.
+    await refundReservation();
     return NextResponse.json(
       { error: "The correction service is temporarily unavailable. Please try again." },
       { status: 503, headers: NO_STORE_HEADERS },
@@ -481,9 +546,16 @@ export async function POST(request: Request) {
     // preserve the product rule instead of presenting a misleading grading
     // failure. A later history read will expose the already-saved review.
     if (isUniqueCorrectionConstraintError(error)) {
+      // The correction is already stored by another request, which paid for it.
+      await refundReservation();
       return duplicateCorrectionResponse();
     }
     console.error("Essay correction failed", error);
+    // Everything that can throw here is the provider answering and then us
+    // failing to save the feedback (the provider's own failures return above,
+    // having refunded already; the guard keeps a second refund from happening).
+    // That is ours, not the learner's.
+    await refundReservation();
     return NextResponse.json(
       { error: "Something went wrong while grading your essay." },
       { status: 502, headers: NO_STORE_HEADERS },

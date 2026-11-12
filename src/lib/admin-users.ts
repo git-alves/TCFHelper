@@ -45,8 +45,10 @@ export const ADMIN_USER_SELECT = {
     select: {
       dayStartedAt: true,
       dailyRequestCount: true,
+      dailyFailedCount: true,
       monthStartedAt: true,
       monthlyRequestCount: true,
+      monthlyFailedCount: true,
     },
   },
   quotaOverride: {
@@ -71,7 +73,15 @@ export type AdminUserUsage = {
     currentMonthCharacters: number;
   };
   examples: { currentDayRequests: number };
-  corrections: { currentDayRequests: number; currentMonthRequests: number };
+  // The request counts are corrections the learner actually received; a
+  // correction that failed on the provider's side is refunded and counted in
+  // the failed fields instead (see refundCorrectionUsage).
+  corrections: {
+    currentDayRequests: number;
+    currentMonthRequests: number;
+    currentDayFailed: number;
+    currentMonthFailed: number;
+  };
 };
 
 /** A date-only record is meaningful only while it is in its UTC window. */
@@ -150,6 +160,14 @@ export function getCurrentAdminUsage(record: Pick<
       currentMonthRequests:
         corrections && isSameWindow(corrections.monthStartedAt, currentMonth)
           ? corrections.monthlyRequestCount
+          : 0,
+      currentDayFailed:
+        corrections && isSameWindow(corrections.dayStartedAt, currentDay)
+          ? corrections.dailyFailedCount
+          : 0,
+      currentMonthFailed:
+        corrections && isSameWindow(corrections.monthStartedAt, currentMonth)
+          ? corrections.monthlyFailedCount
           : 0,
     },
   };

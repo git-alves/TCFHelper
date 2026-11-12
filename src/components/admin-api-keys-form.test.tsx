@@ -91,6 +91,19 @@ afterEach(() => {
   container.remove();
 });
 
+describe("consumption bar", () => {
+  it("shows today's provider calls and says that failed calls are included", () => {
+    render({
+      ...GEMINI_DISPLAY,
+      correction: { ...GEMINI_DISPLAY.correction, requestsToday: 9, dailyLimit: 20 },
+    });
+
+    expect(container.textContent).toContain("9 / 20");
+    expect(container.textContent).toContain("including ones that failed");
+    expect(container.textContent).toContain("refused before the provider was called are not counted");
+  });
+});
+
 describe("Test button", () => {
   it("there is one per section, idle, with no result", () => {
     render(GEMINI_DISPLAY);

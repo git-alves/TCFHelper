@@ -96,7 +96,7 @@ function ConsumptionBar({ section }: { section: AppConfigDisplaySection }) {
         <div className={`h-full rounded-full transition-[width] ${barColor}`} style={{ width: `${widthPercent}%` }} />
       </div>
       <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-        Self-tracked from this app&apos;s own request log, not reported by Google. Resets at midnight UTC.
+        Self-tracked from this app&apos;s own request log, not reported by Google. Counts every call made to the provider today, including ones that failed (they can still cost tokens); requests refused before the provider was called are not counted. Resets at midnight UTC.
       </p>
     </div>
   );

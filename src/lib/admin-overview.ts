@@ -38,7 +38,14 @@ export type AdminOverviewStats = {
   usage: {
     translation: { charactersThisMonth: number; activeUsersThisMonth: number };
     examples: { requestsToday: number; activeUsersToday: number };
-    corrections: { requestsToday: number; requestsThisMonth: number; activeUsersToday: number };
+    corrections: {
+      requestsToday: number;
+      requestsThisMonth: number;
+      activeUsersToday: number;
+      // Corrections refunded after an AI-provider failure; not in the request counts.
+      failedToday: number;
+      failedThisMonth: number;
+    };
   };
 };
 
@@ -58,32 +65,40 @@ export interface GeminiRequestsToday {
 }
 
 /**
- * Shared by the overview stats below and the admin settings API's
- * per-key consumption bar (src/lib/app-config.ts), so both read the exact
- * same reservation-time counters instead of drifting on what "today's
- * Gemini requests" means.
+ * Feeds the admin settings API's per-key consumption bar
+ * (src/lib/app-config.ts): how many provider calls this app made today, per
+ * feature. It sums each table's never-refunded attempt count, not the
+ * request count: a call that failed (or whose result could not be saved) is
+ * refunded out of the request count but still reached the provider and can
+ * still have cost tokens, and a call refused before the provider was reached
+ * is never counted in either. The counters do not record which provider a call
+ * went to, so the figure is per feature, for whichever provider that feature
+ * had configured when each call was made.
+ *
+ * Known undercount: the attempt columns were added later with a default of 0,
+ * and a deployment still running the previous code increments only the request
+ * count. A row written that way keeps attempts at 0 (or short) for its UTC
+ * day, so on the day of the rollout the bar can read lower than the calls
+ * actually made. It corrects itself from the next UTC day, when every row
+ * starts counting attempts again; nothing is backfilled.
  */
 export async function getGeminiRequestsToday(now = new Date()): Promise<GeminiRequestsToday> {
   const currentDayStart = startOfUtcDay(now);
 
   const [exampleDayAgg, correctionDayAgg] = await Promise.all([
     prisma.exampleGenerationQuota.aggregate({
-      // Failed provider calls refund dailyRequestCount but leave a cooldown
-      // row behind. Do not report zero-work rows as active learners.
-      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
-      _sum: { dailyRequestCount: true },
-      _count: { _all: true },
+      where: { dayStartedAt: currentDayStart },
+      _sum: { dailyAttemptCount: true },
     }),
     prisma.correctionUsage.aggregate({
       where: { dayStartedAt: currentDayStart },
-      _sum: { dailyRequestCount: true },
-      _count: { _all: true },
+      _sum: { dailyAttemptCount: true },
     }),
   ]);
 
   return {
-    correctionRequestsToday: correctionDayAgg._sum.dailyRequestCount ?? 0,
-    exampleRequestsToday: exampleDayAgg._sum.dailyRequestCount ?? 0,
+    correctionRequestsToday: correctionDayAgg._sum.dailyAttemptCount ?? 0,
+    exampleRequestsToday: exampleDayAgg._sum.dailyAttemptCount ?? 0,
   };
 }
 
@@ -107,6 +122,7 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
     exampleDayAgg,
     correctionDayAgg,
     correctionMonthAgg,
+    correctionFailedDayAgg,
     recentSignupRecords,
     recentActivity,
   ] = await Promise.all([
@@ -141,13 +157,20 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
       _count: { _all: true },
     }),
     prisma.correctionUsage.aggregate({
-      where: { dayStartedAt: currentDayStart },
+      // Refunded failures leave dailyRequestCount at 0; like examples, do not
+      // report a learner whose only attempts failed as an active learner.
+      where: { dayStartedAt: currentDayStart, dailyRequestCount: { gt: 0 } },
       _sum: { dailyRequestCount: true },
       _count: { _all: true },
     }),
     prisma.correctionUsage.aggregate({
       where: { monthStartedAt: currentMonthStart },
-      _sum: { monthlyRequestCount: true },
+      _sum: { monthlyRequestCount: true, monthlyFailedCount: true },
+    }),
+    // Not filtered on dailyRequestCount: failures are exactly the rows that may be at 0.
+    prisma.correctionUsage.aggregate({
+      where: { dayStartedAt: currentDayStart },
+      _sum: { dailyFailedCount: true },
     }),
     prisma.user.findMany({
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -190,6 +213,8 @@ export async function getAdminOverviewStats(now = new Date()): Promise<AdminOver
         requestsToday: correctionDayAgg._sum.dailyRequestCount ?? 0,
         requestsThisMonth: correctionMonthAgg._sum.monthlyRequestCount ?? 0,
         activeUsersToday: correctionDayAgg._count._all,
+        failedToday: correctionFailedDayAgg._sum.dailyFailedCount ?? 0,
+        failedThisMonth: correctionMonthAgg._sum.monthlyFailedCount ?? 0,
       },
     },
   };

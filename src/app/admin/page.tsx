@@ -110,6 +110,8 @@ export default async function AdminOverviewPage() {
               { label: "Requests today", value: stats.usage.corrections.requestsToday },
               { label: "Requests this month", value: stats.usage.corrections.requestsThisMonth },
               { label: "Active users today", value: stats.usage.corrections.activeUsersToday },
+              { label: "Failed today (refunded)", value: stats.usage.corrections.failedToday },
+              { label: "Failed this month (refunded)", value: stats.usage.corrections.failedThisMonth },
             ]}
           />
         </div>

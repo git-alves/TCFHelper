@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AdminUserAccountStatus } from "@/components/admin-user-account-status";
+import { formatCorrectionUsage } from "@/lib/admin-correction-usage-format";
 import type { AdminUserListItem } from "@/lib/admin-users";
 
 interface AdminUsersTableProps {
@@ -95,10 +96,7 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                 <td className="px-4 py-4 text-xs leading-5 text-zinc-700 dark:text-zinc-300">
                   <p>Translation: {count(user.usage.translation.currentMonthCharacters)} chars this month</p>
                   <p>Examples: {count(user.usage.examples.currentDayRequests)} today</p>
-                  <p>
-                    Corrections: {count(user.usage.corrections.currentDayRequests)} today ·{" "}
-                    {count(user.usage.corrections.currentMonthRequests)} this month
-                  </p>
+                  <p>Corrections: {formatCorrectionUsage(user.usage.corrections)}</p>
                 </td>
                 <td className="px-4 py-4 whitespace-nowrap">
                   <Link href={`/admin/users/${user.id}`} className="text-sm font-medium text-violet-700 underline underline-offset-4 hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-100">

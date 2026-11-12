@@ -71,7 +71,7 @@ describe("GET /api/admin/users/export", () => {
           usage: {
             translation: { currentMinuteRequests: 0, currentMinuteCharacters: 0, currentMonthCharacters: 4200 },
             examples: { currentDayRequests: 3 },
-            corrections: { currentDayRequests: 1, currentMonthRequests: 10 },
+            corrections: { currentDayRequests: 1, currentMonthRequests: 10, currentDayFailed: 2, currentMonthFailed: 5 },
           },
         },
       ],
@@ -85,10 +85,10 @@ describe("GET /api/admin/users/export", () => {
     expect(response.headers.get("Content-Disposition")).toBe('attachment; filename="users.csv"');
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(body).toContain(
-      "Email,Name,Joined at,Last sign-in at,Last active at,Activated at,Admin,Blocked,Translation chars (month),Example generations (day),Corrections (day)\r\n",
+      "Email,Name,Joined at,Last sign-in at,Last active at,Activated at,Admin,Blocked,Translation chars (month),Example generations (day),Corrections (day),Failed corrections (day)\r\n",
     );
     expect(body).toContain('learner@example.com,"Learner, One",2026-08-01T00:00:00.000Z,2026-10-22T09:00:00.000Z,,2026-08-02T00:00:00.000Z');
-    expect(body).toContain("no,yes,4200,3,1\r\n");
+    expect(body).toContain("no,yes,4200,3,1,2\r\n");
   });
 
   it("refuses with a 413 instead of silently truncating when the filter matches too many rows", async () => {
