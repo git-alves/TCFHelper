@@ -114,6 +114,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261023120000_add_user_last_sign_in");
   });
 
+  it("allows the additive correction-usage attempt and failed-count migration", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261114120000_add_correction_usage_attempt_and_failed_counts");
+  });
+
   it("allows the additive admin support-inbox last-seen column migration", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261113120000_add_user_support_inbox_seen_at");
   });

@@ -378,9 +378,20 @@ model CorrectionUsage {
   userId              String   @id
   user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   dayStartedAt        DateTime
+  // Corrections the learner actually received. A correction that fails because
+  // of the AI provider is refunded (decremented) so it does not use up the
+  // learner's daily allowance; see refundCorrectionUsage.
   dailyRequestCount   Int      @default(0)
   monthStartedAt      DateTime
   monthlyRequestCount Int      @default(0)
+  // Every provider attempt for the day, successful or not, and never refunded.
+  // A refunded failure never raises dailyRequestCount, so that count alone no
+  // longer bounds how often a persistently failing provider can be called;
+  // this is the durable per-day cap (see reserveCorrectionUsage).
+  dailyAttemptCount   Int      @default(0)
+  // Refunded failures, per day and per month window, for the admin's usage view.
+  dailyFailedCount    Int      @default(0)
+  monthlyFailedCount  Int      @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
