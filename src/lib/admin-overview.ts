@@ -74,6 +74,13 @@ export interface GeminiRequestsToday {
  * is never counted in either. The counters do not record which provider a call
  * went to, so the figure is per feature, for whichever provider that feature
  * had configured when each call was made.
+ *
+ * Known undercount: the attempt columns were added later with a default of 0,
+ * and a deployment still running the previous code increments only the request
+ * count. A row written that way keeps attempts at 0 (or short) for its UTC
+ * day, so on the day of the rollout the bar can read lower than the calls
+ * actually made. It corrects itself from the next UTC day, when every row
+ * starts counting attempts again; nothing is backfilled.
  */
 export async function getGeminiRequestsToday(now = new Date()): Promise<GeminiRequestsToday> {
   const currentDayStart = startOfUtcDay(now);

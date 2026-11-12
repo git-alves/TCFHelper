@@ -976,16 +976,63 @@ describe("POST /api/essays/correct", () => {
       expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
     });
 
-    it("does not refund when the learner did receive a correction or already has one", async () => {
-      // Saved by a concurrent request: the learner is given that correction.
+    it("refunds a stale lease owner whose correction is now owned by a newer claim, so one correction is not charged twice", async () => {
+      completeCorrectionClaimMock.mockResolvedValue({
+        kind: "inProgress",
+        retryAt: new Date("2026-08-10T12:01:00.000Z"),
+      });
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(409);
+      expect(gradeEssayMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledWith(LOCAL_USER_ID, expect.objectContaining(RESERVATION));
+    });
+
+    it("refunds when another request already saved the correction (existing, or the unique-key backstop)", async () => {
       completeCorrectionClaimMock.mockResolvedValue({ kind: "existing", essayId: "essay_0" });
       expect((await post(task1)).status).toBe(409);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
 
-      // The unique-key backstop: the correction is already stored.
+      refundCorrectionUsageMock.mockClear();
       completeCorrectionClaimMock.mockRejectedValue(Object.assign(new Error("duplicate key"), { code: "P2002" }));
       expect((await post(task1)).status).toBe(409);
+      expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+    });
 
+    it("refunds nothing and reserves nothing when the prompt cannot be loaded, and still frees the claim", async () => {
+      // A failure between the reservation and the provider call would leak the
+      // slot, so the prompt is loaded before the reservation. Failing there
+      // costs the learner nothing and never counts as a provider attempt.
+      getPromptOverridesMock.mockRejectedValue(new Error("database unavailable"));
+
+      const response = await post(task1);
+
+      expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toEqual({
+        error: "The correction service is temporarily unavailable.",
+        code: "CORRECTION_SERVICE_UNAVAILABLE",
+      });
+      expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
       expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+      expect(gradeEssayMock).not.toHaveBeenCalled();
+      expect(releaseCorrectionClaimMock).toHaveBeenCalledWith({
+        userId: LOCAL_USER_ID,
+        correctionKeyHash: "correction_hash_1",
+        claimToken: "claim_1",
+      });
+    });
+
+    it("builds the prompt before it reserves, so the reservation is immediately followed by the provider call", async () => {
+      await post(task1);
+
+      expect(getPromptOverridesMock.mock.invocationCallOrder[0]).toBeLessThan(
+        reserveCorrectionUsageMock.mock.invocationCallOrder[0],
+      );
+      expect(reserveCorrectionUsageMock.mock.invocationCallOrder[0]).toBeLessThan(
+        gradeEssayMock.mock.invocationCallOrder[0],
+      );
     });
 
     it("refunds a reservation exactly once, whichever failure path ends the request", async () => {

@@ -338,6 +338,38 @@ export async function POST(request: Request) {
     );
   }
 
+  // Everything the provider call needs is built BEFORE the quota is reserved,
+  // so nothing that can throw sits between the reservation and the call: a
+  // failure here costs the learner nothing, whereas the same failure after the
+  // reservation would leak the slot (and count an attempt, which means "the
+  // provider call started") with no refund. The claim is released on failure
+  // like every other early exit.
+  let systemPrompt: string;
+  let userPrompt: string;
+  try {
+    const promptOverrides = await getPromptOverrides();
+    systemPrompt = buildCorrectionSystemPrompt(
+      feedbackLanguage,
+      taskType,
+      resolvedTopicPrompt,
+      toCorrectionPromptOverrides(promptOverrides),
+    );
+    userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
+  } catch (error) {
+    console.error("Correction prompt load failed", error);
+    await releaseCorrectionClaim({
+      userId: user.id,
+      correctionKeyHash: claim.correctionKeyHash,
+      claimToken: claim.claimToken,
+    }).catch(() => {
+      console.error("Correction claim cleanup failed");
+    });
+    return NextResponse.json(
+      { error: "The correction service is temporarily unavailable.", code: "CORRECTION_SERVICE_UNAVAILABLE" },
+      { status: 503, headers: NO_STORE_HEADERS },
+    );
+  }
+
   let usageReservation: Awaited<ReturnType<typeof reserveCorrectionUsage>>;
   try {
     usageReservation = await reserveCorrectionUsage(user.id);
@@ -384,14 +416,6 @@ export async function POST(request: Request) {
     await refundCorrectionReservation(user.id, usageReservation);
   };
 
-  const promptOverrides = await getPromptOverrides();
-  const systemPrompt = buildCorrectionSystemPrompt(
-    feedbackLanguage,
-    taskType,
-    resolvedTopicPrompt,
-    toCorrectionPromptOverrides(promptOverrides),
-  );
-  const userPrompt = buildCorrectionUserPrompt({ task, resolvedTopicPrompt, content, wordCount });
   let shouldReleaseClaim = true;
   try {
     let rawFeedback: unknown;
@@ -494,8 +518,18 @@ export async function POST(request: Request) {
         { headers: NO_STORE_HEADERS },
       );
     }
-    if (completion.kind === "existing") return duplicateCorrectionResponse(completion.essayId);
-    if (completion.kind === "inProgress") return correctionInProgressResponse(completion.retryAt);
+    // Another request owns, or already saved, the correction for this key (this
+    // request's lease expired during its provider call and was reclaimed). The
+    // learner will get exactly one correction, paid for by that request's
+    // reservation, so this one is given back instead of charging two slots.
+    if (completion.kind === "existing") {
+      await refundReservation();
+      return duplicateCorrectionResponse(completion.essayId);
+    }
+    if (completion.kind === "inProgress") {
+      await refundReservation();
+      return correctionInProgressResponse(completion.retryAt);
+    }
 
     // The lease disappeared before this request could persist. Do not return
     // its unpersisted result; a retry will either see the winner or reclaim
@@ -512,6 +546,8 @@ export async function POST(request: Request) {
     // preserve the product rule instead of presenting a misleading grading
     // failure. A later history read will expose the already-saved review.
     if (isUniqueCorrectionConstraintError(error)) {
+      // The correction is already stored by another request, which paid for it.
+      await refundReservation();
       return duplicateCorrectionResponse();
     }
     console.error("Essay correction failed", error);
