@@ -96,6 +96,26 @@ export function defaultInactivityTemplate(
   return defaults[`${kind}:${locale}`];
 }
 
+export const INACTIVITY_EMAIL_PAID_SUBSCRIPTION_STATUSES = new Set([
+  "ACTIVE",
+  "PAST_DUE",
+  "CANCELED",
+]);
+
+function inactivityEmailFooter(
+  locale: InactivityEmailLocale,
+  unsubscribeUrl: string,
+) {
+  const senderDetails = [
+    process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim(),
+    process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL?.trim(),
+  ]
+    .filter((value): value is string => Boolean(value))
+    .map(escapeHtml)
+    .join(" · ");
+  return `<hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+}
+
 export function isEligibleForInactivityEmail(
   user: {
     isBlocked: boolean;
@@ -112,8 +132,7 @@ export function isEligibleForInactivityEmail(
   },
   now = new Date(),
 ): boolean {
-  // Consent / existing-business-relationship policy belongs here once the
-  // owner decides how it is recorded. Do not loosen these hard exclusions.
+  // CASL implied consent requires recent durable access/purchase evidence.
   const cutoff = new Date(now.getTime() - 730 * 86_400_000);
   // CASL implied consent: a paid/access relationship is valid for two years.
   // Paddle purchase evidence will join this list when that integration lands.
@@ -126,7 +145,6 @@ export function isEligibleForInactivityEmail(
         (code) => code.redeemedAt && code.redeemedAt >= cutoff,
       ),
     );
-  const paidStatuses = new Set(["ACTIVE", "PAST_DUE", "CANCELED"]);
   const subscriptionEvidence = Boolean(
     user.subscriptions?.some((subscription) => {
       const latest = new Date(
@@ -137,7 +155,10 @@ export function isEligibleForInactivityEmail(
         ),
       );
       const evidenceDate = new Date(Math.min(now.getTime(), latest.getTime()));
-      return paidStatuses.has(subscription.status) && evidenceDate >= cutoff;
+      return (
+        INACTIVITY_EMAIL_PAID_SUBSCRIPTION_STATUSES.has(subscription.status) &&
+        evidenceDate >= cutoff
+      );
     }),
   );
   return (
@@ -413,7 +434,7 @@ export async function sendInactivityEmailTest(input: {
   if (validation) throw new Error(validation);
   const appUrl = `${baseUrl()}/dashboard`;
   const template = defaultInactivityTemplate(input.kind, input.locale);
-  const html = `<div>${renderText(input.body, { name: "Alex", appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[input.locale])} MyTCFLab · ${escapeHtml(process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS!)} · ${escapeHtml(process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!)}. <a href="https://example.invalid/unsubscribe-test">${escapeHtml(unsubscribeLabel[input.locale])}</a></p>`;
+  const html = `<div>${renderText(input.body, { name: "Alex", appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p>${inactivityEmailFooter(input.locale, "https://example.invalid/unsubscribe-test")}`;
   const result = await new Resend(process.env.RESEND_API_KEY!).emails.send({
     from: process.env.EMAIL_FROM!,
     to: input.to,
@@ -637,14 +658,7 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     const listUnsubscribeUrl = `${baseUrl()}/api/unsubscribe/inactivity?token=${token}`;
     const name = user.name?.trim() || fallbackName[locale];
     const subject = template.subject.replace(/\{name\}/g, name);
-    const senderDetails = [
-      process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim(),
-      process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!.trim(),
-    ]
-      .filter((value): value is string => Boolean(value))
-      .map(escapeHtml)
-      .join(" · ");
-    const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+    const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p>${inactivityEmailFooter(locale, unsubscribeUrl)}`;
     let result;
     try {
       result = await resend.emails.send(
