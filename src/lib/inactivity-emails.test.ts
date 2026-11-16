@@ -34,10 +34,7 @@ describe("inactivity email eligibility and templates", () => {
     };
     expect(isEligibleForInactivityEmail(base)).toBe(false);
     expect(
-      isEligibleForInactivityEmail(
-        { ...base, redeemedAccessCodes: [{ id: "lifetime" }] },
-        now,
-      ),
+      isEligibleForInactivityEmail({ ...base, redeemedAccessCodes: [{ id: "lifetime" }] }),
     ).toBe(true);
   });
   it("excludes blocked, admin, unsubscribed, and never-active users", () => {
