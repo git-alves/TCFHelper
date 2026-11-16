@@ -173,6 +173,31 @@ describe("inactivity email eligibility and templates", () => {
 });
 
 describe("inactivity email selection", () => {
+  it("skips learners without evidence while selecting a recent activation", async () => {
+    const now = new Date("2026-11-16T12:00:00Z");
+    const inactive = new Date("2026-10-01T12:00:00Z");
+    const row = (id: string, activationWelcomeShownAt: Date | null) => ({
+      id,
+      email: `${id}@example.com`,
+      name: null,
+      locale: Locale.en,
+      lastActiveAt: inactive,
+      isBlocked: false,
+      isAdmin: false,
+      inactivityEmailsUnsubscribedAt: null,
+      activationWelcomeShownAt,
+      redeemedAccessCodes: [],
+      subscriptions: [],
+      inactivityEmailSends: [],
+    });
+    findMany.mockResolvedValue([
+      row("no-evidence", null),
+      row("eligible", new Date("2026-10-17T12:00:00Z")),
+    ]);
+    await expect(selectInactivityEmailCandidates(now)).resolves.toMatchObject([
+      { id: "eligible" },
+    ]);
+  });
   it("selects only the 30-day email for a first rollout user and resets a later 30-day milestone after activity", async () => {
     const now = new Date("2026-11-16T12:00:00Z");
     const old = new Date("2026-10-01T12:00:00Z");
