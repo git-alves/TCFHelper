@@ -170,13 +170,20 @@ function escapeHtml(value: string) {
   );
 }
 
-function renderText(value: string, values: { name: string; appUrl: string }) {
-  const normalized = value.replace(/<br\s*\/?\s*>/gi, "<br>");
+export function renderInactivityEmailText(
+  value: string,
+  values: { name: string; appUrl: string },
+) {
+  const normalized = value
+    .replace(/<br\s*\/?\s*>/gi, "<br>")
+    .replace(/\r\n|\r|\n/g, "<br>");
   const escaped = escapeHtml(normalized).replace(/&lt;br&gt;/g, "<br>");
   return escaped
     .replace(/\{name\}/g, escapeHtml(values.name))
     .replace(/\{appUrl\}/g, escapeHtml(values.appUrl));
 }
+
+const renderText = renderInactivityEmailText;
 
 export function validateInactivityTemplate(
   subject: string,

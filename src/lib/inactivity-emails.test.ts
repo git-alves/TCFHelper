@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { user: { findMany } } }));
 
 const {
   isEligibleForInactivityEmail,
+  renderInactivityEmailText,
   selectInactivityEmailCandidates,
   signInactivityUnsubscribeToken,
   validateInactivityTemplate,
@@ -24,6 +25,18 @@ afterEach(() => {
 });
 
 describe("inactivity email eligibility and templates", () => {
+  it("renders normalized breaks while escaping all other HTML", () => {
+    const values = { name: "<Ada>", appUrl: "https://example.com" };
+    expect(renderInactivityEmailText("line1\n\nline2", values)).toBe(
+      "line1<br><br>line2",
+    );
+    expect(renderInactivityEmailText("line1\r\nline2", values)).toBe(
+      "line1<br>line2",
+    );
+    expect(renderInactivityEmailText("<b>{name}</b><br>ok", values)).toBe(
+      "&lt;b&gt;&lt;Ada&gt;&lt;/b&gt;<br>ok",
+    );
+  });
   it("requires a live redeemed access code", () => {
     const now = new Date("2026-11-16T12:00:00Z");
     const base = {
@@ -34,7 +47,10 @@ describe("inactivity email eligibility and templates", () => {
     };
     expect(isEligibleForInactivityEmail(base)).toBe(false);
     expect(
-      isEligibleForInactivityEmail({ ...base, redeemedAccessCodes: [{ id: "lifetime" }] }),
+      isEligibleForInactivityEmail({
+        ...base,
+        redeemedAccessCodes: [{ id: "lifetime" }],
+      }),
     ).toBe(true);
   });
   it("excludes blocked, admin, unsubscribed, and never-active users", () => {

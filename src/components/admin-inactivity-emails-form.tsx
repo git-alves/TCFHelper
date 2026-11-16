@@ -145,8 +145,9 @@ export function AdminInactivityEmailsForm({
             role="alert"
             className="mt-3 text-sm text-amber-700 dark:text-amber-300"
           >
-            Canada&apos;s anti-spam law (CASL) requires a valid mailing address and a
-            working contact in these emails. Add one before sending to learners.
+            Canada&apos;s anti-spam law (CASL) requires a valid mailing address
+            and a working contact in these emails. Add one before sending to
+            learners.
           </p>
         )}
         <label className="mt-4 flex items-center gap-2 text-sm">
@@ -213,7 +214,8 @@ export function AdminInactivityEmailsForm({
         <p className="mt-2 text-xs text-zinc-500">
           Allowed placeholders: <code>{"{name}"}</code>{" "}
           <code>{"{appUrl}"}</code>. Use {"{appUrl}"} for the return button. The
-          unsubscribe footer is added automatically and cannot be edited.
+          unsubscribe footer is added automatically and cannot be edited. Press
+          Enter to create a line break.
         </p>
         {invalid && (
           <p role="alert" className="mt-2 text-sm text-red-700">
