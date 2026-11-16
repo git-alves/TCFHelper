@@ -24,6 +24,8 @@ vi.mock("@/lib/inactivity-emails", () => ({
 const { PUT } = await import("./route");
 
 beforeEach(() => {
+  getAdminApiUser.mockReset();
+  updateInactivityEmailSettings.mockReset();
   getAdminApiUser.mockResolvedValue({ id: "admin" });
   updateInactivityEmailSettings.mockResolvedValue({ enabled: false });
 });
