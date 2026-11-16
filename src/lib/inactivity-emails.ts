@@ -89,6 +89,12 @@ const unsubscribeLabel: Record<InactivityEmailLocale, string> = {
   fr: "Ne plus recevoir ces e-mails",
   es: "Dejar de recibir estos correos",
 };
+const noReplyNote: Record<InactivityEmailLocale, string> = {
+  pt: "Este é um e-mail automático — por favor, não responda. Se precisar de ajuda, abra Suporte no MyTCFLab.",
+  en: "This is an automatic email — please don’t reply. If you need help, open Support in MyTCFLab.",
+  fr: "Ceci est un e-mail automatique — merci de ne pas y répondre. Si vous avez besoin d’aide, ouvrez Assistance dans MyTCFLab.",
+  es: "Este es un correo automático; no respondas. Si necesitas ayuda, abre Soporte en MyTCFLab.",
+};
 
 export function defaultInactivityTemplate(
   kind: InactivityEmailKind,
@@ -108,7 +114,7 @@ function inactivityEmailFooter(
     .filter((value): value is string => Boolean(value))
     .map(escapeHtml)
     .join(" · ");
-  return `<hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+  return `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#5b21b6;font-weight:600;text-decoration:underline;">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
 }
 
 export function isEligibleForInactivityEmail(user: {
@@ -185,14 +191,12 @@ export function renderInactivityEmailText(
 
 const renderText = renderInactivityEmailText;
 
-const emailContentStyle =
-  "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#18181b;line-height:1.5;";
-
 export function renderInactivityEmailCta(label: string, href: string) {
-  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="${escapeHtml(href)}" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;"><tr><td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 18px;"><a href="${escapeHtml(href)}" style="display:block;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#ffffff;font-weight:600;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
 }
 
 function renderInactivityEmailHtml(input: {
+  subject: string;
   body: string;
   name: string;
   appUrl: string;
@@ -200,7 +204,11 @@ function renderInactivityEmailHtml(input: {
   locale: InactivityEmailLocale;
   unsubscribeUrl: string;
 }) {
-  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;"><tr><td align="center"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td style="${emailContentStyle}"><div>${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</td></tr></table></td></tr></table>`;
+  const subject = escapeHtml(input.subject).replace(
+    /\{name\}/g,
+    escapeHtml(input.name),
+  );
+  return `<meta name="color-scheme" content="light"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f5" style="background-color:#f4f4f5;"><tr><td align="center" bgcolor="#f4f4f5" style="padding:40px 16px;background-color:#f4f4f5;color:#18181b;"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding:40px;background-color:#ffffff;color:#18181b;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:28px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">MyTCFLab</p><h1 style="margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">${subject}</h1><div style="padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;font-weight:400;color:#52525b;">${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}<p style="margin:28px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(noReplyNote[input.locale])}</p><div style="margin-top:24px;padding-top:24px;border-top:1px solid #e4e4e7;color:#71717a;">${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</div></td></tr></table></td></tr></table>`;
 }
 
 export function validateInactivityTemplate(
@@ -420,6 +428,7 @@ export async function sendInactivityEmailTest(input: {
   const appUrl = `${baseUrl()}/dashboard`;
   const template = defaultInactivityTemplate(input.kind, input.locale);
   const html = renderInactivityEmailHtml({
+    subject: input.subject,
     body: input.body,
     name: "Alex",
     appUrl,
@@ -645,6 +654,7 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     const name = user.name?.trim() || fallbackName[locale];
     const subject = template.subject.replace(/\{name\}/g, name);
     const html = renderInactivityEmailHtml({
+      subject: template.subject,
       body: template.body,
       name,
       appUrl,

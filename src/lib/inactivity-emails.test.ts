@@ -45,7 +45,7 @@ describe("inactivity email eligibility and templates", () => {
         'https://example.com/dashboard?next="today"',
       ),
     ).toContain(
-      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://example.com/dashboard?next=&quot;today&quot;" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return &lt;now&gt;</a>',
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 18px;"><a href="https://example.com/dashboard?next=&quot;today&quot;" style="display:block;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#ffffff;font-weight:600;text-decoration:none;">Return &lt;now&gt;</a>',
     );
   });
   it("requires a live redeemed access code", () => {
