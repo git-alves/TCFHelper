@@ -155,6 +155,20 @@ describe("runInactivityEmailCron", () => {
       where: { id: "claim_1" },
     });
   });
+  it.each([
+    { statusCode: null, name: "application_error", message: "network" },
+    { statusCode: 500, name: "application_error", message: "server" },
+    { statusCode: 502, name: "application_error", message: "gateway" },
+  ])(
+    "leaves returned uncertain Resend errors pending: $statusCode",
+    async (error) => {
+      send.mockResolvedValue({ data: null, error });
+      await expect(runInactivityEmailCron(now, 0)).resolves.toMatchObject({
+        sent: 0,
+      });
+      expect(prisma.inactivityEmailSend.update).not.toHaveBeenCalled();
+    },
+  );
   it("leaves a claim pending on network errors or failed SENT persistence", async () => {
     send.mockRejectedValueOnce(new Error("network"));
     await runInactivityEmailCron(now);
