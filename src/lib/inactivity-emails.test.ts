@@ -135,4 +135,55 @@ describe("inactivity email selection", () => {
       ["returned", InactivityEmailKind.THIRTY_DAY],
     ]);
   });
+
+  it("caps selection and retries only failed sends below three attempts", async () => {
+    const now = new Date("2026-11-16T12:00:00Z");
+    const old = new Date("2026-10-01T12:00:00Z");
+    const user = (id: string, inactivityEmailSends: unknown[] = []) => ({
+      id,
+      email: `${id}@example.com`,
+      name: null,
+      locale: Locale.en,
+      lastActiveAt: old,
+      isBlocked: false,
+      isAdmin: false,
+      inactivityEmailsUnsubscribedAt: null,
+      inactivityEmailSends,
+    });
+    findMany.mockResolvedValue([
+      user("retry", [
+        {
+          id: "failed",
+          kind: InactivityEmailKind.THIRTY_DAY,
+          lastActiveAt: old,
+          status: InactivityEmailSendStatus.FAILED,
+          attempts: 2,
+        },
+      ]),
+      user("exhausted", [
+        {
+          id: "exhausted",
+          kind: InactivityEmailKind.THIRTY_DAY,
+          lastActiveAt: old,
+          status: InactivityEmailSendStatus.FAILED,
+          attempts: 3,
+        },
+      ]),
+      user("pending", [
+        {
+          id: "pending",
+          kind: InactivityEmailKind.THIRTY_DAY,
+          lastActiveAt: old,
+          status: InactivityEmailSendStatus.PENDING,
+          attempts: 1,
+        },
+      ]),
+      ...Array.from({ length: 100 }, (_, index) => user(`user-${index}`)),
+    ]);
+    const selected = await selectInactivityEmailCandidates(now);
+    expect(selected).toHaveLength(90);
+    expect(selected[0]).toMatchObject({ id: "retry", retrySendId: "failed" });
+    expect(selected.map((item) => item.id)).not.toContain("exhausted");
+    expect(selected.map((item) => item.id)).not.toContain("pending");
+  });
 });
