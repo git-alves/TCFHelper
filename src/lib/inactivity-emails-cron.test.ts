@@ -8,6 +8,7 @@ const prisma = {
   user: { findMany: vi.fn(), findFirst: vi.fn() },
   inactivityEmailSend: {
     create: vi.fn(),
+    delete: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
   },
@@ -117,7 +118,7 @@ describe("runInactivityEmailCron", () => {
           "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
         }),
       }),
-      { idempotencyKey: "inactivity-claim_1" },
+      { idempotencyKey: "inactivity-claim_1-1" },
     );
     expect(prisma.inactivityEmailSend.update).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -141,6 +142,18 @@ describe("runInactivityEmailCron", () => {
         }),
       }),
     );
+  });
+  it("stops on a 429 and removes a new pending claim", async () => {
+    send.mockResolvedValue({
+      data: null,
+      error: { statusCode: 429, message: "limited" },
+    });
+    await expect(runInactivityEmailCron(now, 0)).resolves.toMatchObject({
+      skipped: "rate_limited",
+    });
+    expect(prisma.inactivityEmailSend.delete).toHaveBeenCalledWith({
+      where: { id: "claim_1" },
+    });
   });
   it("leaves a claim pending on network errors or failed SENT persistence", async () => {
     send.mockRejectedValueOnce(new Error("network"));
