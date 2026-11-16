@@ -114,4 +114,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // have and the previous deployment's inserts and updates stay valid, so no
   // row changes meaning and nothing is backfilled.
   "20261114120000_add_correction_usage_attempt_and_failed_counts",
+  // New empty template/send-ledger tables, nullable User opt-out timestamp,
+  // and an AppConfig switch defaulting false. Existing deployments remain
+  // behaviorally silent until the owner enables the feature.
+  "20261115120000_add_inactivity_emails",
 ]);
