@@ -17,6 +17,17 @@ const kinds = [
 const key = (kind: InactivityEmailKind, locale: Locale) =>
   `${kind}:${locale}` as keyof InactivityEmailDisplay["templates"];
 
+export function resetInactivityEmailTemplate<
+  T extends { defaultSubject: string; defaultBody: string },
+>(template: T) {
+  return {
+    ...template,
+    subject: template.defaultSubject,
+    body: template.defaultBody,
+    customized: false,
+  };
+}
+
 export function AdminInactivityEmailsForm({
   initialDisplay,
 }: {
@@ -30,6 +41,9 @@ export function AdminInactivityEmailsForm({
   const [draft, setDraft] = useState(initialDisplay.templates);
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showEnableConfirmation, setShowEnableConfirmation] = useState(false);
+  const [enableAcknowledged, setEnableAcknowledged] = useState(false);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const selectedKey = key(kind, locale);
   const selected = draft[selectedKey];
   const invalid =
@@ -132,14 +146,8 @@ export function AdminInactivityEmailsForm({
             checked={display.enabled}
             disabled={!display.configured || invalid || saving}
             onChange={(event) => {
-              if (
-                event.target.checked &&
-                !window.confirm(
-                  "Eligible learners may start receiving the saved emails automatically. Confirm that sender details and legal basis are current.",
-                )
-              )
-                return;
-              void save(event.target.checked);
+              if (event.target.checked) setShowEnableConfirmation(true);
+              else void save(false);
             }}
           />{" "}
           Send inactivity emails automatically
@@ -206,15 +214,7 @@ export function AdminInactivityEmailsForm({
         <button
           type="button"
           className="mt-3 rounded border px-3 py-1 text-sm"
-          onClick={() =>
-            setDraft((current) => ({
-              ...current,
-              [selectedKey]: {
-                ...display.templates[selectedKey],
-                customized: false,
-              },
-            }))
-          }
+          onClick={() => setShowResetConfirmation(true)}
         >
           Reset to default
         </button>
@@ -261,6 +261,98 @@ export function AdminInactivityEmailsForm({
           </p>
         )}
       </div>
+      {showEnableConfirmation && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="enable-inactivity-email-heading"
+          className="rounded-xl border border-black/[.1] p-4 dark:border-white/[.15]"
+        >
+          <h2 id="enable-inactivity-email-heading" className="font-semibold">
+            Turn on inactivity emails?
+          </h2>
+          <p className="mt-2 text-sm">
+            Eligible learners may start receiving the saved 7-day and 30-day
+            emails automatically. Each email is sent once per inactivity streak.
+            Learners who unsubscribe will not receive these emails.
+          </p>
+          <label className="mt-3 flex gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={enableAcknowledged}
+              onChange={(event) => setEnableAcknowledged(event.target.checked)}
+            />{" "}
+            I confirm that MyTCFLab has a valid basis to email these learners
+            and that the sender details are current.
+          </label>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              className="rounded border px-3 py-1 text-sm"
+              onClick={() => {
+                setShowEnableConfirmation(false);
+                setEnableAcknowledged(false);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!enableAcknowledged || saving}
+              className="rounded bg-foreground px-3 py-1 text-sm text-background disabled:opacity-50"
+              onClick={() => {
+                setShowEnableConfirmation(false);
+                setEnableAcknowledged(false);
+                void save(true);
+              }}
+            >
+              Turn on sending
+            </button>
+          </div>
+        </div>
+      )}
+      {showResetConfirmation && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-inactivity-email-heading"
+          className="rounded-xl border border-black/[.1] p-4 dark:border-white/[.15]"
+        >
+          <h2 id="reset-inactivity-email-heading" className="font-semibold">
+            Reset this email to the built-in default?
+          </h2>
+          <p className="mt-2 text-sm">
+            Your custom subject and body for{" "}
+            {kind === InactivityEmailKind.SEVEN_DAY ? "7 days" : "30 days"} /{" "}
+            {locales.find((item) => item.id === locale)?.label} will be
+            replaced. This cannot be undone after saving.
+          </p>
+          <div className="mt-4 flex gap-3">
+            <button
+              type="button"
+              className="rounded border px-3 py-1 text-sm"
+              onClick={() => setShowResetConfirmation(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="rounded bg-foreground px-3 py-1 text-sm text-background"
+              onClick={() => {
+                setDraft((current) => ({
+                  ...current,
+                  [selectedKey]: resetInactivityEmailTemplate(
+                    current[selectedKey],
+                  ),
+                }));
+                setShowResetConfirmation(false);
+              }}
+            >
+              Reset to default
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

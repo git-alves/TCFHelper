@@ -24,6 +24,7 @@ CREATE TABLE "InactivityEmailSend" (
   "kind" "InactivityEmailKind" NOT NULL,
   "lastActiveAt" TIMESTAMP(3) NOT NULL,
   "status" "InactivityEmailSendStatus" NOT NULL DEFAULT 'PENDING',
+  "attempts" INTEGER NOT NULL DEFAULT 1,
   "resendMessageId" TEXT,
   "sentAt" TIMESTAMP(3),
   "failedAt" TIMESTAMP(3),

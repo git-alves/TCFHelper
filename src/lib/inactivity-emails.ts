@@ -244,7 +244,14 @@ export type InactivityEmailDisplay = {
   missingConfiguration: string[];
   templates: Record<
     TemplateKey,
-    { subject: string; body: string; button: string; customized: boolean }
+    {
+      subject: string;
+      body: string;
+      defaultSubject: string;
+      defaultBody: string;
+      button: string;
+      customized: boolean;
+    }
   >;
 };
 
@@ -267,6 +274,8 @@ export async function getInactivityEmailDisplay(): Promise<InactivityEmailDispla
       templates[`${kind}:${locale}`] = {
         subject: row?.subject ?? fallback.subject,
         body: row?.body ?? fallback.body,
+        defaultSubject: fallback.subject,
+        defaultBody: fallback.body,
         button: fallback.button,
         customized: Boolean(row),
       };
@@ -383,10 +392,17 @@ type Candidate = {
   isAdmin: boolean;
   inactivityEmailsUnsubscribedAt: Date | null;
   inactivityEmailSends: Array<{
+    id: string;
     kind: InactivityEmailKind;
     lastActiveAt: Date;
     status: InactivityEmailSendStatus;
+    attempts: number;
   }>;
+};
+
+type SelectedCandidate = Candidate & {
+  kind: InactivityEmailKind;
+  retrySendId: string | null;
 };
 
 export async function selectInactivityEmailCandidates(
@@ -412,12 +428,18 @@ export async function selectInactivityEmailCandidates(
       isAdmin: true,
       inactivityEmailsUnsubscribedAt: true,
       inactivityEmailSends: {
-        select: { kind: true, lastActiveAt: true, status: true },
+        select: {
+          id: true,
+          kind: true,
+          lastActiveAt: true,
+          status: true,
+          attempts: true,
+        },
       },
     },
     orderBy: { lastActiveAt: "asc" },
   });
-  const selected: Array<Candidate & { kind: InactivityEmailKind }> = [];
+  const selected: SelectedCandidate[] = [];
   for (const raw of users) {
     if (!raw.lastActiveAt) continue;
     const user = raw as Candidate;
@@ -426,18 +448,58 @@ export async function selectInactivityEmailCandidates(
       user.lastActiveAt <= thirty
         ? InactivityEmailKind.THIRTY_DAY
         : InactivityEmailKind.SEVEN_DAY;
+    const prior = user.inactivityEmailSends.find(
+      (send) =>
+        send.kind === kind &&
+        send.lastActiveAt.getTime() === user.lastActiveAt.getTime(),
+    );
+    // Never reclaim PENDING automatically: the process may have crashed after
+    // Resend accepted the message, so sending again could duplicate it.
     if (
-      user.inactivityEmailSends.some(
-        (send) =>
-          send.kind === kind &&
-          send.lastActiveAt.getTime() === user.lastActiveAt.getTime(),
-      )
+      prior &&
+      (prior.status !== InactivityEmailSendStatus.FAILED || prior.attempts >= 3)
     )
       continue;
-    selected.push({ ...user, kind });
+    selected.push({ ...user, kind, retrySendId: prior?.id ?? null });
     if (selected.length >= limit) break;
   }
   return selected;
+}
+
+async function claimInactivityEmailSend(user: SelectedCandidate) {
+  if (user.retrySendId) {
+    const retry = await prisma.inactivityEmailSend.updateMany({
+      where: {
+        id: user.retrySendId,
+        status: InactivityEmailSendStatus.FAILED,
+        attempts: { lt: 3 },
+      },
+      data: {
+        status: InactivityEmailSendStatus.PENDING,
+        attempts: { increment: 1 },
+        failedAt: null,
+        failureReason: null,
+      },
+    });
+    return retry.count === 1 ? { id: user.retrySendId } : null;
+  }
+
+  try {
+    return await prisma.inactivityEmailSend.create({
+      data: {
+        userId: user.id,
+        kind: user.kind,
+        lastActiveAt: user.lastActiveAt,
+      },
+    });
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    )
+      return null;
+    throw error;
+  }
 }
 
 export async function runInactivityEmailCron(now = new Date()) {
@@ -464,23 +526,8 @@ export async function runInactivityEmailCron(now = new Date()) {
   const resend = new Resend(process.env.RESEND_API_KEY!);
   let sent = 0;
   for (const user of candidates) {
-    let claim: { id: string };
-    try {
-      claim = await prisma.inactivityEmailSend.create({
-        data: {
-          userId: user.id,
-          kind: user.kind,
-          lastActiveAt: user.lastActiveAt,
-        },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === "P2002"
-      )
-        continue;
-      throw error;
-    }
+    const claim = await claimInactivityEmailSend(user);
+    if (!claim) continue;
     const locale = user.locale as InactivityEmailLocale;
     const template = display.templates[`${user.kind}:${locale}`];
     const appUrl = `${baseUrl()}/dashboard`;

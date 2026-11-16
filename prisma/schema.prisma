@@ -716,6 +716,10 @@ model InactivityEmailSend {
   kind          InactivityEmailKind
   lastActiveAt  DateTime
   status        InactivityEmailSendStatus @default(PENDING)
+  // Starts at one when the send is claimed; failed sends may be retried twice.
+  // PENDING rows are never retried automatically because the provider might
+  // already have accepted the message before a process crash.
+  attempts      Int                       @default(1)
   resendMessageId String?
   sentAt        DateTime?
   failedAt      DateTime?
