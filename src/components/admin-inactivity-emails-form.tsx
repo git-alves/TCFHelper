@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { InactivityEmailKind, Locale } from "@prisma/client";
 import type { InactivityEmailDisplay } from "@/lib/inactivity-emails";
+import {
+  inactivityEmailFooterCopy,
+  inactivityEmailNoReplyNote,
+  inactivityEmailUnsubscribeLabel,
+} from "@/lib/inactivity-email-copy";
 
 const locales = [
   { id: Locale.pt, label: "Português" },
@@ -14,28 +19,6 @@ const kinds = [
   { id: InactivityEmailKind.SEVEN_DAY, label: "7 days without use" },
   { id: InactivityEmailKind.THIRTY_DAY, label: "30 days without use" },
 ] as const;
-const previewNoReplyNote: Record<Locale, string> = {
-  [Locale.pt]:
-    "Este é um e-mail automático — por favor, não responda. Se precisar de ajuda, abra Suporte no MyTCFLab.",
-  [Locale.en]:
-    "This is an automatic email — please don’t reply. If you need help, open Support in MyTCFLab.",
-  [Locale.fr]:
-    "Ceci est un e-mail automatique — merci de ne pas y répondre. Si vous avez besoin d’aide, ouvrez Assistance dans MyTCFLab.",
-  [Locale.es]:
-    "Este es un correo automático; no respondas. Si necesitas ayuda, abre Soporte en MyTCFLab.",
-};
-const previewFooter: Record<Locale, string> = {
-  [Locale.pt]: "Você está recebendo este e-mail porque tem uma conta no MyTCFLab.",
-  [Locale.en]: "You are receiving this email because you have a MyTCFLab account.",
-  [Locale.fr]: "Vous recevez cet e-mail parce que vous avez un compte MyTCFLab.",
-  [Locale.es]: "Recibes este correo porque tienes una cuenta de MyTCFLab.",
-};
-const previewUnsubscribeLabel: Record<Locale, string> = {
-  [Locale.pt]: "Cancelar o recebimento destes e-mails",
-  [Locale.en]: "Unsubscribe from these emails",
-  [Locale.fr]: "Ne plus recevoir ces e-mails",
-  [Locale.es]: "Dejar de recibir estos correos",
-};
 const key = (kind: InactivityEmailKind, locale: Locale) =>
   `${kind}:${locale}` as keyof InactivityEmailDisplay["templates"];
 
@@ -258,7 +241,7 @@ export function AdminInactivityEmailsForm({
           Preview only — sample values are shown.
         </p>
         <div className="mt-3 bg-[#f4f4f5] p-4 sm:p-10">
-          <div className="mx-auto max-w-[560px] bg-white p-6 text-[#18181b] sm:p-10">
+          <div className="mx-auto max-w-[560px] bg-white p-8 text-[#18181b]">
             <p className="font-sans text-xl font-bold leading-7 tracking-[-0.4px]">
               MyTCFLab
             </p>
@@ -275,16 +258,16 @@ export function AdminInactivityEmailsForm({
               {selected.button}
             </span>
             <p className="mt-7 font-sans text-[13px] leading-5 text-[#71717a]">
-              {previewNoReplyNote[locale]}
+              {inactivityEmailNoReplyNote[locale]}
             </p>
             <p className="mt-6 border-t border-[#e4e4e7] pt-6 font-sans text-xs leading-[18px] text-[#71717a]">
-              {previewFooter[locale]} MyTCFLab. {" "}
+              {inactivityEmailFooterCopy[locale]} MyTCFLab. {" "}
               <a
                 href="#"
                 onClick={(event) => event.preventDefault()}
                 className="font-semibold text-[#5b21b6] underline"
               >
-                {previewUnsubscribeLabel[locale]}
+                {inactivityEmailUnsubscribeLabel[locale]}
               </a>
             </p>
           </div>

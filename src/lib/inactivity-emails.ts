@@ -10,6 +10,11 @@ import {
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
+import {
+  inactivityEmailFooterCopy,
+  inactivityEmailNoReplyNote,
+  inactivityEmailUnsubscribeLabel,
+} from "@/lib/inactivity-email-copy";
 
 export const INACTIVITY_EMAIL_DAILY_CAP = 90;
 export const INACTIVITY_EMAIL_KINDS = [
@@ -77,24 +82,6 @@ const fallbackName: Record<InactivityEmailLocale, string> = {
   fr: "là",
   es: "ahí",
 };
-const footer: Record<InactivityEmailLocale, string> = {
-  pt: "Você está recebendo este e-mail porque tem uma conta no MyTCFLab.",
-  en: "You are receiving this email because you have a MyTCFLab account.",
-  fr: "Vous recevez cet e-mail parce que vous avez un compte MyTCFLab.",
-  es: "Recibes este correo porque tienes una cuenta de MyTCFLab.",
-};
-const unsubscribeLabel: Record<InactivityEmailLocale, string> = {
-  pt: "Cancelar o recebimento destes e-mails",
-  en: "Unsubscribe from these emails",
-  fr: "Ne plus recevoir ces e-mails",
-  es: "Dejar de recibir estos correos",
-};
-const noReplyNote: Record<InactivityEmailLocale, string> = {
-  pt: "Este é um e-mail automático — por favor, não responda. Se precisar de ajuda, abra Suporte no MyTCFLab.",
-  en: "This is an automatic email — please don’t reply. If you need help, open Support in MyTCFLab.",
-  fr: "Ceci est un e-mail automatique — merci de ne pas y répondre. Si vous avez besoin d’aide, ouvrez Assistance dans MyTCFLab.",
-  es: "Este es un correo automático; no respondas. Si necesitas ayuda, abre Soporte en MyTCFLab.",
-};
 
 export function defaultInactivityTemplate(
   kind: InactivityEmailKind,
@@ -114,7 +101,7 @@ function inactivityEmailFooter(
     .filter((value): value is string => Boolean(value))
     .map(escapeHtml)
     .join(" · ");
-  return `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#5b21b6;font-weight:600;text-decoration:underline;">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+  return `<p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:18px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(inactivityEmailFooterCopy[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}" style="color:#5b21b6;font-weight:600;text-decoration:underline;">${escapeHtml(inactivityEmailUnsubscribeLabel[locale])}</a></p>`;
 }
 
 export function isEligibleForInactivityEmail(user: {
@@ -185,7 +172,7 @@ export function renderInactivityEmailText(
     .replace(/\r\n|\r|\n/g, "<br>");
   const escaped = escapeHtml(normalized).replace(/&lt;br&gt;/g, "<br>");
   return escaped
-    .replace(/\{name\}/g, escapeHtml(values.name))
+    .replace(/\{name\}/g, () => escapeHtml(values.name))
     .replace(/\{appUrl\}/g, escapeHtml(values.appUrl));
 }
 
@@ -206,9 +193,9 @@ function renderInactivityEmailHtml(input: {
 }) {
   const subject = escapeHtml(input.subject).replace(
     /\{name\}/g,
-    escapeHtml(input.name),
+    () => escapeHtml(input.name),
   );
-  return `<meta name="color-scheme" content="light"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f5" style="background-color:#f4f4f5;"><tr><td align="center" bgcolor="#f4f4f5" style="padding:40px 16px;background-color:#f4f4f5;color:#18181b;"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding:40px;background-color:#ffffff;color:#18181b;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:28px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">MyTCFLab</p><h1 style="margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">${subject}</h1><div style="padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;font-weight:400;color:#52525b;">${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}<p style="margin:28px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(noReplyNote[input.locale])}</p><div style="margin-top:24px;padding-top:24px;border-top:1px solid #e4e4e7;color:#71717a;">${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</div></td></tr></table></td></tr></table>`;
+  return `<meta name="color-scheme" content="light"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f5" style="background-color:#f4f4f5;"><tr><td align="center" bgcolor="#f4f4f5" style="padding:40px 16px;background-color:#f4f4f5;color:#18181b;"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding:32px;background-color:#ffffff;color:#18181b;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:28px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">MyTCFLab</p><h1 style="margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">${subject}</h1><div style="padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;font-weight:400;color:#52525b;">${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}<p style="margin:28px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(inactivityEmailNoReplyNote[input.locale])}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin-top:24px;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding-top:24px;border-top:1px solid #e4e4e7;background-color:#ffffff;color:#71717a;">${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</td></tr></table></td></tr></table></td></tr></table>`;
 }
 
 export function validateInactivityTemplate(
