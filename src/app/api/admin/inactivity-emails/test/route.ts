@@ -24,10 +24,11 @@ export async function POST(request: Request) {
   try {
     await sendInactivityEmailTest({ ...parsed.data, to: admin.email });
     return adminJsonResponse({ sent: true });
-  } catch (error) {
+  } catch {
     return adminJsonResponse(
       {
-        error: error instanceof Error ? error.message : "Could not send test.",
+        error:
+          "Could not send test. Check the email service configuration and try again.",
       },
       400,
     );

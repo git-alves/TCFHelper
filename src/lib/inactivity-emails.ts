@@ -156,10 +156,10 @@ function escapeHtml(value: string) {
 
 function renderText(value: string, values: { name: string; appUrl: string }) {
   const normalized = value.replace(/<br\s*\/?\s*>/gi, "<br>");
-  return escapeHtml(normalized)
+  const escaped = escapeHtml(normalized).replace(/&lt;br&gt;/g, "<br>");
+  return escaped
     .replace(/\{name\}/g, escapeHtml(values.name))
-    .replace(/\{appUrl\}/g, escapeHtml(values.appUrl))
-    .replace(/&lt;br&gt;/g, "<br>");
+    .replace(/\{appUrl\}/g, escapeHtml(values.appUrl));
 }
 
 export function validateInactivityTemplate(
@@ -168,6 +168,7 @@ export function validateInactivityTemplate(
 ): string | null {
   if (!subject.trim()) return "Enter a subject.";
   if (/\r|\n/.test(subject)) return "The subject cannot contain a line break.";
+  body = body.replace(/<br\s*\/?\s*>/gi, "<br>");
   if (!body.trim()) return "Enter an email body.";
   const subjectTokens = subject.match(/\{[^}]+\}/g) ?? [];
   const bodyTokens = body.match(/\{[^}]+\}/g) ?? [];
@@ -533,6 +534,27 @@ export async function runInactivityEmailCron(now = new Date()) {
   const appUrl = `${baseUrl()}/dashboard`;
   let sent = 0;
   for (const user of candidates) {
+    const liveConfig = await prisma.appConfig.findUnique({
+      where: { id: "singleton" },
+      select: { inactivityEmailsEnabled: true },
+    });
+    if (!liveConfig?.inactivityEmailsEnabled)
+      return { sent, skipped: "off" as const };
+    const live = await prisma.user.findFirst({
+      where: { id: user.id },
+      select: {
+        isBlocked: true,
+        isAdmin: true,
+        inactivityEmailsUnsubscribedAt: true,
+        lastActiveAt: true,
+      },
+    });
+    if (
+      !live ||
+      !isEligibleForInactivityEmail(live) ||
+      live.lastActiveAt?.getTime() !== user.lastActiveAt.getTime()
+    )
+      continue;
     const claim = await claimInactivityEmailSend(user);
     if (!claim) continue;
     const locale = user.locale as InactivityEmailLocale;
