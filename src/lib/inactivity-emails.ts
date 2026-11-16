@@ -9,6 +9,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 export const INACTIVITY_EMAIL_DAILY_CAP = 90;
 export const INACTIVITY_EMAIL_KINDS = [
@@ -96,12 +97,6 @@ export function defaultInactivityTemplate(
   return defaults[`${kind}:${locale}`];
 }
 
-export const INACTIVITY_EMAIL_PAID_SUBSCRIPTION_STATUSES = new Set([
-  "ACTIVE",
-  "PAST_DUE",
-  "CANCELED",
-]);
-
 function inactivityEmailFooter(
   locale: InactivityEmailLocale,
   unsubscribeUrl: string,
@@ -122,51 +117,18 @@ export function isEligibleForInactivityEmail(
     isAdmin: boolean;
     inactivityEmailsUnsubscribedAt: Date | null;
     lastActiveAt: Date | null;
-    activationWelcomeShownAt?: Date | null;
-    redeemedAccessCodes?: Array<{ redeemedAt: Date | null }>;
-    subscriptions?: Array<{
-      status: string;
-      createdAt: Date;
-      currentPeriodEnd: Date | null;
-    }>;
+    redeemedAccessCodes?: Array<{ id: string }>;
   },
   now = new Date(),
 ): boolean {
-  // CASL implied consent requires recent durable access/purchase evidence.
-  const cutoff = new Date(now.getTime() - 730 * 86_400_000);
-  // CASL implied consent: a paid/access relationship is valid for two years.
-  // Paddle purchase evidence will join this list when that integration lands.
-  const accessEvidence =
-    Boolean(
-      user.activationWelcomeShownAt && user.activationWelcomeShownAt >= cutoff,
-    ) ||
-    Boolean(
-      user.redeemedAccessCodes?.some(
-        (code) => code.redeemedAt && code.redeemedAt >= cutoff,
-      ),
-    );
-  const subscriptionEvidence = Boolean(
-    user.subscriptions?.some((subscription) => {
-      const latest = new Date(
-        Math.max(
-          subscription.createdAt.getTime(),
-          subscription.currentPeriodEnd?.getTime() ??
-            subscription.createdAt.getTime(),
-        ),
-      );
-      const evidenceDate = new Date(Math.min(now.getTime(), latest.getTime()));
-      return (
-        INACTIVITY_EMAIL_PAID_SUBSCRIPTION_STATUSES.has(subscription.status) &&
-        evidenceDate >= cutoff
-      );
-    }),
-  );
+  // Match the app's current learner gate: only a live redeemed access code
+  // grants access; Stripe subscriptions do not grant access today.
   return (
     !user.isBlocked &&
     !user.isAdmin &&
     !user.inactivityEmailsUnsubscribedAt &&
     Boolean(user.lastActiveAt) &&
-    (accessEvidence || subscriptionEvidence)
+    Boolean(user.redeemedAccessCodes?.length)
   );
 }
 
@@ -465,13 +427,7 @@ type Candidate = {
     status: InactivityEmailSendStatus;
     attempts: number;
   }>;
-  activationWelcomeShownAt: Date | null;
-  redeemedAccessCodes: Array<{ redeemedAt: Date | null }>;
-  subscriptions: Array<{
-    status: string;
-    createdAt: Date;
-    currentPeriodEnd: Date | null;
-  }>;
+  redeemedAccessCodes: Array<{ id: string }>;
 };
 
 type SelectedCandidate = Candidate & {
@@ -502,10 +458,10 @@ export async function selectInactivityEmailCandidates(
       isBlocked: true,
       isAdmin: true,
       inactivityEmailsUnsubscribedAt: true,
-      activationWelcomeShownAt: true,
-      redeemedAccessCodes: { select: { redeemedAt: true } },
-      subscriptions: {
-        select: { status: true, createdAt: true, currentPeriodEnd: true },
+      redeemedAccessCodes: {
+        where: accessCodeIsLiveWhere(now),
+        select: { id: true },
+        take: 1,
       },
       inactivityEmailSends: {
         select: {
@@ -634,10 +590,10 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
         isAdmin: true,
         inactivityEmailsUnsubscribedAt: true,
         lastActiveAt: true,
-        activationWelcomeShownAt: true,
-        redeemedAccessCodes: { select: { redeemedAt: true } },
-        subscriptions: {
-          select: { status: true, createdAt: true, currentPeriodEnd: true },
+        redeemedAccessCodes: {
+          where: accessCodeIsLiveWhere(now),
+          select: { id: true },
+          take: 1,
         },
       },
     });
