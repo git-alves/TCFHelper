@@ -44,9 +44,7 @@ describe("inactivity email eligibility and templates", () => {
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
-      activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-      redeemedAccessCodes: [],
-      subscriptions: [],
+      redeemedAccessCodes: [{ id: "live-code" }],
       lastActiveAt: new Date(),
     };
     expect(isEligibleForInactivityEmail(active)).toBe(true);
@@ -93,10 +91,10 @@ describe("inactivity email eligibility and templates", () => {
 });
 
 describe("inactivity email selection", () => {
-  it("skips learners without evidence while selecting a recent activation", async () => {
+  it("skips learners without a live code", async () => {
     const now = new Date("2026-11-16T12:00:00Z");
     const inactive = new Date("2026-10-01T12:00:00Z");
-    const row = (id: string, activationWelcomeShownAt: Date | null) => ({
+    const row = (id: string, hasLiveCode: boolean) => ({
       id,
       email: `${id}@example.com`,
       name: null,
@@ -105,14 +103,12 @@ describe("inactivity email selection", () => {
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
-      activationWelcomeShownAt,
-      redeemedAccessCodes: [],
-      subscriptions: [],
+      redeemedAccessCodes: hasLiveCode ? [{ id: "live-code" }] : [],
       inactivityEmailSends: [],
     });
     findMany.mockResolvedValue([
-      row("no-evidence", null),
-      row("eligible", new Date("2026-10-17T12:00:00Z")),
+      row("no-evidence", false),
+      row("eligible", true),
     ]);
     await expect(selectInactivityEmailCandidates(now)).resolves.toMatchObject([
       { id: "eligible" },
@@ -132,9 +128,7 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
-        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-        redeemedAccessCodes: [],
-        subscriptions: [],
+        redeemedAccessCodes: [{ id: "live-code" }],
         inactivityEmailSends: [],
       },
       {
@@ -146,9 +140,7 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
-        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-        redeemedAccessCodes: [],
-        subscriptions: [],
+        redeemedAccessCodes: [{ id: "live-code" }],
         inactivityEmailSends: [
           {
             id: "send_7",
@@ -168,9 +160,7 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
-        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-        redeemedAccessCodes: [],
-        subscriptions: [],
+        redeemedAccessCodes: [{ id: "live-code" }],
         inactivityEmailSends: [
           {
             id: "send_30",
@@ -201,9 +191,7 @@ describe("inactivity email selection", () => {
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
-      activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-      redeemedAccessCodes: [],
-      subscriptions: [],
+      redeemedAccessCodes: [{ id: "live-code" }],
       inactivityEmailSends,
     });
     findMany.mockResolvedValue([

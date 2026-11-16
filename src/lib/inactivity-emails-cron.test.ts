@@ -33,18 +33,14 @@ const candidate = {
   isBlocked: false,
   isAdmin: false,
   inactivityEmailsUnsubscribedAt: null,
-  activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-  redeemedAccessCodes: [],
-  subscriptions: [],
+  redeemedAccessCodes: [{ id: "live-code" }],
   inactivityEmailSends: [],
 };
 const live = {
   isBlocked: false,
   isAdmin: false,
   inactivityEmailsUnsubscribedAt: null,
-  activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
-  redeemedAccessCodes: [],
-  subscriptions: [],
+  redeemedAccessCodes: [{ id: "live-code" }],
   lastActiveAt,
 };
 function env() {
