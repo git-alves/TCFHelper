@@ -164,12 +164,10 @@ information, and an unsubscribe mechanism; an unsubscribe must be processed at
 no cost and no later than 10 business days. See the [CRTC CASL FAQ](https://crtc.gc.ca/eng/com500/faq500.htm)
 and the Government of Canada’s [consent guidance](https://ised-isde.canada.ca/site/canada-anti-spam-legislation/en/getting-consent-send-email).
 
-**Decided:** use CASL implied consent from an existing business relationship.
-The sender requires evidence within the prior 730 days: a paid Stripe
-subscription (ACTIVE, PAST_DUE, or CANCELED), a redeemed access code, or the
-durable first-redemption marker `activationWelcomeShownAt`. Future Paddle
-purchases belong in this same eligibility check. A valid mailing address must
-be added before the owner enables sending.
+**Decided:** recipients must have a live redeemed access code at send time,
+using the same rule as the app's access gate. Stripe subscriptions do not grant
+access today and are not counted. A valid mailing address must be added before
+the owner enables sending.
 
 Also decide whether `unsubscribe` means only these re-engagement emails (the
 copy and proposed data model assume that) or all non-essential MyTCFLab email.
