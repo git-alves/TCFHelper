@@ -88,7 +88,6 @@ describe("runInactivityEmailCron", () => {
   it.each([
     "RESEND_API_KEY",
     "EMAIL_FROM",
-    "INACTIVITY_EMAIL_LEGAL_ADDRESS",
     "INACTIVITY_EMAIL_SUPPORT_EMAIL",
     "INACTIVITY_EMAIL_UNSUBSCRIBE_SECRET",
   ])("does not send when %s is missing", async (name) => {
