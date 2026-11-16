@@ -8,6 +8,9 @@ import {
 
 const copy = {
   pt: {
+    confirmHeading: "Cancelar o recebimento destes e-mails?",
+    confirmBody:
+      "Confirme para não receber mais e-mails de retomada do MyTCFLab.",
     success: "Você não receberá mais estes e-mails",
     already: "Você já não recebe estes e-mails",
     invalid: "Este link não é válido",
@@ -20,6 +23,8 @@ const copy = {
     confirm: "Confirmar",
   },
   en: {
+    confirmHeading: "Unsubscribe from these emails?",
+    confirmBody: "Confirm to stop receiving MyTCFLab re-engagement emails.",
     success: "You won’t receive these emails anymore",
     already: "You’re already unsubscribed from these emails",
     invalid: "This link isn’t valid",
@@ -31,6 +36,9 @@ const copy = {
     confirm: "Confirm",
   },
   fr: {
+    confirmHeading: "Ne plus recevoir ces e-mails ?",
+    confirmBody:
+      "Confirmez pour ne plus recevoir les e-mails de reprise de MyTCFLab.",
     success: "Vous ne recevrez plus ces e-mails",
     already: "Vous ne recevez déjà plus ces e-mails",
     invalid: "Ce lien n’est pas valide",
@@ -43,6 +51,9 @@ const copy = {
     confirm: "Confirmer",
   },
   es: {
+    confirmHeading: "¿Dejar de recibir estos correos?",
+    confirmBody:
+      "Confirma para dejar de recibir correos de reanudación de MyTCFLab.",
     success: "Ya no recibirás estos correos",
     already: "Ya no recibes estos correos",
     invalid: "Este enlace no es válido",
@@ -63,9 +74,12 @@ export default async function InactivityUnsubscribePage({
 }) {
   const { token, state, locale } = await searchParams;
   const verified = token ? verifyInactivityUnsubscribeToken(token) : null;
+  const safeLocale = Object.values(Locale).includes(locale as Locale)
+    ? (locale as Locale)
+    : Locale.en;
   const result =
     state === "unsubscribed" || state === "already"
-      ? { kind: state, locale: locale ?? Locale.en }
+      ? { kind: state, locale: safeLocale }
       : null;
   const strings = copy[result?.locale ?? verified?.locale ?? Locale.en];
   async function confirm() {
@@ -80,13 +94,17 @@ export default async function InactivityUnsubscribePage({
       ? strings.success
       : result?.kind === "already"
         ? strings.already
-        : strings.invalid;
+        : verified
+          ? strings.confirmHeading
+          : strings.invalid;
   const body =
     result?.kind === "unsubscribed"
       ? strings.successBody
       : result?.kind === "already"
         ? strings.alreadyBody
-        : strings.invalidBody;
+        : verified
+          ? strings.confirmBody
+          : strings.invalidBody;
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 py-12">
       <p className="text-lg font-semibold">MyTCFLab</p>

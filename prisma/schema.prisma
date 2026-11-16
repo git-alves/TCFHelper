@@ -727,8 +727,6 @@ model InactivityEmailSend {
   createdAt     DateTime                  @default(now())
 
   @@unique([userId, kind, lastActiveAt])
-  @@index([status, createdAt])
-  @@index([userId, kind, sentAt])
 }
 
 /// One row per admin-editable correction prompt block (see
