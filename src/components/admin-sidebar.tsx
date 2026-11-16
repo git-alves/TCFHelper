@@ -25,6 +25,7 @@ const ADMIN_SECTION_GROUPS: { label: string; sections: AdminSection[] }[] = [
       { href: "/admin/logs", label: "Operational log" },
       { href: "/admin/api-keys", label: "API keys" },
       { href: "/admin/prompts", label: "Prompts" },
+      { href: "/admin/inactivity-emails", label: "Inactivity emails" },
     ],
   },
 ];

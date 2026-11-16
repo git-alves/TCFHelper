@@ -160,6 +160,18 @@ export async function updateInactivityEmailSettings(input: { enabled?: boolean; 
   return getInactivityEmailDisplay();
 }
 
+/** Sends only to the authenticated owner through the protected admin route.
+ * The unsubscribe target is deliberately non-functional test data. */
+export async function sendInactivityEmailTest(input: { to: string; kind: InactivityEmailKind; locale: InactivityEmailLocale; subject: string; body: string }) {
+  const provider = inactivityEmailConfiguration(); if (!provider.configured) throw new Error(`Email sending is unavailable: ${provider.missing.join(", ")} is not configured.`);
+  const validation = validateInactivityTemplate(input.subject, input.body); if (validation) throw new Error(validation);
+  const appUrl = `${baseUrl()}/dashboard`; const template = defaultInactivityTemplate(input.kind, input.locale);
+  const html = `<div>${renderText(input.body, { name: "Alex", appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[input.locale])} MyTCFLab · ${escapeHtml(process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS!)} · ${escapeHtml(process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!)}. <a href="https://example.invalid/unsubscribe-test">${escapeHtml(unsubscribeLabel[input.locale])}</a></p>`;
+  const result = await new Resend(process.env.RESEND_API_KEY!).emails.send({ from: process.env.EMAIL_FROM!, to: input.to, replyTo: process.env.EMAIL_REPLY_TO?.trim() || undefined, subject: input.subject.replace(/\{name\}/g, "Alex"), html });
+  if (result.error || !result.data?.id) throw new Error(result.error?.message ?? "Resend did not return a message id");
+  return result.data.id;
+}
+
 type Candidate = { id: string; email: string; name: string | null; locale: Locale; lastActiveAt: Date; isBlocked: boolean; isAdmin: boolean; inactivityEmailsUnsubscribedAt: Date | null; inactivityEmailSends: Array<{ kind: InactivityEmailKind; lastActiveAt: Date; status: InactivityEmailSendStatus }> };
 
 export async function selectInactivityEmailCandidates(now = new Date(), limit = INACTIVITY_EMAIL_DAILY_CAP) {
