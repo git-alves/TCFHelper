@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { InactivityEmailKind, InactivityEmailSendStatus, Locale } from "@prisma/client";
 
 const findMany = vi.fn();
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findMany } } }));
 
 const { isEligibleForInactivityEmail, selectInactivityEmailCandidates, signInactivityUnsubscribeToken, validateInactivityTemplate, verifyInactivityUnsubscribeToken } = await import("./inactivity-emails");
