@@ -410,6 +410,7 @@ type Candidate = {
 type SelectedCandidate = Candidate & {
   kind: InactivityEmailKind;
   retrySendId: string | null;
+  retryAttempts: number | null;
 };
 
 export async function selectInactivityEmailCandidates(
@@ -467,7 +468,12 @@ export async function selectInactivityEmailCandidates(
       (prior.status !== InactivityEmailSendStatus.FAILED || prior.attempts >= 3)
     )
       continue;
-    selected.push({ ...user, kind, retrySendId: prior?.id ?? null });
+    selected.push({
+      ...user,
+      kind,
+      retrySendId: prior?.id ?? null,
+      retryAttempts: prior?.attempts ?? null,
+    });
     if (selected.length >= limit) break;
   }
   return selected;
@@ -488,17 +494,24 @@ async function claimInactivityEmailSend(user: SelectedCandidate) {
         failureReason: null,
       },
     });
-    return retry.count === 1 ? { id: user.retrySendId } : null;
+    return retry.count === 1
+      ? {
+          id: user.retrySendId,
+          attempts: (user.retryAttempts ?? 0) + 1,
+          retry: true,
+        }
+      : null;
   }
 
   try {
-    return await prisma.inactivityEmailSend.create({
+    const created = await prisma.inactivityEmailSend.create({
       data: {
         userId: user.id,
         kind: user.kind,
         lastActiveAt: user.lastActiveAt,
       },
     });
+    return { id: created.id, attempts: 1, retry: false };
   } catch (error) {
     if (
       error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -509,7 +522,7 @@ async function claimInactivityEmailSend(user: SelectedCandidate) {
   }
 }
 
-export async function runInactivityEmailCron(now = new Date()) {
+export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
   const [config, provider] = await Promise.all([
     prisma.appConfig.findUnique({
       where: { id: "singleton" },
@@ -533,7 +546,9 @@ export async function runInactivityEmailCron(now = new Date()) {
   const resend = new Resend(process.env.RESEND_API_KEY!);
   const appUrl = `${baseUrl()}/dashboard`;
   let sent = 0;
-  for (const user of candidates) {
+  for (const [index, user] of candidates.entries()) {
+    if (index > 0 && delayMs > 0)
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
     const liveConfig = await prisma.appConfig.findUnique({
       where: { id: "singleton" },
       select: { inactivityEmailsEnabled: true },
@@ -582,7 +597,7 @@ export async function runInactivityEmailCron(now = new Date()) {
             "X-Entity-Ref-ID": claim.id,
           },
         },
-        { idempotencyKey: `inactivity-${claim.id}` },
+        { idempotencyKey: `inactivity-${claim.id}-${claim.attempts}` },
       );
     } catch {
       console.error("Inactivity email send uncertain; leaving claim pending", {
@@ -591,6 +606,22 @@ export async function runInactivityEmailCron(now = new Date()) {
       continue;
     }
     if (result.error || !result.data?.id) {
+      if (result.error?.statusCode === 429) {
+        if (claim.retry)
+          await prisma.inactivityEmailSend.update({
+            where: { id: claim.id },
+            data: {
+              status: InactivityEmailSendStatus.FAILED,
+              attempts: { decrement: 1 },
+            },
+          });
+        else
+          await prisma.inactivityEmailSend.delete({ where: { id: claim.id } });
+        console.error("Inactivity email rate limited; stopping run", {
+          emailSendId: claim.id,
+        });
+        return { sent, skipped: "rate_limited" as const };
+      }
       if (
         result.error?.statusCode &&
         result.error.statusCode >= 400 &&
