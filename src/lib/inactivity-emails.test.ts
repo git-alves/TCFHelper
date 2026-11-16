@@ -28,6 +28,9 @@ describe("inactivity email eligibility and templates", () => {
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
+      activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
+      redeemedAccessCodes: [],
+      subscriptions: [],
       lastActiveAt: new Date(),
     };
     expect(isEligibleForInactivityEmail(active)).toBe(true);
@@ -88,6 +91,9 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
+        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
+        redeemedAccessCodes: [],
+        subscriptions: [],
         inactivityEmailSends: [],
       },
       {
@@ -99,6 +105,9 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
+        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
+        redeemedAccessCodes: [],
+        subscriptions: [],
         inactivityEmailSends: [
           {
             id: "send_7",
@@ -118,6 +127,9 @@ describe("inactivity email selection", () => {
         isBlocked: false,
         isAdmin: false,
         inactivityEmailsUnsubscribedAt: null,
+        activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
+        redeemedAccessCodes: [],
+        subscriptions: [],
         inactivityEmailSends: [
           {
             id: "send_30",
@@ -148,6 +160,9 @@ describe("inactivity email selection", () => {
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
+      activationWelcomeShownAt: new Date("2026-10-17T12:00:00Z"),
+      redeemedAccessCodes: [],
+      subscriptions: [],
       inactivityEmailSends,
     });
     findMany.mockResolvedValue([
