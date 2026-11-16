@@ -23,6 +23,102 @@ afterEach(() => {
 });
 
 describe("inactivity email eligibility and templates", () => {
+  it("applies the 730-day implied-consent evidence window", () => {
+    const now = new Date("2026-11-16T12:00:00Z");
+    const base = {
+      isBlocked: false,
+      isAdmin: false,
+      inactivityEmailsUnsubscribedAt: null,
+      lastActiveAt: now,
+    };
+    const days = (count: number) =>
+      new Date(now.getTime() - count * 86_400_000);
+    expect(isEligibleForInactivityEmail(base, now)).toBe(false);
+    for (const evidence of [
+      { activationWelcomeShownAt: days(729) },
+      { redeemedAccessCodes: [{ redeemedAt: days(729) }] },
+      {
+        subscriptions: [
+          { status: "ACTIVE", createdAt: days(729), currentPeriodEnd: null },
+        ],
+      },
+    ])
+      expect(isEligibleForInactivityEmail({ ...base, ...evidence }, now)).toBe(
+        true,
+      );
+    for (const evidence of [
+      { activationWelcomeShownAt: days(731) },
+      { redeemedAccessCodes: [{ redeemedAt: days(731) }] },
+      {
+        subscriptions: [
+          { status: "ACTIVE", createdAt: days(731), currentPeriodEnd: null },
+        ],
+      },
+    ])
+      expect(isEligibleForInactivityEmail({ ...base, ...evidence }, now)).toBe(
+        false,
+      );
+    for (const status of ["ACTIVE", "PAST_DUE", "CANCELED"])
+      expect(
+        isEligibleForInactivityEmail(
+          {
+            ...base,
+            subscriptions: [
+              { status, createdAt: days(729), currentPeriodEnd: null },
+            ],
+          },
+          now,
+        ),
+      ).toBe(true);
+    for (const status of [
+      "TRIALING",
+      "INCOMPLETE",
+      "INCOMPLETE_EXPIRED",
+      "UNPAID",
+      "PAUSED",
+    ])
+      expect(
+        isEligibleForInactivityEmail(
+          {
+            ...base,
+            subscriptions: [
+              { status, createdAt: days(729), currentPeriodEnd: null },
+            ],
+          },
+          now,
+        ),
+      ).toBe(false);
+    expect(
+      isEligibleForInactivityEmail(
+        {
+          ...base,
+          subscriptions: [
+            {
+              status: "ACTIVE",
+              createdAt: days(1_095),
+              currentPeriodEnd: new Date(now.getTime() + 86_400_000),
+            },
+          ],
+        },
+        now,
+      ),
+    ).toBe(true);
+    expect(
+      isEligibleForInactivityEmail(
+        {
+          ...base,
+          subscriptions: [
+            {
+              status: "CANCELED",
+              createdAt: days(1_095),
+              currentPeriodEnd: days(365),
+            },
+          ],
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
   it("excludes blocked, admin, unsubscribed, and never-active users", () => {
     const active = {
       isBlocked: false,
