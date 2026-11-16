@@ -122,6 +122,22 @@ enum SupportResolutionFeedback {
   STILL_BROKEN
 }
 
+/// The two owner-configurable re-engagement milestones. Kept separate from
+/// billing/access expiry mail: these are solely based on learner activity.
+enum InactivityEmailKind {
+  SEVEN_DAY
+  THIRTY_DAY
+}
+
+/// A delivery is first claimed as PENDING, then becomes SENT only after
+/// Resend accepts it. A failed provider call is retained for diagnosis but is
+/// deliberately never represented as a successful delivery.
+enum InactivityEmailSendStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 model User {
   id                          String    @id @default(cuid())
   email                       String    @unique
@@ -174,6 +190,9 @@ model User {
   // column shipped, so admin displays must fall back to UTC rather than
   // assume every row has one.
   timezone                    String?
+  // A learner-controlled, permanent opt-out for product re-engagement mail.
+  // Auth and billing providers retain ownership of their respective emails.
+  inactivityEmailsUnsubscribedAt DateTime?
   // When the admin last opened /admin/support. Tickets opened, or reopened by
   // the learner, after this are "new" for the admin's nav bell; null means
   // every open ticket is new. Only the owner account ever has a value.
@@ -191,6 +210,7 @@ model User {
   quotaOverride           UserQuotaOverride?
   redeemedAccessCodes     AccessCode[]             @relation("AccessCodeRedeemedBy")
   supportRequests         SupportRequest[]
+  inactivityEmailSends    InactivityEmailSend[]
 
   @@index([lastActiveAt])
 }
@@ -665,7 +685,48 @@ model AppConfig {
   // DEFAULT_GEMINI_DAILY_REQUEST_LIMIT.
   correctionDailyLimit Int?
   exampleDailyLimit    Int?
+  // New installs and existing deployments remain silent until the owner
+  // explicitly enables inactivity mail in /admin/inactivity-emails.
+  inactivityEmailsEnabled Boolean @default(false)
   updatedAt            DateTime @updatedAt
+}
+
+/// Owner overrides for the four localized variants of each inactivity email.
+/// Missing rows intentionally mean "use the bundled default", so reset is a
+/// delete rather than another mutable default stored in production data.
+model InactivityEmailTemplate {
+  id        String             @id @default(cuid())
+  kind      InactivityEmailKind
+  locale    Locale
+  subject   String
+  body      String
+  updatedAt DateTime           @updatedAt
+
+  @@unique([kind, locale])
+}
+
+/// Durable send claims. `lastActiveAt` identifies one inactivity streak: a
+/// subsequent heartbeat gives the learner a new value and can therefore
+/// qualify them again after another period of inactivity. The unique key is
+/// also the overlap/retry fence for daily cron invocations.
+model InactivityEmailSend {
+  id            String                    @id @default(cuid())
+  userId        String
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          InactivityEmailKind
+  lastActiveAt  DateTime
+  status        InactivityEmailSendStatus @default(PENDING)
+  // Starts at one when the send is claimed; failed sends may be retried twice.
+  // PENDING rows are never retried automatically because the provider might
+  // already have accepted the message before a process crash.
+  attempts      Int                       @default(1)
+  resendMessageId String?
+  sentAt        DateTime?
+  failedAt      DateTime?
+  failureReason String?
+  createdAt     DateTime                  @default(now())
+
+  @@unique([userId, kind, lastActiveAt])
 }
 
 /// One row per admin-editable correction prompt block (see
