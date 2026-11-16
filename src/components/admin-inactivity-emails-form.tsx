@@ -244,7 +244,9 @@ export function AdminInactivityEmailsForm({
             .replace(/\{appUrl\}/g, "/dashboard")
             .replace(/<br\s*\/?\s*>/gi, "\n")}
         </p>
-        <p className="mt-3 text-sm">{selected.button}</p>
+        <span className="mt-4 inline-flex rounded-lg bg-violet-700 px-6 py-3 text-sm font-bold text-white">
+          {selected.button}
+        </span>
         <p className="mt-4 text-xs text-zinc-500">
           The unsubscribe footer and sender details are added automatically.
         </p>

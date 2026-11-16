@@ -185,6 +185,24 @@ export function renderInactivityEmailText(
 
 const renderText = renderInactivityEmailText;
 
+const emailContainerStyle =
+  "max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#18181b;line-height:1.5;";
+
+export function renderInactivityEmailCta(label: string, href: string) {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="${escapeHtml(href)}" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
+}
+
+function renderInactivityEmailHtml(input: {
+  body: string;
+  name: string;
+  appUrl: string;
+  buttonLabel: string;
+  locale: InactivityEmailLocale;
+  unsubscribeUrl: string;
+}) {
+  return `<div style="${emailContainerStyle}"><div>${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</div>`;
+}
+
 export function validateInactivityTemplate(
   subject: string,
   body: string,
@@ -401,7 +419,14 @@ export async function sendInactivityEmailTest(input: {
   if (validation) throw new Error(validation);
   const appUrl = `${baseUrl()}/dashboard`;
   const template = defaultInactivityTemplate(input.kind, input.locale);
-  const html = `<div>${renderText(input.body, { name: "Alex", appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p>${inactivityEmailFooter(input.locale, "https://example.invalid/unsubscribe-test")}`;
+  const html = renderInactivityEmailHtml({
+    body: input.body,
+    name: "Alex",
+    appUrl,
+    buttonLabel: template.button,
+    locale: input.locale,
+    unsubscribeUrl: "https://example.invalid/unsubscribe-test",
+  });
   const result = await new Resend(process.env.RESEND_API_KEY!).emails.send({
     from: process.env.EMAIL_FROM!,
     to: input.to,
@@ -619,7 +644,14 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     const listUnsubscribeUrl = `${baseUrl()}/api/unsubscribe/inactivity?token=${token}`;
     const name = user.name?.trim() || fallbackName[locale];
     const subject = template.subject.replace(/\{name\}/g, name);
-    const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p>${inactivityEmailFooter(locale, unsubscribeUrl)}`;
+    const html = renderInactivityEmailHtml({
+      body: template.body,
+      name,
+      appUrl,
+      buttonLabel: template.button,
+      locale,
+      unsubscribeUrl,
+    });
     let result;
     try {
       result = await resend.emails.send(

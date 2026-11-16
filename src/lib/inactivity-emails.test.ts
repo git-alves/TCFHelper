@@ -12,6 +12,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: { user: { findMany } } }));
 
 const {
   isEligibleForInactivityEmail,
+  renderInactivityEmailCta,
   renderInactivityEmailText,
   selectInactivityEmailCandidates,
   signInactivityUnsubscribeToken,
@@ -35,6 +36,16 @@ describe("inactivity email eligibility and templates", () => {
     );
     expect(renderInactivityEmailText("<b>{name}</b><br>ok", values)).toBe(
       "&lt;b&gt;&lt;Ada&gt;&lt;/b&gt;<br>ok",
+    );
+  });
+  it("renders an escaped CTA inside the email-safe button cell", () => {
+    expect(
+      renderInactivityEmailCta(
+        "Return <now>",
+        'https://example.com/dashboard?next="today"',
+      ),
+    ).toContain(
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://example.com/dashboard?next=&quot;today&quot;" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return &lt;now&gt;</a>',
     );
   });
   it("requires a live redeemed access code", () => {

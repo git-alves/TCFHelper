@@ -21,7 +21,8 @@ vi.mock("resend", () => ({
     emails = { send };
   },
 }));
-const { runInactivityEmailCron } = await import("./inactivity-emails");
+const { runInactivityEmailCron, sendInactivityEmailTest } =
+  await import("./inactivity-emails");
 
 const now = new Date("2026-11-16T12:00:00Z");
 const lastActiveAt = new Date("2026-10-01T12:00:00Z");
@@ -140,6 +141,23 @@ describe("runInactivityEmailCron", () => {
           resendMessageId: "message_1",
         }),
       }),
+    );
+    expect(send.mock.calls[0][0].html).toContain(
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
+    );
+  });
+  it("uses the shared CTA button in a test email", async () => {
+    await expect(
+      sendInactivityEmailTest({
+        to: "owner@example.com",
+        kind: "SEVEN_DAY",
+        locale: Locale.en,
+        subject: "Hello {name}",
+        body: "Hello {name}",
+      }),
+    ).resolves.toBe("message_1");
+    expect(send.mock.calls[0][0].html).toContain(
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
     );
   });
   it("records a definite 4xx rejection as failed", async () => {
