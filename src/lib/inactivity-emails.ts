@@ -96,19 +96,52 @@ export function defaultInactivityTemplate(
   return defaults[`${kind}:${locale}`];
 }
 
-export function isEligibleForInactivityEmail(user: {
-  isBlocked: boolean;
-  isAdmin: boolean;
-  inactivityEmailsUnsubscribedAt: Date | null;
-  lastActiveAt: Date | null;
-}): boolean {
+export function isEligibleForInactivityEmail(
+  user: {
+    isBlocked: boolean;
+    isAdmin: boolean;
+    inactivityEmailsUnsubscribedAt: Date | null;
+    lastActiveAt: Date | null;
+    activationWelcomeShownAt?: Date | null;
+    redeemedAccessCodes?: Array<{ redeemedAt: Date | null }>;
+    subscriptions?: Array<{
+      status: string;
+      createdAt: Date;
+      currentPeriodEnd: Date | null;
+    }>;
+  },
+  now = new Date(),
+): boolean {
   // Consent / existing-business-relationship policy belongs here once the
   // owner decides how it is recorded. Do not loosen these hard exclusions.
+  const cutoff = new Date(now.getTime() - 730 * 86_400_000);
+  // CASL implied consent: a paid/access relationship is valid for two years.
+  // Paddle purchase evidence will join this list when that integration lands.
+  const accessEvidence =
+    Boolean(
+      user.activationWelcomeShownAt && user.activationWelcomeShownAt >= cutoff,
+    ) ||
+    Boolean(
+      user.redeemedAccessCodes?.some(
+        (code) => code.redeemedAt && code.redeemedAt >= cutoff,
+      ),
+    );
+  const paidStatuses = new Set(["ACTIVE", "PAST_DUE", "CANCELED"]);
+  const subscriptionEvidence = Boolean(
+    user.subscriptions?.some(
+      (subscription) =>
+        paidStatuses.has(subscription.status) &&
+        (subscription.currentPeriodEnd && subscription.currentPeriodEnd < now
+          ? subscription.currentPeriodEnd
+          : subscription.createdAt) >= cutoff,
+    ),
+  );
   return (
     !user.isBlocked &&
     !user.isAdmin &&
     !user.inactivityEmailsUnsubscribedAt &&
-    Boolean(user.lastActiveAt)
+    Boolean(user.lastActiveAt) &&
+    (accessEvidence || subscriptionEvidence)
   );
 }
 
@@ -116,8 +149,6 @@ function configProblems() {
   const missing: string[] = [];
   if (!process.env.RESEND_API_KEY?.trim()) missing.push("RESEND_API_KEY");
   if (!process.env.EMAIL_FROM?.trim()) missing.push("EMAIL_FROM");
-  if (!process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim())
-    missing.push("INACTIVITY_EMAIL_LEGAL_ADDRESS");
   if (!process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL?.trim())
     missing.push("INACTIVITY_EMAIL_SUPPORT_EMAIL");
   if (!process.env.INACTIVITY_EMAIL_UNSUBSCRIBE_SECRET?.trim())
@@ -249,6 +280,7 @@ export type InactivityEmailDisplay = {
   enabled: boolean;
   configured: boolean;
   missingConfiguration: string[];
+  legalAddressConfigured: boolean;
   templates: Record<
     TemplateKey,
     {
@@ -292,6 +324,9 @@ export async function getInactivityEmailDisplay(): Promise<InactivityEmailDispla
     enabled: config?.inactivityEmailsEnabled ?? false,
     configured: provider.configured,
     missingConfiguration: provider.missing,
+    legalAddressConfigured: Boolean(
+      process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim(),
+    ),
     templates,
   };
 }
@@ -405,6 +440,13 @@ type Candidate = {
     status: InactivityEmailSendStatus;
     attempts: number;
   }>;
+  activationWelcomeShownAt: Date | null;
+  redeemedAccessCodes: Array<{ redeemedAt: Date | null }>;
+  subscriptions: Array<{
+    status: string;
+    createdAt: Date;
+    currentPeriodEnd: Date | null;
+  }>;
 };
 
 type SelectedCandidate = Candidate & {
@@ -435,6 +477,11 @@ export async function selectInactivityEmailCandidates(
       isBlocked: true,
       isAdmin: true,
       inactivityEmailsUnsubscribedAt: true,
+      activationWelcomeShownAt: true,
+      redeemedAccessCodes: { select: { redeemedAt: true } },
+      subscriptions: {
+        select: { status: true, createdAt: true, currentPeriodEnd: true },
+      },
       inactivityEmailSends: {
         select: {
           id: true,
@@ -451,7 +498,7 @@ export async function selectInactivityEmailCandidates(
   for (const raw of users) {
     if (!raw.lastActiveAt) continue;
     const user = raw as Candidate;
-    if (!isEligibleForInactivityEmail(user)) continue;
+    if (!isEligibleForInactivityEmail(user, now)) continue;
     const kind =
       user.lastActiveAt <= thirty
         ? InactivityEmailKind.THIRTY_DAY
@@ -562,11 +609,16 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
         isAdmin: true,
         inactivityEmailsUnsubscribedAt: true,
         lastActiveAt: true,
+        activationWelcomeShownAt: true,
+        redeemedAccessCodes: { select: { redeemedAt: true } },
+        subscriptions: {
+          select: { status: true, createdAt: true, currentPeriodEnd: true },
+        },
       },
     });
     if (
       !live ||
-      !isEligibleForInactivityEmail(live) ||
+      !isEligibleForInactivityEmail(live, now) ||
       live.lastActiveAt?.getTime() !== user.lastActiveAt.getTime()
     )
       continue;
@@ -581,7 +633,14 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     const listUnsubscribeUrl = `${baseUrl()}/api/unsubscribe/inactivity?token=${token}`;
     const name = user.name?.trim() || fallbackName[locale];
     const subject = template.subject.replace(/\{name\}/g, name);
-    const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[locale])} MyTCFLab · ${escapeHtml(process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS!)} · ${escapeHtml(process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!)}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+    const senderDetails = [
+      process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim(),
+      process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!.trim(),
+    ]
+      .filter(Boolean)
+      .map(escapeHtml)
+      .join(" · ");
+    const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
     let result;
     try {
       result = await resend.emails.send(

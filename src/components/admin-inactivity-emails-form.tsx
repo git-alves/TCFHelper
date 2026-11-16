@@ -140,6 +140,15 @@ export function AdminInactivityEmailsForm({
             Missing: {display.missingConfiguration.join(", ")}.
           </p>
         )}
+        {!display.legalAddressConfigured && (
+          <p
+            role="alert"
+            className="mt-3 text-sm text-amber-700 dark:text-amber-300"
+          >
+            Canada's anti-spam law (CASL) requires a valid mailing address and a
+            working contact in these emails. Add one before sending to learners.
+          </p>
+        )}
         <label className="mt-4 flex items-center gap-2 text-sm">
           <input
             type="checkbox"
