@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runInactivityEmailCron } from "@/lib/inactivity-emails";
 
+// Up to 90 paced sends (500 ms apart) can exceed the platform default timeout.
+export const maxDuration = 300;
+
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
 
 export async function GET(request: NextRequest) {
