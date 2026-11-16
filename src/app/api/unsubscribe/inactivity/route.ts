@@ -6,5 +6,8 @@ import { unsubscribeFromInactivityEmails } from "@/lib/inactivity-emails";
 export async function POST(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token") ?? "";
   await unsubscribeFromInactivityEmails(token);
-  return new NextResponse(null, { status: 204, headers: { "Cache-Control": "private, no-store" } });
+  return new NextResponse(null, {
+    status: 204,
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
