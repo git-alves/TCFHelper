@@ -60,7 +60,7 @@ describe("inactivity email eligibility and templates", () => {
       name: null,
       appUrl: "https://example.com/dashboard",
     });
-    expect(body).toStartWith(greeting);
+    expect(body.startsWith(greeting)).toBe(true);
     expect(body).not.toContain("{name}");
     expect(body).not.toMatch(/, !| ,/);
   });
