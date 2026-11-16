@@ -8,6 +8,7 @@ import {
   inactivityEmailNoReplyNote,
   inactivityEmailUnsubscribeLabel,
 } from "@/lib/inactivity-email-copy";
+import { renderInactivityEmailName } from "@/lib/inactivity-email-name";
 
 const locales = [
   { id: Locale.pt, label: "Português" },
@@ -49,6 +50,7 @@ export function AdminInactivityEmailsForm({
   const [showEnableConfirmation, setShowEnableConfirmation] = useState(false);
   const [enableAcknowledged, setEnableAcknowledged] = useState(false);
   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
+  const [previewHasName, setPreviewHasName] = useState(true);
   const selectedKey = key(kind, locale);
   const selected = draft[selectedKey];
   const invalid =
@@ -240,17 +242,40 @@ export function AdminInactivityEmailsForm({
         <p className="text-xs text-zinc-500">
           Preview only — sample values are shown.
         </p>
+        <div className="mt-3 flex gap-2" aria-label="Preview learner name">
+          <button
+            type="button"
+            aria-pressed={previewHasName}
+            onClick={() => setPreviewHasName(true)}
+            className={`rounded-full border px-3 py-1 text-sm ${previewHasName ? "bg-violet-100 dark:bg-violet-950" : ""}`}
+          >
+            Com nome
+          </button>
+          <button
+            type="button"
+            aria-pressed={!previewHasName}
+            onClick={() => setPreviewHasName(false)}
+            className={`rounded-full border px-3 py-1 text-sm ${!previewHasName ? "bg-violet-100 dark:bg-violet-950" : ""}`}
+          >
+            Sem nome
+          </button>
+        </div>
         <div className="mt-3 bg-[#f4f4f5] p-4 sm:p-10">
           <div className="mx-auto max-w-[560px] bg-white p-8 text-[#18181b]">
             <p className="font-sans text-xl font-bold leading-7 tracking-[-0.4px]">
               MyTCFLab
             </p>
             <h3 className="mt-[38px] font-sans text-[28px] font-bold leading-[34px] tracking-[-0.4px]">
-              {selected.subject.replace(/\{name\}/g, "Alex")}
+              {renderInactivityEmailName(
+                selected.subject,
+                previewHasName ? "Alex" : null,
+              )}
             </h3>
             <p className="mt-[18px] whitespace-pre-wrap font-sans text-base font-normal leading-[26px] text-[#52525b]">
-              {selected.body
-                .replace(/\{name\}/g, "Alex")
+              {renderInactivityEmailName(
+                selected.body,
+                previewHasName ? "Alex" : null,
+              )
                 .replace(/\{appUrl\}/g, "/dashboard")
                 .replace(/<br\s*\/?\s*>/gi, "\n")}
             </p>
