@@ -145,7 +145,7 @@ export function AdminInactivityEmailsForm({
             role="alert"
             className="mt-3 text-sm text-amber-700 dark:text-amber-300"
           >
-            Canada's anti-spam law (CASL) requires a valid mailing address and a
+            Canada&apos;s anti-spam law (CASL) requires a valid mailing address and a
             working contact in these emails. Add one before sending to learners.
           </p>
         )}
