@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InactivityEmailSendStatus, Locale, Prisma } from "@prisma/client";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 const send = vi.fn();
 const prisma = {
@@ -110,6 +111,17 @@ describe("runInactivityEmailCron", () => {
     await expect(runInactivityEmailCron(now)).resolves.toMatchObject({
       sent: 1,
     });
+    expect(prisma.user.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          redeemedAccessCodes: {
+            where: accessCodeIsLiveWhere(now),
+            select: { id: true },
+            take: 1,
+          },
+        }),
+      }),
+    );
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({
         headers: expect.objectContaining({

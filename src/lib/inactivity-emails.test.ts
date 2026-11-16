@@ -4,6 +4,7 @@ import {
   InactivityEmailSendStatus,
   Locale,
 } from "@prisma/client";
+import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
 
 const findMany = vi.fn();
 vi.mock("server-only", () => ({}));
@@ -31,7 +32,7 @@ describe("inactivity email eligibility and templates", () => {
       inactivityEmailsUnsubscribedAt: null,
       lastActiveAt: now,
     };
-    expect(isEligibleForInactivityEmail(base, now)).toBe(false);
+    expect(isEligibleForInactivityEmail(base)).toBe(false);
     expect(
       isEligibleForInactivityEmail(
         { ...base, redeemedAccessCodes: [{ id: "lifetime" }] },
@@ -113,6 +114,17 @@ describe("inactivity email selection", () => {
     await expect(selectInactivityEmailCandidates(now)).resolves.toMatchObject([
       { id: "eligible" },
     ]);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          redeemedAccessCodes: {
+            where: accessCodeIsLiveWhere(now),
+            select: { id: true },
+            take: 1,
+          },
+        }),
+      }),
+    );
   });
   it("selects only the 30-day email for a first rollout user and resets a later 30-day milestone after activity", async () => {
     const now = new Date("2026-11-16T12:00:00Z");

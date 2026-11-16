@@ -111,16 +111,14 @@ function inactivityEmailFooter(
   return `<hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
 }
 
-export function isEligibleForInactivityEmail(
-  user: {
-    isBlocked: boolean;
-    isAdmin: boolean;
-    inactivityEmailsUnsubscribedAt: Date | null;
-    lastActiveAt: Date | null;
-    redeemedAccessCodes?: Array<{ id: string }>;
-  },
-  now = new Date(),
-): boolean {
+export function isEligibleForInactivityEmail(user: {
+  isBlocked: boolean;
+  isAdmin: boolean;
+  inactivityEmailsUnsubscribedAt: Date | null;
+  lastActiveAt: Date | null;
+  // Callers must select this relation with accessCodeIsLiveWhere(now).
+  redeemedAccessCodes?: Array<{ id: string }>;
+}): boolean {
   // Match the app's current learner gate: only a live redeemed access code
   // grants access; Stripe subscriptions do not grant access today.
   return (
@@ -479,7 +477,7 @@ export async function selectInactivityEmailCandidates(
   for (const raw of users) {
     if (!raw.lastActiveAt) continue;
     const user = raw as Candidate;
-    if (!isEligibleForInactivityEmail(user, now)) continue;
+    if (!isEligibleForInactivityEmail(user)) continue;
     const kind =
       user.lastActiveAt <= thirty
         ? InactivityEmailKind.THIRTY_DAY
@@ -599,7 +597,7 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     });
     if (
       !live ||
-      !isEligibleForInactivityEmail(live, now) ||
+      !isEligibleForInactivityEmail(live) ||
       live.lastActiveAt?.getTime() !== user.lastActiveAt.getTime()
     )
       continue;
