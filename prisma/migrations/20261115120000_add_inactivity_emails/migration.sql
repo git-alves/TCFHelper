@@ -36,5 +36,3 @@ CREATE TABLE "InactivityEmailSend" (
 
 CREATE UNIQUE INDEX "InactivityEmailTemplate_kind_locale_key" ON "InactivityEmailTemplate"("kind", "locale");
 CREATE UNIQUE INDEX "InactivityEmailSend_userId_kind_lastActiveAt_key" ON "InactivityEmailSend"("userId", "kind", "lastActiveAt");
-CREATE INDEX "InactivityEmailSend_status_createdAt_idx" ON "InactivityEmailSend"("status", "createdAt");
-CREATE INDEX "InactivityEmailSend_userId_kind_sentAt_idx" ON "InactivityEmailSend"("userId", "kind", "sentAt");

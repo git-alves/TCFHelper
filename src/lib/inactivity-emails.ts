@@ -30,42 +30,42 @@ type TemplateKey = `${InactivityEmailKind}:${InactivityEmailLocale}`;
 const defaults: Record<TemplateKey, DefaultTemplate> = {
   "SEVEN_DAY:pt": {
     subject: "Quando quiser, o MyTCFLab está aqui",
-    body: "Oi, `{name}`!<br><br>Faz alguns dias desde a sua última prática. Quando quiser continuar, seu espaço no MyTCFLab está pronto para você.<br><br>Retome no seu ritmo.",
+    body: "Oi, {name}!<br><br>Faz alguns dias desde a sua última prática. Quando quiser continuar, seu espaço no MyTCFLab está pronto para você.<br><br>Retome no seu ritmo.",
     button: "Voltar ao MyTCFLab",
   },
   "SEVEN_DAY:en": {
     subject: "MyTCFLab is here when you’re ready",
-    body: "Hi `{name}`,<br><br>It’s been a few days since your last practice. Whenever you’d like to continue, your space in MyTCFLab is ready for you.<br><br>Pick up at your own pace.",
+    body: "Hi {name},<br><br>It’s been a few days since your last practice. Whenever you’d like to continue, your space in MyTCFLab is ready for you.<br><br>Pick up at your own pace.",
     button: "Return to MyTCFLab",
   },
   "SEVEN_DAY:fr": {
     subject: "MyTCFLab est là quand vous serez prêt·e",
-    body: "Bonjour `{name}`,<br><br>Quelques jours se sont écoulés depuis votre dernière pratique. Quand vous aurez envie de reprendre, votre espace MyTCFLab vous attend.<br><br>Reprenez à votre rythme.",
+    body: "Bonjour {name},<br><br>Quelques jours se sont écoulés depuis votre dernière pratique. Quand vous aurez envie de reprendre, votre espace MyTCFLab vous attend.<br><br>Reprenez à votre rythme.",
     button: "Retourner à MyTCFLab",
   },
   "SEVEN_DAY:es": {
     subject: "MyTCFLab está aquí cuando quieras",
-    body: "Hola, `{name}`:<br><br>Han pasado algunos días desde tu última práctica. Cuando quieras continuar, tu espacio en MyTCFLab está listo para ti.<br><br>Retoma a tu ritmo.",
+    body: "Hola, {name}:<br><br>Han pasado algunos días desde tu última práctica. Cuando quieras continuar, tu espacio en MyTCFLab está listo para ti.<br><br>Retoma a tu ritmo.",
     button: "Volver a MyTCFLab",
   },
   "THIRTY_DAY:pt": {
     subject: "Seu espaço no MyTCFLab continua pronto",
-    body: "Oi, `{name}`!<br><br>Seu espaço no MyTCFLab continua aqui quando quiser voltar. Uma pequena prática já é um bom recomeço.<br><br>Sem pressa — vá no seu ritmo.",
+    body: "Oi, {name}!<br><br>Seu espaço no MyTCFLab continua aqui quando quiser voltar. Uma pequena prática já é um bom recomeço.<br><br>Sem pressa — vá no seu ritmo.",
     button: "Voltar ao MyTCFLab",
   },
   "THIRTY_DAY:en": {
     subject: "Your MyTCFLab space is still ready",
-    body: "Hi `{name}`,<br><br>Your MyTCFLab space is still here whenever you’d like to come back. A small practice is a good place to restart.<br><br>No rush — go at your own pace.",
+    body: "Hi {name},<br><br>Your MyTCFLab space is still here whenever you’d like to come back. A small practice is a good place to restart.<br><br>No rush — go at your own pace.",
     button: "Return to MyTCFLab",
   },
   "THIRTY_DAY:fr": {
     subject: "Votre espace MyTCFLab est toujours prêt",
-    body: "Bonjour `{name}`,<br><br>Votre espace MyTCFLab est toujours là lorsque vous aurez envie de revenir. Une courte pratique est déjà une bonne façon de reprendre.<br><br>Sans pression — allez à votre rythme.",
+    body: "Bonjour {name},<br><br>Votre espace MyTCFLab est toujours là lorsque vous aurez envie de revenir. Une courte pratique est déjà une bonne façon de reprendre.<br><br>Sans pression — allez à votre rythme.",
     button: "Retourner à MyTCFLab",
   },
   "THIRTY_DAY:es": {
     subject: "Tu espacio de MyTCFLab sigue listo",
-    body: "Hola, `{name}`:<br><br>Tu espacio de MyTCFLab sigue aquí cuando quieras volver. Una práctica breve es una buena forma de retomar.<br><br>Sin prisa — ve a tu ritmo.",
+    body: "Hola, {name}:<br><br>Tu espacio de MyTCFLab sigue aquí cuando quieras volver. Una práctica breve es una buena forma de retomar.<br><br>Sin prisa — ve a tu ritmo.",
     button: "Volver a MyTCFLab",
   },
 };
@@ -122,6 +122,11 @@ function configProblems() {
     missing.push("INACTIVITY_EMAIL_SUPPORT_EMAIL");
   if (!process.env.INACTIVITY_EMAIL_UNSUBSCRIBE_SECRET?.trim())
     missing.push("INACTIVITY_EMAIL_UNSUBSCRIBE_SECRET");
+  if (
+    !process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+    !/^https:\/\//.test(process.env.NEXT_PUBLIC_APP_URL.trim())
+  )
+    missing.push("NEXT_PUBLIC_APP_URL (absolute HTTPS)");
   return missing;
 }
 
@@ -150,7 +155,8 @@ function escapeHtml(value: string) {
 }
 
 function renderText(value: string, values: { name: string; appUrl: string }) {
-  return escapeHtml(value)
+  const normalized = value.replace(/<br\s*\/?\s*>/gi, "<br>");
+  return escapeHtml(normalized)
     .replace(/\{name\}/g, escapeHtml(values.name))
     .replace(/\{appUrl\}/g, escapeHtml(values.appUrl))
     .replace(/&lt;br&gt;/g, "<br>");
@@ -524,34 +530,66 @@ export async function runInactivityEmailCron(now = new Date()) {
   const candidates = await selectInactivityEmailCandidates(now);
   const display = await getInactivityEmailDisplay();
   const resend = new Resend(process.env.RESEND_API_KEY!);
+  const appUrl = `${baseUrl()}/dashboard`;
   let sent = 0;
   for (const user of candidates) {
     const claim = await claimInactivityEmailSend(user);
     if (!claim) continue;
     const locale = user.locale as InactivityEmailLocale;
     const template = display.templates[`${user.kind}:${locale}`];
-    const appUrl = `${baseUrl()}/dashboard`;
-    const unsubscribeUrl = `${baseUrl()}/unsubscribe/inactivity?token=${encodeURIComponent(signInactivityUnsubscribeToken(user.id, locale))}`;
+    const token = encodeURIComponent(
+      signInactivityUnsubscribeToken(user.id, locale),
+    );
+    const unsubscribeUrl = `${baseUrl()}/unsubscribe/inactivity?token=${token}`;
+    const listUnsubscribeUrl = `${baseUrl()}/api/unsubscribe/inactivity?token=${token}`;
     const name = user.name?.trim() || fallbackName[locale];
     const subject = template.subject.replace(/\{name\}/g, name);
     const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[locale])} MyTCFLab · ${escapeHtml(process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS!)} · ${escapeHtml(process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!)}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
+    let result;
     try {
-      const result = await resend.emails.send({
-        from: process.env.EMAIL_FROM!,
-        to: user.email,
-        replyTo: process.env.EMAIL_REPLY_TO?.trim() || undefined,
-        subject,
-        html,
-        headers: {
-          "List-Unsubscribe": `<${unsubscribeUrl}>`,
-          "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
-          "X-Entity-Ref-ID": claim.id,
+      result = await resend.emails.send(
+        {
+          from: process.env.EMAIL_FROM!,
+          to: user.email,
+          replyTo: process.env.EMAIL_REPLY_TO?.trim() || undefined,
+          subject,
+          html,
+          headers: {
+            "List-Unsubscribe": `<${listUnsubscribeUrl}>`,
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+            "X-Entity-Ref-ID": claim.id,
+          },
         },
+        { idempotencyKey: `inactivity-${claim.id}` },
+      );
+    } catch (error) {
+      console.error("Inactivity email send uncertain; leaving claim pending", {
+        emailSendId: claim.id,
       });
-      if (result.error || !result.data?.id)
-        throw new Error(
-          result.error?.message ?? "Resend did not return a message id",
+      continue;
+    }
+    if (result.error || !result.data?.id) {
+      if (
+        result.error?.statusCode &&
+        result.error.statusCode >= 400 &&
+        result.error.statusCode < 500
+      )
+        await prisma.inactivityEmailSend.update({
+          where: { id: claim.id },
+          data: {
+            status: InactivityEmailSendStatus.FAILED,
+            failedAt: new Date(),
+            failureReason: result.error.message.slice(0, 500),
+          },
+        });
+      else
+        console.error(
+          "Inactivity email send uncertain; leaving claim pending",
+          { emailSendId: claim.id },
         );
+      continue;
+    }
+    try {
       await prisma.inactivityEmailSend.update({
         where: { id: claim.id },
         data: {
@@ -562,18 +600,10 @@ export async function runInactivityEmailCron(now = new Date()) {
       });
       sent++;
     } catch (error) {
-      await prisma.inactivityEmailSend.update({
-        where: { id: claim.id },
-        data: {
-          status: InactivityEmailSendStatus.FAILED,
-          failedAt: new Date(),
-          failureReason:
-            error instanceof Error
-              ? error.message.slice(0, 500)
-              : "Unknown Resend failure",
-        },
-      });
-      console.error("Inactivity email send failed", { emailSendId: claim.id });
+      console.error(
+        "Inactivity email accepted but SENT state could not be saved; leaving claim pending",
+        { emailSendId: claim.id },
+      );
     }
   }
   return { sent, skipped: null };
