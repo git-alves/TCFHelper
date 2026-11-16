@@ -142,9 +142,16 @@ describe("runInactivityEmailCron", () => {
         }),
       }),
     );
-    expect(send.mock.calls[0][0].html).toContain(
+    const html = send.mock.calls[0][0].html;
+    expect(html).toContain(
       '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
     );
+    const bodyIndex = html.indexOf("It’s been a few days");
+    const buttonIndex = html.indexOf('bgcolor="#6D28D9"');
+    const footerIndex = html.indexOf("/unsubscribe/inactivity?token=");
+    expect(bodyIndex).toBeGreaterThan(-1);
+    expect(buttonIndex).toBeGreaterThan(bodyIndex);
+    expect(footerIndex).toBeGreaterThan(buttonIndex);
   });
   it("uses the shared CTA button in a test email", async () => {
     await expect(

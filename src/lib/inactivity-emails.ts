@@ -185,8 +185,8 @@ export function renderInactivityEmailText(
 
 const renderText = renderInactivityEmailText;
 
-const emailContainerStyle =
-  "max-width:560px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#18181b;line-height:1.5;";
+const emailContentStyle =
+  "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:#18181b;line-height:1.5;";
 
 export function renderInactivityEmailCta(label: string, href: string) {
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:24px 0;"><tr><td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="${escapeHtml(href)}" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">${escapeHtml(label)}</a></td></tr></table>`;
@@ -200,7 +200,7 @@ function renderInactivityEmailHtml(input: {
   locale: InactivityEmailLocale;
   unsubscribeUrl: string;
 }) {
-  return `<div style="${emailContainerStyle}"><div>${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</div>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="background-color:#ffffff;"><tr><td align="center"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td style="${emailContentStyle}"><div>${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</td></tr></table></td></tr></table>`;
 }
 
 export function validateInactivityTemplate(
