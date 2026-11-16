@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { InactivityEmailKind, Locale } from "@prisma/client";
 import type { InactivityEmailDisplay } from "@/lib/inactivity-emails";
+import {
+  inactivityEmailFooterCopy,
+  inactivityEmailNoReplyNote,
+  inactivityEmailUnsubscribeLabel,
+} from "@/lib/inactivity-email-copy";
 
 const locales = [
   { id: Locale.pt, label: "Português" },
@@ -235,21 +240,38 @@ export function AdminInactivityEmailsForm({
         <p className="text-xs text-zinc-500">
           Preview only — sample values are shown.
         </p>
-        <h3 className="mt-3 font-semibold">
-          {selected.subject.replace("{name}", "Alex")}
-        </h3>
-        <p className="mt-2 whitespace-pre-wrap">
-          {selected.body
-            .replace(/\{name\}/g, "Alex")
-            .replace(/\{appUrl\}/g, "/dashboard")
-            .replace(/<br\s*\/?\s*>/gi, "\n")}
-        </p>
-        <span className="mt-4 inline-flex rounded-lg bg-violet-700 px-6 py-3 text-sm font-bold text-white">
-          {selected.button}
-        </span>
-        <p className="mt-4 text-xs text-zinc-500">
-          The unsubscribe footer and sender details are added automatically.
-        </p>
+        <div className="mt-3 bg-[#f4f4f5] p-4 sm:p-10">
+          <div className="mx-auto max-w-[560px] bg-white p-8 text-[#18181b]">
+            <p className="font-sans text-xl font-bold leading-7 tracking-[-0.4px]">
+              MyTCFLab
+            </p>
+            <h3 className="mt-[38px] font-sans text-[28px] font-bold leading-[34px] tracking-[-0.4px]">
+              {selected.subject.replace(/\{name\}/g, "Alex")}
+            </h3>
+            <p className="mt-[18px] whitespace-pre-wrap font-sans text-base font-normal leading-[26px] text-[#52525b]">
+              {selected.body
+                .replace(/\{name\}/g, "Alex")
+                .replace(/\{appUrl\}/g, "/dashboard")
+                .replace(/<br\s*\/?\s*>/gi, "\n")}
+            </p>
+            <span className="mt-7 inline-flex rounded-lg bg-violet-700 px-[18px] py-3 font-sans text-sm font-semibold leading-5 text-white">
+              {selected.button}
+            </span>
+            <p className="mt-7 font-sans text-[13px] leading-5 text-[#71717a]">
+              {inactivityEmailNoReplyNote[locale]}
+            </p>
+            <p className="mt-6 border-t border-[#e4e4e7] pt-6 font-sans text-xs leading-[18px] text-[#71717a]">
+              {inactivityEmailFooterCopy[locale]} MyTCFLab. {" "}
+              <a
+                href="#"
+                onClick={(event) => event.preventDefault()}
+                className="font-semibold text-[#5b21b6] underline"
+              >
+                {inactivityEmailUnsubscribeLabel[locale]}
+              </a>
+            </p>
+          </div>
+        </div>
       </section>
       <div className="flex flex-wrap gap-3">
         <button

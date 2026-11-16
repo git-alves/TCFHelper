@@ -143,15 +143,27 @@ describe("runInactivityEmailCron", () => {
       }),
     );
     const html = send.mock.calls[0][0].html;
+    expect(html).toContain('<meta name="color-scheme" content="light">');
     expect(html).toContain(
-      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 18px;"><a href="https://app.example.com/dashboard" style="display:block;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#ffffff;font-weight:600;text-decoration:none;">Return to MyTCFLab</a>',
+    );
+    const wordmarkIndex = html.indexOf("MyTCFLab</p>");
+    const headingIndex = html.indexOf(
+      "<h1 style=\"margin:38px 0 0;",
     );
     const bodyIndex = html.indexOf("Your MyTCFLab space is still here");
     const buttonIndex = html.indexOf('bgcolor="#6D28D9"');
+    const noReplyIndex = html.indexOf(
+      "This is an automatic email — please don’t reply.",
+    );
     const footerIndex = html.indexOf("/unsubscribe/inactivity?token=");
+    expect(wordmarkIndex).toBeGreaterThan(-1);
+    expect(headingIndex).toBeGreaterThan(wordmarkIndex);
     expect(bodyIndex).toBeGreaterThan(-1);
+    expect(bodyIndex).toBeGreaterThan(headingIndex);
     expect(buttonIndex).toBeGreaterThan(bodyIndex);
-    expect(footerIndex).toBeGreaterThan(buttonIndex);
+    expect(noReplyIndex).toBeGreaterThan(buttonIndex);
+    expect(footerIndex).toBeGreaterThan(noReplyIndex);
   });
   it("uses the shared CTA button in a test email", async () => {
     await expect(
@@ -159,13 +171,50 @@ describe("runInactivityEmailCron", () => {
         to: "owner@example.com",
         kind: "SEVEN_DAY",
         locale: Locale.en,
-        subject: "Hello {name}",
+        subject: "Hello <b>{name}</b>",
         body: "Hello {name}",
       }),
     ).resolves.toBe("message_1");
     expect(send.mock.calls[0][0].html).toContain(
-      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
+      "<h1 style=\"margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;\">Hello &lt;b&gt;Alex&lt;/b&gt;</h1>",
     );
+    expect(send.mock.calls[0][0].html).toContain(
+      '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 18px;"><a href="https://app.example.com/dashboard" style="display:block;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;mso-line-height-rule:exactly;color:#ffffff;font-weight:600;text-decoration:none;">Return to MyTCFLab</a>',
+    );
+  });
+  it.each([
+    [Locale.pt, "Este é um e-mail automático — por favor, não responda."],
+    [
+      Locale.fr,
+      "Ceci est un e-mail automatique — merci de ne pas y répondre.",
+    ],
+  ])("localizes the no-reply note for %s", async (locale, note) => {
+    await sendInactivityEmailTest({
+      to: "owner@example.com",
+      kind: "SEVEN_DAY",
+      locale,
+      subject: "Hello",
+      body: "Hello",
+    });
+    expect(send.mock.calls[0][0].html).toContain(note);
+  });
+  it("escapes and preserves a learner name in the heading and body", async () => {
+    prisma.user.findMany.mockResolvedValue([
+      { ...candidate, name: "<b>$&" },
+    ]);
+    prisma.inactivityEmailTemplate.findMany.mockResolvedValue([
+      {
+        kind: "THIRTY_DAY",
+        locale: Locale.en,
+        subject: "Hello {name}",
+        body: "Hi {name}",
+      },
+    ]);
+    await runInactivityEmailCron(now);
+    const html = send.mock.calls[0][0].html;
+    expect(html).toContain("<h1");
+    expect(html).toContain("Hello &lt;b&gt;$&amp;");
+    expect(html).toContain("Hi &lt;b&gt;$&amp;");
   });
   it("records a definite 4xx rejection as failed", async () => {
     send.mockResolvedValue({
