@@ -15,6 +15,10 @@ import {
   inactivityEmailNoReplyNote,
   inactivityEmailUnsubscribeLabel,
 } from "@/lib/inactivity-email-copy";
+import {
+  inactivityEmailFirstName,
+  renderInactivityEmailName,
+} from "@/lib/inactivity-email-name";
 
 export const INACTIVITY_EMAIL_DAILY_CAP = 90;
 export const INACTIVITY_EMAIL_KINDS = [
@@ -74,13 +78,6 @@ const defaults: Record<TemplateKey, DefaultTemplate> = {
     body: "Hola, {name}:<br><br>Tu espacio de MyTCFLab sigue aquí cuando quieras volver. Una práctica breve es una buena forma de retomar.<br><br>Sin prisa — ve a tu ritmo.",
     button: "Volver a MyTCFLab",
   },
-};
-
-const fallbackName: Record<InactivityEmailLocale, string> = {
-  pt: "aí",
-  en: "there",
-  fr: "là",
-  es: "ahí",
 };
 
 export function defaultInactivityTemplate(
@@ -165,15 +162,18 @@ function escapeHtml(value: string) {
 
 export function renderInactivityEmailText(
   value: string,
-  values: { name: string; appUrl: string },
+  values: { name: string | null; appUrl: string },
 ) {
-  const normalized = value
+  const normalized = (values.name
+    ? value
+    : renderInactivityEmailName(value, null)
+  )
     .replace(/<br\s*\/?\s*>/gi, "<br>")
     .replace(/\r\n|\r|\n/g, "<br>");
   const escaped = escapeHtml(normalized).replace(/&lt;br&gt;/g, "<br>");
-  return escaped
-    .replace(/\{name\}/g, () => escapeHtml(values.name))
-    .replace(/\{appUrl\}/g, escapeHtml(values.appUrl));
+  return escaped.replace(/\{(name|appUrl)\}/g, (_, key) =>
+    escapeHtml(key === "name" ? values.name ?? "" : values.appUrl),
+  );
 }
 
 const renderText = renderInactivityEmailText;
@@ -185,16 +185,13 @@ export function renderInactivityEmailCta(label: string, href: string) {
 function renderInactivityEmailHtml(input: {
   subject: string;
   body: string;
-  name: string;
+  name: string | null;
   appUrl: string;
   buttonLabel: string;
   locale: InactivityEmailLocale;
   unsubscribeUrl: string;
 }) {
-  const subject = escapeHtml(input.subject).replace(
-    /\{name\}/g,
-    () => escapeHtml(input.name),
-  );
+  const subject = escapeHtml(renderInactivityEmailName(input.subject, input.name));
   return `<meta name="color-scheme" content="light"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#f4f4f5" style="background-color:#f4f4f5;"><tr><td align="center" bgcolor="#f4f4f5" style="padding:40px 16px;background-color:#f4f4f5;color:#18181b;"><table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="max-width:560px;width:100%;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding:32px;background-color:#ffffff;color:#18181b;"><p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:20px;line-height:28px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">MyTCFLab</p><h1 style="margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">${subject}</h1><div style="padding-top:18px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:26px;mso-line-height-rule:exactly;font-weight:400;color:#52525b;">${renderText(input.body, { name: input.name, appUrl: input.appUrl })}</div>${renderInactivityEmailCta(input.buttonLabel, input.appUrl)}<p style="margin:28px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;mso-line-height-rule:exactly;color:#71717a;">${escapeHtml(inactivityEmailNoReplyNote[input.locale])}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#ffffff" style="margin-top:24px;background-color:#ffffff;"><tr><td bgcolor="#ffffff" style="padding-top:24px;border-top:1px solid #e4e4e7;background-color:#ffffff;color:#71717a;">${inactivityEmailFooter(input.locale, input.unsubscribeUrl)}</td></tr></table></td></tr></table></td></tr></table>`;
 }
 
@@ -427,7 +424,7 @@ export async function sendInactivityEmailTest(input: {
     from: process.env.EMAIL_FROM!,
     to: input.to,
     replyTo: process.env.EMAIL_REPLY_TO?.trim() || undefined,
-    subject: input.subject.replace(/\{name\}/g, "Alex"),
+    subject: renderInactivityEmailName(input.subject, "Alex"),
     html,
   });
   if (result.error || !result.data?.id)
@@ -638,8 +635,8 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     );
     const unsubscribeUrl = `${baseUrl()}/unsubscribe/inactivity?token=${token}`;
     const listUnsubscribeUrl = `${baseUrl()}/api/unsubscribe/inactivity?token=${token}`;
-    const name = user.name?.trim() || fallbackName[locale];
-    const subject = template.subject.replace(/\{name\}/g, name);
+    const name = inactivityEmailFirstName(user.name);
+    const subject = renderInactivityEmailName(template.subject, name);
     const html = renderInactivityEmailHtml({
       subject: template.subject,
       body: template.body,
