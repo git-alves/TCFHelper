@@ -216,6 +216,25 @@ describe("runInactivityEmailCron", () => {
     expect(html).toContain("Hello &lt;b&gt;$&amp;");
     expect(html).toContain("Hi &lt;b&gt;$&amp;");
   });
+  it("omits a missing name from the sent subject, heading, and body", async () => {
+    prisma.user.findMany.mockResolvedValue([{ ...candidate, name: null }]);
+    prisma.inactivityEmailTemplate.findMany.mockResolvedValue([
+      {
+        kind: "THIRTY_DAY",
+        locale: Locale.en,
+        subject: "Hello, {name}",
+        body: "Hi {name},",
+      },
+    ]);
+    await runInactivityEmailCron(now);
+    const message = send.mock.calls[0][0];
+    expect(message.subject).toBe("Hello");
+    expect(message.html).toContain(
+      '<h1 style="margin:38px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;mso-line-height-rule:exactly;font-weight:700;letter-spacing:-0.4px;color:#18181b;">Hello</h1>',
+    );
+    expect(message.html).toContain(">Hi,</div>");
+    expect(message.html).not.toContain("{name}");
+  });
   it("records a definite 4xx rejection as failed", async () => {
     send.mockResolvedValue({
       data: null,

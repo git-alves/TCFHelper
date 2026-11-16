@@ -5,12 +5,14 @@ import {
   Locale,
 } from "@prisma/client";
 import { accessCodeIsLiveWhere } from "@/lib/access-code-expiry";
+import { inactivityEmailFirstName } from "@/lib/inactivity-email-name";
 
 const findMany = vi.fn();
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/prisma", () => ({ prisma: { user: { findMany } } }));
 
 const {
+  defaultInactivityTemplate,
   isEligibleForInactivityEmail,
   renderInactivityEmailCta,
   renderInactivityEmailText,
@@ -37,6 +39,30 @@ describe("inactivity email eligibility and templates", () => {
     expect(renderInactivityEmailText("<b>{name}</b><br>ok", values)).toBe(
       "&lt;b&gt;&lt;Ada&gt;&lt;/b&gt;<br>ok",
     );
+  });
+  it("uses only the first name", () => {
+    expect(inactivityEmailFirstName("Maria Silva")).toBe("Maria");
+    expect(inactivityEmailFirstName("  ")).toBeNull();
+    expect(inactivityEmailFirstName(null)).toBeNull();
+  });
+  it.each([
+    [InactivityEmailKind.SEVEN_DAY, Locale.pt, "Oi!"],
+    [InactivityEmailKind.SEVEN_DAY, Locale.en, "Hi,"],
+    [InactivityEmailKind.SEVEN_DAY, Locale.fr, "Bonjour,"],
+    [InactivityEmailKind.SEVEN_DAY, Locale.es, "Hola:"],
+    [InactivityEmailKind.THIRTY_DAY, Locale.pt, "Oi!"],
+    [InactivityEmailKind.THIRTY_DAY, Locale.en, "Hi,"],
+    [InactivityEmailKind.THIRTY_DAY, Locale.fr, "Bonjour,"],
+    [InactivityEmailKind.THIRTY_DAY, Locale.es, "Hola:"],
+  ])("omits a missing name from %s %s templates", (kind, locale, greeting) => {
+    const template = defaultInactivityTemplate(kind, locale);
+    const body = renderInactivityEmailText(template.body, {
+      name: null,
+      appUrl: "https://example.com/dashboard",
+    });
+    expect(body).toStartWith(greeting);
+    expect(body).not.toContain("{name}");
+    expect(body).not.toMatch(/, !| ,/);
   });
   it("renders an escaped CTA inside the email-safe button cell", () => {
     expect(
