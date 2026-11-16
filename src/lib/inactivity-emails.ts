@@ -636,8 +636,7 @@ export async function runInactivityEmailCron(now = new Date(), delayMs = 500) {
     const senderDetails = [
       process.env.INACTIVITY_EMAIL_LEGAL_ADDRESS?.trim(),
       process.env.INACTIVITY_EMAIL_SUPPORT_EMAIL!.trim(),
-    ]
-      .filter(Boolean)
+    ].filter((value): value is string => Boolean(value))
       .map(escapeHtml)
       .join(" · ");
     const html = `<div>${renderText(template.body, { name, appUrl })}</div><p><a href="${escapeHtml(appUrl)}">${escapeHtml(template.button)}</a></p><hr><p>${escapeHtml(footer[locale])} MyTCFLab${senderDetails ? ` · ${senderDetails}` : ""}. <a href="${escapeHtml(unsubscribeUrl)}">${escapeHtml(unsubscribeLabel[locale])}</a></p>`;
