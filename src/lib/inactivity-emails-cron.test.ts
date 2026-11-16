@@ -146,7 +146,7 @@ describe("runInactivityEmailCron", () => {
     expect(html).toContain(
       '<td bgcolor="#6D28D9" style="background-color:#6D28D9;border-radius:8px;padding:12px 24px;"><a href="https://app.example.com/dashboard" style="display:block;color:#ffffff;font-weight:700;text-decoration:none;">Return to MyTCFLab</a>',
     );
-    const bodyIndex = html.indexOf("It’s been a few days");
+    const bodyIndex = html.indexOf("Your MyTCFLab space is still here");
     const buttonIndex = html.indexOf('bgcolor="#6D28D9"');
     const footerIndex = html.indexOf("/unsubscribe/inactivity?token=");
     expect(bodyIndex).toBeGreaterThan(-1);
