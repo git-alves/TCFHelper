@@ -153,7 +153,7 @@ export async function updateInactivityEmailSettings(input: { enabled?: boolean; 
     if (input.enabled !== undefined) await tx.appConfig.upsert({ where: { id: "singleton" }, create: { id: "singleton", inactivityEmailsEnabled: input.enabled }, update: { inactivityEmailsEnabled: input.enabled } });
     for (const template of input.templates ?? []) {
       const fallback = defaultInactivityTemplate(template.kind, template.locale);
-      if (template.subject.trim() === fallback.subject && template.body.trim() === fallback.body) await tx.inactivityEmailTemplate.deleteMany({ where: { kind_locale: { kind: template.kind, locale: template.locale } } });
+      if (template.subject.trim() === fallback.subject && template.body.trim() === fallback.body) await tx.inactivityEmailTemplate.deleteMany({ where: { kind: template.kind, locale: template.locale } });
       else await tx.inactivityEmailTemplate.upsert({ where: { kind_locale: { kind: template.kind, locale: template.locale } }, create: { ...template, subject: template.subject.trim(), body: template.body.trim() }, update: { subject: template.subject.trim(), body: template.body.trim() } });
     }
   });

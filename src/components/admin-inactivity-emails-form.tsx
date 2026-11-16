@@ -9,7 +9,7 @@ const kinds = [{ id: InactivityEmailKind.SEVEN_DAY, label: "7 days without use" 
 const key = (kind: InactivityEmailKind, locale: Locale) => `${kind}:${locale}` as keyof InactivityEmailDisplay["templates"];
 
 export function AdminInactivityEmailsForm({ initialDisplay }: { initialDisplay: InactivityEmailDisplay }) {
-  const [display, setDisplay] = useState(initialDisplay); const [kind, setKind] = useState(InactivityEmailKind.SEVEN_DAY); const [locale, setLocale] = useState(Locale.pt); const [draft, setDraft] = useState(initialDisplay.templates); const [status, setStatus] = useState<string | null>(null); const [saving, setSaving] = useState(false);
+  const [display, setDisplay] = useState(initialDisplay); const [kind, setKind] = useState<InactivityEmailKind>(InactivityEmailKind.SEVEN_DAY); const [locale, setLocale] = useState<Locale>(Locale.pt); const [draft, setDraft] = useState(initialDisplay.templates); const [status, setStatus] = useState<string | null>(null); const [saving, setSaving] = useState(false);
   const selectedKey = key(kind, locale); const selected = draft[selectedKey]; const invalid = !selected.subject.trim() || !selected.body.trim() || /\r|\n/.test(selected.subject) || /\{(?!name\}|appUrl\})[^}]+\}/.test(`${selected.subject} ${selected.body}`) || selected.subject.includes("{appUrl}");
   const changed = JSON.stringify(draft) !== JSON.stringify(display.templates);
   const update = (field: "subject" | "body", value: string) => setDraft((current) => ({ ...current, [selectedKey]: { ...current[selectedKey], [field]: value } }));
