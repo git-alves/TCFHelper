@@ -164,13 +164,16 @@ export function renderInactivityEmailText(
   value: string,
   values: { name: string | null; appUrl: string },
 ) {
-  const normalized = renderInactivityEmailName(value, values.name)
+  const normalized = (values.name
+    ? value
+    : renderInactivityEmailName(value, null)
+  )
     .replace(/<br\s*\/?\s*>/gi, "<br>")
     .replace(/\r\n|\r|\n/g, "<br>");
   const escaped = escapeHtml(normalized).replace(/&lt;br&gt;/g, "<br>");
-  return escaped
-    .replace(/\{name\}/g, () => escapeHtml(values.name ?? ""))
-    .replace(/\{appUrl\}/g, escapeHtml(values.appUrl));
+  return escaped.replace(/\{(name|appUrl)\}/g, (_, key) =>
+    escapeHtml(key === "name" ? values.name ?? "" : values.appUrl),
+  );
 }
 
 const renderText = renderInactivityEmailText;

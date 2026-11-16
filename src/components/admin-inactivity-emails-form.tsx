@@ -53,6 +53,19 @@ export function AdminInactivityEmailsForm({
   const [previewHasName, setPreviewHasName] = useState(true);
   const selectedKey = key(kind, locale);
   const selected = draft[selectedKey];
+  const previewName = previewHasName ? "Alex" : null;
+  const previewSubject = (previewName
+    ? selected.subject
+    : renderInactivityEmailName(selected.subject, null)
+  ).replace(/\{name\}/g, () => previewName ?? "");
+  const previewBody = (previewName
+    ? selected.body
+    : renderInactivityEmailName(selected.body, null)
+  )
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/\{(name|appUrl)\}/g, (_, key) =>
+      key === "name" ? previewName ?? "" : "/dashboard",
+    );
   const invalid =
     !selected.subject.trim() ||
     !selected.body.trim() ||
@@ -266,18 +279,10 @@ export function AdminInactivityEmailsForm({
               MyTCFLab
             </p>
             <h3 className="mt-[38px] font-sans text-[28px] font-bold leading-[34px] tracking-[-0.4px]">
-              {renderInactivityEmailName(
-                selected.subject,
-                previewHasName ? "Alex" : null,
-              )}
+              {previewSubject}
             </h3>
             <p className="mt-[18px] whitespace-pre-wrap font-sans text-base font-normal leading-[26px] text-[#52525b]">
-              {renderInactivityEmailName(
-                selected.body,
-                previewHasName ? "Alex" : null,
-              )
-                .replace(/\{appUrl\}/g, "/dashboard")
-                .replace(/<br\s*\/?\s*>/gi, "\n")}
+              {previewBody}
             </p>
             <span className="mt-7 inline-flex rounded-lg bg-violet-700 px-[18px] py-3 font-sans text-sm font-semibold leading-5 text-white">
               {selected.button}

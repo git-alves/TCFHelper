@@ -45,6 +45,25 @@ describe("inactivity email eligibility and templates", () => {
     expect(inactivityEmailFirstName("  ")).toBeNull();
     expect(inactivityEmailFirstName(null)).toBeNull();
   });
+  it("keeps a missing-name line break", () => {
+    expect(
+      renderInactivityEmailText("Oi!\n{name}, volte", {
+        name: null,
+        appUrl: "https://example.com/dashboard",
+      }),
+    ).toBe("Oi!<br>, volte");
+  });
+  it.each([
+    ["<br>", "&lt;br&gt;"],
+    ["{appUrl}", "{appUrl}"],
+  ])("renders the name %s literally", (name, renderedName) => {
+    expect(
+      renderInactivityEmailText("Hello {name}", {
+        name,
+        appUrl: "https://example.com/dashboard",
+      }),
+    ).toBe(`Hello ${renderedName}`);
+  });
   it.each([
     [InactivityEmailKind.SEVEN_DAY, Locale.pt, "Oi!"],
     [InactivityEmailKind.SEVEN_DAY, Locale.en, "Hi,"],

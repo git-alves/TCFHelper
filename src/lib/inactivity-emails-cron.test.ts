@@ -235,6 +235,43 @@ describe("runInactivityEmailCron", () => {
     expect(message.html).toContain(">Hi,</div>");
     expect(message.html).not.toContain("{name}");
   });
+  it("uses only a learner's first name in the subject, heading, and body", async () => {
+    prisma.user.findMany.mockResolvedValue([
+      { ...candidate, name: "Maria Silva" },
+    ]);
+    prisma.inactivityEmailTemplate.findMany.mockResolvedValue([
+      {
+        kind: "THIRTY_DAY",
+        locale: Locale.en,
+        subject: "Hello {name}",
+        body: "Hi {name}",
+      },
+    ]);
+    await runInactivityEmailCron(now);
+    const message = send.mock.calls[0][0];
+    expect(message.subject).toBe("Hello Maria");
+    expect(message.html).toContain("Hello Maria</h1>");
+    expect(message.html).toContain(">Hi Maria</div>");
+    expect(message.html).not.toContain("Maria Silva");
+  });
+  it.each([
+    ["<br>", "&lt;br&gt;"],
+    ["{appUrl}", "{appUrl}"],
+  ])("renders the name %s literally in the heading and body", async (name, renderedName) => {
+    prisma.user.findMany.mockResolvedValue([{ ...candidate, name }]);
+    prisma.inactivityEmailTemplate.findMany.mockResolvedValue([
+      {
+        kind: "THIRTY_DAY",
+        locale: Locale.en,
+        subject: "Hello {name}",
+        body: "Hi {name}",
+      },
+    ]);
+    await runInactivityEmailCron(now);
+    const html = send.mock.calls[0][0].html;
+    expect(html).toContain(`Hello ${renderedName}</h1>`);
+    expect(html).toContain(`>Hi ${renderedName}</div>`);
+  });
   it("records a definite 4xx rejection as failed", async () => {
     send.mockResolvedValue({
       data: null,

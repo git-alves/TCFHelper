@@ -6,6 +6,6 @@ export function renderInactivityEmailName(
   value: string,
   name: string | null,
 ) {
-  if (!name) return value.replace(/,?\s*\{name\}/g, "");
+  if (!name) return value.replace(/,?[ \t]*\{name\}/g, "");
   return value.replace(/\{name\}/g, () => name);
 }
