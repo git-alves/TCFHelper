@@ -584,7 +584,7 @@ export async function runInactivityEmailCron(now = new Date()) {
         },
         { idempotencyKey: `inactivity-${claim.id}` },
       );
-    } catch (error) {
+    } catch {
       console.error("Inactivity email send uncertain; leaving claim pending", {
         emailSendId: claim.id,
       });
@@ -621,7 +621,7 @@ export async function runInactivityEmailCron(now = new Date()) {
         },
       });
       sent++;
-    } catch (error) {
+    } catch {
       console.error(
         "Inactivity email accepted but SENT state could not be saved; leaving claim pending",
         { emailSendId: claim.id },
