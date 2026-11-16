@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/hubspot-support-sync-retry",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/inactivity-emails",
+      "schedule": "0 5 * * *"
     }
   ]
 }
