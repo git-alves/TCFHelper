@@ -195,7 +195,7 @@ describe("inactivity email selection", () => {
       }),
     );
   });
-  it("selects only the 30-day email for a first rollout user and resets a later 30-day milestone after activity", async () => {
+  it("selects only the 15-day email for a first rollout user and resets a later 15-day milestone after activity", async () => {
     const now = new Date("2026-11-16T12:00:00Z");
     const old = new Date("2026-10-01T12:00:00Z");
     const returned = new Date("2026-10-10T12:00:00Z");
@@ -257,6 +257,33 @@ describe("inactivity email selection", () => {
     expect(selected.map((item) => [item.id, item.kind])).toEqual([
       ["first", InactivityEmailKind.THIRTY_DAY],
       ["returned", InactivityEmailKind.THIRTY_DAY],
+    ]);
+  });
+
+  it("selects the exact 15-day boundary as the second milestone", async () => {
+    const now = new Date("2026-11-16T12:00:00Z");
+    const row = (id: string, daysInactive: number) => ({
+      id,
+      email: `${id}@example.com`,
+      name: null,
+      locale: Locale.en,
+      lastActiveAt: new Date(now.getTime() - daysInactive * 86_400_000),
+      isBlocked: false,
+      isAdmin: false,
+      inactivityEmailsUnsubscribedAt: null,
+      redeemedAccessCodes: [{ id: "live-code" }],
+      inactivityEmailSends: [],
+    });
+    findMany.mockResolvedValue([
+      row("fifteen", 15),
+      row("fourteen", 14),
+      row("seven", 7),
+    ]);
+    const selected = await selectInactivityEmailCandidates(now);
+    expect(selected.map((item) => [item.id, item.kind])).toEqual([
+      ["fifteen", InactivityEmailKind.THIRTY_DAY],
+      ["fourteen", InactivityEmailKind.SEVEN_DAY],
+      ["seven", InactivityEmailKind.SEVEN_DAY],
     ]);
   });
 

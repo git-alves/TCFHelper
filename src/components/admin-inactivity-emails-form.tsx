@@ -18,7 +18,7 @@ const locales = [
 ] as const;
 const kinds = [
   { id: InactivityEmailKind.SEVEN_DAY, label: "7 days without use" },
-  { id: InactivityEmailKind.THIRTY_DAY, label: "30 days without use" },
+  { id: InactivityEmailKind.THIRTY_DAY, label: "15 days without use" },
 ] as const;
 const key = (kind: InactivityEmailKind, locale: Locale) =>
   `${kind}:${locale}` as keyof InactivityEmailDisplay["templates"];
@@ -337,7 +337,7 @@ export function AdminInactivityEmailsForm({
             Turn on inactivity emails?
           </h2>
           <p className="mt-2 text-sm">
-            Eligible learners may start receiving the saved 7-day and 30-day
+            Eligible learners may start receiving the saved 7-day and 15-day
             emails automatically. Each email is sent once per inactivity streak.
             Learners who unsubscribe will not receive these emails.
           </p>
@@ -388,7 +388,7 @@ export function AdminInactivityEmailsForm({
           </h2>
           <p className="mt-2 text-sm">
             Your custom subject and body for{" "}
-            {kind === InactivityEmailKind.SEVEN_DAY ? "7 days" : "30 days"} /{" "}
+            {kind === InactivityEmailKind.SEVEN_DAY ? "7 days" : "15 days"} /{" "}
             {locales.find((item) => item.id === locale)?.label} will be
             replaced. This cannot be undone after saving.
           </p>

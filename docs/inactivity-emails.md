@@ -6,7 +6,7 @@
 
 This is a gentle invitation to resume studying, not a warning or a sales
 message. There are two messages: after 7 complete days without recorded use,
-and after 30 complete days without recorded use. Send each at most once in an
+and after 15 complete days without recorded use. Send each at most once in an
 inactivity streak. A new use of the app starts a new streak and makes the
 learner eligible again. The automation is off by default.
 
@@ -65,7 +65,9 @@ that the learner "should" return.
 | French (`fr`) | MyTCFLab est là quand vous serez prêt·e | Bonjour `{name}`,<br><br>Quelques jours se sont écoulés depuis votre dernière pratique. Quand vous aurez envie de reprendre, votre espace MyTCFLab vous attend.<br><br>Reprenez à votre rythme. | Retourner à MyTCFLab |
 | Spanish (`es`) | MyTCFLab está aquí cuando quieras | Hola, `{name}`:<br><br>Han pasado algunos días desde tu última práctica. Cuando quieras continuar, tu espacio en MyTCFLab está listo para ti.<br><br>Retoma a tu ritmo. | Volver a MyTCFLab |
 
-### 30 days
+### 15 days
+
+The saved-template and delivery enum remains `THIRTY_DAY` as a stable internal key; it now represents the 15-day milestone.
 
 | Locale | Subject | Body | Button |
 | --- | --- | --- | --- |
@@ -85,7 +87,7 @@ editor. The page must be accessible to admins only.
 flowchart TD
   A[Open Inactivity emails] --> B[Load saved settings + built-in defaults]
   B --> C[Review global sending status]
-  C --> D[Choose 7-day or 30-day message]
+  C --> D[Choose 7-day or 15-day message]
   D --> E[Choose pt / en / fr / es]
   E --> F[Edit subject or body; preview updates]
   F --> G{Fields valid?}
@@ -100,16 +102,16 @@ flowchart TD
 
 | Area / control | Required behaviour and English copy | Intent |
 | --- | --- | --- |
-| Header | Eyebrow: `Admin`; title: `Inactivity emails`; description: `Edit the 7-day and 30-day emails sent to eligible learners who stop using MyTCFLab. Sending is off until you turn it on.` | Makes the consequence and the off-by-default safety visible before editing. |
+| Header | Eyebrow: `Admin`; title: `Inactivity emails`; description: `Edit the 7-day and 15-day emails sent to eligible learners who stop using MyTCFLab. Sending is off until you turn it on.` | Makes the consequence and the off-by-default safety visible before editing. |
 | Global status card | Show a clear badge: `Sending is off` / `Sending is on`. Include the switch labelled `Send inactivity emails automatically`. When off, say `You can edit, preview, and send yourself a test. Learners will not receive automatic emails.` | Separates composing from sending so an admin can safely prepare templates. |
-| Email timing selector | Two large, labelled tabs or cards: `7 days without use` and `30 days without use`; include `Sent once per inactivity streak` below each. Keep the selected card visibly active. | Gives the timing meaning instead of exposing internal template keys. |
-| Language selector | Segmented tabs in a stable order: `Português`, `English`, `Français`, `Español`. Keep the selected language while changing between 7 and 30 days. Show `Using built-in default` or `Customized` for the selected translation. | Eight expanded forms would be tiring and error-prone; one translation at a time makes the current edit unmistakable. |
+| Email timing selector | Two large, labelled tabs or cards: `7 days without use` and `15 days without use`; include `Sent once per inactivity streak` below each. Keep the selected card visibly active. | Gives the timing meaning instead of exposing internal template keys. |
+| Language selector | Segmented tabs in a stable order: `Português`, `English`, `Français`, `Español`. Keep the selected language while changing between 7 and 15 days. Show `Using built-in default` or `Customized` for the selected translation. | Eight expanded forms would be tiring and error-prone; one translation at a time makes the current edit unmistakable. |
 | Template fields | Visible labels `Subject` and `Email body`; a single-line subject field and a multi-line body field. Under them, show `{name}` and `{appUrl}` chips plus `Allowed placeholders`. Body help: `Use {appUrl} for the return button. The unsubscribe footer is added automatically and cannot be edited.` Show the locale-specific button label and fixed footer in a read-only `Email details added automatically` disclosure. | Keeps variable rules near the moment of entry and prevents accidental removal of the legal footer. |
 | Live preview | Heading `Preview`; update from the current draft without saving. Render a neutral sample name (for example, `Alex`), the locale's button label linked only in the preview, and the fixed footer. Label it `Preview only — sample values are shown.` | Recognition beats imagination: an admin can see the final hierarchy and footer before saving. |
 | Reset | Per selected language/timing, button `Reset to default`. Confirmation dialog: `Reset this email to the built-in default? Your custom subject and body for [7 days / Portuguese] will be replaced. This cannot be undone after saving.` Actions: `Cancel`, `Reset to default`. Reset changes the draft only; require `Save changes` to persist. | Reset is destructive to custom copy, so it needs a precise scope and confirmation; making it a draft change preserves an exit path. |
 | Save | Page-level primary button `Save changes`; disabled until there is a valid unsaved change. While saving: `Saving…` and disable duplicate submission. On success: `Saved.` in a polite live region. Preserve a visible `Unsaved changes` indicator before save and warn on browser/admin navigation away, following the prompt editor pattern. | The saved template, not a silently retained draft, is the source of automatic sends. |
 | Test | Secondary button `Send a test to my email`; it sends the currently valid draft to the signed-in admin's account email, does **not** save the draft, and does **not** enable automation. Adjacent help: `This test uses sample learner data and includes the unsubscribe footer.` Disable it for an invalid draft or a missing admin email. On completion use `Test sent to [masked email].`; failure: `We couldn’t send the test. Check the email service configuration and try again.` | A draft test makes writing faster while ensuring no learner receives an unreviewed version. State the recipient and scope to prevent surprise. |
-| Enable | Turning the switch on opens a modal, not an immediate state change. Title: `Turn on inactivity emails?` Body: `Eligible learners may start receiving the saved 7-day and 30-day emails automatically. Each email is sent once per inactivity streak. Learners who unsubscribe will not receive these emails.` Require an unchecked acknowledgement: `I confirm that MyTCFLab has a valid basis to email these learners and that the sender details are current.` Primary `Turn on sending`; secondary `Cancel`. Switch remains off unless confirmation succeeds. | This is an external, potentially regulated action; an explicit review prevents an accidental bulk send. The acknowledgement does not itself prove legal compliance. |
+| Enable | Turning the switch on opens a modal, not an immediate state change. Title: `Turn on inactivity emails?` Body: `Eligible learners may start receiving the saved 7-day and 15-day emails automatically. Each email is sent once per inactivity streak. Learners who unsubscribe will not receive these emails.` Require an unchecked acknowledgement: `I confirm that MyTCFLab has a valid basis to email these learners and that the sender details are current.` Primary `Turn on sending`; secondary `Cancel`. Switch remains off unless confirmation succeeds. | This is an external, potentially regulated action; an explicit review prevents an accidental bulk send. The acknowledgement does not itself prove legal compliance. |
 | Disabled provider state | If Resend is not configured, show a non-dismissable status at the top: `Email sending is unavailable because Resend is not configured.` Add `Add RESEND_API_KEY and the required sender settings, then reload this page.` Disable the global switch and test button; editing, previewing, validation, reset, and saving remain available. | The owner can finish copy work, but never mistake an unavailable system for an enabled campaign. |
 
 ### Validation and state details
