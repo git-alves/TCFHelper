@@ -21,6 +21,9 @@ import {
 } from "@/lib/inactivity-email-name";
 
 export const INACTIVITY_EMAIL_DAILY_CAP = 90;
+export const INACTIVITY_FIRST_EMAIL_DAYS = 7;
+// THIRTY_DAY remains the stable internal key for the second milestone, sent at 15 days.
+export const INACTIVITY_SECOND_EMAIL_DAYS = 15;
 export const INACTIVITY_EMAIL_KINDS = [
   InactivityEmailKind.SEVEN_DAY,
   InactivityEmailKind.THIRTY_DAY,
@@ -463,11 +466,15 @@ export async function selectInactivityEmailCandidates(
   now = new Date(),
   limit = INACTIVITY_EMAIL_DAILY_CAP,
 ) {
-  const seven = new Date(now.getTime() - 7 * 86_400_000);
-  const thirty = new Date(now.getTime() - 30 * 86_400_000);
+  const firstMilestone = new Date(
+    now.getTime() - INACTIVITY_FIRST_EMAIL_DAYS * 86_400_000,
+  );
+  const secondMilestone = new Date(
+    now.getTime() - INACTIVITY_SECOND_EMAIL_DAYS * 86_400_000,
+  );
   const users = await prisma.user.findMany({
     where: {
-      lastActiveAt: { not: null, lte: seven },
+      lastActiveAt: { not: null, lte: firstMilestone },
       isBlocked: false,
       isAdmin: false,
       inactivityEmailsUnsubscribedAt: null,
@@ -504,7 +511,7 @@ export async function selectInactivityEmailCandidates(
     const user = raw as Candidate;
     if (!isEligibleForInactivityEmail(user)) continue;
     const kind =
-      user.lastActiveAt <= thirty
+      user.lastActiveAt <= secondMilestone
         ? InactivityEmailKind.THIRTY_DAY
         : InactivityEmailKind.SEVEN_DAY;
     const prior = user.inactivityEmailSends.find(
