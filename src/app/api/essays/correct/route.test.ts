@@ -62,6 +62,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     topic: { findUnique: findUniqueMock, create: topicCreateMock },
     essay: { create: essayCreateMock },
+    modelChainAlert: { upsert: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+    modelChainReserveUse: { create: vi.fn().mockResolvedValue({}) },
   },
 }));
 vi.mock("@/lib/app-config", () => ({
@@ -224,6 +226,39 @@ describe("route segment config", () => {
 });
 
 describe("POST /api/essays/correct", () => {
+  it.each([
+    ["503", new CorrectionProviderRequestError(503)],
+    ["timeout", new CorrectionProviderTransportError()],
+    ["credits", new CorrectionProviderRequestError(402)],
+    ["schema-invalid JSON", null],
+  ])("falls through a configured chain after %s without charging twice", async (_name, failure) => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, correctionModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    gradeEssayMock.mockImplementationOnce(async () => { if (failure) throw failure; return {}; }).mockResolvedValueOnce(feedback);
+    const response = await post({ taskType: "TASK_1", topicPrompt: "Écrivez à votre voisin.", content: VALID_TASK_1_CONTENT });
+    expect(response.status).toBe(200);
+    expect(gradeEssayMock).toHaveBeenCalledTimes(2);
+    expect(reserveCorrectionUsageMock).toHaveBeenCalledTimes(1);
+    expect(refundCorrectionUsageMock).not.toHaveBeenCalled();
+    expect(recordAdminEventMock).toHaveBeenCalledTimes(1);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ provider: "gemini", model: "first" }));
+  });
+
+  it("refunds once and logs one event per chain step when all steps fail", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, correctionModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    gradeEssayMock.mockRejectedValue(new CorrectionProviderRequestError(503));
+    expect((await post({ taskType: "TASK_1", topicPrompt: "Écrivez à votre voisin.", content: VALID_TASK_1_CONTENT })).status).toBe(502);
+    expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
+    expect(recordAdminEventMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reserve usage for a chain with no configured credentials", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, correctionModelChain: [{ provider: "gemini", model: "first", apiKey: null }, { provider: "openrouter", model: "second", apiKey: null }] });
+    hasConfiguredCredentialsMock.mockReturnValue(false);
+    const response = await post({ taskType: "TASK_1", topicPrompt: "Écrivez à votre voisin.", content: VALID_TASK_1_CONTENT });
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ code: "CORRECTION_SERVICE_UNAVAILABLE" });
+    expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
+  });
   it("requires an authenticated learner", async () => {
     getCurrentActivatedAppUserMock.mockResolvedValue(null);
 

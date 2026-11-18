@@ -1,16 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { createMock, deleteManyMock, upsertMock } = vi.hoisted(() => ({ createMock: vi.fn(), deleteManyMock: vi.fn(), upsertMock: vi.fn() }));
+const { createMock, deleteManyMock, upsertMock, updateManyMock } = vi.hoisted(() => ({ createMock: vi.fn(), deleteManyMock: vi.fn(), upsertMock: vi.fn(), updateManyMock: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    modelChainAlert: { upsert: upsertMock, deleteMany: deleteManyMock },
+    modelChainAlert: { upsert: upsertMock, deleteMany: deleteManyMock, updateMany: updateManyMock },
     modelChainReserveUse: { create: createMock },
   },
 }));
 
-const { parseModelChain, runModelChain } = await import("./model-chain");
+const { parseModelChain, runModelChain, openModelChainAlert, clearModelChainAlert, dismissModelChainAlert } = await import("./model-chain");
 
 describe("model fallback chain", () => {
+  it("opens credit and Gemini invalid-key alerts, clears on success, and dismisses", async () => {
+    const step = { provider: "gemini" as const, model: "gemini-3.5-flash", apiKey: null };
+    await openModelChainAlert("correction", step, 402);
+    await openModelChainAlert("correction", step, 400);
+    expect(upsertMock).toHaveBeenLastCalledWith(expect.objectContaining({ create: expect.objectContaining({ kind: "key" }) }));
+    await clearModelChainAlert("correction", step);
+    expect(deleteManyMock).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ section: "correction" }) }));
+    await dismissModelChainAlert("c123456789012345678901234");
+    expect(updateManyMock).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ dismissedAt: expect.any(Date) }) }));
+  });
   it("tries each reserve step once and returns the next usable result", async () => {
     const invoke = vi.fn()
       .mockRejectedValueOnce(Object.assign(new Error("overloaded"), { status: 503 }))

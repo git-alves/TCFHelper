@@ -64,7 +64,7 @@ vi.mock("@/lib/app-user", () => ({
 vi.mock("@/lib/activated-app-user", () => ({
   getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
 }));
-vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock } } }));
+vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findUnique: findUniqueMock }, modelChainAlert: { upsert: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) }, modelChainReserveUse: { create: vi.fn().mockResolvedValue({}) } } }));
 vi.mock("@/lib/app-config", () => ({
   getAppConfig: getAppConfigMock,
   // A tiny stand-in for the real app-config.ts resolver (kept out of this
@@ -186,6 +186,25 @@ describe("route segment config", () => {
 });
 
 describe("POST /api/essays/example", () => {
+  it("falls through a configured chain after a 503", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    generatePreferredModelAnswerMock.mockRejectedValueOnce(new ExampleProviderRequestError(503)).mockResolvedValueOnce({ text: "Un exemple de réponse.", provider: "openrouter" });
+    expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(200);
+    expect(generatePreferredModelAnswerMock).toHaveBeenCalledTimes(2);
+    expect(recordAdminEventMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refunds an all-failed chain once and avoids a claim without credentials", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    generatePreferredModelAnswerMock.mockRejectedValue(new ExampleProviderRequestError(503));
+    expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(502);
+    expect(refundExampleGenerationLeaseMock).toHaveBeenCalledTimes(1);
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: null }] });
+    hasConfiguredCredentialsMock.mockReturnValue(false);
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+    expect(response.status).toBe(503);
+    expect(claimExampleGenerationMock).toHaveBeenCalledTimes(1);
+  });
   it("requires an authenticated learner", async () => {
     getCurrentActivatedAppUserMock.mockResolvedValue(null);
 
