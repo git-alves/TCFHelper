@@ -29,6 +29,8 @@ export interface OverloadRetryOptions {
   attemptTimeoutMs: number;
   /** Overall budget measured from the first attempt. Defaults to MAX_ATTEMPTS attempts plus slack. */
   totalBudgetMs?: number;
+  /** Chain reserve steps must move on immediately instead of retrying 503. */
+  retry503?: boolean;
   // Injectable so tests are deterministic.
   now?: () => number;
   random?: () => number;
@@ -74,7 +76,7 @@ export async function sendWithOverloadRetry(
   const startedAt = now();
 
   let response = await send();
-  for (let attempt = 1; response.status === 503 && attempt < MAX_ATTEMPTS; attempt++) {
+  for (let attempt = 1; options.retry503 !== false && response.status === 503 && attempt < MAX_ATTEMPTS; attempt++) {
     const retryAfterMs = parseRetryAfterMs(response, now());
     const scheduledMs = BASE_WAITS_MS[attempt - 1] * (1 + (random() * 2 - 1) * JITTER_RATIO);
     const waitMs = Math.round(retryAfterMs === undefined ? scheduledMs : Math.min(retryAfterMs, MAX_WAIT_MS));

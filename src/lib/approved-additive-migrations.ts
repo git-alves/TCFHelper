@@ -118,4 +118,7 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // and an AppConfig switch defaulting false. Existing deployments remain
   // behaviorally silent until the owner enables the feature.
   "20261115120000_add_inactivity_emails",
+  // Nullable AppConfig JSON columns plus two new empty operational tables.
+  // Legacy deployments keep their provider behavior until an owner saves a chain.
+  "20261118120000_add_model_fallback_chain",
 ]);

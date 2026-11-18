@@ -28,10 +28,12 @@ const EMPTY_ROW = {
   correctionProvider: null,
   correctionApiKey: null,
   correctionModel: null,
+  correctionModelChain: null,
   correctionDailyLimit: null,
   exampleProvider: null,
   exampleApiKey: null,
   exampleModel: null,
+  exampleModelChain: null,
   exampleDailyLimit: null,
   updatedAt: new Date(),
 };
@@ -79,10 +81,12 @@ describe("getAppConfig", () => {
       correctionProvider: null,
       correctionApiKey: null,
       correctionModel: null,
+      correctionModelChain: null,
       correctionDailyLimit: null,
       exampleProvider: null,
       exampleApiKey: null,
       exampleModel: null,
+      exampleModelChain: null,
       exampleDailyLimit: null,
     });
   });
@@ -93,6 +97,7 @@ describe("getAppConfig", () => {
       correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
+      correctionModelChain: null,
       correctionDailyLimit: 250,
     });
 
@@ -100,10 +105,12 @@ describe("getAppConfig", () => {
       correctionProvider: "openrouter",
       correctionApiKey: "sk-correction-key",
       correctionModel: "gemini-3.5-pro",
+      correctionModelChain: null,
       correctionDailyLimit: 250,
       exampleProvider: null,
       exampleApiKey: null,
       exampleModel: null,
+      exampleModelChain: null,
       exampleDailyLimit: null,
     });
   });

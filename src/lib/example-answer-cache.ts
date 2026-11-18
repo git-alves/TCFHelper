@@ -6,10 +6,11 @@ import type { ModelAnswerProvider } from "@/lib/model-answer-generator";
 import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
 
 const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
-// Gemini can use its 20-second request timeout. Keep the claim longer than
-// that call so a slow but valid response cannot lose ownership and trigger a
-// duplicate provider request.
-const LEASE_DURATION_MS = 60_000;
+// The configured three-step chain has a 75s provider budget (18s + 18s + up
+// to 39s for the final step). A 90s lease covers it plus cache persistence;
+// it equals the route maxDuration, so a killed request cannot retain it past
+// the platform's own deadline.
+const LEASE_DURATION_MS = 90_000;
 // A refunded failure never raises the daily count, so that count alone no
 // longer bounds how often a persistently failing provider gets called. This
 // cooldown between claim attempts (for any topic) is what actually caps the

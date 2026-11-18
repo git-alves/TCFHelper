@@ -107,7 +107,7 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
         // and timeout risk, so watch the "output truncated" log line before
         // raising it further. Matches gradeEssayWithGemini's budget.
         maxTokens: 8192,
-        timeoutMs: CORRECTION_REQUEST_TIMEOUT_MS,
+        timeoutMs: overrides?.requestTimeoutMs ?? CORRECTION_REQUEST_TIMEOUT_MS,
         responseFormat: {
           type: "json_schema",
           json_schema: { name: "essay_feedback", schema: CORRECTION_JSON_SCHEMA },
@@ -116,6 +116,8 @@ export const openRouterCorrectionProvider: CorrectionProvider = {
         // that actually support response_format.
         requireParameters: true,
         logLabel: "correction",
+        retry503: overrides?.retry503,
+        totalBudgetMs: overrides?.totalBudgetMs,
       });
     } catch (error) {
       if (error instanceof OpenRouterRateLimitedError) throw new CorrectionProviderRateLimitedError(error.message);

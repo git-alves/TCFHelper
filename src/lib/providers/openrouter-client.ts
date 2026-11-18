@@ -52,6 +52,8 @@ export interface OpenRouterChatCompletionOptions {
   requireParameters?: boolean;
   /** Distinguishes this call's transport-failure log lines from another adapter's (e.g. "correction" vs "example generation"). */
   logLabel: string;
+  retry503?: boolean;
+  totalBudgetMs?: number;
 }
 
 type JsonRecord = Record<string, unknown>;
@@ -161,6 +163,8 @@ export async function requestOpenRouterChatCompletionDetailed(
     response = await sendWithOverloadRetry(() => request(options), {
       label: `OpenRouter ${options.logLabel}`,
       attemptTimeoutMs: options.timeoutMs,
+      retry503: options.retry503,
+      totalBudgetMs: options.totalBudgetMs,
     });
   } catch (error) {
     console.error(`OpenRouter ${options.logLabel} transport failure`, error);

@@ -52,6 +52,13 @@ afterEach(() => {
 });
 
 describe("sendWithOverloadRetry", () => {
+  it("does not wait or retry when a chain reserve step disables 503 retries", async () => {
+    const clock = makeClock();
+    const send = vi.fn<() => Promise<Response>>().mockResolvedValue(response(503));
+    await expect(sendWithOverloadRetry(send, { label: "Reserve step", attemptTimeoutMs, retry503: false, now: clock.now, sleep: clock.sleep })).resolves.toMatchObject({ status: 503 });
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(clock.sleeps).toEqual([]);
+  });
   it("succeeds on the third attempt after two 503s, waiting about 2s and then about 5s", async () => {
     const clock = makeClock();
     const send = vi

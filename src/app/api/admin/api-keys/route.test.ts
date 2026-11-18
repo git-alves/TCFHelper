@@ -178,6 +178,27 @@ describe("PUT /api/admin/api-keys", () => {
     expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModel: "qwen/qwen3-30b-a3b" });
   });
 
+  it("drops a saved chain key when its provider changes", async () => {
+    getAppConfigMock.mockResolvedValue({ ...EMPTY_STORED, correctionModelChain: [{ provider: "gemini", model: "gemini-3.5-flash-lite", apiKey: GEMINI_KEY }] });
+    await put({ correctionModelChain: [{ provider: "openrouter", model: "qwen/qwen3-30b-a3b", savedApiKeyIndex: 0 }] });
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModelChain: [{ provider: "openrouter", model: "qwen/qwen3-30b-a3b", apiKey: null }] });
+  });
+
+  it.each([
+    ["the model changes", "gemini-3.5-flash"],
+    ["the provider and model stay the same", "gemini-3.5-flash-lite"],
+  ])("keeps a saved chain key when %s", async (_description, model) => {
+    getAppConfigMock.mockResolvedValue({ ...EMPTY_STORED, correctionModelChain: [{ provider: "gemini", model: "gemini-3.5-flash-lite", apiKey: GEMINI_KEY }] });
+    await put({ correctionModelChain: [{ provider: "gemini", model, savedApiKeyIndex: 0 }] });
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModelChain: [{ provider: "gemini", model, apiKey: GEMINI_KEY }] });
+  });
+
+  it("seeds the first chain step with the legacy key when the provider matches", async () => {
+    getAppConfigMock.mockResolvedValue({ ...EMPTY_STORED, correctionProvider: "gemini", correctionModel: "gemini-3.5-flash-lite", correctionApiKey: GEMINI_KEY });
+    await put({ correctionModelChain: [{ provider: "gemini", model: "gemini-3.5-flash", savedApiKeyIndex: 0 }] });
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModelChain: [{ provider: "gemini", model: "gemini-3.5-flash", apiKey: GEMINI_KEY }] });
+  });
+
   describe("provider ids", () => {
     it("accepts a recognized provider id and null (back to the default)", async () => {
       expect((await put({ correctionProvider: "gemini" })).status).toBe(200);

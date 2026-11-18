@@ -39,6 +39,9 @@ export class GeminiRateLimitedError extends Error {}
 export interface GeminiOverrides {
   apiKey?: string | null;
   model?: string | null;
+  requestTimeoutMs?: number;
+  retry503?: boolean;
+  totalBudgetMs?: number;
 }
 
 function resolveApiKey(overrides?: GeminiOverrides) {
@@ -314,6 +317,7 @@ export async function generateModelAnswer(
   params: GenerateModelAnswerParams,
   overrides?: GeminiOverrides,
 ): Promise<string> {
+  const requestTimeoutMs = overrides?.requestTimeoutMs ?? REQUEST_TIMEOUT_MS;
   const apiKey = resolveApiKey(overrides);
   if (!apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
@@ -351,7 +355,7 @@ export async function generateModelAnswer(
         generationConfig: { maxOutputTokens: 2048 },
       }),
       cache: "no-store",
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
 
   // A 503 from Gemini means the model is transiently overloaded, not that
@@ -364,7 +368,9 @@ export async function generateModelAnswer(
   try {
     response = await sendWithOverloadRetry(requestExample, {
       label: "Gemini example generation",
-      attemptTimeoutMs: REQUEST_TIMEOUT_MS,
+      attemptTimeoutMs: requestTimeoutMs,
+      retry503: overrides?.retry503,
+      totalBudgetMs: overrides?.totalBudgetMs,
     });
   } catch (error) {
     console.error("Gemini example-generation transport failure", error);
@@ -511,6 +517,7 @@ export async function gradeEssayWithGemini(
   { systemPrompt, userPrompt }: GradeEssayWithGeminiParams,
   overrides?: GeminiOverrides,
 ): Promise<unknown> {
+  const requestTimeoutMs = overrides?.requestTimeoutMs ?? CORRECTION_REQUEST_TIMEOUT_MS;
   const apiKey = resolveApiKey(overrides);
   if (!apiKey) {
     throw new GeminiNotConfiguredError("GEMINI_API_KEY is not set.");
@@ -548,7 +555,7 @@ export async function gradeEssayWithGemini(
         },
       }),
       cache: "no-store",
-      signal: AbortSignal.timeout(CORRECTION_REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(requestTimeoutMs),
     });
 
   // A 503 from Gemini means the model is transiently overloaded, not that
@@ -561,7 +568,9 @@ export async function gradeEssayWithGemini(
   try {
     response = await sendWithOverloadRetry(requestCorrection, {
       label: "Gemini correction",
-      attemptTimeoutMs: CORRECTION_REQUEST_TIMEOUT_MS,
+      attemptTimeoutMs: requestTimeoutMs,
+      retry503: overrides?.retry503,
+      totalBudgetMs: overrides?.totalBudgetMs,
     });
   } catch (error) {
     console.error("Gemini correction transport failure", error);

@@ -18,6 +18,15 @@ const limitFieldSchema = z.number().int().min(1).max(MAX_DAILY_LIMIT).nullable()
 // rejected here rather than stored.
 const correctionProviderFieldSchema = z.enum(CORRECTION_PROVIDER_IDS).nullable().optional();
 const exampleProviderFieldSchema = z.enum(EXAMPLE_PROVIDER_IDS).nullable().optional();
+const chainStepSchema = z.object({
+  provider: z.enum(CORRECTION_PROVIDER_IDS),
+  model: textFieldSchema,
+  // A blank key means use that provider's environment default. Existing
+  // saved keys are supplied explicitly by the form only when retained.
+  apiKey: textFieldSchema,
+  savedApiKeyIndex: z.number().int().min(0).max(2).optional(),
+}).strict();
+const chainFieldSchema = z.array(chainStepSchema).min(1).max(3).nullable().optional();
 
 const requestSchema = z
   .object({
@@ -29,6 +38,8 @@ const requestSchema = z
     exampleApiKey: textFieldSchema,
     exampleModel: textFieldSchema,
     exampleDailyLimit: limitFieldSchema,
+    correctionModelChain: chainFieldSchema,
+    exampleModelChain: chainFieldSchema,
   })
   .strict();
 
@@ -70,6 +81,20 @@ export async function PUT(request: Request) {
   }
 
   const config = await getAppConfig();
+  const retainSavedKeys = (chain: z.infer<typeof chainFieldSchema>, previous: unknown, legacy: { provider: string | null; model: string | null; apiKey: string | null }) => {
+    if (!chain) return chain;
+    const prior = Array.isArray(previous) ? previous : legacy.apiKey ? [{ provider: legacy.provider ?? "gemini", model: legacy.model, apiKey: legacy.apiKey }] : [];
+    return chain.map(({ savedApiKeyIndex, ...step }) => ({
+      ...step,
+      // A mask is never sent back to the browser. This stable index lets a
+      // reordered existing step retain its secret when its key box is blank.
+      apiKey: step.apiKey === undefined && savedApiKeyIndex !== undefined && typeof prior[savedApiKeyIndex] === "object" && prior[savedApiKeyIndex] !== null &&
+        (prior[savedApiKeyIndex] as { provider?: unknown }).provider === step.provider &&
+        typeof (prior[savedApiKeyIndex] as { apiKey?: unknown }).apiKey === "string"
+        ? (prior[savedApiKeyIndex] as { apiKey: string }).apiKey
+        : step.apiKey ?? null,
+    }));
+  };
   const correction = planSectionUpdate(config, "correction", sectionPatchFromBody(parsed.data, "correction"));
   const example = planSectionUpdate(config, "example", sectionPatchFromBody(parsed.data, "example"));
   const error = correction.error ?? example.error;
@@ -80,6 +105,8 @@ export async function PUT(request: Request) {
     ...example.update,
     ...(parsed.data.correctionDailyLimit !== undefined ? { correctionDailyLimit: parsed.data.correctionDailyLimit } : {}),
     ...(parsed.data.exampleDailyLimit !== undefined ? { exampleDailyLimit: parsed.data.exampleDailyLimit } : {}),
+    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: retainSavedKeys(parsed.data.correctionModelChain, config.correctionModelChain, { provider: config.correctionProvider, model: config.correctionModel, apiKey: config.correctionApiKey }) } : {}),
+    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: retainSavedKeys(parsed.data.exampleModelChain, config.exampleModelChain, { provider: config.exampleProvider, model: config.exampleModel, apiKey: config.exampleApiKey }) } : {}),
   });
   return adminJsonResponse(await getAppConfigDisplay());
 }

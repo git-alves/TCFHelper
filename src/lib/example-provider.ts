@@ -27,6 +27,9 @@ export function isExampleProviderId(value: string): value is ExampleProviderId {
 export interface ExampleProviderOverrides {
   apiKey?: string | null;
   model?: string | null;
+  requestTimeoutMs?: number;
+  retry503?: boolean;
+  totalBudgetMs?: number;
 }
 
 /** A provider credential (API key, or a required model with no default) is missing. */

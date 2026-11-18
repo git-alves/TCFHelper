@@ -81,6 +81,7 @@ const bodyOf = (call: number) => JSON.parse(((fetchMock.mock.calls[call] as unkn
 beforeEach(() => {
   fetchMock = vi.fn();
   global.fetch = fetchMock as unknown as typeof fetch;
+  window.alert = vi.fn();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
@@ -246,6 +247,33 @@ describe("Test button", () => {
     // A password field holds it; no text node shows it.
     expect(input(0, "API key").type).toBe("password");
     expect(container.textContent).not.toContain(TYPED_KEY);
+  });
+});
+
+describe("reserve model chains", () => {
+  it("keeps a saved key when its model changes and tests a blank model as null", async () => {
+    fetchMock.mockResolvedValue(json({ result: { ok: true, kind: "ok", message: "Works.", latencyMs: 5 }, tested: {} }));
+    render({ ...GEMINI_DISPLAY, correction: { ...GEMINI_DISPLAY.correction, apiKeySet: true, apiKeyMasked: "••••1234" } });
+
+    await click(Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Use an ordered model chain for corrections")!);
+    await click(Array.from(container.querySelectorAll("button")).find((button) => button.textContent === "Test this step")!);
+
+    expect(bodyOf(0)).toEqual({ section: "correction", provider: "gemini", model: null, savedApiKeyIndex: 0 });
+
+    await change(container.querySelector<HTMLInputElement>('[aria-label="Essay correction step 1 model"]')!, "gemini-3.5-flash-lite");
+    fetchMock.mockResolvedValueOnce(json(GEMINI_DISPLAY));
+    await act(async () => {
+      container.querySelector("form")!.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+
+    expect(bodyOf(1).correctionModelChain).toEqual([{ provider: "gemini", model: "gemini-3.5-flash-lite", savedApiKeyIndex: 0 }]);
+  });
+
+  it("renders model-chain alerts and reserve usage in English", () => {
+    render({ ...GEMINI_DISPLAY, modelChainStatus: { alerts: [{ id: "alert_1", provider: "openrouter", model: "free-model", kind: "credits" }], reserveToday: { correction: 2, example: 3 } } });
+
+    expect(container.textContent).toContain("add OpenRouter credits to keep using this model.");
+    expect(container.textContent).toContain("Today, 2 corrections and 3 examples were handled by a reserve step.");
   });
 });
 

@@ -673,12 +673,16 @@ model AppConfig {
   correctionProvider   String?
   correctionApiKey     String?
   correctionModel      String?
+  // Optional ordered JSON array of up to three {provider, model, apiKey}
+  // steps. Null deliberately preserves the pre-chain single-provider path.
+  correctionModelChain Json?
   // Which ExampleProvider (src/lib/example-provider.ts) writes a generated
   // model answer -- same "gemini"/"openrouter" domain and defaulting
   // behavior as correctionProvider above, but independently selectable.
   exampleProvider      String?
   exampleApiKey        String?
   exampleModel         String?
+  exampleModelChain    Json?
   // Admin-editable reference point for the settings-page consumption bar
   // only (src/lib/app-config.ts) -- an approximate daily Gemini request
   // count against a limit the owner sets, not an enforced quota. Null uses
@@ -689,6 +693,33 @@ model AppConfig {
   // explicitly enables inactivity mail in /admin/inactivity-emails.
   inactivityEmailsEnabled Boolean @default(false)
   updatedAt            DateTime @updatedAt
+}
+
+/// Persistent, dismissible owner notices for a model-chain key/credit issue.
+/// A missing row means healthy; success on the same step clears its row.
+model ModelChainAlert {
+  id        String   @id @default(cuid())
+  section   String
+  stepKey   String
+  provider  String
+  model     String
+  kind      String
+  dismissedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([section, stepKey])
+}
+
+/// One row for a learner request that succeeded on a reserve chain step.
+/// This is operational accounting only; quota reservation remains owned by
+/// CorrectionUsage/ExampleGenerationLease and happens once per request.
+model ModelChainReserveUse {
+  id        String   @id @default(cuid())
+  section   String
+  createdAt DateTime @default(now())
+
+  @@index([section, createdAt])
 }
 
 /// Owner overrides for the four localized variants of each inactivity email.

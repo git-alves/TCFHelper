@@ -1,5 +1,20 @@
 # Correction model evaluation and CEFR calibration
 
+## Ordered model fallback (admin configuration)
+
+In **Admin → API Keys**, enable an ordered model chain for corrections and/or
+example text. Put up to three steps in the order they should be tried. Each
+step has its own provider, model, and optional stored key (a blank key uses
+that provider's environment default). Test each step before saving.
+
+For the beta, use free models in the chain. Later, put a paid OpenRouter model
+first (for example Claude Haiku) and free models after it. A 402 insufficient-
+credits response, invalid key, overload, timeout, transport failure, or
+unusable structured answer advances immediately to the next step. The admin
+banner identifies insufficient-credit and invalid-key steps; it clears after a
+success on that step or can be dismissed. Learner quota is reserved once per
+request, not once per provider attempt.
+
 **Problem** — TCF learners receive a CEFR estimate from the correction flow, but reported boundary errors (for example, a C2 response reported as C1 or a C1 response reported as B2) undermine the feedback's central promise. A one-band error is not harmless at these boundaries: it can direct a learner toward the wrong practice level and makes progress tracking untrustworthy. The present validation gate allows a CEFR estimate within one band, so it cannot detect this specific failure reliably.
 
 **Job to be done** — When a learner submits a TCF writing task, give them a conservative but evidence-based level and correction that a qualified reviewer would recognize as appropriate for the original writing, so they know what to practise next.
