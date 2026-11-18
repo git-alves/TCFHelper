@@ -178,6 +178,12 @@ describe("PUT /api/admin/api-keys", () => {
     expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModel: "qwen/qwen3-30b-a3b" });
   });
 
+  it("never reattaches a saved chain key after its provider or model changes", async () => {
+    getAppConfigMock.mockResolvedValue({ ...EMPTY_STORED, correctionModelChain: [{ provider: "gemini", model: "gemini-3.5-flash-lite", apiKey: GEMINI_KEY }] });
+    await put({ correctionModelChain: [{ provider: "openrouter", model: "qwen/qwen3-30b-a3b", savedApiKeyIndex: 0 }] });
+    expect(updateAppConfigMock).toHaveBeenCalledWith({ correctionModelChain: [{ provider: "openrouter", model: "qwen/qwen3-30b-a3b", apiKey: null }] });
+  });
+
   describe("provider ids", () => {
     it("accepts a recognized provider id and null (back to the default)", async () => {
       expect((await put({ correctionProvider: "gemini" })).status).toBe(200);

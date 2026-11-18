@@ -5,6 +5,7 @@ import { AdminRecentSignupsFeed } from "@/components/admin-recent-signups-feed";
 import { AdminStatTile } from "@/components/admin-stat-tile";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { getAdminOverviewStats } from "@/lib/admin-overview";
+import { getModelChainAdminStatus } from "@/lib/model-chain";
 
 function UsageCard({
   title,
@@ -41,7 +42,7 @@ export default async function AdminOverviewPage() {
     throw error;
   }
 
-  const stats = await getAdminOverviewStats();
+  const [stats, modelChainStatus] = await Promise.all([getAdminOverviewStats(), getModelChainAdminStatus()]);
 
   return (
     <main className="flex w-full flex-1 flex-col gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
@@ -54,6 +55,11 @@ export default async function AdminOverviewPage() {
           </p>
         </div>
       </div>
+      {modelChainStatus.alerts.map((alert) => (
+        <div key={alert.id} role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
+          <strong>{alert.provider} / {alert.model}:</strong> {alert.kind === "credits" ? "top up credits for this provider step." : "this step has an invalid API key; update it in API Keys."}
+        </div>
+      ))}
 
       <section aria-labelledby="registered-users-heading" className="flex flex-col gap-3">
         <h2 id="registered-users-heading" className="text-sm font-medium text-zinc-500 dark:text-zinc-400">

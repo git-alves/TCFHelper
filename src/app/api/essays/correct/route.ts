@@ -324,7 +324,8 @@ export async function POST(request: Request) {
   // reserve an unrefundable slot if this newly claimed request cannot reach
   // the configured provider. Release only this caller's lease so a later
   // configured retry can claim it normally.
-  if (!configuredChain && !provider.hasConfiguredCredentials(providerOverrides)) {
+  const chainHasCredentials = configuredChain?.some((step) => getCorrectionProvider(step.provider).hasConfiguredCredentials({ apiKey: step.apiKey, model: step.model }));
+  if ((!configuredChain && !provider.hasConfiguredCredentials(providerOverrides)) || (configuredChain && !chainHasCredentials)) {
     await recordAdminEvent({
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: user.id,
@@ -438,7 +439,6 @@ export async function POST(request: Request) {
         const outcome = await runModelChain({
           section: "correction",
           steps: configuredChain,
-          legacy: false,
           budgetMs: CORRECTION_CHAIN_BUDGET_MS,
           reserveStepTimeoutMs: CORRECTION_RESERVE_STEP_TIMEOUT_MS,
           normalAttemptTimeoutMs: 45_000,
@@ -486,7 +486,7 @@ export async function POST(request: Request) {
       const reasonCode = (error as { modelChainReason?: string })?.modelChainReason === "schema_invalid"
         ? "schema_invalid"
         : classifyCorrectionProviderFailure(error);
-      await recordAdminEvent({
+      if (!configuredChain) await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
         provider: providerId,

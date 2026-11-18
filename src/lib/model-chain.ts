@@ -46,7 +46,8 @@ export function modelStepKey(step: ModelChainStep) {
 }
 
 export async function openModelChainAlert(section: ModelChainSection, step: ModelChainStep, status: number) {
-  if (status !== 401 && status !== 403 && status !== 402) return;
+  // Gemini uses HTTP 400 for API_KEY_INVALID, unlike OpenRouter's 401/403.
+  if (status !== 401 && status !== 403 && status !== 402 && !(step.provider === "gemini" && status === 400)) return;
   const kind = status === 402 ? "credits" : "key";
   await prisma.modelChainAlert.upsert({
     where: { section_stepKey: { section, stepKey: modelStepKey(step) } },
@@ -85,7 +86,6 @@ export type ChainFailure = { error: unknown; status?: number; reasonCode: string
 export type ModelChainRunOptions<T> = {
   section: ModelChainSection;
   steps: ModelChainStep[];
-  legacy: boolean;
   budgetMs: number;
   reserveStepTimeoutMs: number;
   normalAttemptTimeoutMs: number;
@@ -119,8 +119,8 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
       if (!failure) throw error;
       await options.onFailure(step, failure);
       if (failure.status) void openModelChainAlert(options.section, step, failure.status).catch(() => undefined);
-      // A failure that is specifically a learner-input 400 is deliberately
-      // not fallbackable by route classifiers, so it never reaches here.
+      // Route request validation happens before this runner. A provider 400
+      // (notably Gemini's API_KEY_INVALID) is a chain failure and advances.
     }
   }
   throw lastError;

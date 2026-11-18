@@ -17,6 +17,7 @@ const requestSchema = z
     provider: z.enum(CORRECTION_PROVIDER_IDS).nullable().optional(),
     apiKey: textFieldSchema,
     model: textFieldSchema,
+    savedApiKeyIndex: z.number().int().min(0).max(2).optional(),
   })
   .strict();
 
@@ -59,8 +60,12 @@ export async function POST(request: Request) {
     return adminJsonResponse({ error: field ? `Invalid value for ${field}.` : "Invalid request." }, 400);
   }
 
-  const { section, provider, apiKey, model } = parsed.data;
-  const resolved = resolveTestTarget(await getAppConfig(), section, { provider, apiKey, model });
+  const { section, provider, apiKey, model, savedApiKeyIndex } = parsed.data;
+  const config = await getAppConfig();
+  const chain = section === "correction" ? config.correctionModelChain : config.exampleModelChain;
+  const prior = savedApiKeyIndex !== undefined && Array.isArray(chain) ? chain[savedApiKeyIndex] : null;
+  const savedKey = prior && typeof prior === "object" && (prior as { provider?: unknown }).provider === provider && (prior as { model?: unknown }).model === model && typeof (prior as { apiKey?: unknown }).apiKey === "string" ? (prior as { apiKey: string }).apiKey : undefined;
+  const resolved = resolveTestTarget(config, section, { provider, apiKey: apiKey ?? savedKey, model });
   if ("error" in resolved) return adminJsonResponse({ error: resolved.error }, 400);
 
   const { target } = resolved;

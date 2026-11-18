@@ -75,6 +75,8 @@ const requestSchema = z
 // record an upstream provider message: it is not trusted and could echo
 // request content.
 function classifyExampleGenerationFailure(error: unknown): AdminEventReasonCode {
+  if (error instanceof ModelAnswerNotConfiguredError) return "not_configured";
+  if (error instanceof ModelAnswerRateLimitedError) return "rate_limited";
   if (error instanceof ModelAnswerInvalidOutputError) return "invalid_response";
   if (error instanceof ExampleProviderRequestError) return "upstream_http_error";
   if (error instanceof ExampleProviderTransportError) return "transport_error";
@@ -176,7 +178,8 @@ export async function POST(request: Request) {
 
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.
-  if (!configuredChain && !exampleProvider.hasConfiguredCredentials(exampleOverrides)) {
+  const chainHasCredentials = configuredChain?.some((step) => getExampleProvider(step.provider).hasConfiguredCredentials({ apiKey: step.apiKey, model: step.model }));
+  if ((!configuredChain && !exampleProvider.hasConfiguredCredentials(exampleOverrides)) || (configuredChain && !chainHasCredentials)) {
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
@@ -265,7 +268,7 @@ export async function POST(request: Request) {
     const generated = configuredChain
       ? (
           await runModelChain({
-            section: "example", steps: configuredChain, legacy: false,
+            section: "example", steps: configuredChain,
             budgetMs: EXAMPLE_CHAIN_BUDGET_MS, reserveStepTimeoutMs: EXAMPLE_RESERVE_STEP_TIMEOUT_MS, normalAttemptTimeoutMs: 20_000,
             isFallbackable(error) {
               if (error instanceof ModelAnswerInvalidOutputError) return { error, reasonCode: "invalid_response" };
@@ -322,7 +325,7 @@ export async function POST(request: Request) {
     await refundExampleGenerationLease(user.id, taskType, typedLevel, topicHash, claim.claimToken).catch(() => {
       console.error("Example generation lease cleanup failed");
     });
-    if (error instanceof ModelAnswerNotConfiguredError) {
+    if (!configuredChain && error instanceof ModelAnswerNotConfiguredError) {
       await recordAdminEvent({
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
@@ -337,7 +340,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (error instanceof ModelAnswerRateLimitedError) {
+    if (!configuredChain && error instanceof ModelAnswerRateLimitedError) {
       await recordAdminEvent({
         eventType: "EXAMPLE_PROVIDER_FAILED",
         userId: user.id,
@@ -359,7 +362,7 @@ export async function POST(request: Request) {
     // is what actually distinguishes an auth/config problem from a
     // transient upstream outage in the Vercel function log.
     const reasonCode = classifyExampleGenerationFailure(error);
-    await recordAdminEvent({
+    if (!configuredChain) await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
       provider: exampleProviderId,

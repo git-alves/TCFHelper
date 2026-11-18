@@ -20,7 +20,7 @@ describe("model fallback chain", () => {
     await expect(runModelChain({
       section: "correction",
       steps: [{ provider: "gemini", model: "one", apiKey: null }, { provider: "openrouter", model: "two", apiKey: null }],
-      legacy: false, budgetMs: 150_000, reserveStepTimeoutMs: 35_000, normalAttemptTimeoutMs: 45_000,
+      budgetMs: 150_000, reserveStepTimeoutMs: 35_000, normalAttemptTimeoutMs: 45_000,
       invoke, onFailure: failed,
       isFallbackable: (error) => ({ error, status: (error as { status: number }).status, reasonCode: "upstream_http_error" }),
     })).resolves.toMatchObject({ value: "usable", reserve: true });
@@ -46,7 +46,7 @@ describe("model fallback chain", () => {
     await expect(runModelChain({
       section: "example",
       steps: [{ provider: "gemini", model: "first", apiKey: null }, { provider: "gemini", model: "second", apiKey: null }],
-      legacy: false, budgetMs: 75_000, reserveStepTimeoutMs: 18_000, normalAttemptTimeoutMs: 20_000,
+      budgetMs: 75_000, reserveStepTimeoutMs: 18_000, normalAttemptTimeoutMs: 20_000,
       invoke, onFailure,
       isFallbackable: (error) => ({ error, status: (error as { status?: number }).status, reasonCode }),
     })).resolves.toMatchObject({ value: "reserve answer", reserve: true });

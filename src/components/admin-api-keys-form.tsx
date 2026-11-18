@@ -34,7 +34,7 @@ interface SectionFormState {
 // the UI shares one dropdown implementation over that domain rather than
 // duplicating it per feature.
 type ProviderId = CorrectionProviderId & ExampleProviderId;
-type ChainStepForm = { provider: ProviderId; model: string; apiKey: string; savedApiKeyIndex?: number };
+type ChainStepForm = { provider: ProviderId; model: string; apiKey: string; savedApiKeyIndex?: number; clearSavedKey?: boolean };
 
 const PROVIDER_LABELS: Record<ProviderId, string> = {
   gemini: "Gemini Direct",
@@ -53,7 +53,8 @@ function ChainEditor({ title, value, onChange, onTest }: { title: string; value:
     <p className="mb-3 text-xs text-zinc-600 dark:text-zinc-400">Steps run in this order. A failed or slow step moves straight to the next one; the last step may retry if time remains.</p>
     <div className="flex flex-col gap-3">{value.map((step, index) => <div key={`${index}-${step.provider}`} className="rounded-lg border border-black/[.1] p-3 dark:border-white/[.15]">
       <div className="mb-2 flex items-center justify-between gap-2"><strong className="text-sm">Step {index + 1}</strong><span className="flex gap-1"><button type="button" onClick={() => move(index, -1)} disabled={index === 0}>↑</button><button type="button" onClick={() => move(index, 1)} disabled={index === value.length - 1}>↓</button><button type="button" onClick={() => onChange(value.filter((_, i) => i !== index))} disabled={value.length === 1}>Remove</button></span></div>
-      <div className="grid gap-2 sm:grid-cols-3"><select aria-label={`${title} step ${index + 1} provider`} value={step.provider} onChange={(event) => change(index, { provider: event.target.value as ProviderId })} className={INPUT_CLASSES}><option value="gemini">Gemini Direct</option><option value="openrouter">OpenRouter</option></select><input aria-label={`${title} step ${index + 1} model`} value={step.model} onChange={(event) => change(index, { model: event.target.value })} placeholder="Model" className={INPUT_CLASSES}/><input aria-label={`${title} step ${index + 1} API key`} type="password" value={step.apiKey} onChange={(event) => change(index, { apiKey: event.target.value })} placeholder="API key (or env default)" className={INPUT_CLASSES}/></div>
+      <div className="grid gap-2 sm:grid-cols-3"><select aria-label={`${title} step ${index + 1} provider`} value={step.provider} onChange={(event) => change(index, { provider: event.target.value as ProviderId, savedApiKeyIndex: undefined, clearSavedKey: false })} className={INPUT_CLASSES}><option value="gemini">Gemini Direct</option><option value="openrouter">OpenRouter</option></select><input aria-label={`${title} step ${index + 1} model`} value={step.model} onChange={(event) => change(index, { model: event.target.value, savedApiKeyIndex: undefined, clearSavedKey: false })} placeholder="Model" className={INPUT_CLASSES}/><input aria-label={`${title} step ${index + 1} API key`} type="password" value={step.apiKey} onChange={(event) => change(index, { apiKey: event.target.value, clearSavedKey: false })} placeholder="API key (or env default)" className={INPUT_CLASSES}/></div>
+      {step.savedApiKeyIndex !== undefined && <button type="button" onClick={() => change(index, { savedApiKeyIndex: undefined, clearSavedKey: true, apiKey: "" })} className="mt-2 text-xs underline">Remove saved key (use environment default)</button>}
       <button type="button" onClick={() => onTest(step)} className="mt-2 text-xs font-medium text-violet-700 dark:text-violet-300">Test this step</button>
     </div>)}</div>
     {value.length < 3 && <button type="button" onClick={() => onChange([...value, { provider: "gemini", model: "", apiKey: "" }])} className="mt-3 text-sm font-medium text-violet-700 dark:text-violet-300">Add reserve step</button>}
@@ -406,9 +407,15 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
   }
 
   async function runChainStepTest(section: TestSection, step: ChainStepForm) {
-    const response = await fetch("/api/admin/api-keys/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, provider: step.provider, model: step.model, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : {}) }) });
+    const response = await fetch("/api/admin/api-keys/test", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ section, provider: step.provider, model: step.model, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : {}), ...(step.savedApiKeyIndex !== undefined ? { savedApiKeyIndex: step.savedApiKeyIndex } : {}) }) });
     const payload = await response.json().catch(() => null) as { result?: { ok: boolean; message: string } } | null;
     window.alert(payload?.result?.message ?? "Could not run the test.");
+  }
+
+  async function dismissAlert(id: string) {
+    const response = await fetch(`/api/admin/model-chain-alerts/${id}/dismiss`, { method: "POST" });
+    if (!response.ok) { setError("Could not dismiss the alert. Please try again."); return; }
+    setDisplay((current) => current.modelChainStatus ? { ...current, modelChainStatus: { ...current.modelChainStatus, alerts: current.modelChainStatus.alerts.filter((alert) => alert.id !== id) } } : current);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -427,8 +434,8 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
         exampleModel: example.model.trim(),
         exampleDailyLimit,
       };
-      if (correctionChain) body.correctionModelChain = correctionChain.map((step) => ({ provider: step.provider, model: step.model.trim() || null, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : {}), ...(step.savedApiKeyIndex !== undefined ? { savedApiKeyIndex: step.savedApiKeyIndex } : {}) }));
-      if (exampleChain) body.exampleModelChain = exampleChain.map((step) => ({ provider: step.provider, model: step.model.trim() || null, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : {}), ...(step.savedApiKeyIndex !== undefined ? { savedApiKeyIndex: step.savedApiKeyIndex } : {}) }));
+      body.correctionModelChain = correctionChain ? correctionChain.map((step) => ({ provider: step.provider, model: step.model.trim() || null, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : step.clearSavedKey ? { apiKey: null } : {}), ...(step.savedApiKeyIndex !== undefined ? { savedApiKeyIndex: step.savedApiKeyIndex } : {}) })) : null;
+      body.exampleModelChain = exampleChain ? exampleChain.map((step) => ({ provider: step.provider, model: step.model.trim() || null, ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : step.clearSavedKey ? { apiKey: null } : {}), ...(step.savedApiKeyIndex !== undefined ? { savedApiKeyIndex: step.savedApiKeyIndex } : {}) })) : null;
       if (correction.apiKeyCleared) body.correctionApiKey = "";
       else if (correction.apiKeyInput.trim()) body.correctionApiKey = correction.apiKeyInput.trim();
       if (example.apiKeyCleared) body.exampleApiKey = "";
@@ -469,7 +476,7 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
       {display.modelChainStatus && <section aria-label="Model chain alerts" className="flex flex-col gap-2">
         {display.modelChainStatus.alerts.map((alert) => <div key={alert.id} role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm">
           <p><strong>{alert.provider} / {alert.model}:</strong> {alert.kind === "credits" ? "repor créditos no OpenRouter para continuar usando este modelo." : "chave inválida; confira a chave desta etapa."}</p>
-          <button type="button" className="mt-1 text-xs underline" onClick={() => void fetch(`/api/admin/model-chain-alerts/${alert.id}/dismiss`, { method: "POST" }).then(() => router.refresh())}>Dismiss</button>
+          <button type="button" className="mt-1 text-xs underline" onClick={() => void dismissAlert(alert.id)}>Dismiss</button>
         </div>)}
         <p className="text-sm text-zinc-600 dark:text-zinc-400">Hoje, {display.modelChainStatus.reserveToday.correction} correções e {display.modelChainStatus.reserveToday.example} exemplos foram atendidos por uma etapa reserva.</p>
       </section>}
@@ -485,8 +492,8 @@ export function AdminApiKeysForm({ initialDisplay }: AdminApiKeysFormProps) {
         testState={correctionTest}
         onTest={() => void runTest("correction")}
       />
-      {correctionChain ? <ChainEditor title="Essay correction" value={correctionChain} onChange={setCorrectionChain} onTest={(step) => void runChainStepTest("correction", step)} /> : <button type="button" onClick={() => setCorrectionChain([{ provider: correctionProvider, model: correction.model, apiKey: correction.apiKeyInput }])} className="self-start text-sm font-medium text-violet-700 dark:text-violet-300">Use an ordered model chain for corrections</button>}
-      {exampleChain ? <ChainEditor title="Example generation" value={exampleChain} onChange={setExampleChain} onTest={(step) => void runChainStepTest("example", step)} /> : <button type="button" onClick={() => setExampleChain([{ provider: exampleProvider, model: example.model, apiKey: example.apiKeyInput }])} className="self-start text-sm font-medium text-violet-700 dark:text-violet-300">Use an ordered model chain for examples</button>}
+      {correctionChain ? <><ChainEditor title="Essay correction" value={correctionChain} onChange={setCorrectionChain} onTest={(step) => void runChainStepTest("correction", step)} /><button type="button" onClick={() => setCorrectionChain(null)} className="self-start text-sm underline">Turn off correction chain</button></> : <button type="button" onClick={() => setCorrectionChain([{ provider: correctionProvider, model: correction.model, apiKey: correction.apiKeyInput, ...(display.correction.apiKeySet ? { savedApiKeyIndex: 0 } : {}) }])} className="self-start text-sm font-medium text-violet-700 dark:text-violet-300">Use an ordered model chain for corrections</button>}
+      {exampleChain ? <><ChainEditor title="Example generation" value={exampleChain} onChange={setExampleChain} onTest={(step) => void runChainStepTest("example", step)} /><button type="button" onClick={() => setExampleChain(null)} className="self-start text-sm underline">Turn off example chain</button></> : <button type="button" onClick={() => setExampleChain([{ provider: exampleProvider, model: example.model, apiKey: example.apiKeyInput, ...(display.example.apiKeySet ? { savedApiKeyIndex: 0 } : {}) }])} className="self-start text-sm font-medium text-violet-700 dark:text-violet-300">Use an ordered model chain for examples</button>}
       <AiSettingsSection
         title="Example generation"
         description="Used when generating a model answer for a learner to study."
