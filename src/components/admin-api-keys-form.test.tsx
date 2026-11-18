@@ -81,6 +81,7 @@ const bodyOf = (call: number) => JSON.parse(((fetchMock.mock.calls[call] as unkn
 beforeEach(() => {
   fetchMock = vi.fn();
   global.fetch = fetchMock as unknown as typeof fetch;
+  window.alert = vi.fn();
   container = document.createElement("div");
   document.body.appendChild(container);
   root = createRoot(container);
