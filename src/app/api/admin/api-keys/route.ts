@@ -90,7 +90,6 @@ export async function PUT(request: Request) {
       // reordered existing step retain its secret when its key box is blank.
       apiKey: step.apiKey === undefined && savedApiKeyIndex !== undefined && typeof prior[savedApiKeyIndex] === "object" && prior[savedApiKeyIndex] !== null &&
         (prior[savedApiKeyIndex] as { provider?: unknown }).provider === step.provider &&
-        (prior[savedApiKeyIndex] as { model?: unknown }).model === step.model &&
         typeof (prior[savedApiKeyIndex] as { apiKey?: unknown }).apiKey === "string"
         ? (prior[savedApiKeyIndex] as { apiKey: string }).apiKey
         : step.apiKey ?? null,

@@ -180,11 +180,12 @@ export async function POST(request: Request) {
   // during a configuration outage, but before a fresh daily slot is spent.
   const chainHasCredentials = configuredChain?.some((step) => getExampleProvider(step.provider).hasConfiguredCredentials({ apiKey: step.apiKey, model: step.model }));
   if ((!configuredChain && !exampleProvider.hasConfiguredCredentials(exampleOverrides)) || (configuredChain && !chainHasCredentials)) {
+    const failedStep = configuredChain?.[0];
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
-      provider: exampleProviderId,
-      model: resolvedModel,
+      provider: failedStep?.provider ?? exampleProviderId,
+      model: failedStep?.model ?? resolvedModel,
       reasonCode: "not_configured",
       httpStatus: 503,
     });
@@ -325,14 +326,10 @@ export async function POST(request: Request) {
     await refundExampleGenerationLease(user.id, taskType, typedLevel, topicHash, claim.claimToken).catch(() => {
       console.error("Example generation lease cleanup failed");
     });
-    if (!configuredChain && error instanceof ModelAnswerNotConfiguredError) {
-      await recordAdminEvent({
-        eventType: "EXAMPLE_PROVIDER_FAILED",
-        userId: user.id,
-        provider: exampleProviderId,
-        model: resolvedModel,
-        reasonCode: "not_configured",
-        httpStatus: 503,
+    if (error instanceof ModelAnswerNotConfiguredError) {
+      if (!configuredChain) await recordAdminEvent({
+        eventType: "EXAMPLE_PROVIDER_FAILED", userId: user.id, provider: exampleProviderId, model: resolvedModel,
+        reasonCode: "not_configured", httpStatus: 503,
       });
       return NextResponse.json(
         { error: "The example generator is not configured.", code: "EXAMPLE_GENERATOR_UNAVAILABLE" },
@@ -340,14 +337,10 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!configuredChain && error instanceof ModelAnswerRateLimitedError) {
-      await recordAdminEvent({
-        eventType: "EXAMPLE_PROVIDER_FAILED",
-        userId: user.id,
-        provider: exampleProviderId,
-        model: resolvedModel,
-        reasonCode: "rate_limited",
-        httpStatus: 429,
+    if (error instanceof ModelAnswerRateLimitedError) {
+      if (!configuredChain) await recordAdminEvent({
+        eventType: "EXAMPLE_PROVIDER_FAILED", userId: user.id, provider: exampleProviderId, model: resolvedModel,
+        reasonCode: "rate_limited", httpStatus: 429,
       });
       return NextResponse.json(
         { error: "The example generator is busy. Please try again shortly.", code: "EXAMPLE_RATE_LIMITED" },

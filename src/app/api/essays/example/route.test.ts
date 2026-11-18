@@ -205,6 +205,27 @@ describe("POST /api/essays/example", () => {
     expect(response.status).toBe(503);
     expect(claimExampleGenerationMock).toHaveBeenCalledTimes(1);
   });
+
+  it("returns the rate-limited response after every chain step is rate limited without duplicate outer events", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    generatePreferredModelAnswerMock.mockRejectedValue(new ModelAnswerRateLimitedErrorMock());
+
+    const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });
+
+    expect(response.status).toBe(429);
+    await expect(response.json()).resolves.toMatchObject({ code: "EXAMPLE_RATE_LIMITED" });
+    expect(recordAdminEventMock).toHaveBeenCalledTimes(2);
+    expect(recordAdminEventMock).toHaveBeenNthCalledWith(1, expect.objectContaining({ provider: "gemini", reasonCode: "rate_limited" }));
+    expect(recordAdminEventMock).toHaveBeenNthCalledWith(2, expect.objectContaining({ provider: "openrouter", reasonCode: "rate_limited" }));
+  });
+
+  it("labels a chain credentials pre-check event with the first chain step", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: "openrouter", exampleApiKey: null, exampleModel: "legacy-model", exampleModelChain: [{ provider: "gemini", model: "first", apiKey: null }] });
+    hasConfiguredCredentialsMock.mockReturnValue(false);
+
+    expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(503);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ provider: "gemini", model: "first", reasonCode: "not_configured" }));
+  });
   it("requires an authenticated learner", async () => {
     getCurrentActivatedAppUserMock.mockResolvedValue(null);
 

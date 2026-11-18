@@ -51,7 +51,7 @@ export default async function AdminApiKeysPage() {
           </li>
           <li>
             Choosing a different provider for a section removes that section&apos;s saved key and model when you save, so one
-            provider&apos;s key is never sent to another.
+            provider&apos;s key is never sent to another. Changing only the model keeps that provider&apos;s saved key.
           </li>
         </ul>
       </section>
