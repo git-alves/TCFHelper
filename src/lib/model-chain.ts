@@ -1,5 +1,3 @@
-import "server-only";
-
 import { prisma } from "@/lib/prisma";
 import { isCorrectionProviderId, type CorrectionProviderId } from "@/lib/correction-provider";
 
@@ -64,10 +62,18 @@ export async function clearModelChainAlert(section: ModelChainSection, step: Mod
 export async function getModelChainAdminStatus() {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const [alerts, reserve] = await Promise.all([
-    prisma.modelChainAlert.findMany({ where: { dismissedAt: null }, orderBy: { updatedAt: "desc" } }),
-    prisma.modelChainReserveUse.groupBy({ by: ["section"], where: { createdAt: { gte: today } }, _count: { _all: true } }),
-  ]);
+  // During a rolling deploy, the new additive tables may not have arrived at
+  // every replica yet. Settings remain usable and show no banner until they do.
+  let alerts: { id: string; provider: string; model: string; kind: string }[] = [];
+  let reserve: { section: string; _count: { _all: number } }[] = [];
+  try {
+    [alerts, reserve] = await Promise.all([
+      prisma.modelChainAlert.findMany({ where: { dismissedAt: null }, orderBy: { updatedAt: "desc" } }),
+      prisma.modelChainReserveUse.groupBy({ by: ["section"], where: { createdAt: { gte: today } }, _count: { _all: true } }),
+    ]);
+  } catch {
+    // Best-effort admin-only summary; chain execution does not depend on it.
+  }
   return { alerts, reserveToday: { correction: reserve.find((r) => r.section === "correction")?._count._all ?? 0, example: reserve.find((r) => r.section === "example")?._count._all ?? 0 } };
 }
 
@@ -104,8 +110,8 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
     const timeoutMs = isLast ? Math.min(options.normalAttemptTimeoutMs, remaining) : Math.min(options.reserveStepTimeoutMs, remaining);
     try {
       const value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
-      void clearModelChainAlert(options.section, step).catch(() => undefined);
-      if (index > 0) void prisma.modelChainReserveUse.create({ data: { section: options.section } }).catch(() => undefined);
+      void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
+      if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
       return { value, step, reserve: index > 0 };
     } catch (error) {
       lastError = error;

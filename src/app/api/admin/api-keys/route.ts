@@ -24,6 +24,7 @@ const chainStepSchema = z.object({
   // A blank key means use that provider's environment default. Existing
   // saved keys are supplied explicitly by the form only when retained.
   apiKey: textFieldSchema,
+  savedApiKeyIndex: z.number().int().min(0).max(2).optional(),
 }).strict();
 const chainFieldSchema = z.array(chainStepSchema).min(1).max(3).nullable().optional();
 
@@ -80,6 +81,18 @@ export async function PUT(request: Request) {
   }
 
   const config = await getAppConfig();
+  const retainSavedKeys = (chain: z.infer<typeof chainFieldSchema>, previous: unknown) => {
+    if (!chain) return chain;
+    const prior = Array.isArray(previous) ? previous : [];
+    return chain.map(({ savedApiKeyIndex, ...step }) => ({
+      ...step,
+      // A mask is never sent back to the browser. This stable index lets a
+      // reordered existing step retain its secret when its key box is blank.
+      apiKey: step.apiKey === undefined && savedApiKeyIndex !== undefined && typeof prior[savedApiKeyIndex] === "object" && prior[savedApiKeyIndex] !== null && typeof (prior[savedApiKeyIndex] as { apiKey?: unknown }).apiKey === "string"
+        ? (prior[savedApiKeyIndex] as { apiKey: string }).apiKey
+        : step.apiKey ?? null,
+    }));
+  };
   const correction = planSectionUpdate(config, "correction", sectionPatchFromBody(parsed.data, "correction"));
   const example = planSectionUpdate(config, "example", sectionPatchFromBody(parsed.data, "example"));
   const error = correction.error ?? example.error;
@@ -90,8 +103,8 @@ export async function PUT(request: Request) {
     ...example.update,
     ...(parsed.data.correctionDailyLimit !== undefined ? { correctionDailyLimit: parsed.data.correctionDailyLimit } : {}),
     ...(parsed.data.exampleDailyLimit !== undefined ? { exampleDailyLimit: parsed.data.exampleDailyLimit } : {}),
-    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: parsed.data.correctionModelChain } : {}),
-    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: parsed.data.exampleModelChain } : {}),
+    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: retainSavedKeys(parsed.data.correctionModelChain, config.correctionModelChain) } : {}),
+    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: retainSavedKeys(parsed.data.exampleModelChain, config.exampleModelChain) } : {}),
   });
   return adminJsonResponse(await getAppConfigDisplay());
 }

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { DEFAULT_GEMINI_CORRECTION_MODEL, DEFAULT_GEMINI_MODEL } from "@/lib/gemini";
 import { getGeminiRequestsToday } from "@/lib/admin-overview";
@@ -26,12 +27,12 @@ export interface AppConfigValue {
   correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
-  correctionModelChain: unknown | null;
+  correctionModelChain: Prisma.JsonValue | null;
   correctionDailyLimit: number | null;
   exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
-  exampleModelChain: unknown | null;
+  exampleModelChain: Prisma.JsonValue | null;
   exampleDailyLimit: number | null;
 }
 
@@ -52,12 +53,12 @@ function toAppConfigValue(row: {
   correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
-  correctionModelChain: unknown | null;
+  correctionModelChain: Prisma.JsonValue | null;
   correctionDailyLimit: number | null;
   exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
-  exampleModelChain: unknown | null;
+  exampleModelChain: Prisma.JsonValue | null;
   exampleDailyLimit: number | null;
 }): AppConfigValue {
   return {
@@ -94,12 +95,12 @@ export interface AppConfigUpdateInput {
   correctionProvider?: string | null;
   correctionApiKey?: string | null;
   correctionModel?: string | null;
-  correctionModelChain?: unknown | null;
+  correctionModelChain?: Prisma.InputJsonValue | null;
   correctionDailyLimit?: number | null;
   exampleProvider?: string | null;
   exampleApiKey?: string | null;
   exampleModel?: string | null;
-  exampleModelChain?: unknown | null;
+  exampleModelChain?: Prisma.InputJsonValue | null;
   exampleDailyLimit?: number | null;
 }
 
@@ -130,10 +131,16 @@ export async function updateAppConfig(patch: AppConfigUpdateInput): Promise<AppC
     if (normalized[key] === undefined) delete normalized[key];
   }
 
+  const { correctionModelChain, exampleModelChain, ...textData } = normalized;
+  const data: Prisma.AppConfigUpdateInput = {
+    ...textData,
+    ...(correctionModelChain === undefined ? {} : { correctionModelChain: correctionModelChain ?? Prisma.DbNull }),
+    ...(exampleModelChain === undefined ? {} : { exampleModelChain: exampleModelChain ?? Prisma.DbNull }),
+  };
   const row = await prisma.appConfig.upsert({
     where: { id: CONFIG_ID },
-    create: { id: CONFIG_ID, ...normalized },
-    update: normalized,
+    create: { id: CONFIG_ID, ...data } as Prisma.AppConfigCreateInput,
+    update: data,
   });
 
   return toAppConfigValue(row);
@@ -170,9 +177,9 @@ export interface AppConfigDisplay {
   correctionProvider: CorrectionProviderId;
   example: AppConfigDisplaySection;
   exampleProvider: ExampleProviderId;
-  correctionModelChain: { provider: CorrectionProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
-  exampleModelChain: { provider: ExampleProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
-  modelChainStatus: Awaited<ReturnType<typeof getModelChainAdminStatus>>;
+  correctionModelChain?: { provider: CorrectionProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
+  exampleModelChain?: { provider: ExampleProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
+  modelChainStatus?: Awaited<ReturnType<typeof getModelChainAdminStatus>>;
 }
 
 /**
@@ -202,6 +209,9 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
     exampleProvider === "openrouter"
       ? process.env.OPENROUTER_EXAMPLE_MODEL?.trim() || ""
       : process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
+  const correctionModelChain = parseModelChain(config.correctionModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null;
+  const exampleModelChain = parseModelChain(config.exampleModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null;
+  const hasChainStatus = modelChainStatus.alerts.length > 0 || modelChainStatus.reserveToday.correction > 0 || modelChainStatus.reserveToday.example > 0;
 
   return {
     correction: {
@@ -216,7 +226,7 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
       requestsToday: requestsToday.correctionRequestsToday,
     },
     correctionProvider,
-    correctionModelChain: parseModelChain(config.correctionModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null,
+    ...(correctionModelChain ? { correctionModelChain } : {}),
     example: {
       apiKeySet: Boolean(config.exampleApiKey),
       apiKeyMasked: maskSecret(config.exampleApiKey),
@@ -229,7 +239,7 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
       requestsToday: requestsToday.exampleRequestsToday,
     },
     exampleProvider,
-    exampleModelChain: parseModelChain(config.exampleModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null,
-    modelChainStatus,
+    ...(exampleModelChain ? { exampleModelChain } : {}),
+    ...(hasChainStatus ? { modelChainStatus } : {}),
   };
 }
