@@ -81,9 +81,9 @@ export async function PUT(request: Request) {
   }
 
   const config = await getAppConfig();
-  const retainSavedKeys = (chain: z.infer<typeof chainFieldSchema>, previous: unknown) => {
+  const retainSavedKeys = (chain: z.infer<typeof chainFieldSchema>, previous: unknown, legacy: { provider: string | null; model: string | null; apiKey: string | null }) => {
     if (!chain) return chain;
-    const prior = Array.isArray(previous) ? previous : [];
+    const prior = Array.isArray(previous) ? previous : legacy.apiKey ? [{ provider: legacy.provider ?? "gemini", model: legacy.model, apiKey: legacy.apiKey }] : [];
     return chain.map(({ savedApiKeyIndex, ...step }) => ({
       ...step,
       // A mask is never sent back to the browser. This stable index lets a
@@ -106,8 +106,8 @@ export async function PUT(request: Request) {
     ...example.update,
     ...(parsed.data.correctionDailyLimit !== undefined ? { correctionDailyLimit: parsed.data.correctionDailyLimit } : {}),
     ...(parsed.data.exampleDailyLimit !== undefined ? { exampleDailyLimit: parsed.data.exampleDailyLimit } : {}),
-    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: retainSavedKeys(parsed.data.correctionModelChain, config.correctionModelChain) } : {}),
-    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: retainSavedKeys(parsed.data.exampleModelChain, config.exampleModelChain) } : {}),
+    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: retainSavedKeys(parsed.data.correctionModelChain, config.correctionModelChain, { provider: config.correctionProvider, model: config.correctionModel, apiKey: config.correctionApiKey }) } : {}),
+    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: retainSavedKeys(parsed.data.exampleModelChain, config.exampleModelChain, { provider: config.exampleProvider, model: config.exampleModel, apiKey: config.exampleApiKey }) } : {}),
   });
   return adminJsonResponse(await getAppConfigDisplay());
 }
