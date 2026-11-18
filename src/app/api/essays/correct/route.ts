@@ -30,6 +30,13 @@ import { getCorrectionRequestKey } from "@/lib/correction-request-key";
 import { refundCorrectionUsage, reserveCorrectionUsage } from "@/lib/correction-usage";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
 import { checkFrenchText } from "@/lib/french-text-check";
+import {
+  CORRECTION_CHAIN_BUDGET_MS,
+  CORRECTION_RESERVE_STEP_TIMEOUT_MS,
+  parseModelChain,
+  runModelChain,
+  type ModelChainStep,
+} from "@/lib/model-chain";
 
 // Covers three 45s provider attempts plus two backoff waits on a 503 (about
 // 143s worst case, see provider-retry.ts) with room to persist the result.
@@ -301,6 +308,7 @@ export async function POST(request: Request) {
   // provider's own env-var defaults -- fetched once and reused for both the
   // availability check below and the actual call.
   const appConfig = await getAppConfig();
+  const configuredChain = parseModelChain(appConfig.correctionModelChain);
   const providerId = resolveCorrectionProviderId(appConfig.correctionProvider);
   const provider = getCorrectionProvider(providerId);
   const providerOverrides = { apiKey: appConfig.correctionApiKey, model: appConfig.correctionModel };
@@ -316,7 +324,7 @@ export async function POST(request: Request) {
   // reserve an unrefundable slot if this newly claimed request cannot reach
   // the configured provider. Release only this caller's lease so a later
   // configured retry can claim it normally.
-  if (!provider.hasConfiguredCredentials(providerOverrides)) {
+  if (!configuredChain && !provider.hasConfiguredCredentials(providerOverrides)) {
     await recordAdminEvent({
       eventType: "CORRECTION_PROVIDER_FAILED",
       userId: user.id,
@@ -418,11 +426,66 @@ export async function POST(request: Request) {
 
   let shouldReleaseClaim = true;
   try {
-    let rawFeedback: unknown;
+    let parsedFeedback: ReturnType<typeof freshEssayFeedbackSchema.safeParse>;
     try {
-      rawFeedback = await provider.gradeEssay({ systemPrompt, userPrompt }, providerOverrides);
+      if (!configuredChain) {
+        // Exact legacy path: one resolved provider and its existing retry
+        // policy, so deployments with no new setting remain unchanged.
+        parsedFeedback = freshEssayFeedbackSchema.safeParse(
+          await provider.gradeEssay({ systemPrompt, userPrompt }, providerOverrides),
+        );
+      } else {
+        const outcome = await runModelChain({
+          section: "correction",
+          steps: configuredChain,
+          legacy: false,
+          budgetMs: CORRECTION_CHAIN_BUDGET_MS,
+          reserveStepTimeoutMs: CORRECTION_RESERVE_STEP_TIMEOUT_MS,
+          normalAttemptTimeoutMs: 45_000,
+          isFallbackable(error) {
+            if ((error as { modelChainReason?: string })?.modelChainReason === "schema_invalid") {
+              return { error, reasonCode: "schema_invalid" };
+            }
+            const status = boundedCorrectionProviderHttpStatus(error);
+            // All provider failures listed in the owner decision, plus
+            // malformed/schema-invalid answers below, move to the next step.
+            return { error, status, reasonCode: classifyCorrectionProviderFailure(error) };
+          },
+          async onFailure(step, failure) {
+            await recordAdminEvent({
+              eventType: "CORRECTION_PROVIDER_FAILED", userId: user.id, provider: step.provider,
+              model: step.model ?? undefined, reasonCode: failure.reasonCode as AdminEventReasonCode,
+              httpStatus: failure.status ?? 502,
+            });
+          },
+          async invoke(step: ModelChainStep, controls) {
+            const candidate = getCorrectionProvider(step.provider);
+            if (!candidate.hasConfiguredCredentials({ apiKey: step.apiKey, model: step.model })) {
+              throw new CorrectionProviderNotConfiguredError();
+            }
+            const raw = await candidate.gradeEssay(
+              { systemPrompt, userPrompt },
+              { apiKey: step.apiKey, model: step.model, requestTimeoutMs: controls.timeoutMs, retry503: controls.retry503, totalBudgetMs: controls.totalBudgetMs },
+            );
+            const result = freshEssayFeedbackSchema.safeParse(raw);
+            if (!result.success) {
+              // Schema-invalid JSON is an unusable answer and explicitly a
+              // fallback condition, without ever recording its contents.
+              const error = new Error("schema_invalid");
+              (error as Error & { modelChainReason?: string }).modelChainReason = "schema_invalid";
+              throw error;
+            }
+            return result;
+          },
+        });
+        parsedFeedback = outcome.value;
+      }
     } catch (error) {
-      const reasonCode = classifyCorrectionProviderFailure(error);
+      // The chain's schema-invalid sentinel is intentionally a closed log
+      // reason. It is still fallbackable in configured chains.
+      const reasonCode = (error as { modelChainReason?: string })?.modelChainReason === "schema_invalid"
+        ? "schema_invalid"
+        : classifyCorrectionProviderFailure(error);
       await recordAdminEvent({
         eventType: "CORRECTION_PROVIDER_FAILED",
         userId: user.id,
@@ -438,7 +501,6 @@ export async function POST(request: Request) {
         { status: 502, headers: NO_STORE_HEADERS },
       );
     }
-    const parsedFeedback = freshEssayFeedbackSchema.safeParse(rawFeedback);
     if (!parsedFeedback.success) {
       // Distinct from format_unsupported/invalid_json above: the provider
       // did return parseable JSON, so it did attempt (and its transport

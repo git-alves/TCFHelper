@@ -13,6 +13,7 @@ import {
   isExampleProviderId,
   type ExampleProviderId,
 } from "@/lib/example-provider";
+import { getModelChainAdminStatus, parseModelChain } from "@/lib/model-chain";
 
 const CONFIG_ID = "singleton";
 
@@ -25,10 +26,12 @@ export interface AppConfigValue {
   correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
+  correctionModelChain: unknown | null;
   correctionDailyLimit: number | null;
   exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
+  exampleModelChain: unknown | null;
   exampleDailyLimit: number | null;
 }
 
@@ -36,10 +39,12 @@ const EMPTY_CONFIG: AppConfigValue = {
   correctionProvider: null,
   correctionApiKey: null,
   correctionModel: null,
+  correctionModelChain: null,
   correctionDailyLimit: null,
   exampleProvider: null,
   exampleApiKey: null,
   exampleModel: null,
+  exampleModelChain: null,
   exampleDailyLimit: null,
 };
 
@@ -47,20 +52,24 @@ function toAppConfigValue(row: {
   correctionProvider: string | null;
   correctionApiKey: string | null;
   correctionModel: string | null;
+  correctionModelChain: unknown | null;
   correctionDailyLimit: number | null;
   exampleProvider: string | null;
   exampleApiKey: string | null;
   exampleModel: string | null;
+  exampleModelChain: unknown | null;
   exampleDailyLimit: number | null;
 }): AppConfigValue {
   return {
     correctionProvider: row.correctionProvider,
     correctionApiKey: row.correctionApiKey,
     correctionModel: row.correctionModel,
+    correctionModelChain: row.correctionModelChain,
     correctionDailyLimit: row.correctionDailyLimit,
     exampleProvider: row.exampleProvider,
     exampleApiKey: row.exampleApiKey,
     exampleModel: row.exampleModel,
+    exampleModelChain: row.exampleModelChain,
     exampleDailyLimit: row.exampleDailyLimit,
   };
 }
@@ -85,10 +94,12 @@ export interface AppConfigUpdateInput {
   correctionProvider?: string | null;
   correctionApiKey?: string | null;
   correctionModel?: string | null;
+  correctionModelChain?: unknown | null;
   correctionDailyLimit?: number | null;
   exampleProvider?: string | null;
   exampleApiKey?: string | null;
   exampleModel?: string | null;
+  exampleModelChain?: unknown | null;
   exampleDailyLimit?: number | null;
 }
 
@@ -107,10 +118,12 @@ export async function updateAppConfig(patch: AppConfigUpdateInput): Promise<AppC
     correctionProvider: normalizeText(patch.correctionProvider),
     correctionApiKey: normalizeText(patch.correctionApiKey),
     correctionModel: normalizeText(patch.correctionModel),
+    correctionModelChain: patch.correctionModelChain,
     correctionDailyLimit: patch.correctionDailyLimit,
     exampleProvider: normalizeText(patch.exampleProvider),
     exampleApiKey: normalizeText(patch.exampleApiKey),
     exampleModel: normalizeText(patch.exampleModel),
+    exampleModelChain: patch.exampleModelChain,
     exampleDailyLimit: patch.exampleDailyLimit,
   };
   for (const key of Object.keys(normalized) as (keyof AppConfigUpdateInput)[]) {
@@ -157,6 +170,9 @@ export interface AppConfigDisplay {
   correctionProvider: CorrectionProviderId;
   example: AppConfigDisplaySection;
   exampleProvider: ExampleProviderId;
+  correctionModelChain: { provider: CorrectionProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
+  exampleModelChain: { provider: ExampleProviderId; model: string | null; apiKeySet: boolean; apiKeyMasked: string | null }[] | null;
+  modelChainStatus: Awaited<ReturnType<typeof getModelChainAdminStatus>>;
 }
 
 /**
@@ -167,7 +183,7 @@ export interface AppConfigDisplay {
  * reported by Google.
  */
 export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
-  const [config, requestsToday] = await Promise.all([getAppConfig(), getGeminiRequestsToday()]);
+  const [config, requestsToday, modelChainStatus] = await Promise.all([getAppConfig(), getGeminiRequestsToday(), getModelChainAdminStatus()]);
   const correctionProvider = resolveCorrectionProviderId(config.correctionProvider);
   // OpenRouter fronts hundreds of models with no single sane default (unlike
   // Gemini's fixed free-tier default below) -- an admin on this provider
@@ -200,6 +216,7 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
       requestsToday: requestsToday.correctionRequestsToday,
     },
     correctionProvider,
+    correctionModelChain: parseModelChain(config.correctionModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null,
     example: {
       apiKeySet: Boolean(config.exampleApiKey),
       apiKeyMasked: maskSecret(config.exampleApiKey),
@@ -212,5 +229,7 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
       requestsToday: requestsToday.exampleRequestsToday,
     },
     exampleProvider,
+    exampleModelChain: parseModelChain(config.exampleModelChain)?.map((step) => ({ provider: step.provider, model: step.model, apiKeySet: Boolean(step.apiKey), apiKeyMasked: maskSecret(step.apiKey) })) ?? null,
+    modelChainStatus,
   };
 }

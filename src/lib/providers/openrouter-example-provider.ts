@@ -59,8 +59,10 @@ export const openRouterExampleProvider: ExampleProvider = {
         model,
         messages: [{ role: "user", content: buildExamplePrompt(params) }],
         maxTokens: 2048,
-        timeoutMs: EXAMPLE_REQUEST_TIMEOUT_MS,
+        timeoutMs: overrides?.requestTimeoutMs ?? EXAMPLE_REQUEST_TIMEOUT_MS,
         logLabel: "example generation",
+        retry503: overrides?.retry503,
+        totalBudgetMs: overrides?.totalBudgetMs,
       });
     } catch (error) {
       if (error instanceof OpenRouterRateLimitedError) throw new ExampleProviderRateLimitedError(error.message);

@@ -27,6 +27,10 @@ export function isCorrectionProviderId(value: string): value is CorrectionProvid
 export interface CorrectionProviderOverrides {
   apiKey?: string | null;
   model?: string | null;
+  /** Internal chain execution controls; never persisted from a learner request. */
+  requestTimeoutMs?: number;
+  retry503?: boolean;
+  totalBudgetMs?: number;
 }
 
 export interface GradeEssayParams {

@@ -18,6 +18,14 @@ const limitFieldSchema = z.number().int().min(1).max(MAX_DAILY_LIMIT).nullable()
 // rejected here rather than stored.
 const correctionProviderFieldSchema = z.enum(CORRECTION_PROVIDER_IDS).nullable().optional();
 const exampleProviderFieldSchema = z.enum(EXAMPLE_PROVIDER_IDS).nullable().optional();
+const chainStepSchema = z.object({
+  provider: z.enum(CORRECTION_PROVIDER_IDS),
+  model: textFieldSchema,
+  // A blank key means use that provider's environment default. Existing
+  // saved keys are supplied explicitly by the form only when retained.
+  apiKey: textFieldSchema,
+}).strict();
+const chainFieldSchema = z.array(chainStepSchema).min(1).max(3).nullable().optional();
 
 const requestSchema = z
   .object({
@@ -29,6 +37,8 @@ const requestSchema = z
     exampleApiKey: textFieldSchema,
     exampleModel: textFieldSchema,
     exampleDailyLimit: limitFieldSchema,
+    correctionModelChain: chainFieldSchema,
+    exampleModelChain: chainFieldSchema,
   })
   .strict();
 
@@ -80,6 +90,8 @@ export async function PUT(request: Request) {
     ...example.update,
     ...(parsed.data.correctionDailyLimit !== undefined ? { correctionDailyLimit: parsed.data.correctionDailyLimit } : {}),
     ...(parsed.data.exampleDailyLimit !== undefined ? { exampleDailyLimit: parsed.data.exampleDailyLimit } : {}),
+    ...(parsed.data.correctionModelChain !== undefined ? { correctionModelChain: parsed.data.correctionModelChain } : {}),
+    ...(parsed.data.exampleModelChain !== undefined ? { exampleModelChain: parsed.data.exampleModelChain } : {}),
   });
   return adminJsonResponse(await getAppConfigDisplay());
 }

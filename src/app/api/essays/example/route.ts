@@ -32,6 +32,13 @@ import {
   generatePreferredModelAnswer,
 } from "@/lib/model-answer-generator";
 import { recordAdminEvent, type AdminEventReasonCode } from "@/lib/admin-events";
+import {
+  EXAMPLE_CHAIN_BUDGET_MS,
+  EXAMPLE_RESERVE_STEP_TIMEOUT_MS,
+  parseModelChain,
+  runModelChain,
+  type ModelChainStep,
+} from "@/lib/model-chain";
 
 // Covers three 20s provider attempts plus two backoff waits on a 503 (about
 // 68s worst case, see provider-retry.ts) with room to persist the result.
@@ -132,6 +139,7 @@ export async function POST(request: Request) {
   // during-an-outage cache tolerance below) and reused for the cache key,
   // the availability check, and the actual call.
   const appConfig = await getAppConfig();
+  const configuredChain = parseModelChain(appConfig.exampleModelChain);
   const exampleProviderId = resolveExampleProviderId(appConfig.exampleProvider);
   const exampleProvider = getExampleProvider(exampleProviderId);
   const exampleOverrides = { apiKey: appConfig.exampleApiKey, model: appConfig.exampleModel };
@@ -150,7 +158,7 @@ export async function POST(request: Request) {
     taskType,
     resolvedTopicPrompt,
     examplePromptOverridesFingerprint(examplePromptOverrides),
-    `${exampleProviderId}:${appConfig.exampleModel ?? ""}`,
+    configuredChain ? JSON.stringify(configuredChain.map((step) => [step.provider, step.model])) : `${exampleProviderId}:${appConfig.exampleModel ?? ""}`,
   );
   let cached: { content: string } | null;
   try {
@@ -168,7 +176,7 @@ export async function POST(request: Request) {
 
   // Do this after a cache read so saved study material is still available
   // during a configuration outage, but before a fresh daily slot is spent.
-  if (!exampleProvider.hasConfiguredCredentials(exampleOverrides)) {
+  if (!configuredChain && !exampleProvider.hasConfiguredCredentials(exampleOverrides)) {
     await recordAdminEvent({
       eventType: "EXAMPLE_PROVIDER_FAILED",
       userId: user.id,
@@ -253,17 +261,31 @@ export async function POST(request: Request) {
   }
 
   try {
-    const generated = await generatePreferredModelAnswer(
-      exampleProvider,
-      {
-        task,
-        taskType,
-        level: typedLevel,
-        topicPrompt: resolvedTopicPrompt,
-        promptOverrides: examplePromptOverrides,
-      },
-      exampleOverrides,
-    );
+    const generationParams = { task, taskType, level: typedLevel, topicPrompt: resolvedTopicPrompt, promptOverrides: examplePromptOverrides };
+    const generated = configuredChain
+      ? (
+          await runModelChain({
+            section: "example", steps: configuredChain, legacy: false,
+            budgetMs: EXAMPLE_CHAIN_BUDGET_MS, reserveStepTimeoutMs: EXAMPLE_RESERVE_STEP_TIMEOUT_MS, normalAttemptTimeoutMs: 20_000,
+            isFallbackable(error) {
+              if (error instanceof ModelAnswerInvalidOutputError) return { error, reasonCode: "invalid_response" };
+              return { error, status: boundedExampleProviderHttpStatus(error), reasonCode: classifyExampleGenerationFailure(error) };
+            },
+            async onFailure(step, failure) {
+              await recordAdminEvent({
+                eventType: "EXAMPLE_PROVIDER_FAILED", userId: user.id, provider: step.provider, model: step.model ?? undefined,
+                reasonCode: failure.reasonCode as AdminEventReasonCode, httpStatus: failure.status ?? 502,
+              });
+            },
+            async invoke(step: ModelChainStep, controls) {
+              const candidate = getExampleProvider(step.provider);
+              const overrides = { apiKey: step.apiKey, model: step.model, requestTimeoutMs: controls.timeoutMs, retry503: controls.retry503, totalBudgetMs: controls.totalBudgetMs };
+              if (!candidate.hasConfiguredCredentials(overrides)) throw new ModelAnswerNotConfiguredError();
+              return generatePreferredModelAnswer(candidate, generationParams, overrides);
+            },
+          })
+        ).value
+      : await generatePreferredModelAnswer(exampleProvider, generationParams, exampleOverrides);
     // The fixed provider name remains in the cache metadata and logs so each
     // saved example has a clear provenance record.
     console.log("Example generated:", generated.provider);
