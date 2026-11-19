@@ -166,6 +166,7 @@ function JobCard({
   reserve,
   getTest,
   runTest,
+  changeProvider,
 }: {
   job: Job;
   display: AppConfigDisplay;
@@ -181,6 +182,7 @@ function JobCard({
   reserve: number;
   getTest: (n: number) => Test;
   runTest: (n: number) => void;
+  changeProvider: (provider: Provider) => void;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [allEdit, setAllEdit] = useState(false);
@@ -195,6 +197,9 @@ function JobCard({
       ? display.correctionModelChain
       : display.exampleModelChain;
   const jobAlerts = alerts.filter((x) => x.section === job);
+  const savedProvider =
+    job === "correction" ? display.correctionProvider : display.exampleProvider;
+  const providerChanged = draft.provider !== savedProvider;
   const update = (i: number, patch: Partial<Step>) =>
     change({
       ...draft,
@@ -430,12 +435,20 @@ function JobCard({
           </strong>
           <p className="mt-1">
             {providerName[draft.provider]} ·{" "}
-            {draft.model || section.modelDefault || "No model"} ·{" "}
-            {section.apiKeySet
-              ? `saved key ${section.apiKeyMasked}`
-              : section.apiKeyFromEnv
-                ? "environment key"
-                : "No key — will fail"}
+            {draft.model ||
+              (providerChanged
+                ? draft.provider === "gemini"
+                  ? "Default Gemini model"
+                  : "No model"
+                : section.modelDefault || "No model")}{" "}
+            ·{" "}
+            {providerChanged
+              ? "No saved key for this provider yet"
+              : section.apiKeySet
+                ? `saved key ${section.apiKeyMasked}`
+                : section.apiKeyFromEnv
+                  ? "environment key"
+                  : "No key — will fail"}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
@@ -529,20 +542,23 @@ function JobCard({
             <select
               className={input}
               value={draft.provider}
-              onChange={(e) =>
-                change({
-                  ...draft,
-                  provider: e.target.value as Provider,
-                  model: "",
-                  apiKey: "",
-                  apiKeyCleared: false,
-                })
-              }
+              onChange={(e) => changeProvider(e.target.value as Provider)}
             >
               <option value="gemini">Gemini Direct</option>
               <option value="openrouter">OpenRouter</option>
             </select>
           </label>
+          {providerChanged && (section.apiKeySet || Boolean(section.model)) && (
+            <p
+              role="status"
+              className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm"
+            >
+              Switching to {providerName[draft.provider]} will remove the saved{" "}
+              {providerName[savedProvider]} key and model for this section when
+              you save. Enter a new key and model below to keep using this
+              section.
+            </p>
+          )}
           <label className="text-sm font-medium">
             Legacy model
             <input
@@ -677,6 +693,30 @@ export function AdminApiKeysForm({
     );
     if (job === "correction") setCorrection(next);
     else setExample(next);
+  }
+
+  function changeProvider(job: Job, provider: Provider) {
+    const savedProvider =
+      job === "correction"
+        ? display.correctionProvider
+        : display.exampleProvider;
+    const current = job === "correction" ? correction : example;
+
+    if (provider === savedProvider) {
+      change(job, {
+        ...fromDisplay(display, job),
+        dailyLimit: current.dailyLimit,
+      });
+      return;
+    }
+
+    change(job, {
+      ...current,
+      provider,
+      model: "",
+      apiKey: "",
+      apiKeyCleared: false,
+    });
   }
   async function test(job: Job, index: number) {
     const draft = job === "correction" ? correction : example;
@@ -866,6 +906,7 @@ export function AdminApiKeysForm({
         display={display}
         draft={correction}
         change={(d) => change("correction", d)}
+        changeProvider={(provider) => changeProvider("correction", provider)}
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.correction ?? 0}
         getTest={(i) =>
@@ -881,6 +922,7 @@ export function AdminApiKeysForm({
         display={display}
         draft={example}
         change={(d) => change("example", d)}
+        changeProvider={(provider) => changeProvider("example", provider)}
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.example ?? 0}
         getTest={(i) =>
