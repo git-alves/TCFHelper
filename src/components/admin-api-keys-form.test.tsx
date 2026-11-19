@@ -270,7 +270,7 @@ describe("reserve model chains", () => {
   });
 
   it("renders model-chain alerts and reserve usage in English", () => {
-    render({ ...GEMINI_DISPLAY, modelChainStatus: { alerts: [{ id: "alert_1", provider: "openrouter", model: "free-model", kind: "credits" }], reserveToday: { correction: 2, example: 3 } } });
+    render({ ...GEMINI_DISPLAY, modelChainStatus: { alerts: [{ id: "alert_1", section: "correction", provider: "openrouter", model: "free-model", kind: "credits" }], reserveToday: { correction: 2, example: 3 } } });
 
     expect(container.textContent).toContain("add OpenRouter credits to keep using this model.");
     expect(container.textContent).toContain("Today, 2 corrections and 3 examples were handled by a reserve step.");

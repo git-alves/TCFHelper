@@ -68,10 +68,14 @@ export async function getModelChainAdminStatus() {
   let alerts: { id: string; section: ModelChainSection; provider: string; model: string; kind: string }[] = [];
   let reserve: { section: string; _count: { _all: number } }[] = [];
   try {
-    [alerts, reserve] = await Promise.all([
+    const [storedAlerts, storedReserve] = await Promise.all([
       prisma.modelChainAlert.findMany({ where: { dismissedAt: null }, orderBy: { updatedAt: "desc" } }),
       prisma.modelChainReserveUse.groupBy({ by: ["section"], where: { createdAt: { gte: today } }, _count: { _all: true } }),
     ]);
+    alerts = storedAlerts
+      .filter((alert): alert is typeof alert & { section: ModelChainSection } => alert.section === "correction" || alert.section === "example")
+      .map(({ id, section, provider, model, kind }) => ({ id, section, provider, model, kind }));
+    reserve = storedReserve;
   } catch {
     // Best-effort admin-only summary; chain execution does not depend on it.
   }
