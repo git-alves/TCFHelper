@@ -22,6 +22,8 @@ const section = {
   requestsToday: 82,
 };
 const display: AppConfigDisplay = {
+  geminiEnvKey: false,
+  openrouterEnvKey: false,
   correctionProvider: "gemini",
   correction: section,
   exampleProvider: "gemini",
@@ -98,6 +100,37 @@ describe("API key operational cards", () => {
     expect(container.textContent).toContain("Today: 82 / 1,000");
     expect(container.textContent).toContain("No current alerts");
     expect(container.querySelector("details")?.open).toBe(false);
+  });
+
+  it("labels unsaved Gemini and OpenRouter steps from their own environment-key availability", () => {
+    render({
+      ...display,
+      correctionModelChain: [
+        { provider: "gemini", model: "first", apiKeySet: false, apiKeyMasked: null },
+        { provider: "openrouter", model: "second", apiKeySet: false, apiKeyMasked: null },
+      ],
+    });
+    expect(container.textContent).toContain("No key — will fail");
+
+    render({
+      ...display,
+      geminiEnvKey: true,
+      openrouterEnvKey: true,
+      correctionModelChain: [
+        { provider: "gemini", model: "first", apiKeySet: false, apiKeyMasked: null },
+        { provider: "openrouter", model: "second", apiKeySet: false, apiKeyMasked: null },
+      ],
+    });
+    expect(container.textContent).toContain("Gemini Direct · first");
+    expect(container.textContent).toContain("OpenRouter · second");
+    expect(container.textContent.match(/environment key/g)).toHaveLength(2);
+  });
+
+  it("prefers a saved chain key over an available environment key", () => {
+    render({ ...display, geminiEnvKey: true, openrouterEnvKey: true });
+
+    expect(container.textContent).toContain("saved key ••••1234");
+    expect(container.textContent).toContain("environment key");
   });
 
   it("keeps only one row expanded, tests it inline, and clears its result after an edit", async () => {
@@ -354,6 +387,14 @@ describe("legacy API key settings", () => {
       container.querySelectorAll<HTMLInputElement>("details input")[0]!.value,
     ).toBe("gemini-3.5-flash-lite");
     expect(container.textContent).toContain("saved key ••••1234");
+  });
+
+  it("uses the selected provider's environment-key availability in the legacy summary", async () => {
+    render({ ...legacyDisplay, openrouterEnvKey: true });
+    await openCorrectionLegacySettings();
+    await change("details select", "openrouter");
+
+    expect(container.textContent).toContain("OpenRouter · No model · environment key");
   });
 
   it("keeps an added reserve chain when switching the Advanced provider away and back", async () => {
