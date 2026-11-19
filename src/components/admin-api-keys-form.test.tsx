@@ -102,7 +102,7 @@ describe("API key operational cards", () => {
     expect(container.querySelector("details")?.open).toBe(false);
   });
 
-  it("labels unsaved Gemini and OpenRouter steps from their own environment-key availability", () => {
+  it("warns when unsaved Gemini and OpenRouter steps have no environment key", () => {
     render({
       ...display,
       correctionModelChain: [
@@ -110,8 +110,10 @@ describe("API key operational cards", () => {
         { provider: "openrouter", model: "second", apiKeySet: false, apiKeyMasked: null },
       ],
     });
-    expect(container.textContent).toContain("No key — will fail");
+    expect(container.textContent.match(/No key — will fail/g)).toHaveLength(2);
+  });
 
+  it("labels unsaved Gemini and OpenRouter steps with their own environment key", () => {
     render({
       ...display,
       geminiEnvKey: true,
@@ -376,9 +378,7 @@ describe("legacy API key settings", () => {
     expect(container.textContent).toContain(
       "will remove the saved Gemini Direct key and model",
     );
-    expect(container.textContent).toContain(
-      "No saved key for this provider yet",
-    );
+    expect(container.textContent).toContain("No key — will fail");
     expect(
       container.querySelectorAll<HTMLInputElement>("details input")[0]!.value,
     ).toBe("");
