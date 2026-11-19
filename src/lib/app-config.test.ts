@@ -200,6 +200,8 @@ describe("getAppConfigDisplay", () => {
     findUniqueMock.mockResolvedValue(null);
 
     await expect(getAppConfigDisplay()).resolves.toEqual({
+      geminiEnvKey: true,
+      openrouterEnvKey: false,
       correction: {
         apiKeySet: false,
         apiKeyMasked: null,
@@ -233,6 +235,19 @@ describe("getAppConfigDisplay", () => {
     const display = await getAppConfigDisplay();
 
     expect(display.correction.apiKeyFromEnv).toBe(false);
+    expect(display).toMatchObject({ geminiEnvKey: false, openrouterEnvKey: false });
+  });
+
+  it("reports only environment-key availability and never the environment secret", async () => {
+    process.env.GEMINI_API_KEY = " gemini-secret-value ";
+    process.env.OPENROUTER_API_KEY = " openrouter-secret-value ";
+    findUniqueMock.mockResolvedValue(null);
+
+    const display = await getAppConfigDisplay();
+
+    expect(display).toMatchObject({ geminiEnvKey: true, openrouterEnvKey: true });
+    expect(JSON.stringify(display)).not.toContain("gemini-secret-value");
+    expect(JSON.stringify(display)).not.toContain("openrouter-secret-value");
   });
 
   it("reports an admin-set key and a custom daily limit, independent of any env var", async () => {

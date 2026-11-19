@@ -167,6 +167,10 @@ export interface AppConfigDisplaySection {
 }
 
 export interface AppConfigDisplay {
+  /** Availability only: never expose the environment secret itself. */
+  geminiEnvKey: boolean;
+  /** Availability only: never expose the environment secret itself. */
+  openrouterEnvKey: boolean;
   correction: AppConfigDisplaySection;
   // The resolved provider id (never null -- see resolveCorrectionProviderId/
   // resolveExampleProviderId) driving which env vars the matching section's
@@ -214,6 +218,8 @@ export async function getAppConfigDisplay(): Promise<AppConfigDisplay> {
   const hasChainStatus = modelChainStatus.alerts.length > 0 || modelChainStatus.reserveToday.correction > 0 || modelChainStatus.reserveToday.example > 0;
 
   return {
+    geminiEnvKey: Boolean(process.env.GEMINI_API_KEY?.trim()),
+    openrouterEnvKey: Boolean(process.env.OPENROUTER_API_KEY?.trim()),
     correction: {
       apiKeySet: Boolean(config.correctionApiKey),
       apiKeyMasked: maskSecret(config.correctionApiKey),

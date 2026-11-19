@@ -92,11 +92,16 @@ function serialize(chain: Step[] | null) {
 function source(
   step: Step,
   saved: { apiKeySet: boolean; apiKeyMasked: string | null } | undefined,
+  environmentKey: boolean,
 ) {
   if (step.apiKey.trim()) return "replacement key (unsaved)";
   if (step.savedApiKeyIndex !== undefined && saved?.apiKeySet)
     return `saved key ${saved.apiKeyMasked}`;
-  return "No saved key — environment availability unknown";
+  return environmentKey ? "environment key" : "No key — will fail";
+}
+
+function hasEnvironmentKey(display: AppConfigDisplay, provider: Provider) {
+  return provider === "gemini" ? display.geminiEnvKey : display.openrouterEnvKey;
 }
 function Result({ test }: { test: Test }) {
   if (!test.outcome) return null;
@@ -294,6 +299,13 @@ function JobCard({
               (alert) =>
                 alert.provider === step.provider && alert.model === step.model,
             );
+            const keySource = source(
+              step,
+              step.savedApiKeyIndex === undefined
+                ? undefined
+                : displayedChain?.[step.savedApiKeyIndex],
+              hasEnvironmentKey(display, step.provider),
+            );
             return (
               <li
                 key={step.id}
@@ -308,13 +320,14 @@ function JobCard({
                       {providerName[step.provider]} ·{" "}
                       {step.model || "default model"}
                     </span>
-                    <span className="ml-3 text-xs text-zinc-600 dark:text-zinc-400">
-                      {source(
-                        step,
-                        step.savedApiKeyIndex === undefined
-                          ? undefined
-                          : displayedChain?.[step.savedApiKeyIndex],
-                      )}
+                    <span
+                      className={`ml-3 text-xs ${
+                        keySource === "No key — will fail"
+                          ? "font-medium text-amber-800 dark:text-amber-300"
+                          : "text-zinc-600 dark:text-zinc-400"
+                      }`}
+                    >
+                      {keySource}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -495,13 +508,23 @@ function JobCard({
                   : "No model"
                 : section.modelDefault || "No model")}{" "}
             ·{" "}
-            {providerChanged
-              ? "No saved key for this provider yet"
-              : section.apiKeySet
-                ? `saved key ${section.apiKeyMasked}`
-                : section.apiKeyFromEnv
-                  ? "environment key"
-                  : "No key — will fail"}
+            <span
+              className={
+                !draft.apiKey.trim() &&
+                (providerChanged || !section.apiKeySet) &&
+                !hasEnvironmentKey(display, draft.provider)
+                  ? "font-medium text-amber-800 dark:text-amber-300"
+                  : undefined
+              }
+            >
+              {draft.apiKey.trim()
+                ? "replacement key (unsaved)"
+                : !providerChanged && section.apiKeySet
+                  ? `saved key ${section.apiKeyMasked}`
+                  : hasEnvironmentKey(display, draft.provider)
+                    ? "environment key"
+                    : "No key — will fail"}
+            </span>
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
