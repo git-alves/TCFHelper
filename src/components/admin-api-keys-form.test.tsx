@@ -141,6 +141,10 @@ describe("API key operational cards", () => {
         .querySelector<HTMLButtonElement>('[aria-label="Test step 1"]')!
         .click(),
     );
+    expect(
+      container.querySelector<HTMLButtonElement>('[aria-label="Test step 1"]')!
+        .disabled,
+    ).toBe(true);
     await act(async () =>
       setValue(
         container.querySelector<HTMLInputElement>(
@@ -306,6 +310,31 @@ describe("legacy API key settings", () => {
     expect(container.textContent).not.toContain("Works.");
   });
 
+  it("shows legacy test failures and an unreachable-service error inline", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        result: {
+          ok: false,
+          message: "The provider rejected this key.",
+          latencyMs: 9,
+        },
+        tested: {},
+      }),
+    });
+    render(legacyDisplay);
+    await click("Test");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "rejected this key",
+    );
+
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    await click("Test");
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "Could not reach the admin service",
+    );
+  });
+
   it("warns on a provider switch and restores the saved provider, key status, and model on switch-back", async () => {
     render(legacyDisplay);
     await openCorrectionLegacySettings();
@@ -447,6 +476,29 @@ describe("save and card state", () => {
     expect(body().correctionModelChain[0]).toEqual({
       provider: "openrouter",
       model: "vendor/model",
+    });
+  });
+
+  it("saves a legacy provider change with a typed replacement key", async () => {
+    const typedKey = "sk-or-v1-TYPEDKEYTYPEDKEY0123456789xy";
+    fetchMock.mockResolvedValue(success());
+    render({ ...display, correctionModelChain: undefined });
+    const details = container.querySelector("details")!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+    });
+    const provider = container.querySelector<HTMLSelectElement>("select")!;
+    await act(async () => setValue(provider, "openrouter"));
+    const inputs =
+      container.querySelectorAll<HTMLInputElement>("details input");
+    await act(async () => setValue(inputs[0]!, "vendor/model"));
+    await act(async () => setValue(inputs[1]!, typedKey));
+    await submit();
+    expect(body()).toMatchObject({
+      correctionProvider: "openrouter",
+      correctionModel: "vendor/model",
+      correctionApiKey: typedKey,
     });
   });
 
