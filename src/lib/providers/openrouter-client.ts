@@ -42,6 +42,12 @@ export interface OpenRouterChatCompletionOptions {
   messages: OpenRouterChatMessage[];
   maxTokens: number;
   timeoutMs: number;
+  /**
+   * OpenRouter's reasoning controls. Models without reasoning support ignore
+   * this object, while reasoning-capable models can reserve part of the shared
+   * completion budget for thinking before producing the learner-facing text.
+   */
+  reasoning?: { max_tokens: number };
   responseFormat?: Record<string, unknown>;
   /**
    * Ask OpenRouter to route only to endpoints that honour every parameter in
@@ -125,6 +131,7 @@ function request(options: OpenRouterChatCompletionOptions) {
       messages: options.messages,
       ...(options.responseFormat ? { response_format: options.responseFormat } : {}),
       ...(options.requireParameters ? { provider: { require_parameters: true } } : {}),
+      ...(options.reasoning ? { reasoning: options.reasoning } : {}),
       max_tokens: options.maxTokens,
     }),
     cache: "no-store",
