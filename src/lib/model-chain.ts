@@ -9,6 +9,7 @@ export interface ModelChainStep {
 }
 
 const MAX_STEPS = 3;
+const SUCCESS_OBSERVABILITY_TIMEOUT_MS = 250;
 // The correction lease reserves 170s. Provider work has a 150s budget,
 // leaving 20s for validation/persistence: step 1/2 are capped at 35s and
 // the final step receives the remaining budget (up to its normal 45s attempt
@@ -87,6 +88,7 @@ export async function dismissModelChainAlert(id: string) {
 }
 
 export type ChainFailure = { error: unknown; status?: number; reasonCode: string };
+export type ModelChainFailedStep = { step: ModelChainStep; failure: ChainFailure };
 export type ModelChainRunOptions<T> = {
   section: ModelChainSection;
   steps: ModelChainStep[];
@@ -95,8 +97,30 @@ export type ModelChainRunOptions<T> = {
   normalAttemptTimeoutMs: number;
   isFallbackable: (error: unknown) => ChainFailure | null;
   invoke: (step: ModelChainStep, controls: { timeoutMs: number; retry503: boolean; totalBudgetMs: number }) => Promise<T>;
+  /** Called only when every configured step failed. */
   onFailure: (step: ModelChainStep, failure: ChainFailure) => Promise<void>;
+  /** Called after a reserve step succeeds, for failures it recovered from. */
+  onRecovered?: (failedSteps: ModelChainFailedStep[], recoveredBy: ModelChainStep) => Promise<void>;
 };
+
+/** Runs post-success observability without letting it delay or fail a learner response indefinitely. */
+async function settleSuccessObservability(work: () => Promise<unknown> | unknown) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  // Starting through a promise callback converts a synchronous throw into a
+  // handled rejection before the timeout race is created.
+  const settled = Promise.resolve().then(work).then(
+    () => undefined,
+    () => undefined,
+  );
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(resolve, SUCCESS_OBSERVABILITY_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([settled, timeout]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
 
 /**
  * Executes each configured step once. Only the last step may use the legacy
@@ -106,26 +130,43 @@ export type ModelChainRunOptions<T> = {
 export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promise<{ value: T; step: ModelChainStep; reserve: boolean }> {
   const started = Date.now();
   let lastError: unknown;
+  const failedSteps: ModelChainFailedStep[] = [];
   for (let index = 0; index < options.steps.length; index++) {
     const step = options.steps[index]!;
     const isLast = index === options.steps.length - 1;
     const elapsed = Date.now() - started;
     const remaining = Math.max(1, options.budgetMs - elapsed);
     const timeoutMs = isLast ? Math.min(options.normalAttemptTimeoutMs, remaining) : Math.min(options.reserveStepTimeoutMs, remaining);
+    let value: T;
     try {
-      const value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
-      void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
-      if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
-      return { value, step, reserve: index > 0 };
+      value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
     } catch (error) {
       lastError = error;
       const failure = options.isFallbackable(error);
-      if (!failure) throw error;
-      await options.onFailure(step, failure);
+      if (!failure) {
+        for (const failedStep of failedSteps) await options.onFailure(failedStep.step, failedStep.failure);
+        throw error;
+      }
+      failedSteps.push({ step, failure });
       if (failure.status) void openModelChainAlert(options.section, step, failure.status).catch(() => undefined);
       // Route request validation happens before this runner. A provider 400
       // (notably Gemini's API_KEY_INVALID) is a chain failure and advances.
+      continue;
     }
+    // Observability never changes a successful learner result. This is also
+    // intentionally outside invoke's try/catch, so a logging failure cannot
+    // be mistaken for a provider failure and trigger another reserve step.
+    await Promise.allSettled([
+      ...(failedSteps.length > 0 && options.onRecovered
+        ? [settleSuccessObservability(() => options.onRecovered!(failedSteps, step))]
+        : []),
+      settleSuccessObservability(() => clearModelChainAlert(options.section, step)),
+      ...(index > 0
+        ? [settleSuccessObservability(() => prisma.modelChainReserveUse.create({ data: { section: options.section } }))]
+        : []),
+    ]);
+    return { value, step, reserve: index > 0 };
   }
+  for (const { step, failure } of failedSteps) await options.onFailure(step, failure);
   throw lastError;
 }

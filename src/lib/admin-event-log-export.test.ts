@@ -98,6 +98,19 @@ describe("formatAdminEventLogTxt", () => {
     );
   });
 
+  it("exports recovered chain warnings with their safe event type and message", () => {
+    const text = format([
+      event({
+        severity: "WARN",
+        eventType: "EXAMPLE_PROVIDER_RECOVERED",
+        message: "Sample text step failed (gemini): upstream http error — recovered by a reserve step.",
+      }),
+    ]);
+    expect(text).toContain("WARN | AI services");
+    expect(text).toContain("recovered by a reserve step");
+    expect(text).toContain("Event type: EXAMPLE_PROVIDER_RECOVERED");
+  });
+
   it("omits fields that do not apply instead of writing null, undefined or blanks", () => {
     const text = format([
       event({ userId: null, userEmail: null, provider: null, model: null, reasonCode: null, httpStatus: null, message: "Access code activated successfully." , eventType: "ACCESS_CODE_REDEEMED", severity: "INFO", module: "QUOTA_ACCESS" }),

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AUTOMATIC_ADDITIVE_MIGRATIONS } from "./approved-additive-migrations";
 
@@ -132,5 +134,35 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
 
   it("allows the additive starter-topic bank deployment-order fence", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261110120000_add_starter_topic_bank_state");
+  });
+
+  it("allows the additive recovered-chain AdminEvent vocabulary", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261119120000_add_recovered_chain_events");
+  });
+
+  it("widens the AdminEvent constraint without removing existing provider-failure rows", () => {
+    const migration = readFileSync(
+      fileURLToPath(new URL("../../prisma/migrations/20261119120000_add_recovered_chain_events/migration.sql", import.meta.url)),
+      "utf8",
+    );
+    const eventTypeConstraint = migration.match(/ADD CONSTRAINT "AdminEvent_eventType_check" CHECK \("eventType" IN \(([\s\S]*?)\)\);/)?.[1] ?? "";
+    const eventTypes = new Set([...eventTypeConstraint.matchAll(/'([^']+)'/g)].map((match) => match[1]));
+    for (const previousType of [
+      "ACCESS_CODE_REDEEMED",
+      "ACCESS_CODE_REJECTED",
+      "TRANSLATION_QUOTA_DENIED",
+      "EXAMPLE_QUOTA_DENIED",
+      "CORRECTION_QUOTA_DENIED",
+      "CORRECTION_PROVIDER_FAILED",
+      "EXAMPLE_PROVIDER_FAILED",
+      "TRANSLATION_PROVIDER_FAILED",
+      "GRAMMAR_CHECK_PROVIDER_FAILED",
+      "SPELL_CHECK_FAILED",
+      "AUTH_SESSION_CREATED",
+      "AUTH_NETWORK_REVIEW_REQUIRED",
+    ]) expect(eventTypes).toContain(previousType);
+    expect(migration).toContain("'CORRECTION_PROVIDER_RECOVERED'");
+    expect(migration).toContain("'EXAMPLE_PROVIDER_RECOVERED'");
+    expect(migration).toContain('"severity" = \'WARN\'');
   });
 });

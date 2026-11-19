@@ -26,6 +26,8 @@ export const ADMIN_EVENT_TYPES = [
   "CORRECTION_QUOTA_DENIED",
   "CORRECTION_PROVIDER_FAILED",
   "EXAMPLE_PROVIDER_FAILED",
+  "CORRECTION_PROVIDER_RECOVERED",
+  "EXAMPLE_PROVIDER_RECOVERED",
   "TRANSLATION_PROVIDER_FAILED",
   "SPELL_CHECK_FAILED",
   "AUTH_SESSION_CREATED",
@@ -150,6 +152,18 @@ const EVENT_DEFINITIONS: Record<AdminEventType, EventDefinition> = {
     severity: "ERROR",
     module: "ESSAY_SERVICE",
     searchText: "sample text example generation provider ai failed",
+    coalesceForMs: 15 * 60_000,
+  },
+  CORRECTION_PROVIDER_RECOVERED: {
+    severity: "WARN",
+    module: "ESSAY_SERVICE",
+    searchText: "essay correction generation provider recovered reserve step",
+    coalesceForMs: 15 * 60_000,
+  },
+  EXAMPLE_PROVIDER_RECOVERED: {
+    severity: "WARN",
+    module: "ESSAY_SERVICE",
+    searchText: "sample text example generation provider recovered reserve step",
     coalesceForMs: 15 * 60_000,
   },
   TRANSLATION_PROVIDER_FAILED: {
@@ -364,6 +378,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         hasNoAuthenticationContext(input)
       );
     case "CORRECTION_PROVIDER_FAILED":
+    case "CORRECTION_PROVIDER_RECOVERED":
       return (
         (input.provider === "gemini" || input.provider === "openrouter") &&
         input.httpStatus !== undefined &&
@@ -386,6 +401,7 @@ function isEventFieldCombinationValid(input: AdminEventInput) {
         hasNoAuthenticationContext(input)
       );
     case "EXAMPLE_PROVIDER_FAILED":
+    case "EXAMPLE_PROVIDER_RECOVERED":
       return (
         (input.provider === "gemini" || input.provider === "openrouter") &&
         input.httpStatus !== undefined &&
@@ -816,8 +832,12 @@ export function formatAdminEventMessage(event: AdminEventMessageInput): string {
       return `Correction daily limit reached${quota}.${repeat}`;
     case "CORRECTION_PROVIDER_FAILED":
       return `Correction generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
+    case "CORRECTION_PROVIDER_RECOVERED":
+      return `Correction step failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"} — recovered by a reserve step.${repeat}`;
     case "EXAMPLE_PROVIDER_FAILED":
       return `Sample text generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
+    case "EXAMPLE_PROVIDER_RECOVERED":
+      return `Sample text step failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"} — recovered by a reserve step.${repeat}`;
     case "TRANSLATION_PROVIDER_FAILED":
       return `Translation generation failed${provider ? ` (${provider})` : ""}: ${reasonCode?.replaceAll("_", " ") ?? "provider error"}.${repeat}`;
     case "SPELL_CHECK_FAILED":

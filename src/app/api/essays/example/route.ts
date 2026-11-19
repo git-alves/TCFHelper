@@ -281,6 +281,17 @@ export async function POST(request: Request) {
                 reasonCode: failure.reasonCode as AdminEventReasonCode, httpStatus: failure.status ?? 502,
               });
             },
+            async onRecovered(failedSteps) {
+              for (const { step, failure } of failedSteps) {
+                // The event writer is deliberately best-effort: a new app
+                // replica can safely run before this additive migration lands.
+                await recordAdminEvent({
+                  eventType: "EXAMPLE_PROVIDER_RECOVERED", userId: user.id, provider: step.provider,
+                  model: step.model ?? undefined, reasonCode: failure.reasonCode as AdminEventReasonCode,
+                  httpStatus: failure.status ?? 502,
+                });
+              }
+            },
             async invoke(step: ModelChainStep, controls) {
               const candidate = getExampleProvider(step.provider);
               const overrides = { apiKey: step.apiKey, model: step.model, requestTimeoutMs: controls.timeoutMs, retry503: controls.retry503, totalBudgetMs: controls.totalBudgetMs };
