@@ -167,7 +167,7 @@ export async function requestOpenRouterChatCompletionDetailed(
       totalBudgetMs: options.totalBudgetMs,
     });
   } catch (error) {
-    console.error(`OpenRouter ${options.logLabel} transport failure`, error);
+    console.error(`OpenRouter ${options.logLabel} transport failure (attempt timeout ${options.timeoutMs}ms)`, error);
     throw new OpenRouterTransportError();
   }
 

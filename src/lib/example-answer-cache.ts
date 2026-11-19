@@ -6,8 +6,9 @@ import type { ModelAnswerProvider } from "@/lib/model-answer-generator";
 import { resolveUserQuotaLimits } from "@/lib/user-quota-limits";
 
 const CLAIM_TRANSACTION_TIMEOUT_MS = 3_000;
-// The configured three-step chain has a 75s provider budget (18s + 18s + up
-// to 39s for the final step). A 90s lease covers it plus cache persistence;
+// The configured chain has a 75s provider budget: its first two steps are
+// capped at 18s, and its last step receives every remaining millisecond. A
+// 90s lease covers it plus cache persistence;
 // it equals the route maxDuration, so a killed request cannot retain it past
 // the platform's own deadline.
 const LEASE_DURATION_MS = 90_000;

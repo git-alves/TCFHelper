@@ -11,8 +11,8 @@ export interface ModelChainStep {
 const MAX_STEPS = 3;
 // The correction lease reserves 170s. Provider work has a 150s budget,
 // leaving 20s for validation/persistence: step 1/2 are capped at 35s and
-// the final step receives the remaining budget (up to its normal 45s attempt
-// and its existing retry policy only when another full attempt still fits).
+// the final step receives all time left in that budget. Its normal retry
+// policy naturally skips a retry when another full long attempt cannot fit.
 export const CORRECTION_CHAIN_BUDGET_MS = 150_000;
 export const CORRECTION_RESERVE_STEP_TIMEOUT_MS = 35_000;
 export const EXAMPLE_CHAIN_BUDGET_MS = 75_000;
@@ -99,8 +99,9 @@ export type ModelChainRunOptions<T> = {
 };
 
 /**
- * Executes each configured step once. Only the last step may use the legacy
- * 503 retry policy, and only while its remaining slice can accommodate it.
+ * Executes each configured step once. In a multi-step chain the last step gets
+ * every millisecond the earlier steps did not use; only it may use the legacy
+ * 503 retry policy, and only while the remaining budget can accommodate it.
  * Legacy configuration deliberately bypasses this helper at route level.
  */
 export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promise<{ value: T; step: ModelChainStep; reserve: boolean }> {
@@ -111,7 +112,15 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
     const isLast = index === options.steps.length - 1;
     const elapsed = Date.now() - started;
     const remaining = Math.max(1, options.budgetMs - elapsed);
-    const timeoutMs = isLast ? Math.min(options.normalAttemptTimeoutMs, remaining) : Math.min(options.reserveStepTimeoutMs, remaining);
+    // Preserve the established single-chain-step behavior. With fallbacks,
+    // though, a final free-provider request can use time saved by fast failures
+    // instead of being cut off at the normal per-attempt timeout.
+    const timeoutMs =
+      isLast && options.steps.length > 1
+        ? remaining
+        : isLast
+          ? Math.min(options.normalAttemptTimeoutMs, remaining)
+          : Math.min(options.reserveStepTimeoutMs, remaining);
     try {
       const value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
       void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);

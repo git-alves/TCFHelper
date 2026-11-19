@@ -42,8 +42,59 @@ describe("model fallback chain", () => {
     })).resolves.toMatchObject({ value: "usable", reserve: true });
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke.mock.calls[0]?.[1]).toMatchObject({ retry503: false, timeoutMs: 35_000 });
-    expect(invoke.mock.calls[1]?.[1]).toMatchObject({ retry503: true });
+    expect(invoke.mock.calls[1]?.[1]).toMatchObject({ retry503: true, timeoutMs: 150_000, totalBudgetMs: 150_000 });
     expect(failed).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["correction", 150_000, 35_000, 45_000, 60_000],
+    ["example", 75_000, 18_000, 20_000, 40_000],
+  ] as const)("uses the remaining %s budget for a final answer after fast failures", async (section, budgetMs, reserveStepTimeoutMs, normalAttemptTimeoutMs, answerAfterMs) => {
+    let now = 1_000_000;
+    const nowSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+    const invoke = vi.fn().mockImplementation(async (_step, controls) => {
+      if (invoke.mock.calls.length < 3) throw Object.assign(new Error("overloaded"), { status: 503 });
+      expect(controls).toMatchObject({ timeoutMs: budgetMs, totalBudgetMs: budgetMs, retry503: true });
+      now += answerAfterMs;
+      return "long final answer";
+    });
+    const onFailure = vi.fn().mockResolvedValue(undefined);
+
+    try {
+      await expect(runModelChain({
+        section,
+        steps: [
+          { provider: "gemini", model: "first", apiKey: null },
+          { provider: "gemini", model: "second", apiKey: null },
+          { provider: "openrouter", model: "final", apiKey: null },
+        ],
+        budgetMs,
+        reserveStepTimeoutMs,
+        normalAttemptTimeoutMs,
+        invoke,
+        onFailure,
+        isFallbackable: (error) => ({ error, status: (error as { status?: number }).status, reasonCode: "upstream_http_error" }),
+      })).resolves.toMatchObject({ value: "long final answer", reserve: true });
+      expect(invoke.mock.calls[0]?.[1]).toMatchObject({ timeoutMs: reserveStepTimeoutMs, retry503: false });
+      expect(invoke.mock.calls[1]?.[1]).toMatchObject({ timeoutMs: reserveStepTimeoutMs, retry503: false });
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("keeps a one-step chain at its normal attempt timeout", async () => {
+    const invoke = vi.fn().mockResolvedValue("answer");
+    await runModelChain({
+      section: "correction",
+      steps: [{ provider: "gemini", model: "only", apiKey: null }],
+      budgetMs: 150_000,
+      reserveStepTimeoutMs: 35_000,
+      normalAttemptTimeoutMs: 45_000,
+      invoke,
+      onFailure: vi.fn(),
+      isFallbackable: () => null,
+    });
+    expect(invoke).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ timeoutMs: 45_000, totalBudgetMs: 150_000 }));
   });
 
   it("keeps malformed stored chains disabled so legacy behavior is selected", () => {
