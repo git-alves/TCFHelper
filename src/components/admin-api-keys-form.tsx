@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type {
   AppConfigDisplay,
@@ -12,6 +12,7 @@ import type { ExampleProviderId } from "@/lib/example-provider";
 type Job = "correction" | "example";
 type Provider = CorrectionProviderId & ExampleProviderId;
 type Step = {
+  id: string;
   provider: Provider;
   model: string;
   apiKey: string;
@@ -32,7 +33,7 @@ type Outcome = {
   latencyMs: number | null;
   summary: string | null;
 };
-type Test = { running: boolean; outcome: Outcome | null };
+type Test = { running: boolean; outcome: Outcome | null; requestId?: number };
 const providerName: Record<Provider, string> = {
   gemini: "Gemini Direct",
   openrouter: "OpenRouter",
@@ -44,6 +45,7 @@ const button =
   "min-h-11 rounded-lg border border-black/[.15] px-3 py-2 text-sm font-medium " +
   "hover:bg-black/[.04] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/[.2] " +
   "dark:hover:bg-white/[.08]";
+let nextChainStepId = 0;
 
 function fromDisplay(display: AppConfigDisplay, job: Job): Draft {
   const section = display[job];
@@ -61,6 +63,7 @@ function fromDisplay(display: AppConfigDisplay, job: Job): Draft {
     dailyLimit: section.dailyLimitIsDefault ? "" : String(section.dailyLimit),
     chain:
       shown?.map((step, index) => ({
+        id: `saved-${index}`,
         provider: step.provider,
         model: step.model ?? "",
         apiKey: "",
@@ -87,12 +90,11 @@ function serialize(chain: Step[] | null) {
 function source(
   step: Step,
   saved: { apiKeySet: boolean; apiKeyMasked: string | null } | undefined,
-  section: AppConfigDisplaySection,
 ) {
   if (step.apiKey.trim()) return "replacement key (unsaved)";
   if (step.savedApiKeyIndex !== undefined && saved?.apiKeySet)
     return `saved key ${saved.apiKeyMasked}`;
-  return section.apiKeyFromEnv ? "environment key" : "No key — will fail";
+  return "No saved key — environment availability unknown";
 }
 function Result({ test }: { test: Test }) {
   if (!test.outcome) return null;
@@ -180,13 +182,13 @@ function JobCard({
     kind: string;
   }[];
   reserve: number;
-  getTest: (n: number) => Test;
-  runTest: (n: number) => void;
+  getTest: (stepId: string) => Test;
+  runTest: (stepId: string) => void;
   changeProvider: (provider: Provider) => void;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const [allEdit, setAllEdit] = useState(false);
-  const [remove, setRemove] = useState<number | null>(null);
+  const [remove, setRemove] = useState<string | null>(null);
   const [off, setOff] = useState(false);
   const [legacyEditing, setLegacyEditing] = useState(false);
   const section = display[job];
@@ -214,6 +216,7 @@ function JobCard({
     [chain[i], chain[to]] = [chain[to]!, chain[i]!];
     change({ ...draft, chain });
     setEditing(to);
+    setRemove(null);
   };
   const modelMissing = draft.provider === "openrouter" && !draft.model.trim();
   const chainStatus = draft.chain
@@ -258,10 +261,10 @@ function JobCard({
             const role =
               i === 0 ? "Primary" : i === 1 ? "Reserve" : "Final reserve";
             const isEditing = allEdit || editing === i;
-            const test = getTest(i);
+            const test = getTest(step.id);
             return (
               <li
-                key={`${i}-${step.provider}`}
+                key={step.id}
                 className="rounded-xl border border-black/[.1] p-3 dark:border-white/[.15]"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -274,7 +277,12 @@ function JobCard({
                       {step.model || "default model"}
                     </span>
                     <span className="ml-3 text-xs text-zinc-600 dark:text-zinc-400">
-                      {source(step, displayedChain?.[i], section)}
+                      {source(
+                        step,
+                        step.savedApiKeyIndex === undefined
+                          ? undefined
+                          : displayedChain?.[step.savedApiKeyIndex],
+                      )}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -289,7 +297,7 @@ function JobCard({
                       type="button"
                       className={button}
                       disabled={test.running}
-                      onClick={() => runTest(i)}
+                      onClick={() => runTest(step.id)}
                     >
                       {test.running ? "Testing…" : "Test"}
                     </button>
@@ -384,13 +392,13 @@ function JobCard({
                         <button
                           type="button"
                           className={button}
-                          onClick={() => setRemove(i)}
+                          onClick={() => setRemove(step.id)}
                         >
                           Remove step
                         </button>
                       )}
                     </div>
-                    {remove === i && (
+                    {remove === step.id && (
                       <p
                         role="alert"
                         className="rounded-lg bg-amber-500/10 p-3 text-sm"
@@ -461,13 +469,13 @@ function JobCard({
             <button
               type="button"
               className={button}
-              disabled={getTest(-1).running}
-              onClick={() => runTest(-1)}
+              disabled={getTest("legacy").running}
+              onClick={() => runTest("legacy")}
             >
-              {getTest(-1).running ? "Testing…" : "Test"}
+              {getTest("legacy").running ? "Testing…" : "Test"}
             </button>
           </div>
-          <Result test={getTest(-1)} />
+          <Result test={getTest("legacy")} />
         </div>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -492,7 +500,12 @@ function JobCard({
                     ...draft,
                     chain: [
                       ...draft.chain!,
-                      { provider: "gemini", model: "", apiKey: "" },
+                      {
+                        id: `new-${++nextChainStepId}`,
+                        provider: "gemini",
+                        model: "",
+                        apiKey: "",
+                      },
                     ],
                   });
                   setEditing(draft.chain!.length);
@@ -511,6 +524,7 @@ function JobCard({
                 ...draft,
                 chain: [
                   {
+                    id: `new-${++nextChainStepId}`,
                     provider: draft.provider,
                     model: draft.model,
                     apiKey: draft.apiKey,
@@ -669,6 +683,8 @@ export function AdminApiKeysForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [cardStateVersion, setCardStateVersion] = useState(0);
+  const testSequence = useRef(0);
   const initial = useMemo(
     () =>
       JSON.stringify({
@@ -681,7 +697,7 @@ export function AdminApiKeysForm({
   const invalid = [correction, example].some(
     (d) =>
       !/^$|^[1-9]\d*$/.test(d.dailyLimit.trim()) ||
-      d.chain?.some((s) => s.provider === "openrouter" && !s.model.trim()),
+      d.chain?.some((s) => !s.model.trim()),
   );
   const alerts = display.modelChainStatus?.alerts ?? [];
   function change(job: Job, next: Draft) {
@@ -718,15 +734,21 @@ export function AdminApiKeysForm({
       apiKeyCleared: false,
     });
   }
-  async function test(job: Job, index: number) {
+  async function test(job: Job, stepId: string) {
     const draft = job === "correction" ? correction : example;
-    const step = draft.chain?.[index] ?? {
+    const step = draft.chain?.find((candidate) => candidate.id === stepId) ?? {
+      id: "legacy",
       provider: draft.provider,
       model: draft.model,
       apiKey: draft.apiKey,
+      savedApiKeyIndex: undefined,
     };
-    const key = `${job}:${index < 0 ? "legacy" : index}`;
-    setTests((all) => ({ ...all, [key]: { running: true, outcome: null } }));
+    const key = `${job}:${stepId}`;
+    const requestId = ++testSequence.current;
+    setTests((all) => ({
+      ...all,
+      [key]: { running: true, outcome: null, requestId },
+    }));
     try {
       const response = await fetch("/api/admin/api-keys/test", {
         method: "POST",
@@ -762,20 +784,29 @@ export function AdminApiKeysForm({
             latencyMs: null,
             summary: null,
           };
-      setTests((all) => ({ ...all, [key]: { running: false, outcome } }));
+      setTests((all) =>
+        all[key]?.requestId === requestId
+          ? { ...all, [key]: { running: false, outcome, requestId } }
+          : all,
+      );
     } catch {
-      setTests((all) => ({
-        ...all,
-        [key]: {
-          running: false,
-          outcome: {
-            ok: false,
-            message: "Could not reach the admin service.",
-            latencyMs: null,
-            summary: null,
-          },
-        },
-      }));
+      setTests((all) =>
+        all[key]?.requestId === requestId
+          ? {
+              ...all,
+              [key]: {
+                running: false,
+                requestId,
+                outcome: {
+                  ok: false,
+                  message: "Could not reach the admin service.",
+                  latencyMs: null,
+                  summary: null,
+                },
+              },
+            }
+          : all,
+      );
     }
   }
   async function dismiss(id: string) {
@@ -846,6 +877,7 @@ export function AdminApiKeysForm({
       setCorrection(fromDisplay(next, "correction"));
       setExample(fromDisplay(next, "example"));
       setTests({});
+      setCardStateVersion((version) => version + 1);
       setSaved(true);
       router.refresh();
     } catch {
@@ -909,13 +941,14 @@ export function AdminApiKeysForm({
         changeProvider={(provider) => changeProvider("correction", provider)}
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.correction ?? 0}
-        getTest={(i) =>
-          tests[`correction:${i < 0 ? "legacy" : i}`] ?? {
+        key={`correction-${cardStateVersion}`}
+        getTest={(stepId) =>
+          tests[`correction:${stepId}`] ?? {
             running: false,
             outcome: null,
           }
         }
-        runTest={(i) => void test("correction", i)}
+        runTest={(stepId) => void test("correction", stepId)}
       />
       <JobCard
         job="example"
@@ -925,13 +958,14 @@ export function AdminApiKeysForm({
         changeProvider={(provider) => changeProvider("example", provider)}
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.example ?? 0}
-        getTest={(i) =>
-          tests[`example:${i < 0 ? "legacy" : i}`] ?? {
+        key={`example-${cardStateVersion}`}
+        getTest={(stepId) =>
+          tests[`example:${stepId}`] ?? {
             running: false,
             outcome: null,
           }
         }
-        runTest={(i) => void test("example", i)}
+        runTest={(stepId) => void test("example", stepId)}
       />
       {dirty && (
         <div
@@ -950,6 +984,7 @@ export function AdminApiKeysForm({
                 setExample(fromDisplay(display, "example"));
                 setTests({});
                 setError(null);
+                setCardStateVersion((version) => version + 1);
               }}
             >
               Discard changes
@@ -967,7 +1002,7 @@ export function AdminApiKeysForm({
           </div>
           {invalid && (
             <p role="alert" className="basis-full text-sm text-red-700">
-              Complete each OpenRouter model and enter whole-number daily limits
+              Enter a model for every chain step and whole-number daily limits
               before saving.
             </p>
           )}
