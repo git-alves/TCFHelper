@@ -65,7 +65,7 @@ export async function getModelChainAdminStatus() {
   today.setUTCHours(0, 0, 0, 0);
   // During a rolling deploy, the new additive tables may not have arrived at
   // every replica yet. Settings remain usable and show no banner until they do.
-  let alerts: { id: string; provider: string; model: string; kind: string }[] = [];
+  let alerts: { id: string; section: ModelChainSection; provider: string; model: string; kind: string }[] = [];
   let reserve: { section: string; _count: { _all: number } }[] = [];
   try {
     [alerts, reserve] = await Promise.all([
