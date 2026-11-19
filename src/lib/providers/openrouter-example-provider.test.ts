@@ -52,16 +52,30 @@ describe("openRouterExampleProvider.hasConfiguredCredentials", () => {
 });
 
 describe("openRouterExampleProvider.generateExample", () => {
-  it("still treats an empty completion as a request failure, even when it stopped at the token limit", async () => {
+  it("logs safe reasoning metadata for an empty length-limited completion and treats it as a request failure", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockFetchOnce({
       status: 200,
       ok: true,
-      json: async () => ({ choices: [{ finish_reason: "length", message: { content: "" } }] }),
+      json: async () => ({
+        choices: [{ finish_reason: "length", message: { content: "" } }],
+        usage: {
+          prompt_tokens: 400,
+          completion_tokens: 2048,
+          completion_tokens_details: { reasoning_tokens: 2048 },
+        },
+      }),
     });
 
     await expect(
       openRouterExampleProvider.generateExample(params, { apiKey: "k", model: "m" }),
     ).rejects.toMatchObject({ status: 200 });
+    expect(consoleError).toHaveBeenCalledWith(
+      "OpenRouter example output empty finishReason=length promptTokens=400 completionTokens=2048 reasoningTokens=2048",
+    );
+    const logged = consoleError.mock.calls.flat().join(" ");
+    expect(logged).not.toContain("télétravail");
+    expect(logged).not.toContain("test-key");
   });
 
   it("throws ExampleProviderNotConfiguredError without a model", async () => {
@@ -87,8 +101,8 @@ describe("openRouterExampleProvider.generateExample", () => {
     expect(body.model).toBe("openai/gpt-5-mini");
     expect(body.messages).toHaveLength(1);
     expect(body.messages[0].role).toBe("user");
-    // The correction budget change must not leak into the example generator.
-    expect(body.max_tokens).toBe(2048);
+    expect(body.max_tokens).toBe(8192);
+    expect(body.reasoning).toEqual({ max_tokens: 2048 });
     // require_parameters is for the structured correction call only.
     expect(body).not.toHaveProperty("provider");
     expect(body).not.toHaveProperty("response_format");

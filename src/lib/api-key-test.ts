@@ -373,7 +373,7 @@ export async function runApiKeyTest(input: ApiKeyTestInput): Promise<ApiKeyTestR
     if (TRUNCATED(reply.finishReason)) {
       return result(
         "truncated",
-        `The model used up the test's ${API_KEY_TEST_MAX_TOKENS[section].toLocaleString("en-US")}-token limit before answering (a reasoning model?). Real ${section === "correction" ? "corrections allow 8,192 tokens" : "examples allow 2,048 tokens"}, so it may still work: try a real one to confirm.`,
+        `The model used up the test's ${API_KEY_TEST_MAX_TOKENS[section].toLocaleString("en-US")}-token limit before answering (a reasoning model?). Real ${section === "correction" ? "corrections allow 8,192 tokens" : "examples allow 8,192 tokens"}, so it may still work: try a real one to confirm.`,
         withEchoedModel,
       );
     }
