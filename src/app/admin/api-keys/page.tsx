@@ -26,13 +26,9 @@ export default async function AdminApiKeysPage() {
         </div>
       </div>
 
-      <section
-        aria-labelledby="api-keys-help-heading"
-        className="max-w-3xl rounded-xl border border-black/[.1] bg-black/[.02] p-4 text-sm leading-6 text-zinc-700 dark:border-white/[.15] dark:bg-white/[.03] dark:text-zinc-300"
-      >
-        <h2 id="api-keys-help-heading" className="font-semibold">
-          Before you pick a model
-        </h2>
+      <details className="max-w-3xl rounded-xl border border-black/[.1] bg-black/[.02] p-4 text-sm leading-6 text-zinc-700 dark:border-white/[.15] dark:bg-white/[.03] dark:text-zinc-300">
+        <summary className="cursor-pointer font-semibold">Model requirements &amp; key precedence</summary>
+        <div className="mt-3">
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
             <strong>Essay correction</strong> needs a model that supports structured JSON output (OpenRouter&apos;s{" "}
@@ -54,7 +50,8 @@ export default async function AdminApiKeysPage() {
             provider&apos;s key is never sent to another. Changing only the model keeps that provider&apos;s saved key.
           </li>
         </ul>
-      </section>
+        </div>
+      </details>
 
       <AdminApiKeysForm initialDisplay={display} />
     </main>

@@ -1,16 +1,22 @@
 import { describe, expect, it, vi } from "vitest";
 
-const { createMock, deleteManyMock, upsertMock, updateManyMock } = vi.hoisted(() => ({ createMock: vi.fn(), deleteManyMock: vi.fn(), upsertMock: vi.fn(), updateManyMock: vi.fn() }));
+const { createMock, deleteManyMock, upsertMock, updateManyMock, findManyMock, groupByMock } = vi.hoisted(() => ({ createMock: vi.fn(), deleteManyMock: vi.fn(), upsertMock: vi.fn(), updateManyMock: vi.fn(), findManyMock: vi.fn(), groupByMock: vi.fn() }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    modelChainAlert: { upsert: upsertMock, deleteMany: deleteManyMock, updateMany: updateManyMock },
-    modelChainReserveUse: { create: createMock },
+    modelChainAlert: { upsert: upsertMock, deleteMany: deleteManyMock, updateMany: updateManyMock, findMany: findManyMock },
+    modelChainReserveUse: { create: createMock, groupBy: groupByMock },
   },
 }));
 
-const { parseModelChain, runModelChain, openModelChainAlert, clearModelChainAlert, dismissModelChainAlert } = await import("./model-chain");
+const { parseModelChain, runModelChain, openModelChainAlert, clearModelChainAlert, dismissModelChainAlert, getModelChainAdminStatus } = await import("./model-chain");
 
 describe("model fallback chain", () => {
+  it("includes each alert's read-only job section in the admin display", async () => {
+    findManyMock.mockResolvedValue([{ id: "alert_1", section: "example", provider: "gemini", model: "model", kind: "key" }]);
+    groupByMock.mockResolvedValue([]);
+
+    await expect(getModelChainAdminStatus()).resolves.toMatchObject({ alerts: [{ id: "alert_1", section: "example" }] });
+  });
   it("opens credit and Gemini invalid-key alerts, clears on success, and dismisses", async () => {
     const step = { provider: "gemini" as const, model: "gemini-3.5-flash", apiKey: null };
     await openModelChainAlert("correction", step, 402);

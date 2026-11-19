@@ -57,7 +57,7 @@ export default async function AdminOverviewPage() {
       </div>
       {modelChainStatus.alerts.map((alert) => (
         <div key={alert.id} role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm">
-          <strong>{alert.provider} / {alert.model}:</strong> {alert.kind === "credits" ? "top up credits for this provider step." : "this step has an invalid API key; update it in API Keys."}
+          <strong>{alert.section === "correction" ? "Essay correction" : "Example generation"} · {alert.provider} / {alert.model}:</strong> {alert.kind === "credits" ? "top up credits for this provider step." : "this step has an invalid API key; update it in API Keys."}
         </div>
       ))}
 
