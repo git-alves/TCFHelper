@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { AUTOMATIC_ADDITIVE_MIGRATIONS } from "./approved-additive-migrations";
 
@@ -136,5 +138,17 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
 
   it("allows the additive recovered-chain AdminEvent vocabulary", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261119120000_add_recovered_chain_events");
+  });
+
+  it("widens the AdminEvent constraint without removing existing provider-failure rows", () => {
+    const migration = readFileSync(
+      fileURLToPath(new URL("../../prisma/migrations/20261119120000_add_recovered_chain_events/migration.sql", import.meta.url)),
+      "utf8",
+    );
+    expect(migration).toContain("'CORRECTION_PROVIDER_FAILED'");
+    expect(migration).toContain("'EXAMPLE_PROVIDER_FAILED'");
+    expect(migration).toContain("'CORRECTION_PROVIDER_RECOVERED'");
+    expect(migration).toContain("'EXAMPLE_PROVIDER_RECOVERED'");
+    expect(migration).toContain('"severity" = \'WARN\'');
   });
 });
