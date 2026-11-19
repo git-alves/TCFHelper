@@ -192,6 +192,7 @@ describe("POST /api/essays/example", () => {
     expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(200);
     expect(generatePreferredModelAnswerMock).toHaveBeenCalledTimes(2);
     expect(recordAdminEventMock).toHaveBeenCalledTimes(1);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "EXAMPLE_PROVIDER_RECOVERED", provider: "gemini", model: "first" }));
   });
 
   it("refunds an all-failed chain once and avoids a claim without credentials", async () => {
@@ -199,6 +200,7 @@ describe("POST /api/essays/example", () => {
     generatePreferredModelAnswerMock.mockRejectedValue(new ExampleProviderRequestError(503));
     expect((await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." })).status).toBe(502);
     expect(refundExampleGenerationLeaseMock).toHaveBeenCalledTimes(1);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "EXAMPLE_PROVIDER_FAILED" }));
     getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: null }] });
     hasConfiguredCredentialsMock.mockReturnValue(false);
     const response = await post({ taskType: "TASK_1", level: "B2", topicPrompt: "Écrivez à votre voisin." });

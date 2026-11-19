@@ -200,6 +200,20 @@ describe("recordAdminEvent", () => {
     });
   });
 
+  it("persists a recovered correction chain step as a WARN event", async () => {
+    await recordAdminEvent({
+      eventType: "CORRECTION_PROVIDER_RECOVERED",
+      userId: USER_ID,
+      provider: "gemini",
+      model: "gemini-3.5-flash-lite",
+      reasonCode: "upstream_http_error",
+      httpStatus: 503,
+    });
+    expect(upsertMock).toHaveBeenCalledWith(expect.objectContaining({
+      create: expect.objectContaining({ severity: "WARN", eventType: "CORRECTION_PROVIDER_RECOVERED" }),
+    }));
+  });
+
   it("persists the resolved model and folds it into the searchText, so a candidate model is findable by name", async () => {
     await recordAdminEvent(
       {
@@ -582,6 +596,17 @@ describe("admin-event retention", () => {
 });
 
 describe("formatAdminEventMessage", () => {
+  it("renders recovered provider failures as reserve-step warnings", () => {
+    expect(formatAdminEventMessage({
+      eventType: "EXAMPLE_PROVIDER_RECOVERED",
+      provider: "gemini",
+      reasonCode: "upstream_http_error",
+      quotaWindow: null,
+      usageValue: null,
+      quotaLimit: null,
+      occurrenceCount: 1,
+    })).toBe("Sample text step failed (gemini): upstream http error — recovered by a reserve step.");
+  });
   it("renders a closed, contextual message rather than a stored provider error", () => {
     expect(
       formatAdminEventMessage({

@@ -133,4 +133,8 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
   it("allows the additive starter-topic bank deployment-order fence", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261110120000_add_starter_topic_bank_state");
   });
+
+  it("allows the additive recovered-chain AdminEvent vocabulary", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261119120000_add_recovered_chain_events");
+  });
 });

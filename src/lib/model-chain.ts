@@ -87,6 +87,7 @@ export async function dismissModelChainAlert(id: string) {
 }
 
 export type ChainFailure = { error: unknown; status?: number; reasonCode: string };
+export type ModelChainFailedStep = { step: ModelChainStep; failure: ChainFailure };
 export type ModelChainRunOptions<T> = {
   section: ModelChainSection;
   steps: ModelChainStep[];
@@ -95,7 +96,10 @@ export type ModelChainRunOptions<T> = {
   normalAttemptTimeoutMs: number;
   isFallbackable: (error: unknown) => ChainFailure | null;
   invoke: (step: ModelChainStep, controls: { timeoutMs: number; retry503: boolean; totalBudgetMs: number }) => Promise<T>;
+  /** Called only when every configured step failed. */
   onFailure: (step: ModelChainStep, failure: ChainFailure) => Promise<void>;
+  /** Called after a reserve step succeeds, for failures it recovered from. */
+  onRecovered?: (failedSteps: ModelChainFailedStep[], recoveredBy: ModelChainStep) => Promise<void>;
 };
 
 /**
@@ -106,6 +110,7 @@ export type ModelChainRunOptions<T> = {
 export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promise<{ value: T; step: ModelChainStep; reserve: boolean }> {
   const started = Date.now();
   let lastError: unknown;
+  const failedSteps: ModelChainFailedStep[] = [];
   for (let index = 0; index < options.steps.length; index++) {
     const step = options.steps[index]!;
     const isLast = index === options.steps.length - 1;
@@ -114,6 +119,7 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
     const timeoutMs = isLast ? Math.min(options.normalAttemptTimeoutMs, remaining) : Math.min(options.reserveStepTimeoutMs, remaining);
     try {
       const value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
+      if (failedSteps.length > 0) await options.onRecovered?.(failedSteps, step);
       void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
       if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
       return { value, step, reserve: index > 0 };
@@ -121,11 +127,12 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
       lastError = error;
       const failure = options.isFallbackable(error);
       if (!failure) throw error;
-      await options.onFailure(step, failure);
+      failedSteps.push({ step, failure });
       if (failure.status) void openModelChainAlert(options.section, step, failure.status).catch(() => undefined);
       // Route request validation happens before this runner. A provider 400
       // (notably Gemini's API_KEY_INVALID) is a chain failure and advances.
     }
   }
+  for (const { step, failure } of failedSteps) await options.onFailure(step, failure);
   throw lastError;
 }

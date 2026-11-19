@@ -121,4 +121,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // Nullable AppConfig JSON columns plus two new empty operational tables.
   // Legacy deployments keep their provider behavior until an owner saves a chain.
   "20261118120000_add_model_fallback_chain",
+  // Widens the AdminEvent closed vocabulary with WARN-only model-chain
+  // recovery events. Existing event rows and prior application writes remain
+  // valid unchanged during a rolling deploy.
+  "20261119120000_add_recovered_chain_events",
 ]);

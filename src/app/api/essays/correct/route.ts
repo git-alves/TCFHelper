@@ -458,6 +458,18 @@ export async function POST(request: Request) {
               httpStatus: failure.status ?? 502,
             });
           },
+          async onRecovered(failedSteps) {
+            for (const { step, failure } of failedSteps) {
+              // Before the additive migration arrives, recordAdminEvent catches
+              // the database constraint rejection, so a successful correction
+              // is never affected during a rolling deploy.
+              await recordAdminEvent({
+                eventType: "CORRECTION_PROVIDER_RECOVERED", userId: user.id, provider: step.provider,
+                model: step.model ?? undefined, reasonCode: failure.reasonCode as AdminEventReasonCode,
+                httpStatus: failure.status ?? 502,
+              });
+            }
+          },
           async invoke(step: ModelChainStep, controls) {
             const candidate = getCorrectionProvider(step.provider);
             if (!candidate.hasConfiguredCredentials({ apiKey: step.apiKey, model: step.model })) {
