@@ -186,6 +186,7 @@ function JobCard({
   const [allEdit, setAllEdit] = useState(false);
   const [remove, setRemove] = useState<number | null>(null);
   const [off, setOff] = useState(false);
+  const [legacyEditing, setLegacyEditing] = useState(false);
   const section = display[job];
   const title =
     job === "correction" ? "Essay correction" : "Example generation";
@@ -436,6 +437,24 @@ function JobCard({
                 ? "environment key"
                 : "No key — will fail"}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={button}
+              onClick={() => setLegacyEditing(true)}
+            >
+              Edit single model
+            </button>
+            <button
+              type="button"
+              className={button}
+              disabled={getTest(-1).running}
+              onClick={() => runTest(-1)}
+            >
+              {getTest(-1).running ? "Testing…" : "Test"}
+            </button>
+          </div>
+          <Result test={getTest(-1)} />
         </div>
       )}
       <div className="mt-4 flex flex-wrap gap-2">
@@ -494,7 +513,13 @@ function JobCard({
           </button>
         )}
       </div>
-      <details className="mt-4 rounded-xl border border-black/[.1] p-3 dark:border-white/[.15]">
+      <details
+        open={legacyEditing}
+        onToggle={(event) =>
+          setLegacyEditing((event.target as HTMLDetailsElement).open)
+        }
+        className="mt-4 rounded-xl border border-black/[.1] p-3 dark:border-white/[.15]"
+      >
         <summary className="cursor-pointer font-medium">
           Advanced / legacy settings
         </summary>
@@ -660,7 +685,7 @@ export function AdminApiKeysForm({
       model: draft.model,
       apiKey: draft.apiKey,
     };
-    const key = `${job}:${index}`;
+    const key = `${job}:${index < 0 ? "legacy" : index}`;
     setTests((all) => ({ ...all, [key]: { running: true, outcome: null } }));
     try {
       const response = await fetch("/api/admin/api-keys/test", {
@@ -670,7 +695,15 @@ export function AdminApiKeysForm({
           section: job,
           provider: step.provider,
           model: step.model.trim() || null,
-          ...(step.apiKey.trim() ? { apiKey: step.apiKey.trim() } : {}),
+          ...(draft.chain
+            ? step.apiKey.trim()
+              ? { apiKey: step.apiKey.trim() }
+              : {}
+            : draft.apiKeyCleared
+              ? { apiKey: "" }
+              : step.apiKey.trim()
+                ? { apiKey: step.apiKey.trim() }
+                : {}),
           ...(step.savedApiKeyIndex !== undefined
             ? { savedApiKeyIndex: step.savedApiKeyIndex }
             : {}),
@@ -836,7 +869,10 @@ export function AdminApiKeysForm({
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.correction ?? 0}
         getTest={(i) =>
-          tests[`correction:${i}`] ?? { running: false, outcome: null }
+          tests[`correction:${i < 0 ? "legacy" : i}`] ?? {
+            running: false,
+            outcome: null,
+          }
         }
         runTest={(i) => void test("correction", i)}
       />
@@ -848,7 +884,10 @@ export function AdminApiKeysForm({
         alerts={alerts}
         reserve={display.modelChainStatus?.reserveToday.example ?? 0}
         getTest={(i) =>
-          tests[`example:${i}`] ?? { running: false, outcome: null }
+          tests[`example:${i < 0 ? "legacy" : i}`] ?? {
+            running: false,
+            outcome: null,
+          }
         }
         runTest={(i) => void test("example", i)}
       />
