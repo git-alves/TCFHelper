@@ -124,6 +124,43 @@ describe("API key operational cards", () => {
     expect(container.textContent).not.toContain("window.alert");
   });
 
+  it("ignores a slow step-test result after that step changes", async () => {
+    let finish!: (response: {
+      ok: boolean;
+      json: () => Promise<unknown>;
+    }) => void;
+    fetchMock.mockReturnValue(new Promise((resolve) => (finish = resolve)));
+    render();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Edit step 1"]')!
+        .click(),
+    );
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Test step 1"]')!
+        .click(),
+    );
+    await act(async () =>
+      setValue(
+        container.querySelector<HTMLInputElement>(
+          '[aria-label="Essay correction step 1 model"]',
+        )!,
+        "changed-after-test",
+      ),
+    );
+    await act(async () =>
+      finish({
+        ok: true,
+        json: async () => ({
+          result: { ok: true, message: "Stale result", latencyMs: 1 },
+          tested: {},
+        }),
+      }),
+    );
+    expect(container.textContent).not.toContain("Stale result");
+  });
+
   it("uses the unchanged chain-test request contract and keeps the saved key index", async () => {
     fetchMock.mockResolvedValue({
       ok: true,
