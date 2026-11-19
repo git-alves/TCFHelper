@@ -18,6 +18,8 @@ type Step = {
   apiKey: string;
   savedApiKeyIndex?: number;
   clearSavedKey?: boolean;
+  /** A newly added blank step needs an explicit configuration decision. */
+  newStepUntouched?: boolean;
 };
 type Draft = {
   provider: Provider;
@@ -212,7 +214,13 @@ function JobCard({
     change({
       ...draft,
       chain: draft.chain!.map((step, n) =>
-        n === i ? { ...step, ...patch } : step,
+        n === i
+          ? {
+              ...step,
+              ...patch,
+              ...(step.newStepUntouched ? { newStepUntouched: false } : {}),
+            }
+          : step,
       ),
     });
   const move = (i: number, delta: number) => {
@@ -542,6 +550,7 @@ function JobCard({
                         provider: "gemini",
                         model: "",
                         apiKey: "",
+                        newStepUntouched: true,
                       },
                     ],
                   });
@@ -734,7 +743,11 @@ export function AdminApiKeysForm({
   const invalid = [correction, example].some(
     (d) =>
       !/^$|^[1-9]\d*$/.test(d.dailyLimit.trim()) ||
-      d.chain?.some((s) => !s.model.trim()),
+      d.chain?.some(
+        (s) =>
+          (s.provider === "openrouter" && !s.model.trim()) ||
+          s.newStepUntouched,
+      ),
   );
   const alerts = display.modelChainStatus?.alerts ?? [];
   function change(job: Job, next: Draft) {
@@ -756,9 +769,13 @@ export function AdminApiKeysForm({
     const current = job === "correction" ? correction : example;
 
     if (provider === savedProvider) {
+      const saved = fromDisplay(display, job);
       change(job, {
-        ...fromDisplay(display, job),
-        dailyLimit: current.dailyLimit,
+        ...current,
+        provider: saved.provider,
+        model: saved.model,
+        apiKey: saved.apiKey,
+        apiKeyCleared: saved.apiKeyCleared,
       });
       return;
     }

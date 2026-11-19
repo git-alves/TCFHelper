@@ -355,6 +355,18 @@ describe("legacy API key settings", () => {
     ).toBe("gemini-3.5-flash-lite");
     expect(container.textContent).toContain("saved key ••••1234");
   });
+
+  it("keeps an added reserve chain when switching the Advanced provider away and back", async () => {
+    render(legacyDisplay);
+    await click("Convert to model chain");
+    await click("Add reserve step");
+    await openCorrectionLegacySettings();
+    const provider = container.querySelector<HTMLSelectElement>("select")!;
+    await act(async () => setValue(provider, "openrouter"));
+    await act(async () => setValue(provider, "gemini"));
+
+    expect(container.textContent).toContain("Active model chain · 2 steps");
+  });
 });
 
 describe("save and card state", () => {
@@ -421,7 +433,7 @@ describe("save and card state", () => {
     expect(body(1).correctionModelChain).toBeNull();
   });
 
-  it("drops a saved chain key after a provider change, preserves it after a model change, and restores drafts on discard", async () => {
+  it("drops a saved chain key after a provider change, preserves it after a model change, and restores original values on discard", async () => {
     fetchMock.mockResolvedValue(success());
     render();
     await act(async () =>
@@ -454,6 +466,17 @@ describe("save and card state", () => {
     expect(
       container.querySelector('[aria-label="Essay correction step 1 model"]'),
     ).toBeNull();
+    const details = container.querySelector("details")!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+    });
+    await change('details input[type="number"]', "200");
+    await submit();
+    expect(body(1).correctionModelChain).toEqual([
+      { provider: "gemini", model: "first", savedApiKeyIndex: 0 },
+      { provider: "openrouter", model: "second" },
+    ]);
   });
 
   it("drops the saved key index when a step provider changes", async () => {
@@ -502,13 +525,17 @@ describe("save and card state", () => {
     });
   });
 
-  it("keeps a retained key index when another step is removed", async () => {
+  it("keeps a retained key index when the earlier saved step is removed", async () => {
     fetchMock.mockResolvedValue(success());
-    render();
+    render({
+      ...display,
+      correctionModelChain: [
+        { provider: "gemini", model: "first", apiKeySet: true, apiKeyMasked: "••••1111" },
+        { provider: "gemini", model: "second", apiKeySet: true, apiKeyMasked: "••••2222" },
+      ],
+    });
     await act(async () =>
-      container
-        .querySelector<HTMLButtonElement>('[aria-label="Edit step 2"]')!
-        .click(),
+      container.querySelector<HTMLButtonElement>('[aria-label="Edit step 1"]')!.click(),
     );
     await click("Remove step");
     await act(async () =>
@@ -518,7 +545,7 @@ describe("save and card state", () => {
     );
     await submit();
     expect(body().correctionModelChain).toEqual([
-      { provider: "gemini", model: "first", savedApiKeyIndex: 0 },
+      { provider: "gemini", model: "second", savedApiKeyIndex: 1 },
     ]);
   });
 
@@ -533,7 +560,48 @@ describe("save and card state", () => {
     });
   });
 
-  it("blocks Save after adding an unconfigured Gemini reserve step", async () => {
+  it("saves a blank-model Gemini chain step with its retained saved key", async () => {
+    fetchMock.mockResolvedValue(success());
+    render({
+      ...display,
+      correctionModelChain: [
+        { provider: "gemini", model: null, apiKeySet: true, apiKeyMasked: "••••1234" },
+      ],
+    });
+    const details = container.querySelector("details")!;
+    await act(async () => {
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+    });
+    await change('details input[type="number"]', "200");
+
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+    await submit();
+    expect(body()).toMatchObject({
+      correctionDailyLimit: 200,
+      correctionModelChain: [
+        { provider: "gemini", model: null, savedApiKeyIndex: 0 },
+      ],
+    });
+  });
+
+  it("converts a blank-model legacy Gemini setting into a saveable chain", async () => {
+    fetchMock.mockResolvedValue(success());
+    render({
+      ...display,
+      correction: { ...display.correction, model: null },
+      correctionModelChain: undefined,
+    });
+    await click("Convert to model chain");
+
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(false);
+    await submit();
+    expect(body().correctionModelChain).toEqual([
+      { provider: "gemini", model: null, savedApiKeyIndex: 0 },
+    ]);
+  });
+
+  it("blocks Save after adding an untouched Gemini reserve step", async () => {
     render();
     await click("Add reserve step");
     expect(
