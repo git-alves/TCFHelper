@@ -340,11 +340,17 @@ describe("save and card state", () => {
     });
 
     fetchMock.mockResolvedValue(success());
-    await act(async () =>
-      container.querySelector("details")!.dispatchEvent(new Event("toggle")),
-    );
+    await act(async () => {
+      const details = container.querySelector("details")!;
+      details.open = true;
+      details.dispatchEvent(new Event("toggle"));
+    });
     await click("Turn off chain");
-    await click("Turn off chain");
+    await act(async () => {
+      Array.from(container.querySelectorAll("button"))
+        .filter((button) => button.textContent === "Turn off chain")[1]!
+        .click();
+    });
     await submit();
     expect(body(1).correctionModelChain).toBeNull();
   });
