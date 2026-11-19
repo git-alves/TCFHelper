@@ -40,7 +40,7 @@ describe("API key operational cards", () => {
     await click("Test");
     expect(container.querySelector('[role="status"]')?.textContent).toContain("Works.");
     await change('[aria-label="Essay correction step 1 model"]', "changed");
-    expect(container.querySelector('[role="status"]')?.textContent).not.toContain("Works.");
+    expect(container.querySelector('[role="status"]')?.textContent ?? "").not.toContain("Works.");
     expect(container.textContent).not.toContain("window.alert");
   });
 
@@ -73,6 +73,7 @@ describe("API key operational cards", () => {
     render();
     await click("Edit");
     await change('[aria-label="Essay correction step 1 provider"]', "openrouter");
+    await change('[aria-label="Essay correction step 1 model"]', "");
     expect(container.textContent).toContain("Complete each OpenRouter model");
     expect(container.querySelector("button")?.textContent).toBeTruthy();
     expect(container.textContent).toContain("Move later");
