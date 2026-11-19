@@ -107,6 +107,22 @@ describe("model fallback chain", () => {
     expect(invoke).toHaveBeenCalledTimes(2);
   });
 
+  it("returns a recovered answer when recovery logging throws synchronously", async () => {
+    const invoke = vi.fn().mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 })).mockResolvedValueOnce("answer");
+    await expect(runModelChain({
+      section: "example",
+      steps: [{ provider: "gemini", model: "one", apiKey: null }, { provider: "openrouter", model: "two", apiKey: null }],
+      budgetMs: 75_000, reserveStepTimeoutMs: 18_000, normalAttemptTimeoutMs: 20_000,
+      invoke,
+      onFailure: vi.fn(),
+      onRecovered: () => {
+        throw new Error("sync log unavailable");
+      },
+      isFallbackable: (error) => ({ error, status: (error as { status: number }).status, reasonCode: "upstream_http_error" }),
+    })).resolves.toMatchObject({ value: "answer", reserve: true });
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
   it("writes buffered failures before rethrowing a non-fallbackable error", async () => {
     const first = Object.assign(new Error("recoverable"), { status: 503 });
     const fatal = new Error("fatal");

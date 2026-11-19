@@ -9,6 +9,7 @@ export interface ModelChainStep {
 }
 
 const MAX_STEPS = 3;
+const SUCCESS_OBSERVABILITY_TIMEOUT_MS = 250;
 // The correction lease reserves 170s. Provider work has a 150s budget,
 // leaving 20s for validation/persistence: step 1/2 are capped at 35s and
 // the final step receives the remaining budget (up to its normal 45s attempt
@@ -102,6 +103,25 @@ export type ModelChainRunOptions<T> = {
   onRecovered?: (failedSteps: ModelChainFailedStep[], recoveredBy: ModelChainStep) => Promise<void>;
 };
 
+/** Runs post-success observability without letting it delay or fail a learner response indefinitely. */
+async function settleSuccessObservability(work: () => Promise<unknown> | unknown) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  // Starting through a promise callback converts a synchronous throw into a
+  // handled rejection before the timeout race is created.
+  const settled = Promise.resolve().then(work).then(
+    () => undefined,
+    () => undefined,
+  );
+  const timeout = new Promise<void>((resolve) => {
+    timeoutId = setTimeout(resolve, SUCCESS_OBSERVABILITY_TIMEOUT_MS);
+  });
+  try {
+    await Promise.race([settled, timeout]);
+  } finally {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+  }
+}
+
 /**
  * Executes each configured step once. Only the last step may use the legacy
  * 503 retry policy, and only while its remaining slice can accommodate it.
@@ -136,11 +156,15 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
     // Observability never changes a successful learner result. This is also
     // intentionally outside invoke's try/catch, so a logging failure cannot
     // be mistaken for a provider failure and trigger another reserve step.
-    if (failedSteps.length > 0) {
-      void Promise.resolve(options.onRecovered?.(failedSteps, step)).catch(() => undefined);
-    }
-    void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
-    if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
+    await Promise.allSettled([
+      ...(failedSteps.length > 0 && options.onRecovered
+        ? [settleSuccessObservability(() => options.onRecovered!(failedSteps, step))]
+        : []),
+      settleSuccessObservability(() => clearModelChainAlert(options.section, step)),
+      ...(index > 0
+        ? [settleSuccessObservability(() => prisma.modelChainReserveUse.create({ data: { section: options.section } }))]
+        : []),
+    ]);
     return { value, step, reserve: index > 0 };
   }
   for (const { step, failure } of failedSteps) await options.onFailure(step, failure);
