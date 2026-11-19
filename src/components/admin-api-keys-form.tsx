@@ -144,6 +144,7 @@ function Usage({
         </p>
         <div
           role="progressbar"
+          aria-label="Today’s requests against the daily request limit"
           aria-valuenow={section.requestsToday}
           aria-valuemin={0}
           aria-valuemax={section.dailyLimit}
@@ -154,6 +155,10 @@ function Usage({
             style={{ width: `${width}%` }}
           />
         </div>
+        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+          Failed provider calls count toward this total; requests refused before
+          a provider call do not.
+        </p>
       </div>
     </div>
   );
@@ -191,6 +196,7 @@ function JobCard({
   const [remove, setRemove] = useState<string | null>(null);
   const [off, setOff] = useState(false);
   const [legacyEditing, setLegacyEditing] = useState(false);
+  const [moveMessage, setMoveMessage] = useState("");
   const section = display[job];
   const title =
     job === "correction" ? "Essay correction" : "Example generation";
@@ -217,6 +223,7 @@ function JobCard({
     change({ ...draft, chain });
     setEditing(to);
     setRemove(null);
+    setMoveMessage(`Step ${i + 1} moved to position ${to + 1}.`);
   };
   const modelMissing = draft.provider === "openrouter" && !draft.model.trim();
   const chainStatus = draft.chain
@@ -254,7 +261,20 @@ function JobCard({
             : "No current alerts"}
         </p>
         <Usage section={section} reserve={reserve} />
+        {jobAlerts.map((alert) => (
+          <p
+            key={alert.id}
+            role="alert"
+            className="mt-2 rounded-lg bg-amber-500/10 p-2 text-sm"
+          >
+            {alert.provider} / {alert.model}:{" "}
+            {alert.kind === "credits" ? "Credits needed." : "Invalid API key."}
+          </p>
+        ))}
       </div>
+      <p className="sr-only" aria-live="polite">
+        {moveMessage}
+      </p>
       {draft.chain ? (
         <ol className="mt-4 space-y-2" aria-label={`${title} model chain`}>
           {draft.chain.map((step, i) => {
@@ -262,6 +282,10 @@ function JobCard({
               i === 0 ? "Primary" : i === 1 ? "Reserve" : "Final reserve";
             const isEditing = allEdit || editing === i;
             const test = getTest(step.id);
+            const stepAlerts = jobAlerts.filter(
+              (alert) =>
+                alert.provider === step.provider && alert.model === step.model,
+            );
             return (
               <li
                 key={step.id}
@@ -289,6 +313,7 @@ function JobCard({
                     <button
                       type="button"
                       className={button}
+                      aria-label={`${isEditing ? "Finish editing" : "Edit"} step ${i + 1}`}
                       onClick={() => setEditing(isEditing ? null : i)}
                     >
                       {isEditing ? "Done" : "Edit"}
@@ -297,12 +322,24 @@ function JobCard({
                       type="button"
                       className={button}
                       disabled={test.running}
+                      aria-label={`Test step ${i + 1}`}
                       onClick={() => runTest(step.id)}
                     >
                       {test.running ? "Testing…" : "Test"}
                     </button>
                   </div>
                 </div>
+                {stepAlerts.map((alert) => (
+                  <p
+                    key={alert.id}
+                    role="alert"
+                    className="mt-3 rounded-lg bg-amber-500/10 p-2 text-sm"
+                  >
+                    {alert.kind === "credits"
+                      ? "Credits needed for this step."
+                      : "Invalid API key for this step."}
+                  </p>
+                ))}
                 {isEditing && (
                   <div className="mt-4 grid gap-3 border-t border-black/[.08] pt-4 dark:border-white/[.12]">
                     <h3 className="font-medium">
