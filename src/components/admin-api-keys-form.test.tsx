@@ -389,4 +389,94 @@ describe("save and card state", () => {
       container.querySelector('[aria-label="Essay correction step 1 model"]'),
     ).toBeNull();
   });
+
+  it("drops the saved key index when a step provider changes", async () => {
+    fetchMock.mockResolvedValue(success());
+    render();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Edit step 1"]')!
+        .click(),
+    );
+    await change(
+      '[aria-label="Essay correction step 1 provider"]',
+      "openrouter",
+    );
+    await change(
+      '[aria-label="Essay correction step 1 model"]',
+      "vendor/model",
+    );
+    await submit();
+    expect(body().correctionModelChain[0]).toEqual({
+      provider: "openrouter",
+      model: "vendor/model",
+    });
+  });
+
+  it("keeps a retained key index when another step is removed", async () => {
+    fetchMock.mockResolvedValue(success());
+    render();
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>('[aria-label="Edit step 2"]')!
+        .click(),
+    );
+    await click("Remove step");
+    await act(async () =>
+      container
+        .querySelector<HTMLButtonElement>("[role=alert] button")!
+        .click(),
+    );
+    await submit();
+    expect(body().correctionModelChain).toEqual([
+      { provider: "gemini", model: "first", savedApiKeyIndex: 0 },
+    ]);
+  });
+
+  it("saves legacy fields without a chain", async () => {
+    fetchMock.mockResolvedValue(success());
+    render({ ...display, correctionModelChain: undefined });
+    await submit();
+    expect(body()).toMatchObject({
+      correctionProvider: "gemini",
+      correctionModel: "gemini-3.5-flash-lite",
+      correctionModelChain: null,
+    });
+  });
+
+  it("blocks Save after adding an unconfigured Gemini reserve step", async () => {
+    render();
+    await click("Add reserve step");
+    expect(
+      container.querySelector<HTMLButtonElement>('button[type="submit"]')!
+        .disabled,
+    ).toBe(true);
+    expect(container.textContent).toContain(
+      "Enter a model for every chain step",
+    );
+  });
+
+  it("dismisses an alert with its exact endpoint", async () => {
+    fetchMock.mockResolvedValue({ ok: true });
+    render({
+      ...display,
+      modelChainStatus: {
+        alerts: [
+          {
+            id: "a1",
+            section: "correction",
+            provider: "gemini",
+            model: "first",
+            kind: "key",
+          },
+        ],
+        reserveToday: { correction: 0, example: 0 },
+      },
+    });
+    await click("Dismiss");
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "/api/admin/model-chain-alerts/a1/dismiss",
+    );
+    expect(container.querySelector('[aria-label="Attention"]')).toBeNull();
+  });
 });
