@@ -281,13 +281,11 @@ describe("legacy API key settings", () => {
       "No saved key for this provider yet",
     );
     expect(
-      container.querySelectorAll<HTMLInputElement>('input[type="text"]')[0]!
-        .value,
+      container.querySelectorAll<HTMLInputElement>("details input")[0]!.value,
     ).toBe("");
     await act(async () => setValue(provider, "gemini"));
     expect(
-      container.querySelectorAll<HTMLInputElement>('input[type="text"]')[0]!
-        .value,
+      container.querySelectorAll<HTMLInputElement>("details input")[0]!.value,
     ).toBe("gemini-3.5-flash-lite");
     expect(container.textContent).toContain("saved key ••••1234");
   });
@@ -337,6 +335,7 @@ describe("save and card state", () => {
     expect(body()).toMatchObject({
       correctionModelChain: [
         { provider: "gemini", model: "first", apiKey: null },
+        { provider: "openrouter", model: "second" },
       ],
     });
 
