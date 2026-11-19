@@ -117,21 +117,31 @@ export async function runModelChain<T>(options: ModelChainRunOptions<T>): Promis
     const elapsed = Date.now() - started;
     const remaining = Math.max(1, options.budgetMs - elapsed);
     const timeoutMs = isLast ? Math.min(options.normalAttemptTimeoutMs, remaining) : Math.min(options.reserveStepTimeoutMs, remaining);
+    let value: T;
     try {
-      const value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
-      if (failedSteps.length > 0) await options.onRecovered?.(failedSteps, step);
-      void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
-      if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
-      return { value, step, reserve: index > 0 };
+      value = await options.invoke(step, { timeoutMs, retry503: isLast, totalBudgetMs: remaining });
     } catch (error) {
       lastError = error;
       const failure = options.isFallbackable(error);
-      if (!failure) throw error;
+      if (!failure) {
+        for (const failedStep of failedSteps) await options.onFailure(failedStep.step, failedStep.failure);
+        throw error;
+      }
       failedSteps.push({ step, failure });
       if (failure.status) void openModelChainAlert(options.section, step, failure.status).catch(() => undefined);
       // Route request validation happens before this runner. A provider 400
       // (notably Gemini's API_KEY_INVALID) is a chain failure and advances.
+      continue;
     }
+    // Observability never changes a successful learner result. This is also
+    // intentionally outside invoke's try/catch, so a logging failure cannot
+    // be mistaken for a provider failure and trigger another reserve step.
+    if (failedSteps.length > 0) {
+      void Promise.resolve(options.onRecovered?.(failedSteps, step)).catch(() => undefined);
+    }
+    void Promise.resolve(clearModelChainAlert(options.section, step)).catch(() => undefined);
+    if (index > 0) void Promise.resolve(prisma.modelChainReserveUse.create({ data: { section: options.section } })).catch(() => undefined);
+    return { value, step, reserve: index > 0 };
   }
   for (const { step, failure } of failedSteps) await options.onFailure(step, failure);
   throw lastError;

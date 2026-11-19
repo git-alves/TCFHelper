@@ -249,7 +249,7 @@ describe("POST /api/essays/correct", () => {
     expect((await post({ taskType: "TASK_1", topicPrompt: "Écrivez à votre voisin.", content: VALID_TASK_1_CONTENT })).status).toBe(502);
     expect(refundCorrectionUsageMock).toHaveBeenCalledTimes(1);
     expect(recordAdminEventMock).toHaveBeenCalledTimes(2);
-    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "CORRECTION_PROVIDER_FAILED" }));
+    expect(recordAdminEventMock.mock.calls.every(([event]) => (event as { eventType: string }).eventType === "CORRECTION_PROVIDER_FAILED")).toBe(true);
   });
 
   it("does not reserve usage for a chain with no configured credentials", async () => {

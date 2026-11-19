@@ -92,4 +92,33 @@ describe("model fallback chain", () => {
     })).rejects.toThrow("down");
     expect(onFailure).toHaveBeenCalledTimes(2);
   });
+
+  it("returns a recovered answer when recovery logging throws", async () => {
+    const invoke = vi.fn().mockRejectedValueOnce(Object.assign(new Error("down"), { status: 503 })).mockResolvedValueOnce("answer");
+    await expect(runModelChain({
+      section: "example",
+      steps: [{ provider: "gemini", model: "one", apiKey: null }, { provider: "openrouter", model: "two", apiKey: null }],
+      budgetMs: 75_000, reserveStepTimeoutMs: 18_000, normalAttemptTimeoutMs: 20_000,
+      invoke,
+      onFailure: vi.fn(),
+      onRecovered: vi.fn().mockRejectedValue(new Error("log unavailable")),
+      isFallbackable: (error) => ({ error, status: (error as { status: number }).status, reasonCode: "upstream_http_error" }),
+    })).resolves.toMatchObject({ value: "answer", reserve: true });
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("writes buffered failures before rethrowing a non-fallbackable error", async () => {
+    const first = Object.assign(new Error("recoverable"), { status: 503 });
+    const fatal = new Error("fatal");
+    const onFailure = vi.fn().mockResolvedValue(undefined);
+    await expect(runModelChain({
+      section: "correction",
+      steps: [{ provider: "gemini", model: "one", apiKey: null }, { provider: "openrouter", model: "two", apiKey: null }],
+      budgetMs: 150_000, reserveStepTimeoutMs: 35_000, normalAttemptTimeoutMs: 45_000,
+      invoke: vi.fn().mockRejectedValueOnce(first).mockRejectedValueOnce(fatal),
+      onFailure,
+      isFallbackable: (error) => error === first ? { error, status: 503, reasonCode: "upstream_http_error" } : null,
+    })).rejects.toThrow("fatal");
+    expect(onFailure).toHaveBeenCalledWith(expect.objectContaining({ model: "one" }), expect.objectContaining({ reasonCode: "upstream_http_error" }));
+  });
 });

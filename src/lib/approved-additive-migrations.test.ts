@@ -145,8 +145,22 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
       fileURLToPath(new URL("../../prisma/migrations/20261119120000_add_recovered_chain_events/migration.sql", import.meta.url)),
       "utf8",
     );
-    expect(migration).toContain("'CORRECTION_PROVIDER_FAILED'");
-    expect(migration).toContain("'EXAMPLE_PROVIDER_FAILED'");
+    const eventTypeConstraint = migration.match(/ADD CONSTRAINT "AdminEvent_eventType_check" CHECK \("eventType" IN \(([\s\S]*?)\)\);/)?.[1] ?? "";
+    const eventTypes = new Set([...eventTypeConstraint.matchAll(/'([^']+)'/g)].map((match) => match[1]));
+    for (const previousType of [
+      "ACCESS_CODE_REDEEMED",
+      "ACCESS_CODE_REJECTED",
+      "TRANSLATION_QUOTA_DENIED",
+      "EXAMPLE_QUOTA_DENIED",
+      "CORRECTION_QUOTA_DENIED",
+      "CORRECTION_PROVIDER_FAILED",
+      "EXAMPLE_PROVIDER_FAILED",
+      "TRANSLATION_PROVIDER_FAILED",
+      "GRAMMAR_CHECK_PROVIDER_FAILED",
+      "SPELL_CHECK_FAILED",
+      "AUTH_SESSION_CREATED",
+      "AUTH_NETWORK_REVIEW_REQUIRED",
+    ]) expect(eventTypes).toContain(previousType);
     expect(migration).toContain("'CORRECTION_PROVIDER_RECOVERED'");
     expect(migration).toContain("'EXAMPLE_PROVIDER_RECOVERED'");
     expect(migration).toContain('"severity" = \'WARN\'');
