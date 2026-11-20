@@ -98,13 +98,13 @@ describe("generatePreferredModelAnswer", () => {
     });
   });
 
-  it("keeps non-round task tolerance within 20 percent at both boundaries", async () => {
+  it("keeps the 20 percent lower tolerance and applies a five percent upper tolerance", async () => {
     const nonRoundParams = {
       ...params,
       task: { ...params.task, minWords: 101, maxWords: 149 },
     };
     const atMinimum = Array.from({ length: 81 }, (_, index) => `mot${index}`).join(" ");
-    const atMaximum = Array.from({ length: 178 }, (_, index) => `mot${index}`).join(" ");
+    const atMaximum = Array.from({ length: 156 }, (_, index) => `mot${index}`).join(" ");
 
     await expect(
       generatePreferredModelAnswer(stubProvider(async () => atMinimum), nonRoundParams),
@@ -112,6 +112,20 @@ describe("generatePreferredModelAnswer", () => {
     await expect(
       generatePreferredModelAnswer(stubProvider(async () => atMaximum), nonRoundParams),
     ).resolves.toEqual({ text: atMaximum, provider: "gemini" });
+  });
+
+  it("accepts 189 but rejects 190 words for a TASK_3 answer", async () => {
+    const task3Params = { ...params, task: TASK_INSTRUCTIONS.TASK_3, taskType: "TASK_3" as const };
+    const atMaximum = Array.from({ length: 189 }, (_, index) => `mot${index}`).join(" ");
+    const overMaximum = Array.from({ length: 190 }, (_, index) => `mot${index}`).join(" ");
+
+    await expect(generatePreferredModelAnswer(stubProvider(async () => atMaximum), task3Params)).resolves.toEqual({
+      text: atMaximum,
+      provider: "gemini",
+    });
+    await expect(generatePreferredModelAnswer(stubProvider(async () => overMaximum), task3Params)).rejects.toBeInstanceOf(
+      ModelAnswerInvalidOutputError,
+    );
   });
 
   it("rejects unusable provider output instead of filling the editor", async () => {

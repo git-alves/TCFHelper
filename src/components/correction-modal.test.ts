@@ -42,7 +42,7 @@ function renderResultModal(
   {
     feedback: feedbackOverride = feedback,
     ...overrides
-  }: { cefrAssessment?: "current" | "legacy"; feedback?: typeof feedback } = {},
+  }: { cefrAssessment?: "current" | "legacy"; feedback?: typeof feedback; originalText?: string } = {},
 ) {
   return renderToStaticMarkup(
     createElement(CorrectionModal, {
@@ -78,6 +78,19 @@ describe("CorrectionModal", () => {
     expect(markup).toContain("mytcflab generated model version");
     expect(markup).not.toContain("Mark as read this session");
     expect(markup).toContain("<svg");
+  });
+
+  it("uses a green word-count badge in range and an amber badge with a localized hint outside the range", () => {
+    const inRangeMarkup = renderResultModal({ originalText: Array.from({ length: 120 }, () => "mot").join(" ") });
+    const overRangeMarkup = renderResultModal({ originalText: Array.from({ length: 151 }, () => "mot").join(" ") });
+    const underRangeMarkup = renderResultModal({ originalText: Array.from({ length: 119 }, () => "mot").join(" ") });
+
+    expect(inRangeMarkup).toContain("bg-emerald-500/10");
+    expect(inRangeMarkup).not.toContain("Outside the required range");
+    expect(overRangeMarkup).toContain("bg-amber-500/10");
+    expect(overRangeMarkup).toContain('title="Outside the required range"');
+    expect(underRangeMarkup).toContain("bg-amber-500/10");
+    expect(underRangeMarkup).toContain('title="Outside the required range"');
   });
 
   it("uses an interactive disclosure card for each correction note", () => {

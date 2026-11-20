@@ -478,6 +478,7 @@ export interface AppCopy {
       loading: string;
       statusEvaluated: string;
       wordCount: (values: WordCountValues) => string;
+      wordCountOutsideRequiredRange: string;
       // secureLevel is the level actually assigned to the student
       // (feedback.cefr.conservativeLevel) for a *current*-provenance
       // correction (cefrAssessment === "current") -- demonstratedLevel is the
@@ -1057,6 +1058,7 @@ export const APP_COPY = {
         loading: "Preparing your detailed correction…",
         statusEvaluated: "Evaluated",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} words`,
+        wordCountOutsideRequiredRange: "Outside the required range",
         secureLevel: ({ level }) => `Secure level: ${level}`,
         demonstratedLevel: ({ level }) => `Demonstrated level: ${level}`,
         previouslyRecordedLevel: ({ level }) => `Previously recorded level: ${level}`,
@@ -1748,6 +1750,7 @@ export const APP_COPY = {
         loading: "Préparation de votre correction détaillée…",
         statusEvaluated: "Évaluée",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} mots`,
+        wordCountOutsideRequiredRange: "Hors de la fourchette requise",
         secureLevel: ({ level }) => `Niveau acquis : ${level}`,
         demonstratedLevel: ({ level }) => `Niveau démontré : ${level}`,
         previouslyRecordedLevel: ({ level }) => `Niveau précédemment enregistré : ${level}`,
@@ -2443,6 +2446,7 @@ export const APP_COPY = {
         loading: "Preparando tu corrección detallada…",
         statusEvaluated: "Evaluada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palabras`,
+        wordCountOutsideRequiredRange: "Fuera del rango requerido",
         secureLevel: ({ level }) => `Nivel consolidado: ${level}`,
         demonstratedLevel: ({ level }) => `Nivel demostrado: ${level}`,
         previouslyRecordedLevel: ({ level }) => `Nivel registrado anteriormente: ${level}`,
@@ -3138,6 +3142,7 @@ export const APP_COPY = {
         loading: "Preparando sua correção detalhada…",
         statusEvaluated: "Avaliada",
         wordCount: ({ count, minWords, maxWords }) => `${count} / ${minWords}–${maxWords} palavras`,
+        wordCountOutsideRequiredRange: "Fora da faixa exigida",
         secureLevel: ({ level }) => `Nível consolidado: ${level}`,
         demonstratedLevel: ({ level }) => `Nível demonstrado: ${level}`,
         previouslyRecordedLevel: ({ level }) => `Nível registrado anteriormente: ${level}`,

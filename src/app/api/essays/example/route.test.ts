@@ -195,6 +195,22 @@ describe("POST /api/essays/example", () => {
     expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({ eventType: "EXAMPLE_PROVIDER_RECOVERED", provider: "gemini", model: "first" }));
   });
 
+  it("falls through a configured chain after an over-long answer and records the existing invalid-output reason", async () => {
+    getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
+    generatePreferredModelAnswerMock
+      .mockRejectedValueOnce(new ModelAnswerInvalidOutputErrorMock("190 words"))
+      .mockResolvedValueOnce({ text: "Un exemple de réponse.", provider: "openrouter" });
+
+    expect((await post({ taskType: "TASK_3", level: "B2", topicPrompt: "Débattez d'un sujet." })).status).toBe(200);
+    expect(generatePreferredModelAnswerMock).toHaveBeenCalledTimes(2);
+    expect(recordAdminEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      eventType: "EXAMPLE_PROVIDER_RECOVERED",
+      provider: "gemini",
+      model: "first",
+      reasonCode: "invalid_response",
+    }));
+  });
+
   it("refunds an all-failed chain once and avoids a claim without credentials", async () => {
     getAppConfigMock.mockResolvedValue({ correctionProvider: null, correctionApiKey: null, correctionModel: null, exampleProvider: null, exampleApiKey: null, exampleModel: null, exampleModelChain: [{ provider: "gemini", model: "first", apiKey: "key-one" }, { provider: "openrouter", model: "second", apiKey: "key-two" }] });
     generatePreferredModelAnswerMock.mockRejectedValue(new ExampleProviderRequestError(503));

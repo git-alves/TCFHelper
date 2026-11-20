@@ -378,9 +378,7 @@ export function CorrectionModal({
   }, [isWaiting]);
   const modalCopy = copy.workspace.correctionModal;
   const originalWordCount = countWords(originalText);
-  const isWordCountInRange = feedback?.meetsWordCount ?? (
-    originalWordCount >= task.minWords && originalWordCount <= task.maxWords
-  );
+  const isWordCountInRange = originalWordCount >= task.minWords && originalWordCount <= task.maxWords;
 
   useEffect(() => {
     if (!open) return;
@@ -625,8 +623,9 @@ export function CorrectionModal({
               className={`rounded-full px-2.5 py-1 ${
                 isWordCountInRange
                   ? "bg-emerald-500/10 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300"
-                  : "bg-red-500/10 text-red-800 dark:bg-red-400/15 dark:text-red-300"
+                  : "bg-amber-500/10 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300"
               }`}
+              title={isWordCountInRange ? undefined : modalCopy.wordCountOutsideRequiredRange}
             >
               {modalCopy.wordCount({
                 count: originalWordCount,
