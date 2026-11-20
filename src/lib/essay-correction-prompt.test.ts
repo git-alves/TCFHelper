@@ -83,6 +83,34 @@ describe("buildCorrectionSystemPrompt", () => {
     expect(prompt).toContain("occasional evidence still supports a C2 estimatedLevel");
   });
 
+  it.each(["TASK_1", "TASK_2", "TASK_3"] as const)(
+    "never treats length within the task's range as a level criterion (%s)",
+    (taskType) => {
+      const prompt = buildCorrectionSystemPrompt("English", taskType, "Sujet.");
+
+      expect(prompt).toContain("Length is never a level criterion.");
+      expect(prompt).toContain("Every level, C2 included, is judged on the quality demonstrated within the task's required word range");
+      expect(prompt).toContain("reaching the maximum word count is never required");
+      expect(prompt).toContain("Never withhold or lower estimatedLevel or conservativeLevel because of length");
+      expect(prompt).toContain("never say that a higher level would need a longer essay, a longer or more extensive sample, or more words");
+      expect(prompt).toContain("The main blocker preventing the next level must instead cite concrete features of the original writing");
+      expect(prompt).toContain("A response within the required word range is never too short for any level.");
+      expect(prompt).toContain("main blocker preventing the next CEFR level (a concrete feature of the original writing, never its length)");
+      expect(prompt).not.toContain("If the writing is too short or does not provide enough evidence");
+    },
+  );
+
+  it("keeps the anti-inflation rules alongside the length rule", () => {
+    const prompt = buildCorrectionSystemPrompt("English", "TASK_3", "Sujet.");
+
+    expect(prompt).toContain("Only the length criterion is affected: every other rule in this section still applies.");
+    expect(prompt).toContain("A higher conservativeLevel must be demonstrated consistently, not occasionally.");
+    expect(prompt).toContain("- isolated advanced vocabulary;");
+    expect(prompt).toContain("- memorized expressions;");
+    expect(prompt).toContain("mixed C1/C2 evidence -> conservativeLevel C1");
+    expect(prompt).toContain("conservativeLevel C2 should only be awarded when this quality of control is sustained across the response");
+  });
+
   it("keeps calibration review as an opt-in variant for a controlled prompt comparison", () => {
     const baseline = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.");
     const reviewed = buildCorrectionSystemPrompt("English", "TASK_1", "Écrivez à votre voisin.", undefined, "calibration-review");
