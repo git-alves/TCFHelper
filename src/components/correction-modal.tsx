@@ -378,9 +378,7 @@ export function CorrectionModal({
   }, [isWaiting]);
   const modalCopy = copy.workspace.correctionModal;
   const originalWordCount = countWords(originalText);
-  const isWordCountInRange = feedback?.meetsWordCount ?? (
-    originalWordCount >= task.minWords && originalWordCount <= task.maxWords
-  );
+  const isWordCountInRange = originalWordCount >= task.minWords && originalWordCount <= task.maxWords;
 
   useEffect(() => {
     if (!open) return;
