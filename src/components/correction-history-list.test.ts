@@ -72,8 +72,15 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain("bg-emerald-500/10");
     expect(markup.match(/bg-amber-500\/10/g)).toHaveLength(2);
     expect(markup.match(/title=\"Outside the required range\"/g)).toHaveLength(2);
-    for (const locale of ["fr", "es", "pt"] as const) {
-      expect(APP_COPY[locale].workspace.correctionModal.wordCountOutsideRequiredRange).not.toBe("");
+    for (const locale of ["en", "fr", "es", "pt"] as const) {
+      const localizedMarkup = renderToStaticMarkup(
+        createElement(CorrectionHistoryListContent, {
+          locale,
+          copy: APP_COPY[locale],
+          items: [{ id: locale, taskType: "TASK_3", wordCount: 181, createdAt: "2026-08-07T12:00:00.000Z", assessedAt: "2026-08-07T12:00:01.000Z", cefrLevel: null, meetsWordCount: true, topicTitle: null }],
+        }),
+      );
+      expect(localizedMarkup).toContain(`title=\"${APP_COPY[locale].workspace.correctionModal.wordCountOutsideRequiredRange}\"`);
     }
   });
 
