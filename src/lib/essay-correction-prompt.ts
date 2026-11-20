@@ -61,6 +61,8 @@ A higher conservativeLevel must be demonstrated consistently, not occasionally.
 
 Scale what "consistently" requires to the length of text actually available -- the task's required word count and the essay's actual word count are given in the user message. A response of only 60-180 words has little room to repeat any pattern many times over; do not demand the same density of repeated evidence you would expect across a much longer essay. Do not downgrade conservativeLevel solely because a few sentences use ordinary vocabulary or simple connectors -- simple constructions are compatible with a higher CEFR level when more advanced control is clearly demonstrated elsewhere in the response. Judge consistency relative to the amount of text actually available, not against an absolute expectation sized for a longer sample.
 
+Length is never a level criterion. Every level, C2 included, is judged on the quality demonstrated within the task's required word range: a response anywhere in that range remains eligible for any level when the required quality and sustained control are demonstrated, and reaching the maximum word count is never required. Never withhold or lower estimatedLevel or conservativeLevel because of length, and never say that a higher level would need a longer essay, a longer or more extensive sample, or more words. The main blocker preventing the next level must instead cite concrete features of the original writing (for example errors, imprecise or unidiomatic wording, a misused connector, or control that is not sustained). Only the length criterion is affected: every other rule in this section still applies.
+
 Do NOT set conservativeLevel to a higher level merely because the writing contains:
 - isolated advanced vocabulary;
 - memorized expressions;
@@ -80,7 +82,7 @@ This evidence does not need to be present in every sentence -- a C2 text can and
 
 conservativeLevel C2 should only be awarded when this quality of control is sustained across the response, not merely occasional. If it is only occasional, that occasional evidence still supports a C2 estimatedLevel; set conservativeLevel to the highest level actually supported by sustained evidence instead.
 
-If the writing is too short or does not provide enough evidence to distinguish two levels reliably, set conservativeLevel to the more conservative level and explicitly state that evidence is limited.
+If the writing is below the task's required minimum length, or otherwise does not provide enough evidence to distinguish two levels reliably, set conservativeLevel to the more conservative level and explicitly state that evidence is limited. A response within the required word range is never too short for any level.
 
 IMPORTANT: the CEFR estimate is a pedagogical estimate for practice. It is NOT an official TCF score and must not be presented as an official equivalence.
 
@@ -126,7 +128,7 @@ For each score provide: numerical score; short justification; concrete evidence 
 
 FINAL CEFR RATIONALE
 
-Provide: estimatedLevel (Demonstrated level); conservativeLevel (Secure level -- never higher than estimatedLevel); Confidence (High / Medium / Low); short rationale; concrete evidence from the ORIGINAL writing; main blocker preventing the next CEFR level.
+Provide: estimatedLevel (Demonstrated level); conservativeLevel (Secure level -- never higher than estimatedLevel); Confidence (High / Medium / Low); short rationale; concrete evidence from the ORIGINAL writing; main blocker preventing the next CEFR level (a concrete feature of the original writing, never its length).
 
 If estimatedLevel and conservativeLevel differ, explain why in the rationale.
 
