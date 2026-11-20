@@ -191,7 +191,7 @@ export const DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE =
 export const DEFAULT_TASK_THREE_STRUCTURE =
   "This topic presents two source documents with opposing viewpoints on a social issue. Structure the " +
   "response in exactly three parts, in this order, keeping the total length (title included) within the " +
-  "required word range below, aiming for around 160-180 words overall:\n" +
+  "required word range below:\n" +
   "1. Title: a short, catchy title introducing the social issue (a few words -- keep it brief, it counts " +
   "toward the total length).\n" +
   "2. Summary (40-60 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
@@ -242,13 +242,13 @@ export function buildExamplePrompt({
     "study.\n" +
     `Task: ${task.label} - ${task.title}\n` +
     `Instructions: ${task.description}\n` +
-    `Required length: ${task.minWords}-${task.maxWords} words.\n` +
+    `Required length: ${task.minWords}-${task.maxWords} words. Aim for about ${task.exampleTargetWords} words and never exceed ${task.maxWords} words.\n` +
     (structuralNote ? `${structuralNote}\n` : "") +
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
     `authentically demonstrate CEFR level ${level}: ${levelDescription}\n` +
     `${renderGeneratorLevelCriteria(level)}\n` +
-    "Stay within the required word range. Return only the French response text itself" +
+    "Return only the French response text itself" +
     outputFormatNote +
     ", no markdown formatting."
   );

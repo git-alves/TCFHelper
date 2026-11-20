@@ -5,6 +5,7 @@ import {
   ExampleProviderRequestError,
   ExampleProviderTransportError,
 } from "@/lib/example-provider";
+import { TASK_INSTRUCTIONS } from "@/lib/tcf-tasks";
 import { openRouterExampleProvider } from "./openrouter-example-provider";
 
 const originalFetch = global.fetch;
@@ -27,7 +28,7 @@ afterEach(() => {
 });
 
 const params = {
-  task: { label: "Tâche 2", title: "Essai", description: "Décrivez.", minWords: 120, maxWords: 150 } as never,
+  task: TASK_INSTRUCTIONS.TASK_2,
   taskType: "TASK_2" as const,
   level: "B2" as const,
   topicPrompt: "Le télétravail est-il bénéfique ?",
@@ -52,6 +53,24 @@ describe("openRouterExampleProvider.hasConfiguredCredentials", () => {
 });
 
 describe("openRouterExampleProvider.generateExample", () => {
+  it.each([
+    ["TASK_1", TASK_INSTRUCTIONS.TASK_1, "Aim for about 100 words and never exceed 120 words."],
+    ["TASK_2", TASK_INSTRUCTIONS.TASK_2, "Aim for about 135 words and never exceed 150 words."],
+    ["TASK_3", TASK_INSTRUCTIONS.TASK_3, "Aim for about 150 words and never exceed 180 words."],
+  ] as const)("sends the explicit target and ceiling to OpenRouter for %s", async (taskType, task, targetLine) => {
+    mockFetchOnce({
+      status: 200,
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "Un exemple généré." } }] }),
+    });
+
+    await openRouterExampleProvider.generateExample({ ...params, task, taskType }, { apiKey: "k", model: "m" });
+
+    const [, init] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body.messages[0].content).toContain(targetLine);
+  });
+
   it("logs safe reasoning metadata for an empty length-limited completion and treats it as a request failure", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockFetchOnce({

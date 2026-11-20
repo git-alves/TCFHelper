@@ -90,6 +90,16 @@ async function runPersistent503(start: () => Promise<unknown>) {
 const overloaded = () => ({ ok: false, status: 503, json: async () => ({}) }) as Response;
 
 describe("buildExamplePrompt", () => {
+  it.each([
+    ["TASK_1", TASK_INSTRUCTIONS.TASK_1, "Aim for about 100 words and never exceed 120 words."],
+    ["TASK_2", TASK_INSTRUCTIONS.TASK_2, "Aim for about 135 words and never exceed 150 words."],
+    ["TASK_3", TASK_INSTRUCTIONS.TASK_3, "Aim for about 150 words and never exceed 180 words."],
+  ] as const)("includes the explicit target and ceiling for %s", (taskType, task, targetLine) => {
+    const prompt = buildExamplePrompt({ ...params, task, taskType });
+
+    expect(prompt).toContain(`Required length: ${task.minWords}-${task.maxWords} words. ${targetLine}`);
+  });
+
   it("uses the default structure and level description when no overrides are given", () => {
     const prompt = buildExamplePrompt(params);
 
@@ -141,6 +151,24 @@ describe("buildExamplePrompt", () => {
 });
 
 describe("generateModelAnswer", () => {
+  it.each([
+    ["TASK_1", TASK_INSTRUCTIONS.TASK_1, "Aim for about 100 words and never exceed 120 words."],
+    ["TASK_2", TASK_INSTRUCTIONS.TASK_2, "Aim for about 135 words and never exceed 150 words."],
+    ["TASK_3", TASK_INSTRUCTIONS.TASK_3, "Aim for about 150 words and never exceed 180 words."],
+  ] as const)("sends the explicit target and ceiling to Gemini for %s", async (taskType, task, targetLine) => {
+    mockFetchOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Réponse." }] } }] }),
+    });
+
+    await generateModelAnswer({ ...params, task, taskType });
+
+    const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+    const body = JSON.parse(String(requestInit.body));
+    expect(String(body.contents[0].parts[0].text)).toContain(targetLine);
+  });
+
   it("fails closed when GEMINI_API_KEY is not set", async () => {
     delete process.env.GEMINI_API_KEY;
 
@@ -359,7 +387,7 @@ describe("generateModelAnswer", () => {
     expect(promptText).toContain("a nuance acknowledging a limit or counterpoint");
     expect(promptText).toContain("argument against your position (two to three sentences)");
     expect(promptText).toContain("a brief conclusion restating your personal position");
-    expect(promptText).toContain("160-180 words");
+    expect(promptText).toContain("Aim for about 150 words and never exceed 180 words.");
     // The title counts toward the same total the validator measures -- the
     // prompt must not claim otherwise.
     expect(promptText).not.toContain("not counted");
