@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -32,6 +33,7 @@ import {
   refundExampleGenerationLease,
   releaseExampleGenerationLease,
 } from "./example-answer-cache";
+import { MODEL_ANSWER_PROMPT_VERSION } from "./gemini";
 
 const cacheKey = ["learner_1", "TASK_2", "B2" as const, "topic_hash"] as const;
 const reservationDay = new Date("2026-08-05T00:00:00.000Z");
@@ -58,6 +60,22 @@ beforeEach(() => {
 });
 
 describe("hashExampleTopic", () => {
+  it("includes the prompt version so a code prompt change invalidates cached examples", () => {
+    const taskType = "TASK_2";
+    const topic = "Le télétravail est-il bénéfique ?";
+    const promptFingerprint = "same-fingerprint";
+    const providerFingerprint = "gemini:";
+    const hashWithVersion = (version: string) =>
+      createHash("sha256")
+        .update(`${version}\n${taskType}\n${topic}\n${promptFingerprint}\n${providerFingerprint}`, "utf8")
+        .digest("hex");
+
+    const current = hashExampleTopic(taskType, topic, promptFingerprint, providerFingerprint);
+
+    expect(current).toBe(hashWithVersion(MODEL_ANSWER_PROMPT_VERSION));
+    expect(current).not.toBe(hashWithVersion("2026-10-10"));
+  });
+
   it("changes when the prompt-overrides fingerprint changes, even for the same task/topic", () => {
     const withDefaultPrompt = hashExampleTopic(
       "TASK_2",

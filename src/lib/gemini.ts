@@ -21,7 +21,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-10-10";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-11-20";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -191,13 +191,13 @@ export const DEFAULT_TASK_TWO_EXAMPLE_STRUCTURE =
 export const DEFAULT_TASK_THREE_STRUCTURE =
   "This topic presents two source documents with opposing viewpoints on a social issue. Structure the " +
   "response in exactly three parts, in this order, keeping the total length (title included) within the " +
-  "required word range below, aiming for around 160-180 words overall:\n" +
+  "required word range below:\n" +
   "1. Title: a short, catchy title introducing the social issue (a few words -- keep it brief, it counts " +
   "toward the total length).\n" +
-  "2. Summary (40-60 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
+  "2. Summary (35-45 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
   "without giving a personal opinion. Use contrasting connectors, e.g. \"D'un côté... d'un autre côté\", " +
   "\"Le premier document souligne que... tandis que le second met en avant...\".\n" +
-  "3. Opinion (the rest of the length, roughly 100-130 words): structure it in exactly this order -- " +
+  "3. Opinion (roughly 95-105 words): structure it in exactly this order -- " +
   "(a) one argument in favor of your position (two to three sentences), followed by a concrete example " +
   "illustrating it; " +
   "(b) a nuance acknowledging a limit or counterpoint to that argument; " +
@@ -242,13 +242,13 @@ export function buildExamplePrompt({
     "study.\n" +
     `Task: ${task.label} - ${task.title}\n` +
     `Instructions: ${task.description}\n` +
-    `Required length: ${task.minWords}-${task.maxWords} words.\n` +
+    `Required length: ${task.minWords}-${task.maxWords} words. Aim for about ${task.exampleTargetWords} words and never exceed ${task.maxWords} words.\n` +
     (structuralNote ? `${structuralNote}\n` : "") +
     `Topic:\n${topicPrompt}\n\n` +
     "Write a complete, natural, well-structured French response to this exact topic. The response must " +
     `authentically demonstrate CEFR level ${level}: ${levelDescription}\n` +
     `${renderGeneratorLevelCriteria(level)}\n` +
-    "Stay within the required word range. Return only the French response text itself" +
+    "Return only the French response text itself" +
     outputFormatNote +
     ", no markdown formatting."
   );

@@ -8,6 +8,7 @@ export interface TaskDefinition {
   description: string;
   minWords: number;
   maxWords: number;
+  exampleTargetWords: number;
 }
 
 // Static task instructions modeled on the TCF (Test de Connaissance du
@@ -21,6 +22,7 @@ export const TASK_INSTRUCTIONS: Record<TaskType, TaskDefinition> = {
       "Rédigez un message court (lettre, e-mail ou message) pour raconter un événement, décrire une expérience ou transmettre une information à un destinataire précis.",
     minWords: 60,
     maxWords: 120,
+    exampleTargetWords: 100,
   },
   TASK_2: {
     label: "Tâche 2",
@@ -29,6 +31,7 @@ export const TASK_INSTRUCTIONS: Record<TaskType, TaskDefinition> = {
       "Rédigez un article de blog ou un e-mail pour raconter une expérience ou un événement à des lecteurs précis. Faites vivre l'expérience avec des détails utiles, puis ajoutez votre réaction, votre commentaire ou la suite que vous en tirez, selon le but du message.",
     minWords: 120,
     maxWords: 150,
+    exampleTargetWords: 135,
   },
   TASK_3: {
     label: "Tâche 3",
@@ -37,5 +40,6 @@ export const TASK_INSTRUCTIONS: Record<TaskType, TaskDefinition> = {
       "Analysez un sujet de société en présentant différents points de vue, puis défendez votre propre position à l'aide d'arguments structurés.",
     minWords: 120,
     maxWords: 180,
+    exampleTargetWords: 150,
   },
 };
