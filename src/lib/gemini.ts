@@ -21,7 +21,7 @@ const REQUEST_TIMEOUT_MS = 20_000;
 // Bump this when the CEFR instructions, answer shape, or primary model policy
 // materially changes so learners never receive an answer cached for an older
 // rubric or provider setup.
-export const MODEL_ANSWER_PROMPT_VERSION = "2026-10-10";
+export const MODEL_ANSWER_PROMPT_VERSION = "2026-11-20";
 
 export type ExampleCefrLevel = "B2" | "C1" | "C2";
 
@@ -194,10 +194,10 @@ export const DEFAULT_TASK_THREE_STRUCTURE =
   "required word range below:\n" +
   "1. Title: a short, catchy title introducing the social issue (a few words -- keep it brief, it counts " +
   "toward the total length).\n" +
-  "2. Summary (40-60 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
+  "2. Summary (35-45 words): objectively summarize and contrast the two documents' opposing viewpoints, " +
   "without giving a personal opinion. Use contrasting connectors, e.g. \"D'un côté... d'un autre côté\", " +
   "\"Le premier document souligne que... tandis que le second met en avant...\".\n" +
-  "3. Opinion (the rest of the length, roughly 100-130 words): structure it in exactly this order -- " +
+  "3. Opinion (roughly 95-105 words): structure it in exactly this order -- " +
   "(a) one argument in favor of your position (two to three sentences), followed by a concrete example " +
   "illustrating it; " +
   "(b) a nuance acknowledging a limit or counterpoint to that argument; " +

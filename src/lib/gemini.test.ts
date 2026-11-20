@@ -382,7 +382,8 @@ describe("generateModelAnswer", () => {
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
-    expect(promptText).toContain("Summary (40-60 words)");
+    expect(promptText).toContain("Summary (35-45 words)");
+    expect(promptText).toContain("Opinion (roughly 95-105 words)");
     expect(promptText).toContain("argument in favor of your position (two to three sentences)");
     expect(promptText).toContain("a nuance acknowledging a limit or counterpoint");
     expect(promptText).toContain("argument against your position (two to three sentences)");
@@ -471,7 +472,7 @@ describe("generateModelAnswer", () => {
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
-    expect(promptText).not.toContain("Summary (40-60 words)");
+    expect(promptText).not.toContain("Summary (35-45 words)");
   });
 
   it("omits the Task 3 document-synthesis structure for a custom topic without real source documents, so the model isn't pushed to invent viewpoints", async () => {
@@ -491,7 +492,7 @@ describe("generateModelAnswer", () => {
     const [, requestInit] = (global.fetch as ReturnType<typeof vi.fn>).mock.calls[0];
     const body = JSON.parse(String(requestInit.body));
     const promptText = String(body.contents[0].parts[0].text);
-    expect(promptText).not.toContain("Summary (40-60 words)");
+    expect(promptText).not.toContain("Summary (35-45 words)");
   });
 });
 
