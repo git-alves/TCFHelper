@@ -207,6 +207,7 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                 minWords: task.minWords,
                 maxWords: task.maxWords,
               });
+              const isWordCountInRange = item.wordCount >= task.minWords && item.wordCount <= task.maxWords;
 
               return (
                 <li key={item.id}>
@@ -226,8 +227,9 @@ export function CorrectionHistoryListContent({ items, locale, copy }: Correction
                           </span>
                         )}
                         <span
+                          title={isWordCountInRange ? undefined : copy.workspace.correctionModal.wordCountOutsideRequiredRange}
                           className={`rounded-full px-2.5 py-1 ${
-                            item.meetsWordCount
+                            isWordCountInRange
                               ? "bg-emerald-500/10 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300"
                               : "bg-amber-500/10 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300"
                           }`}

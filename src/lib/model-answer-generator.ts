@@ -15,17 +15,18 @@ export class ModelAnswerInvalidOutputError extends Error {}
 
 // Free-tier models frequently miss an exact word target by a modest margin
 // even when explicitly instructed, so a hard cutoff at the task's boundary
-// rejected usable answers far too often. This tolerance only catches
-// genuinely degenerate output (near-empty or wildly overlong), not ordinary
-// model imprecision.
+// rejected usable answers far too often. The lower tolerance catches
+// near-empty output, while the tighter upper tolerance prevents models from
+// producing answers that substantially exceed the task's required maximum.
 const LENGTH_TOLERANCE = 0.2;
+const UPPER_LENGTH_TOLERANCE = 0.05;
 
 function validateAnswerLength(text: string, params: GenerateModelAnswerParams) {
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
-  // Round the bounds inward (not outward) so the tolerance never exceeds
-  // LENGTH_TOLERANCE for a non-round task range.
+  // Round the bounds inward (not outward) so neither tolerance is exceeded
+  // for a non-round task range.
   const minAllowed = Math.ceil(params.task.minWords * (1 - LENGTH_TOLERANCE));
-  const maxAllowed = Math.floor(params.task.maxWords * (1 + LENGTH_TOLERANCE));
+  const maxAllowed = Math.floor(params.task.maxWords * (1 + UPPER_LENGTH_TOLERANCE));
   if (wordCount < minAllowed || wordCount > maxAllowed) {
     throw new ModelAnswerInvalidOutputError(
       `Model answer contains ${wordCount} words; expected roughly ${params.task.minWords}-${params.task.maxWords}.`,

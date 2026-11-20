@@ -56,6 +56,27 @@ describe("CorrectionHistoryList", () => {
     expect(markup).toContain(">Clear all<");
   });
 
+  it("uses green in range and amber with a localized hint outside the required word range", () => {
+    const markup = renderToStaticMarkup(
+      createElement(CorrectionHistoryListContent, {
+        locale: "en",
+        copy: APP_COPY.en,
+        items: [
+          { id: "in", taskType: "TASK_3", wordCount: 180, createdAt: "2026-08-07T12:00:00.000Z", assessedAt: "2026-08-07T12:00:01.000Z", cefrLevel: null, meetsWordCount: true, topicTitle: null },
+          { id: "over", taskType: "TASK_3", wordCount: 181, createdAt: "2026-08-07T12:00:00.000Z", assessedAt: "2026-08-07T12:00:01.000Z", cefrLevel: null, meetsWordCount: true, topicTitle: null },
+          { id: "under", taskType: "TASK_3", wordCount: 119, createdAt: "2026-08-07T12:00:00.000Z", assessedAt: "2026-08-07T12:00:01.000Z", cefrLevel: null, meetsWordCount: false, topicTitle: null },
+        ],
+      }),
+    );
+
+    expect(markup).toContain("bg-emerald-500/10");
+    expect(markup.match(/bg-amber-500\/10/g)).toHaveLength(2);
+    expect(markup.match(/title=\"Outside the required range\"/g)).toHaveLength(2);
+    for (const locale of ["fr", "es", "pt"] as const) {
+      expect(APP_COPY[locale].workspace.correctionModal.wordCountOutsideRequiredRange).not.toBe("");
+    }
+  });
+
   it("offers clear-all only while there is history to clear", () => {
     const emptyMarkup = renderToStaticMarkup(
       createElement(CorrectionHistoryListContent, { locale: "en", copy: APP_COPY.en, items: [] }),
