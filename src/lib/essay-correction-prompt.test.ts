@@ -90,6 +90,10 @@ describe("buildCorrectionSystemPrompt", () => {
 
       expect(prompt).toContain("Length is never a level criterion.");
       expect(prompt).toContain("Every level, C2 included, is judged on the quality demonstrated within the task's required word range");
+      expect(prompt).toContain(
+        "a response anywhere in that range remains eligible for any level when the required quality and sustained control are demonstrated",
+      );
+      expect(prompt).not.toContain("can earn any level");
       expect(prompt).toContain("reaching the maximum word count is never required");
       expect(prompt).toContain("Never withhold or lower estimatedLevel or conservativeLevel because of length");
       expect(prompt).toContain("never say that a higher level would need a longer essay, a longer or more extensive sample, or more words");
