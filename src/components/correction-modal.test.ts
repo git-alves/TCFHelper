@@ -42,7 +42,7 @@ function renderResultModal(
   {
     feedback: feedbackOverride = feedback,
     ...overrides
-  }: { cefrAssessment?: "current" | "legacy"; feedback?: typeof feedback } = {},
+  }: { cefrAssessment?: "current" | "legacy"; feedback?: typeof feedback; originalText?: string } = {},
 ) {
   return renderToStaticMarkup(
     createElement(CorrectionModal, {
