@@ -3,9 +3,15 @@ import { AccessCodeActivationForm } from "@/components/access-code-activation-fo
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
 import { hasRedeemedAccessCode } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
+import { getAppCopy } from "@/lib/app-copy";
 import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
+import { getRequestLocale } from "@/lib/request-locale";
 
 export default async function ActivatePage() {
+  // Decision 4 is intentionally parked until expiry can be durably associated
+  // with a detached code. Keeping this value at one switch point means the
+  // later schema-backed lookup only has to supply an ISO date here.
+  const expiredAt: string | null = null;
   let user;
   try {
     user = await getCurrentAppUser();
@@ -44,12 +50,18 @@ export default async function ActivatePage() {
     redirect("/tasks");
   }
 
+  const locale = await getRequestLocale();
+  const copy = getAppCopy(locale).activation;
+  const expiredEndDate = expiredAt
+    ? new Intl.DateTimeFormat(locale === "pt" ? "pt-BR" : locale, { dateStyle: "long" }).format(new Date(expiredAt))
+    : null;
+
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-24">
-      <p className="text-sm font-medium text-violet-700 dark:text-violet-300">Welcome to MyTCFLab</p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Activate your account</h1>
+      <p className="text-sm font-medium text-violet-700 dark:text-violet-300">{copy.eyebrow}</p>
+      <h1 className="mt-2 text-3xl font-semibold tracking-tight">{expiredEndDate ? copy.expiredTitle : copy.title}</h1>
       <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-        Enter the single-use access code you received to start using the learning workspace.
+        {expiredEndDate ? copy.expiredDescription({ endDate: expiredEndDate }) : copy.description}
       </p>
       <AccessCodeActivationForm />
     </main>

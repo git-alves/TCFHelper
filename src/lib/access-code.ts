@@ -24,7 +24,7 @@ type AdmissionLockedTx = {
 type AdmissionResolution =
   | { kind: "none" }
   | { kind: "active" }
-  | { kind: "expired" };
+  | { kind: "expired"; expiresAt: Date };
 
 /**
  * Access codes are generated in upper case. Normalizing the learner's entry
@@ -80,7 +80,7 @@ async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Pr
     where: { id: userId, activationWelcomeShownAt: null },
     data: { activationWelcomeShownAt: new Date() },
   });
-  return { kind: "expired" };
+  return { kind: "expired", expiresAt };
 }
 
 /**
@@ -92,12 +92,12 @@ async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Pr
  * whether the code even looks expired; the actual detach always re-resolves
  * under the per-user lock rather than trusting that stale read.
  */
-export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
+export async function getRedeemedAccessCodeAdmission(userId: string): Promise<AdmissionResolution> {
   const redemption = await prisma.accessCode.findUnique({
     where: { redeemedByUserId: userId },
     select: { id: true, redeemedAt: true, validityDays: true, expiresAt: true },
   });
-  if (redemption === null) return false;
+  if (redemption === null) return { kind: "none" };
 
   const expiresAt = resolveExpiresAt(redemption);
   // Self-heals a legacy/gap row the same way resolveAdmissionLocked does
@@ -110,8 +110,8 @@ export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
       data: { expiresAt },
     });
   }
-  if (expiresAt === null) return true;
-  if (Date.now() < expiresAt.getTime()) return true;
+  if (expiresAt === null) return { kind: "active" };
+  if (Date.now() < expiresAt.getTime()) return { kind: "active" };
 
   const resolution = await prisma.$transaction(
     async (tx) => {
@@ -120,7 +120,17 @@ export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
     },
     { timeout: ACCESS_CODE_TRANSACTION_TIMEOUT_MS },
   );
-  return resolution.kind === "active";
+  return resolution;
+}
+
+/**
+ * Returns whether the learner has a live admission. Callers that need to
+ * distinguish a just-expired code from no code at all should use
+ * getRedeemedAccessCodeAdmission: expiry is discovered and detached here,
+ * so a second lookup cannot recover that fact without durable history.
+ */
+export async function hasRedeemedAccessCode(userId: string): Promise<boolean> {
+  return (await getRedeemedAccessCodeAdmission(userId)).kind === "active";
 }
 
 function isUniqueConstraint(error: unknown): error is Prisma.PrismaClientKnownRequestError {

@@ -67,6 +67,7 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                     ) : (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Needs code</span>
                     )}
+                    {user.expiresInDays !== null && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Expires in {user.expiresInDays} days</span>}
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-4 text-zinc-600 dark:text-zinc-400">{formattedDate(user.createdAt, user.timezone)}</td>

@@ -62,6 +62,19 @@ export interface AppCopy {
     // The admin's bell: the support inbox, with how many tickets are new.
     adminSupportInbox: (values: { count: number }) => string;
   };
+  accessExpiry: {
+    banner: (values: { days: number; endDate: string }) => string;
+    dismiss: string;
+    requestNewCode: string;
+    expiresIn: (values: { days: number }) => string;
+  };
+  activation: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    expiredTitle: string;
+    expiredDescription: (values: { endDate: string }) => string;
+  };
   home: {
     title: string;
     description: string;
@@ -358,6 +371,7 @@ export interface AppCopy {
       genericCorrectionError: string;
       correctionBusyError: string;
       correctionSessionExpiredError: string;
+      correctionAccessExpiredError: string;
       correctionDailyLimitError: (values: { time: string }) => string;
       correctionDailyLimitErrorNoTime: string;
       correctionStillTrying: string;
@@ -582,6 +596,19 @@ export const APP_COPY = {
       closeSupportFirst: "Close Support first",
       adminSupportInbox: ({ count }) =>
         count === 0 ? "Support inbox" : count === 1 ? "Support inbox — 1 new ticket" : `Support inbox — ${count} new tickets`,
+    },
+    accessExpiry: {
+      banner: ({ days, endDate }) => `TODO-COPY: Your access ends in ${days} days (${endDate}).`,
+      dismiss: "TODO-COPY: Dismiss",
+      requestNewCode: "TODO-COPY: Request a new code",
+      expiresIn: ({ days }) => `TODO-COPY: Expires in ${days} days`,
+    },
+    activation: {
+      eyebrow: "TODO-COPY: Welcome to MyTCFLab",
+      title: "TODO-COPY: Activate your account",
+      description: "TODO-COPY: Enter the single-use access code you received to start using the learning workspace.",
+      expiredTitle: "TODO-COPY: Your access has ended",
+      expiredDescription: ({ endDate }) => `TODO-COPY: Your access ended on ${endDate}.`,
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to C2.",
@@ -912,6 +939,7 @@ export const APP_COPY = {
         correctionBusyError: "The system is busy. **Your text is saved**, please try again in a minute.",
         correctionSessionExpiredError:
           "Your session expired. Sign in again to get your correction; **your text is saved**.",
+        correctionAccessExpiredError: "TODO-COPY: Your access ended; **your text is saved**.",
         correctionDailyLimitError: ({ time }) =>
           `You've used up today's corrections. Your limit comes back at ${time}.`,
         correctionDailyLimitErrorNoTime: "You've used up today's corrections. Your limit comes back tomorrow.",
@@ -1267,6 +1295,19 @@ export const APP_COPY = {
       adminSupportInbox: ({ count }) =>
         count === 0 ? "Boîte de réception du support" : count === 1 ? "Boîte de réception du support — 1 nouveau ticket" : `Boîte de réception du support — ${count} nouveaux tickets`,
     },
+    accessExpiry: {
+      banner: ({ days, endDate }) => `TODO-COPY: Your access ends in ${days} days (${endDate}).`,
+      dismiss: "TODO-COPY: Dismiss",
+      requestNewCode: "TODO-COPY: Request a new code",
+      expiresIn: ({ days }) => `TODO-COPY: Expires in ${days} days`,
+    },
+    activation: {
+      eyebrow: "TODO-COPY: Welcome to MyTCFLab",
+      title: "TODO-COPY: Activate your account",
+      description: "TODO-COPY: Enter the single-use access code you received to start using the learning workspace.",
+      expiredTitle: "TODO-COPY: Your access has ended",
+      expiredDescription: ({ endDate }) => `TODO-COPY: Your access ended on ${endDate}.`,
+    },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau C2.",
       description:
@@ -1604,6 +1645,7 @@ export const APP_COPY = {
         correctionBusyError: "Le système est occupé. **Votre texte est enregistré**, réessayez dans une minute.",
         correctionSessionExpiredError:
           "Votre session a expiré. Reconnectez-vous pour obtenir votre correction ; **votre texte est enregistré**.",
+        correctionAccessExpiredError: "TODO-COPY: Your access ended; **your text is saved**.",
         correctionDailyLimitError: ({ time }) =>
           `Vous avez épuisé votre limite de corrections pour aujourd’hui. Elle sera de retour à ${time}.`,
         correctionDailyLimitErrorNoTime:
@@ -1966,6 +2008,19 @@ export const APP_COPY = {
       adminSupportInbox: ({ count }) =>
         count === 0 ? "Bandeja de soporte" : count === 1 ? "Bandeja de soporte — 1 ticket nuevo" : `Bandeja de soporte — ${count} tickets nuevos`,
     },
+    accessExpiry: {
+      banner: ({ days, endDate }) => `TODO-COPY: Your access ends in ${days} days (${endDate}).`,
+      dismiss: "TODO-COPY: Dismiss",
+      requestNewCode: "TODO-COPY: Request a new code",
+      expiresIn: ({ days }) => `TODO-COPY: Expires in ${days} days`,
+    },
+    activation: {
+      eyebrow: "TODO-COPY: Welcome to MyTCFLab",
+      title: "TODO-COPY: Activate your account",
+      description: "TODO-COPY: Enter the single-use access code you received to start using the learning workspace.",
+      expiredTitle: "TODO-COPY: Your access has ended",
+      expiredDescription: ({ endDate }) => `TODO-COPY: Your access ended on ${endDate}.`,
+    },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar C2.",
       description:
@@ -2301,6 +2356,7 @@ export const APP_COPY = {
         correctionBusyError: "El sistema está ocupado. **Tu texto está guardado**, vuelve a intentarlo en un minuto.",
         correctionSessionExpiredError:
           "Tu sesión expiró. Inicia sesión de nuevo para corregir; **tu texto está guardado**.",
+        correctionAccessExpiredError: "TODO-COPY: Your access ended; **your text is saved**.",
         correctionDailyLimitError: ({ time }) =>
           `Has agotado tu límite de correcciones de hoy. Volverá a las ${time}.`,
         correctionDailyLimitErrorNoTime: "Has agotado tu límite de correcciones de hoy. Volverá mañana.",
@@ -2662,6 +2718,19 @@ export const APP_COPY = {
       adminSupportInbox: ({ count }) =>
         count === 0 ? "Caixa de suporte" : count === 1 ? "Caixa de suporte — 1 chamado novo" : `Caixa de suporte — ${count} chamados novos`,
     },
+    accessExpiry: {
+      banner: ({ days, endDate }) => `TODO-COPY: Your access ends in ${days} days (${endDate}).`,
+      dismiss: "TODO-COPY: Dismiss",
+      requestNewCode: "TODO-COPY: Request a new code",
+      expiresIn: ({ days }) => `TODO-COPY: Expires in ${days} days`,
+    },
+    activation: {
+      eyebrow: "TODO-COPY: Welcome to MyTCFLab",
+      title: "TODO-COPY: Activate your account",
+      description: "TODO-COPY: Enter the single-use access code you received to start using the learning workspace.",
+      expiredTitle: "TODO-COPY: Your access has ended",
+      expiredDescription: ({ endDate }) => `TODO-COPY: Your access ended on ${endDate}.`,
+    },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar C2.",
       description:
@@ -2997,6 +3066,7 @@ export const APP_COPY = {
         correctionBusyError: "O sistema está ocupado. **Seu texto está salvo**, tente de novo em um minuto.",
         correctionSessionExpiredError:
           "Sua sessão expirou. Entre de novo para corrigir; **seu texto está salvo**.",
+        correctionAccessExpiredError: "TODO-COPY: Your access ended; **your text is saved**.",
         correctionDailyLimitError: ({ time }) =>
           `Você esgotou seu limite de correções de hoje. Ele voltará às ${time}.`,
         correctionDailyLimitErrorNoTime: "Você esgotou seu limite de correções de hoje. Ele voltará amanhã.",

@@ -11,7 +11,7 @@ import {
 } from "@/lib/correction-provider";
 
 const {
-  getCurrentActivatedAppUserMock,
+  getCurrentActivatedAppUserAdmissionMock,
   AppUserProvisioningErrorMock,
   findUniqueMock,
   topicCreateMock,
@@ -32,7 +32,7 @@ const {
   class AppUserProvisioningErrorMock extends Error {}
 
   return {
-    getCurrentActivatedAppUserMock: vi.fn(),
+    getCurrentActivatedAppUserAdmissionMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findUniqueMock: vi.fn(),
     topicCreateMock: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/activated-app-user", () => ({
-  getCurrentActivatedAppUser: getCurrentActivatedAppUserMock,
+  getCurrentActivatedAppUserAdmission: getCurrentActivatedAppUserAdmissionMock,
 }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -148,7 +148,7 @@ function stubProvider(id: "gemini" | "openrouter" = "gemini"): CorrectionProvide
 }
 
 beforeEach(() => {
-  getCurrentActivatedAppUserMock.mockReset();
+  getCurrentActivatedAppUserAdmissionMock.mockReset();
   findUniqueMock.mockReset();
   topicCreateMock.mockReset();
   essayCreateMock.mockReset();
@@ -164,7 +164,7 @@ beforeEach(() => {
   reserveCorrectionUsageMock.mockReset();
   refundCorrectionUsageMock.mockReset();
   recordAdminEventMock.mockReset();
-  getCurrentActivatedAppUserMock.mockResolvedValue({ id: LOCAL_USER_ID });
+  getCurrentActivatedAppUserAdmissionMock.mockResolvedValue({ user: { id: LOCAL_USER_ID }, accessExpired: false });
   hasConfiguredCredentialsMock.mockReturnValue(true);
   resolveModelMock.mockReturnValue("gemini-3.5-flash-lite");
   getCorrectionProviderMock.mockImplementation((id: "gemini" | "openrouter") => stubProvider(id));
@@ -261,7 +261,7 @@ describe("POST /api/essays/correct", () => {
     expect(reserveCorrectionUsageMock).not.toHaveBeenCalled();
   });
   it("requires an authenticated learner", async () => {
-    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+    getCurrentActivatedAppUserAdmissionMock.mockResolvedValue({ user: null, accessExpired: false });
 
     const response = await post({
       taskType: "TASK_1",
@@ -275,7 +275,7 @@ describe("POST /api/essays/correct", () => {
   });
 
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
-    getCurrentActivatedAppUserMock.mockRejectedValue(
+    getCurrentActivatedAppUserAdmissionMock.mockRejectedValue(
       new AppUserProvisioningErrorMock("identity cannot be linked"),
     );
 
@@ -295,7 +295,7 @@ describe("POST /api/essays/correct", () => {
   });
 
   it("does not disclose an unactivated account before claiming a correction", async () => {
-    getCurrentActivatedAppUserMock.mockResolvedValue(null);
+    getCurrentActivatedAppUserAdmissionMock.mockResolvedValue({ user: null, accessExpired: false });
 
     const response = await post({
       taskType: "TASK_1",

@@ -3,6 +3,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { accessCodeIsLiveWhere, resolveExpiresAt } from "@/lib/access-code-expiry";
+import { calendarDaysUntil, isAccessExpiryWarning } from "@/lib/access-code-expiry-warning";
 import { DEFAULT_USER_QUOTA_LIMITS, type UserQuotaLimits } from "@/lib/user-quota-limits";
 
 export const ADMIN_USERS_PAGE_SIZE = 25;
@@ -197,6 +198,7 @@ export type AdminUserListItem = {
   // needs to know "does this account currently have access" -- e.g. the
   // table's status badge -- must use this field, not activatedAt.
   hasLiveAdmission: boolean;
+  expiresInDays: number | null;
   usage: AdminUserUsage;
 };
 
@@ -215,6 +217,7 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
   const resolvedExpiresAt = redemption !== undefined ? resolveExpiresAt(redemption) : undefined;
   const hasLiveAdmission =
     resolvedExpiresAt !== undefined && (resolvedExpiresAt === null || resolvedExpiresAt.getTime() > now.getTime());
+  const expiryDays = resolvedExpiresAt && hasLiveAdmission ? calendarDaysUntil(resolvedExpiresAt, now, record.timezone) : null;
 
   return {
     id: record.id,
@@ -228,6 +231,7 @@ function serializeUser(record: AdminUserRecord, now: Date): AdminUserListItem {
     isBlocked: record.isBlocked,
     activatedAt: redemption?.redeemedAt?.toISOString() ?? null,
     hasLiveAdmission,
+    expiresInDays: expiryDays !== null && isAccessExpiryWarning(expiryDays) ? expiryDays : null,
     usage: getCurrentAdminUsage(record, now),
   };
 }

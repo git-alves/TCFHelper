@@ -15,6 +15,7 @@ const APP_USER_SELECT = {
   isBlocked: true,
   walkthroughCompletedVersion: true,
   lastActiveAt: true,
+  timezone: true,
 } satisfies Prisma.UserSelect;
 
 // A slow or momentarily locked heartbeat write must never make an ordinary

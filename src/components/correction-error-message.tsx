@@ -21,6 +21,8 @@ export function correctionErrorText(error: CorrectionErrorState, copy: AppCopy, 
       return editor.correctionBusyError;
     case "sessionExpired":
       return editor.correctionSessionExpiredError;
+    case "accessExpired":
+      return editor.correctionAccessExpiredError;
     case "generic":
       return editor.genericCorrectionError;
   }
