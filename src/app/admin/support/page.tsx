@@ -3,6 +3,7 @@ import { AdminSupportDeleteButton } from "@/components/admin-support-delete-butt
 import { AdminSupportInboxSeen } from "@/components/admin-support-inbox-count";
 import { AdminSupportResolveButton } from "@/components/admin-support-resolve-button";
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
+import { AdminSupportEditReply } from "@/components/admin-support-edit-reply";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyNewTicket, getSupportInboxSeenAt } from "@/lib/support-inbox";
@@ -182,6 +183,8 @@ export default async function AdminSupportPage() {
                         Note: {request.resolutionNote}
                       </p>
                     )}
+                    {request.status === "RESOLVED" && request.noticeSeenAt === null && request.noticeDismissedAt === null && request.resolutionFeedback === null && <AdminSupportEditReply requestId={request.id} note={request.resolutionNote} />}
+                    {request.noticeSeenAt && <p className="mt-1 text-xs text-zinc-500">Seen by learner</p>}
                     <p data-testid="ticket-learner-response" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Learner response: {describeNoticeStatus(getSupportNoticeStatus(request, visitStartedAt))}
                     </p>
