@@ -13,7 +13,12 @@ export function AccessExpiryBanner({ notice }: { notice: AccessExpiryNotice | nu
   const pathname = usePathname();
   const [dismissed, setDismissed] = useState(false);
   useEffect(() => {
-    if (notice) setDismissed(isAccessExpiryDismissed({ getItem: safeGetLocalItem }, notice.accessCodeId, notice.todayKey));
+    if (notice) {
+      // localStorage is intentionally read after hydration; this state only
+      // reconciles the server-rendered banner with a prior local dismissal.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDismissed(isAccessExpiryDismissed({ getItem: safeGetLocalItem }, notice.accessCodeId, notice.todayKey));
+    }
   }, [notice]);
   const inLearnerApp = isLearnerAppPath(pathname);
   if (!notice || dismissed || !inLearnerApp) return null;
