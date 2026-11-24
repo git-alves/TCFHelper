@@ -91,7 +91,7 @@ describe("/activate", () => {
   });
 
   it("fails closed, without redirecting, when activation state cannot be read", async () => {
-    hasRedeemedAccessCodeMock.mockRejectedValue(new Error("database unavailable"));
+    getRedeemedAccessCodeAdmissionMock.mockRejectedValue(new Error("database unavailable"));
 
     const page = await ActivatePage();
 
