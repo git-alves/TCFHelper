@@ -11,7 +11,7 @@ type RedemptionResponse = {
   error?: string;
 };
 
-export function AccessCodeActivationForm({ copy }: { copy: { codeLabel: string; activate: string; activating: string; clientError: { activation: string; service: string }; newCodeLabel: string }; expired?: boolean }) {
+export function AccessCodeActivationForm({ copy }: { copy: { codeLabel: string; activate: string; activating: string; clientError: { activation: string; service: string } } }) {
   const router = useRouter();
   const errorId = useId();
   const [code, setCode] = useState("");
