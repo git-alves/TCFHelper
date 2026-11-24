@@ -16,6 +16,7 @@ const {
   getPendingSupportNotice,
   markSupportNoticeSeen,
   resolveSupportRequest,
+  editSupportResolutionNote,
 } = await import("./support-resolution");
 
 const NOW = new Date("2026-11-12T10:00:00.000Z");
@@ -32,6 +33,23 @@ beforeEach(() => {
   findFirstMock.mockReset();
   findUniqueMock.mockReset();
   updateManyMock.mockReset();
+});
+
+describe("editSupportResolutionNote", () => {
+  it("updates only the unseen resolved reply", async () => {
+    updateManyMock.mockResolvedValue({ count: 1 });
+    await expect(editSupportResolutionNote("req_1", "Corrected reply")).resolves.toEqual({ kind: "updated" });
+    expect(updateManyMock).toHaveBeenCalledWith({
+      where: { id: "req_1", status: "RESOLVED", noticeSeenAt: null, noticeDismissedAt: null, resolutionFeedback: null },
+      data: { resolutionNote: "Corrected reply" },
+    });
+  });
+
+  it("reports a conflict when the learner has already interacted", async () => {
+    updateManyMock.mockResolvedValue({ count: 0 });
+    findUniqueMock.mockResolvedValue({ id: "req_1" });
+    await expect(editSupportResolutionNote("req_1", "Too late")).resolves.toEqual({ kind: "notEditable" });
+  });
 });
 
 describe("getPendingSupportNotice", () => {
