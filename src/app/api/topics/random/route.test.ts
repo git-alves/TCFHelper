@@ -97,10 +97,21 @@ describe("GET /api/topics/random", () => {
     expect((await response.json())).toMatchObject({ topic: { id: "caaaaaaaa" }, cycleReset: true });
   });
 
-  it("ignores malformed or oversized exclude input", async () => {
-    await GET(request("TASK_2", "not-an-id"));
-    await GET(request("TASK_2", Array.from({ length: 41 }, () => "caaaaaaaa").join(",")));
-    expect(findManyMock).toHaveBeenCalledTimes(2);
+  it("serves every topic before repeating the sole unwritten topic", async () => {
+    findManyMock.mockResolvedValue([bank("caaaaaaaa"), bank("cbbbbbbbb"), bank("ccccccccc")]);
+    essayFindManyMock.mockResolvedValue([{ topicId: "caaaaaaaa" }, { topicId: "cbbbbbbbb" }]);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const first = await (await GET(request("TASK_2", "ccccccccc"))).json();
+    expect(first).toMatchObject({ topic: { id: "caaaaaaaa" }, cycleReset: false });
+    const second = await (await GET(request("TASK_2", "ccccccccc,caaaaaaaa"))).json();
+    expect(second).toMatchObject({ topic: { id: "cbbbbbbbb" }, cycleReset: false });
+  });
+
+  it("drops malformed exclude ids while retaining valid exclusions", async () => {
+    findManyMock.mockResolvedValue([bank("caaaaaaaa"), bank("cbbbbbbbb")]);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const response = await GET(request("TASK_2", "not-an-id,caaaaaaaa"));
+    expect((await response.json()).topic.id).toBe("cbbbbbbbb");
   });
 
   it("reads only active starter-bank topics for the requested task", async () => {

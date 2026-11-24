@@ -5,18 +5,17 @@ import { AppUserProvisioningError } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyWritingContext } from "@/lib/guided-writing-classifier";
 import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
+import { TOPIC_CYCLE_MAX_IDS } from "@/lib/topic-cycle";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
-const MAX_EXCLUDE_IDS = 40;
 const CUID = /^c[a-z0-9]{8,}$/;
 
 function requestedExclusions(request: Request): string[] {
   const raw = new URL(request.url).searchParams.get("exclude");
   if (!raw) return [];
   const ids = raw.split(",");
-  if (ids.length > MAX_EXCLUDE_IDS || ids.some((id) => !CUID.test(id))) return [];
-  return [...new Set(ids)];
+  return [...new Set(ids.filter((id) => CUID.test(id)))].slice(0, TOPIC_CYCLE_MAX_IDS);
 }
 
 /**
@@ -67,11 +66,6 @@ export async function GET(request: Request) {
     select: { id: true, taskType: true, title: true, prompt: true, guideContext: true },
   });
 
-  const written = await prisma.essay.findMany({
-    where: { userId: user.id, topicId: { not: null } },
-    select: { topicId: true },
-  });
-
   if (topics.length === 0) {
     return NextResponse.json(
       { error: "No topics are available for this task yet.", code: "NO_TOPICS_AVAILABLE" },
@@ -79,15 +73,24 @@ export async function GET(request: Request) {
     );
   }
 
+  const written = await prisma.essay.findMany({
+    where: { userId: user.id, topicId: { in: topics.map((topic) => topic.id) } },
+    select: { topicId: true },
+  });
+
   const seen = new Set([...excluded, ...written.map((essay) => essay.topicId).filter((id): id is string => id !== null)]);
   let candidates = topics.filter((topic) => !seen.has(topic.id));
-  const cycleReset = candidates.length === 0;
-  if (cycleReset) {
+  let cycleReset = false;
+  if (candidates.length === 0) {
+    candidates = topics.filter((topic) => !excluded.has(topic.id));
+  }
+  if (candidates.length === 0) {
     // Keep the currently shown topic out of a fresh cycle when the client
     // supplied it in exclude, so a reset never immediately repeats it.
     const currentTopicId = excludedIds.at(-1);
     candidates = topics.filter((topic) => topic.id !== currentTopicId);
     if (candidates.length === 0) candidates = topics;
+    cycleReset = true;
   }
   const topic = candidates[Math.floor(Math.random() * candidates.length)];
 

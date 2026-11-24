@@ -67,6 +67,7 @@ import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 import { splitTaskThreeDocuments } from "@/lib/task-three-topic";
 import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
+import { TOPIC_CYCLE_MAX_IDS } from "@/lib/topic-cycle";
 
 // A topic from the app's own database of practice prompts (see
 // src/lib/starter-topics.ts), served at random by /api/topics/random.
@@ -95,7 +96,10 @@ function servedTopics(userId: string | undefined, taskType: TaskType): string[] 
 
 function saveServedTopic(userId: string | undefined, taskType: TaskType, id: string, reset: boolean) {
   const key = topicCycleKey(userId, taskType);
-  if (key) safeSetLocalItem(key, JSON.stringify(reset ? [id] : [...new Set([...servedTopics(userId, taskType), id])].slice(-40)));
+  if (key) {
+    const previous = servedTopics(userId, taskType);
+    safeSetLocalItem(key, JSON.stringify(reset ? [id] : [...previous.filter((topicId) => topicId !== id), id].slice(-TOPIC_CYCLE_MAX_IDS)));
+  }
 }
 
 // How long the draft must sit unchanged before it is written to the device. A
