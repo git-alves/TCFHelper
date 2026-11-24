@@ -36,7 +36,7 @@ vi.mock("@/lib/prisma", () => ({
     user: { findUnique: userFindUniqueMock, ...userWriteMocks },
   },
 }));
-vi.mock("next/navigation", () => ({ notFound: notFoundMock }));
+vi.mock("next/navigation", () => ({ notFound: notFoundMock, useRouter: () => ({ refresh: vi.fn() }) }));
 
 const { default: AdminSupportPage } = await import("./page");
 
