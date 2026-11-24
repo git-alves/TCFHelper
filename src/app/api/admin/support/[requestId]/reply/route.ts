@@ -2,7 +2,7 @@ import { z } from "zod";
 import { adminJsonResponse, adminNotFoundResponse, getAdminApiUser } from "@/lib/admin-api";
 import { editSupportResolutionNote, SUPPORT_RESOLUTION_NOTE_MAX_CHARS } from "@/lib/support-resolution";
 
-const schema = z.object({ note: z.string().max(SUPPORT_RESOLUTION_NOTE_MAX_CHARS) }).strict();
+const schema = z.object({ note: z.string().trim().min(1).max(SUPPORT_RESOLUTION_NOTE_MAX_CHARS) }).strict();
 export async function PATCH(request: Request, { params }: { params: Promise<{ requestId: string }> }) {
   if (!(await getAdminApiUser())) return adminNotFoundResponse();
   const parsed = schema.safeParse(await request.json().catch(() => null));
