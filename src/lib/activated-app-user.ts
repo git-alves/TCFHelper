@@ -31,5 +31,8 @@ export async function getCurrentActivatedAppUserAdmission(): Promise<{
   if (user.isAdmin) return { user, accessExpired: false };
 
   const admission = await getRedeemedAccessCodeAdmission(user.id);
-  return { user: admission.kind === "active" ? user : null, accessExpired: admission.kind === "expired" };
+  return {
+    user: admission.kind === "active" ? user : null,
+    accessExpired: admission.kind === "expired" || user.accessExpiredAt !== null,
+  };
 }

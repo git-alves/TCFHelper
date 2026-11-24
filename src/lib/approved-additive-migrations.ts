@@ -125,4 +125,8 @@ export const AUTOMATIC_ADDITIVE_MIGRATIONS = new Set([
   // recovery events. Existing event rows and prior application writes remain
   // valid unchanged during a rolling deploy.
   "20261119120000_add_recovered_chain_events",
+  // A nullable User access-expiry outcome marker. No existing row is changed
+  // or backfilled; null remains the ordinary activation state until a timed
+  // admission expires under the new application version.
+  "20261124120000_add_user_access_expired_at",
 ]);

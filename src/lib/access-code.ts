@@ -80,6 +80,7 @@ async function resolveAdmissionLocked(tx: AdmissionLockedTx, userId: string): Pr
     where: { id: userId, activationWelcomeShownAt: null },
     data: { activationWelcomeShownAt: new Date() },
   });
+  await tx.user.updateMany({ where: { id: userId }, data: { accessExpiredAt: expiresAt } });
   return { kind: "expired", expiresAt };
 }
 
@@ -197,6 +198,10 @@ export async function redeemAccessCode(userId: string, code: string): Promise<Ac
           where: { id: userId, activationWelcomeShownAt: null },
           data: { activationWelcomeShownAt: new Date() },
         });
+        // A replacement code restores access, including after a prior timed
+        // admission was detached. This is deliberately separate from the
+        // one-time welcome marker's conditional write.
+        await tx.user.updateMany({ where: { id: userId }, data: { accessExpiredAt: null } });
 
         return {
           kind: "redeemed",

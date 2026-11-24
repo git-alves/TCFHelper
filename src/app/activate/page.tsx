@@ -8,10 +8,6 @@ import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redi
 import { getRequestLocale } from "@/lib/request-locale";
 
 export default async function ActivatePage() {
-  // Decision 4 is intentionally parked until expiry can be durably associated
-  // with a detached code. Keeping this value at one switch point means the
-  // later schema-backed lookup only has to supply an ISO date here.
-  const expiredAt: string | null = null;
   let user;
   try {
     user = await getCurrentAppUser();
@@ -50,6 +46,8 @@ export default async function ActivatePage() {
     redirect("/tasks");
   }
 
+  const expiredAt = user.accessExpiredAt?.toISOString() ?? null;
+
   const locale = await getRequestLocale();
   const copy = getAppCopy(locale).activation;
   const expiredEndDate = expiredAt
@@ -63,7 +61,7 @@ export default async function ActivatePage() {
       <p className="mt-3 text-zinc-600 dark:text-zinc-400">
         {expiredEndDate ? copy.expiredDescription({ endDate: expiredEndDate }) : copy.description}
       </p>
-      <AccessCodeActivationForm />
+      <AccessCodeActivationForm label={expiredEndDate ? copy.newCodeLabel : undefined} />
     </main>
   );
 }

@@ -67,7 +67,7 @@ export function AdminUsersTable({ users, currentAdminId }: AdminUsersTableProps)
                     ) : (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Needs code</span>
                     )}
-                    {typeof user.expiresInDays === "number" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 dark:bg-amber-950 dark:text-amber-200">Expires in {user.expiresInDays} days</span>}
+                    {typeof user.expiresInDays === "number" && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${user.expiresInDays === 0 ? "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"}`}>{user.expiresInDays === 0 ? "Expires today" : user.expiresInDays === 1 ? "Expires tomorrow" : `Expires in ${user.expiresInDays} days`}</span>}
                   </div>
                 </td>
                 <td className="whitespace-nowrap px-4 py-4 text-zinc-600 dark:text-zinc-400">{formattedDate(user.createdAt, user.timezone)}</td>

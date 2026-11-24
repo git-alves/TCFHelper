@@ -11,7 +11,7 @@ type RedemptionResponse = {
   error?: string;
 };
 
-export function AccessCodeActivationForm() {
+export function AccessCodeActivationForm({ label = "Access code" }: { label?: string }) {
   const router = useRouter();
   const errorId = useId();
   const [code, setCode] = useState("");
@@ -83,7 +83,7 @@ export function AccessCodeActivationForm() {
     <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4" noValidate>
       <div className="flex flex-col gap-2">
         <label htmlFor="access-code" className="text-sm font-medium">
-          Access code
+          {label}
         </label>
         <input
           id="access-code"
