@@ -13,7 +13,9 @@ beforeEach(() => findUniqueMock.mockReset());
 describe("getAccessExpiryNotice", () => {
   it.each([[8, null], [7, 7], [1, 1], [0, 0], [-1, null]])("handles a %i-day expiry", async (days, expectedDays) => {
     findUniqueMock.mockResolvedValue({ id: "code_1", redeemedAt: now, validityDays: 30, expiresAt: new Date(Date.UTC(2026, 7, 1 + days, 18)) });
-    await expect(getAccessExpiryNotice(learner, now)).resolves.toMatchObject(expectedDays === null ? null : { days: expectedDays });
+    const result = await getAccessExpiryNotice(learner, now);
+    if (expectedDays === null) expect(result).toBeNull();
+    else expect(result).toMatchObject({ days: expectedDays });
   });
 
   it("never warns for a lifetime code or admin", async () => {
