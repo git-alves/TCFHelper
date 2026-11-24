@@ -36,19 +36,32 @@ beforeEach(() => {
 });
 
 describe("editSupportResolutionNote", () => {
-  it("updates only the unseen resolved reply", async () => {
+  it("updates only the note of an unseen, unexpired resolved reply", async () => {
     updateManyMock.mockResolvedValue({ count: 1 });
-    await expect(editSupportResolutionNote("req_1", "Corrected reply")).resolves.toEqual({ kind: "updated" });
+    await expect(editSupportResolutionNote("req_1", "Corrected reply", NOW)).resolves.toEqual({ kind: "updated" });
     expect(updateManyMock).toHaveBeenCalledWith({
-      where: { id: "req_1", status: "RESOLVED", noticeSeenAt: null, noticeDismissedAt: null, resolutionFeedback: null },
+      where: {
+        id: "req_1",
+        status: "RESOLVED",
+        noticeSeenAt: null,
+        noticeDismissedAt: null,
+        resolutionFeedback: null,
+        resolvedAt: { gt: EXPIRY_CUTOFF },
+      },
       data: { resolutionNote: "Corrected reply" },
     });
+  });
+
+  it("reports notFound for a missing request", async () => {
+    updateManyMock.mockResolvedValue({ count: 0 });
+    findUniqueMock.mockResolvedValue(null);
+    await expect(editSupportResolutionNote("missing", "Reply", NOW)).resolves.toEqual({ kind: "notFound" });
   });
 
   it("reports a conflict when the learner has already interacted", async () => {
     updateManyMock.mockResolvedValue({ count: 0 });
     findUniqueMock.mockResolvedValue({ id: "req_1" });
-    await expect(editSupportResolutionNote("req_1", "Too late")).resolves.toEqual({ kind: "notEditable" });
+    await expect(editSupportResolutionNote("req_1", "Too late", NOW)).resolves.toEqual({ kind: "notEditable" });
   });
 });
 

@@ -143,10 +143,20 @@ describe("AdminSupportPage", () => {
       { noticeSeenAt: new Date() },
       { noticeDismissedAt: new Date() },
       { resolutionFeedback: "WORKED" as const },
+      // Past the 7-day notice window: the learner will never be shown it.
+      { resolvedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000) },
     ]) {
       const markup = await render([{ ...BASE, status: "RESOLVED", resolvedAt: new Date(), ...overrides }]);
       expect(markup).not.toContain("Edit reply");
     }
+  });
+
+  it("hides Edit reply on a reopened ticket's earlier resolution", async () => {
+    const markup = await render([
+      { ...BASE, status: "OPEN", resolvedAt: new Date(), resolutionNote: "Old reply", resolutionFeedback: "STILL_BROKEN" as const },
+    ]);
+    expect(markup).toContain("Reopened — earlier resolution");
+    expect(markup).not.toContain("Edit reply");
   });
 
   it("shows when the learner saw the notice without answering", async () => {

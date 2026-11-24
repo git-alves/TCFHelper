@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { classifyNewTicket, getSupportInboxSeenAt } from "@/lib/support-inbox";
 import { getSupportNoticeStatus, type SupportNoticeStatus } from "@/lib/support-notice-status";
 import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
+import { supportNoticeExpiryCutoff } from "@/lib/support-notice-expiry";
 
 const CATEGORY_LABELS = {
   BUG: "Bug",
@@ -37,6 +38,28 @@ function describeNoticeStatus(status: SupportNoticeStatus | null) {
     case "expired":
       return "No answer (expired)";
   }
+}
+
+// Mirrors editSupportResolutionNote's conditions: resolved, and the learner
+// has not opened, dismissed or answered a notice that is still live.
+function isReplyEditable(
+  request: {
+    status: string;
+    resolvedAt: Date | null;
+    noticeSeenAt: Date | null;
+    noticeDismissedAt: Date | null;
+    resolutionFeedback: string | null;
+  },
+  now: Date,
+) {
+  return (
+    request.status === "RESOLVED" &&
+    request.noticeSeenAt === null &&
+    request.noticeDismissedAt === null &&
+    request.resolutionFeedback === null &&
+    request.resolvedAt !== null &&
+    request.resolvedAt > supportNoticeExpiryCutoff(now)
+  );
 }
 
 function formatDate(value: Date) {
@@ -183,8 +206,9 @@ export default async function AdminSupportPage() {
                         Note: {request.resolutionNote}
                       </p>
                     )}
-                    {request.status === "RESOLVED" && request.noticeSeenAt === null && request.noticeDismissedAt === null && request.resolutionFeedback === null && <AdminSupportEditReply requestId={request.id} note={request.resolutionNote} />}
-                    {request.noticeSeenAt && <p className="mt-1 text-xs text-zinc-500">Seen by learner</p>}
+                    {isReplyEditable(request, visitStartedAt) && (
+                      <AdminSupportEditReply requestId={request.id} note={request.resolutionNote} />
+                    )}
                     <p data-testid="ticket-learner-response" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Learner response: {describeNoticeStatus(getSupportNoticeStatus(request, visitStartedAt))}
                     </p>

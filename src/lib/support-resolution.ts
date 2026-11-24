@@ -64,9 +64,26 @@ export async function getPendingSupportNotice(userId: string, now = new Date()):
 export type ResolveOutcome = { kind: "resolved"; ticketNumber: number } | { kind: "notFound" } | { kind: "alreadyResolved" };
 export type EditResolutionOutcome = { kind: "updated" } | { kind: "notEditable" } | { kind: "notFound" };
 
-export async function editSupportResolutionNote(requestId: string, note: string | null): Promise<EditResolutionOutcome> {
+/**
+ * Replaces the reply on a resolved request while the learner has not seen it:
+ * not opened, dismissed or answered, and the notice not yet expired (an
+ * expired notice is never shown, so an edit would reach no one). Only the note
+ * changes; resolvedAt keeps driving the notice's expiry.
+ */
+export async function editSupportResolutionNote(
+  requestId: string,
+  note: string,
+  now = new Date(),
+): Promise<EditResolutionOutcome> {
   const updated = await prisma.supportRequest.updateMany({
-    where: { id: requestId, status: "RESOLVED", noticeSeenAt: null, noticeDismissedAt: null, resolutionFeedback: null },
+    where: {
+      id: requestId,
+      status: "RESOLVED",
+      noticeSeenAt: null,
+      noticeDismissedAt: null,
+      resolutionFeedback: null,
+      resolvedAt: { gt: supportNoticeExpiryCutoff(now) },
+    },
     data: { resolutionNote: note },
   });
   if (updated.count === 1) return { kind: "updated" };
