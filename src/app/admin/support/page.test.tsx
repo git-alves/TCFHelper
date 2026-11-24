@@ -118,7 +118,7 @@ describe("AdminSupportPage", () => {
     expect(markup).not.toContain("ticket-resolution");
   });
 
-  it("shows a resolved ticket with its time, the note, that the learner has not seen it, and no button", async () => {
+  it("shows Edit reply for an unseen resolved ticket", async () => {
     const markup = await render([
       {
         ...BASE,
@@ -135,7 +135,18 @@ describe("AdminSupportPage", () => {
     expect(markup).toContain("Note: We fixed the editor.");
     expect(markup).toContain("Learner response: Not answered yet");
     expect(markup).not.toContain("(seen");
-    expect(markup).not.toContain("resolve-button");
+    expect(markup).toContain("Edit reply");
+  });
+
+  it("hides Edit reply after the learner has seen, dismissed, or answered", async () => {
+    for (const overrides of [
+      { noticeSeenAt: new Date() },
+      { noticeDismissedAt: new Date() },
+      { resolutionFeedback: "WORKED" as const },
+    ]) {
+      const markup = await render([{ ...BASE, status: "RESOLVED", resolvedAt: new Date(), ...overrides }]);
+      expect(markup).not.toContain("Edit reply");
+    }
   });
 
   it("shows when the learner saw the notice without answering", async () => {
