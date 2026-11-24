@@ -34,7 +34,9 @@ export async function getSupportNoticeUser(options?: { skipPresenceTouch?: boole
 }
 
 export function supportNoticeOutcomeResponse(outcome: NoticeActionOutcome) {
-  if (outcome.kind === "ok") return supportNoticeJson({ ok: true, next: outcome.next });
+  if (outcome.kind === "ok") {
+    return supportNoticeJson({ ok: true, next: outcome.next, ...(outcome.notice ? { notice: outcome.notice } : {}) });
+  }
   if (outcome.kind === "notFound") return supportNoticeJson({ error: "Support request not found." }, 404);
   return supportNoticeJson(
     {

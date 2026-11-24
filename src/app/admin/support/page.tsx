@@ -3,11 +3,13 @@ import { AdminSupportDeleteButton } from "@/components/admin-support-delete-butt
 import { AdminSupportInboxSeen } from "@/components/admin-support-inbox-count";
 import { AdminSupportResolveButton } from "@/components/admin-support-resolve-button";
 import { AdminSupportRetryButton } from "@/components/admin-support-retry-button";
+import { AdminSupportEditReply } from "@/components/admin-support-edit-reply";
 import { AppUserProvisioningError, getCurrentAdminUser } from "@/lib/app-user";
 import { prisma } from "@/lib/prisma";
 import { classifyNewTicket, getSupportInboxSeenAt } from "@/lib/support-inbox";
 import { getSupportNoticeStatus, type SupportNoticeStatus } from "@/lib/support-notice-status";
 import { MAX_HUBSPOT_SYNC_ATTEMPTS } from "@/lib/support-hubspot-sync";
+import { supportNoticeExpiryCutoff } from "@/lib/support-notice-expiry";
 
 const CATEGORY_LABELS = {
   BUG: "Bug",
@@ -36,6 +38,28 @@ function describeNoticeStatus(status: SupportNoticeStatus | null) {
     case "expired":
       return "No answer (expired)";
   }
+}
+
+// Mirrors editSupportResolutionNote's conditions: resolved, and the learner
+// has not opened, dismissed or answered a notice that is still live.
+function isReplyEditable(
+  request: {
+    status: string;
+    resolvedAt: Date | null;
+    noticeSeenAt: Date | null;
+    noticeDismissedAt: Date | null;
+    resolutionFeedback: string | null;
+  },
+  now: Date,
+) {
+  return (
+    request.status === "RESOLVED" &&
+    request.noticeSeenAt === null &&
+    request.noticeDismissedAt === null &&
+    request.resolutionFeedback === null &&
+    request.resolvedAt !== null &&
+    request.resolvedAt > supportNoticeExpiryCutoff(now)
+  );
 }
 
 function formatDate(value: Date) {
@@ -181,6 +205,9 @@ export default async function AdminSupportPage() {
                       <p className="mt-1 whitespace-pre-wrap break-words text-zinc-700 dark:text-zinc-300">
                         Note: {request.resolutionNote}
                       </p>
+                    )}
+                    {isReplyEditable(request, visitStartedAt) && (
+                      <AdminSupportEditReply requestId={request.id} note={request.resolutionNote} />
                     )}
                     <p data-testid="ticket-learner-response" className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
                       Learner response: {describeNoticeStatus(getSupportNoticeStatus(request, visitStartedAt))}

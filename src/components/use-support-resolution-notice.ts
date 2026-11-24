@@ -14,6 +14,17 @@ interface NoticeState {
   notice: SupportResolutionNotice | null;
 }
 
+// The reply text from a /seen response, or undefined when the response does
+// not carry a usable notice for this id.
+function currentResolutionNote(data: unknown, noticeId: string): string | null | undefined {
+  if (!data || typeof data !== "object" || !("notice" in data)) return undefined;
+  const notice = (data as { notice?: unknown }).notice;
+  if (!notice || typeof notice !== "object") return undefined;
+  const { id, resolutionNote } = notice as { id?: unknown; resolutionNote?: unknown };
+  if (id !== noticeId) return undefined;
+  return typeof resolutionNote === "string" || resolutionNote === null ? resolutionNote : undefined;
+}
+
 /**
  * Client state for the support-resolution notice. The first notice arrives
  * from the layout, which already runs on every full page load: there is no
@@ -48,9 +59,21 @@ export function useSupportResolutionNotice(initialNotice: SupportResolutionNotic
     setIsOpen(true);
     if (reportedSeen.current.has(notice.id)) return;
     reportedSeen.current.add(notice.id);
-    // Best effort: lets the admin see the notice was opened. Never blocks the
-    // modal and a failure changes nothing for the learner.
-    void fetch(`/api/support/${notice.id}/seen`, { method: "POST" }).catch(() => undefined);
+    // Best effort: lets the admin see the notice was opened, and returns the
+    // reply as stored now -- the admin may have edited it after this page
+    // loaded, and can no longer edit it once it is seen. Never blocks the
+    // modal; on any failure the learner keeps the text the page loaded with.
+    const noticeId = notice.id;
+    void fetch(`/api/support/${noticeId}/seen`, { method: "POST" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        const resolutionNote = currentResolutionNote(data, noticeId);
+        if (resolutionNote === undefined) return;
+        setState((current) =>
+          current.notice?.id === noticeId ? { ...current, notice: { ...current.notice, resolutionNote } } : current,
+        );
+      })
+      .catch(() => undefined);
   }, [notice]);
 
   const close = useCallback(() => {
