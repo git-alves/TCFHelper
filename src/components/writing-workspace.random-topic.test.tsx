@@ -26,6 +26,7 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   requestedUrls = [];
+  localStorage.clear();
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: RequestInfo | URL) => {
@@ -43,13 +44,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function pressRandomTopic() {
+async function pressRandomTopic(userId?: string) {
   act(() => {
     root.render(
       <AppLocaleProvider initialLocale="en">
         <DashboardNavGuardProvider>
           <WalkthroughWorkspaceScriptProvider>
-            <WritingWorkspace />
+            <WritingWorkspace userId={userId} />
           </WalkthroughWorkspaceScriptProvider>
         </DashboardNavGuardProvider>
       </AppLocaleProvider>,
@@ -101,5 +102,32 @@ describe("Get a random topic", () => {
 
     expect(alertText()).toMatch(/try again/i);
     expect(alertText()).not.toContain("We don't have any topics");
+  });
+
+  it("sends the per-user/task served list and appends the returned topic last", async () => {
+    const key = "mytcflab:served-topics:learner_1:TASK_1";
+    localStorage.setItem(key, JSON.stringify(["cfirsttopic", "csecondtopic", "creturnedtopic"]));
+    topicResponse = () => ({ ok: true, json: async () => ({ topic: { id: "csecondtopic", taskType: "TASK_1", title: "Sujet", prompt: "Rédigez un texte suffisamment long sur ce sujet.", guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "deterministic" } }, cycleReset: false }) }) as Response;
+
+    await pressRandomTopic("learner_1");
+
+    expect(requestedUrls[0]).toContain("exclude=cfirsttopic%2Ccsecondtopic%2Ccreturnedtopic");
+    expect(JSON.parse(localStorage.getItem(key) ?? "[]")).toEqual(["cfirsttopic", "creturnedtopic", "csecondtopic"]);
+  });
+
+  it("resets the served list after a server cycle reset", async () => {
+    const key = "mytcflab:served-topics:learner_1:TASK_1";
+    localStorage.setItem(key, JSON.stringify(["coldtopic", "cnowtopic"]));
+    topicResponse = () => ({ ok: true, json: async () => ({ topic: { id: "cnewtopic", taskType: "TASK_1", title: "Sujet", prompt: "Rédigez un texte suffisamment long sur ce sujet.", guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "deterministic" } }, cycleReset: true }) }) as Response;
+
+    await pressRandomTopic("learner_1");
+    expect(JSON.parse(localStorage.getItem(key) ?? "[]")).toEqual(["cnewtopic"]);
+  });
+
+  it("does not send or store served topics without a user id", async () => {
+    topicResponse = () => ({ ok: true, json: async () => ({ topic: { id: "ctopic", taskType: "TASK_1", title: "Sujet", prompt: "Rédigez un texte suffisamment long sur ce sujet.", guideContext: { profile: "PUBLIC_ARTICLE_OR_NOTE", confidence: "deterministic" } }, cycleReset: false }) }) as Response;
+    await pressRandomTopic();
+    expect(requestedUrls[0]).not.toContain("exclude=");
+    expect([...Array(localStorage.length)].map((_, index) => localStorage.key(index))).not.toContain("mytcflab:served-topics:undefined:TASK_1");
   });
 });
