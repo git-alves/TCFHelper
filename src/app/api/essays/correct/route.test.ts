@@ -274,6 +274,20 @@ describe("POST /api/essays/correct", () => {
     expect(essayCreateMock).not.toHaveBeenCalled();
   });
 
+  it("reports a just-expired access code distinctly while preserving a signed-out 401", async () => {
+    getCurrentActivatedAppUserAdmissionMock.mockResolvedValue({ user: null, accessExpired: true });
+
+    const response = await post({
+      taskType: "TASK_1",
+      topicPrompt: "Écrivez à votre voisin.",
+      content: VALID_TASK_1_CONTENT,
+    });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: "Access expired", code: "ACCESS_EXPIRED" });
+    expect(claimCorrectionMock).not.toHaveBeenCalled();
+  });
+
   it("fails closed while a Clerk identity cannot be safely provisioned", async () => {
     getCurrentActivatedAppUserAdmissionMock.mockRejectedValue(
       new AppUserProvisioningErrorMock("identity cannot be linked"),

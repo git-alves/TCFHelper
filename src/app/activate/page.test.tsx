@@ -29,6 +29,7 @@ vi.mock("@/lib/access-code", () => ({
 vi.mock("@/lib/blocked-user-redirect", () => ({
   redirectForUnauthenticatedOrBlockedUser: redirectForUnauthenticatedOrBlockedUserMock,
 }));
+vi.mock("@/lib/request-locale", () => ({ getRequestLocale: vi.fn().mockResolvedValue("en") }));
 vi.mock("@/components/access-code-activation-form", () => ({
   AccessCodeActivationForm: () => <div data-testid="access-code-activation-form" />,
 }));
