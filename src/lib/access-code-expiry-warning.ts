@@ -37,3 +37,7 @@ export function isAccessExpiryWarning(days: number): boolean {
 export function accessExpiryDismissalStorageKey(accessCodeId: string) {
   return `mytcflab:access-expiry-dismissed:${accessCodeId}`;
 }
+
+export function isAccessExpiryDismissed(storage: Pick<Storage, "getItem">, accessCodeId: string, todayKey: string): boolean {
+  return storage.getItem(accessExpiryDismissalStorageKey(accessCodeId)) === todayKey;
+}

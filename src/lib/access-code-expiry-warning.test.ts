@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calendarDaysUntil, isAccessExpiryWarning, localCalendarDayKey } from "./access-code-expiry-warning";
+import { calendarDaysUntil, isAccessExpiryDismissed, isAccessExpiryWarning, localCalendarDayKey } from "./access-code-expiry-warning";
 
 describe("access expiry warnings", () => {
   const now = new Date("2026-08-01T22:00:00.000Z");
@@ -19,5 +19,11 @@ describe("access expiry warnings", () => {
   it("uses the learner's local calendar day for dismissal keys", () => {
     expect(localCalendarDayKey(now, zone)).toBe("2026-08-01");
     expect(localCalendarDayKey(new Date("2026-08-02T03:00:00.000Z"), zone)).toBe("2026-08-02");
+  });
+
+  it("shows a dismissed warning again on the learner's next calendar day", () => {
+    const storage = { getItem: () => "2026-08-01" } as Pick<Storage, "getItem">;
+    expect(isAccessExpiryDismissed(storage, "code_1", "2026-08-01")).toBe(true);
+    expect(isAccessExpiryDismissed(storage, "code_1", "2026-08-02")).toBe(false);
   });
 });

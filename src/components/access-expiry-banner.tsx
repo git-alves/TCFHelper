@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
-import { accessExpiryDismissalStorageKey, ACCESS_EXPIRY_SUPPORT_HREF } from "@/lib/access-code-expiry-warning";
+import { accessExpiryDismissalStorageKey, ACCESS_EXPIRY_SUPPORT_HREF, isAccessExpiryDismissed } from "@/lib/access-code-expiry-warning";
 import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
 import type { AccessExpiryNotice } from "@/lib/access-expiry-notice";
 
 export function AccessExpiryBanner({ notice }: { notice: AccessExpiryNotice | null }) {
   const copy = useAppCopy().accessExpiry;
   const { locale } = useAppLocale();
-  const initiallyDismissed = notice !== null && safeGetLocalItem(accessExpiryDismissalStorageKey(notice.accessCodeId)) === notice.todayKey;
+  const initiallyDismissed = notice !== null && isAccessExpiryDismissed({ getItem: safeGetLocalItem }, notice.accessCodeId, notice.todayKey);
   const [dismissed, setDismissed] = useState(initiallyDismissed);
   if (!notice || dismissed) return null;
   const endDate = new Intl.DateTimeFormat(locale === "pt" ? "pt-BR" : locale, { dateStyle: "long", timeZone: notice.timezone ?? "UTC" }).format(new Date(notice.expiresAt));
