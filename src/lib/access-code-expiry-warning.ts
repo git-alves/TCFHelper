@@ -1,6 +1,6 @@
 export const ACCESS_EXPIRY_WARNING_DAYS = 7;
 
-function dateParts(date: Date, timeZone: string | null): [number, number, number] {
+export function dateParts(date: Date, timeZone: string | null): [number, number, number] {
   try {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: timeZone ?? "UTC",
@@ -12,6 +12,14 @@ function dateParts(date: Date, timeZone: string | null): [number, number, number
     return [value("year"), value("month"), value("day")];
   } catch {
     return dateParts(date, "UTC");
+  }
+}
+
+export function formatAccessExpiry(date: Date, locale: string, timeZone: string | null, options: Intl.DateTimeFormatOptions): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { ...options, timeZone: timeZone ?? "UTC" }).format(date);
+  } catch {
+    return new Intl.DateTimeFormat(locale, { ...options, timeZone: "UTC" }).format(date);
   }
 }
 

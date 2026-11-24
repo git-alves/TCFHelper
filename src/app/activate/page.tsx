@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AccessCodeActivationForm } from "@/components/access-code-activation-form";
 import { DashboardAccountUnavailable } from "@/components/dashboard-account-unavailable";
-import { hasRedeemedAccessCode } from "@/lib/access-code";
+import { getRedeemedAccessCodeAdmission } from "@/lib/access-code";
 import { AppUserProvisioningError, getCurrentAppUser } from "@/lib/app-user";
 import { getAppCopy } from "@/lib/app-copy";
 import { redirectForUnauthenticatedOrBlockedUser } from "@/lib/blocked-user-redirect";
@@ -23,9 +23,9 @@ export default async function ActivatePage() {
     return null;
   }
 
-  let isActivated: boolean;
+  let admission;
   try {
-    isActivated = user.isAdmin || (await hasRedeemedAccessCode(user.id));
+    admission = user.isAdmin ? { kind: "active" as const } : await getRedeemedAccessCodeAdmission(user.id);
   } catch {
     // Fail closed if activation state cannot be read. Rendering this isolated
     // page is safe; allowing a route into the app would not be.
@@ -42,11 +42,11 @@ export default async function ActivatePage() {
   // Outside the try/catch above: Next.js redirects by throwing, and a
   // blanket catch around that throw would misreport a normal redirect as
   // the "activation temporarily unavailable" failure instead of navigating.
-  if (isActivated) {
+  if (admission.kind === "active") {
     redirect("/tasks");
   }
 
-  const expiredAt = user.accessExpiredAt?.toISOString() ?? null;
+  const expiredAt = admission.kind === "expired" ? admission.expiresAt : user.accessExpiredAt;
 
   const locale = await getRequestLocale();
   const copy = getAppCopy(locale).activation;
@@ -61,7 +61,8 @@ export default async function ActivatePage() {
       <p className="mt-3 text-zinc-600 dark:text-zinc-400">
         {expiredEndDate ? copy.expiredDescription : copy.description}
       </p>
-      <AccessCodeActivationForm label={expiredEndDate ? copy.newCodeLabel : undefined} />
+      {expiredEndDate && <p className="mt-8 text-sm font-medium">{copy.newCodeLabel}</p>}
+      <AccessCodeActivationForm copy={copy} />
     </main>
   );
 }

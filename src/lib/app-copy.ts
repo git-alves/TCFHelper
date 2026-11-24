@@ -67,9 +67,7 @@ export interface AppCopy {
     bannerTomorrow: (values: { date: string }) => string;
     bannerToday: (values: { time: string; date: string }) => string;
     dismiss: string;
-    expiresIn: (values: { days: number }) => string;
-    expiresTomorrow: string;
-    expiresToday: string;
+    bannerAriaLabel: string;
   };
   activation: {
     eyebrow: string;
@@ -78,6 +76,10 @@ export interface AppCopy {
     expiredTitle: string;
     expiredDescription: string;
     newCodeLabel: string;
+    codeLabel: string;
+    activate: string;
+    activating: string;
+    clientError: { activation: string; service: string };
   };
   home: {
     title: string;
@@ -606,9 +608,7 @@ export const APP_COPY = {
       bannerTomorrow: ({ date }) => `Your beta tester access ends tomorrow (${date}).`,
       bannerToday: ({ time, date }) => `Your beta tester access ends today at ${time} (${date}).`,
       dismiss: "Dismiss until tomorrow",
-      expiresIn: ({ days }) => `Expires in ${days} days`,
-      expiresTomorrow: "Expires tomorrow",
-      expiresToday: "Expires today",
+      bannerAriaLabel: "Beta access expiry notice",
     },
     activation: {
       eyebrow: "Welcome to MyTCFLab",
@@ -617,6 +617,7 @@ export const APP_COPY = {
       expiredTitle: "Your beta tester access has ended",
       expiredDescription: "Thank you for testing MyTCFLab and helping us improve! Soon, you’ll be able to subscribe to one of our plans and continue practicing. Your history is saved.",
       newCodeLabel: "Received a new code? Enter it here",
+      codeLabel: "Access code", activate: "Activate account", activating: "Activating…", clientError: { activation: "We could not activate your account. Please try again.", service: "We could not reach the activation service. Please try again." },
     },
     home: {
       title: "Write for the TCF exam. Get feedback that gets you to C2.",
@@ -1307,12 +1308,11 @@ export const APP_COPY = {
       bannerDays: ({ days, date }) => `Votre accès de bêta-testeur prend fin dans ${days} jours (${date}).`,
       bannerTomorrow: ({ date }) => `Votre accès de bêta-testeur prend fin demain (${date}).`,
       bannerToday: ({ time, date }) => `Votre accès de bêta-testeur prend fin aujourd’hui à ${time} (${date}).`,
-      dismiss: "Dismiss until tomorrow",
-      expiresIn: ({ days }) => `Expires in ${days} days`, expiresTomorrow: "Expires tomorrow", expiresToday: "Expires today",
+      dismiss: "Masquer jusqu’à demain", bannerAriaLabel: "Avis d’expiration de l’accès bêta",
     },
     activation: {
-      eyebrow: "Welcome to MyTCFLab", title: "Activez votre compte", description: "Saisissez le code d’accès à usage unique que vous avez reçu pour accéder à l’espace d’apprentissage.",
-      expiredTitle: "Votre accès de bêta-testeur a pris fin", expiredDescription: "Merci d’avoir testé MyTCFLab et de nous aider à l’améliorer ! Bientôt, vous pourrez vous abonner à l’un de nos forfaits et continuer vos entraînements. Votre historique est conservé.", newCodeLabel: "Vous avez reçu un nouveau code ? Saisissez-le ici",
+      eyebrow: "Bienvenue sur MyTCFLab", title: "Activez votre compte", description: "Saisissez le code d’accès à usage unique que vous avez reçu pour accéder à l’espace d’apprentissage.",
+      expiredTitle: "Votre accès de bêta-testeur a pris fin", expiredDescription: "Merci d’avoir testé MyTCFLab et de nous aider à l’améliorer ! Bientôt, vous pourrez vous abonner à l’un de nos forfaits et continuer vos entraînements. Votre historique est conservé.", newCodeLabel: "Vous avez reçu un nouveau code ? Saisissez-le ici", codeLabel: "Code d’accès", activate: "Activer le compte", activating: "Activation…", clientError: { activation: "Nous n’avons pas pu activer votre compte. Veuillez réessayer.", service: "Nous n’avons pas pu joindre le service d’activation. Veuillez réessayer." },
     },
     home: {
       title: "Préparez l’expression écrite du TCF. Recevez des commentaires qui vous aident à atteindre le niveau C2.",
@@ -2015,10 +2015,10 @@ export const APP_COPY = {
         count === 0 ? "Bandeja de soporte" : count === 1 ? "Bandeja de soporte — 1 ticket nuevo" : `Bandeja de soporte — ${count} tickets nuevos`,
     },
     accessExpiry: {
-      bannerDays: ({ days, date }) => `Tu acceso de beta tester termina en ${days} días (${date}).`, bannerTomorrow: ({ date }) => `Tu acceso de beta tester termina mañana (${date}).`, bannerToday: ({ time, date }) => `Tu acceso de beta tester termina hoy a las ${time} (${date}).`, dismiss: "Dismiss until tomorrow", expiresIn: ({ days }) => `Expires in ${days} days`, expiresTomorrow: "Expires tomorrow", expiresToday: "Expires today",
+      bannerDays: ({ days, date }) => `Tu acceso de beta tester termina en ${days} días (${date}).`, bannerTomorrow: ({ date }) => `Tu acceso de beta tester termina mañana (${date}).`, bannerToday: ({ time, date }) => `Tu acceso de beta tester termina hoy a las ${time} (${date}).`, dismiss: "Ocultar hasta mañana", bannerAriaLabel: "Aviso de vencimiento del acceso beta",
     },
     activation: {
-      eyebrow: "Welcome to MyTCFLab", title: "Activa tu cuenta", description: "Introduce el código de acceso de un solo uso que recibiste para empezar a usar el espacio de aprendizaje.", expiredTitle: "Tu acceso de beta tester terminó", expiredDescription: "¡Gracias por probar MyTCFLab y ayudarnos a mejorar! Pronto podrás suscribirte a uno de nuestros planes y continuar practicando. Tu historial está guardado.", newCodeLabel: "¿Recibiste un código nuevo? Introdúcelo aquí",
+      eyebrow: "Te damos la bienvenida a MyTCFLab", title: "Activa tu cuenta", description: "Introduce el código de acceso de un solo uso que recibiste para empezar a usar el espacio de aprendizaje.", expiredTitle: "Tu acceso de beta tester terminó", expiredDescription: "¡Gracias por probar MyTCFLab y ayudarnos a mejorar! Pronto podrás suscribirte a uno de nuestros planes y continuar practicando. Tu historial está guardado.", newCodeLabel: "¿Recibiste un código nuevo? Introdúcelo aquí", codeLabel: "Código de acceso", activate: "Activar cuenta", activating: "Activando…", clientError: { activation: "No pudimos activar tu cuenta. Inténtalo de nuevo.", service: "No pudimos conectarnos al servicio de activación. Inténtalo de nuevo." },
     },
     home: {
       title: "Escribe para el examen TCF. Recibe comentarios que te ayudarán a alcanzar C2.",
@@ -2718,10 +2718,10 @@ export const APP_COPY = {
         count === 0 ? "Caixa de suporte" : count === 1 ? "Caixa de suporte — 1 chamado novo" : `Caixa de suporte — ${count} chamados novos`,
     },
     accessExpiry: {
-      bannerDays: ({ days, date }) => `Seu acesso de beta tester termina em ${days} dias (${date}).`, bannerTomorrow: ({ date }) => `Seu acesso de beta tester termina amanhã (${date}).`, bannerToday: ({ time, date }) => `Seu acesso de beta tester termina hoje às ${time} (${date}).`, dismiss: "Dismiss until tomorrow", expiresIn: ({ days }) => `Expires in ${days} days`, expiresTomorrow: "Expires tomorrow", expiresToday: "Expires today",
+      bannerDays: ({ days, date }) => `Seu acesso de beta tester termina em ${days} dias (${date}).`, bannerTomorrow: ({ date }) => `Seu acesso de beta tester termina amanhã (${date}).`, bannerToday: ({ time, date }) => `Seu acesso de beta tester termina hoje às ${time} (${date}).`, dismiss: "Fechar até amanhã", bannerAriaLabel: "Aviso sobre o término do acesso de beta tester",
     },
     activation: {
-      eyebrow: "Boas-vindas ao MyTCFLab", title: "Ative sua conta", description: "Insira o código de acesso de uso único que você recebeu para começar a usar o espaço de aprendizagem.", expiredTitle: "Seu acesso de beta tester terminou", expiredDescription: "Obrigado por testar o MyTCFLab e nos ajudar a melhorar! Em breve você poderá assinar um dos nossos planos e continuar suas práticas. Seu histórico fica guardado.", newCodeLabel: "Recebeu um novo código? Digite aqui",
+      eyebrow: "Boas-vindas ao MyTCFLab", title: "Ative sua conta", description: "Insira o código de acesso de uso único que você recebeu para começar a usar o espaço de aprendizagem.", expiredTitle: "Seu acesso de beta tester terminou", expiredDescription: "Obrigado por testar o MyTCFLab e nos ajudar a melhorar! Em breve você poderá assinar um dos nossos planos e continuar suas práticas. Seu histórico fica guardado.", newCodeLabel: "Recebeu um novo código? Digite aqui", codeLabel: "Código de acesso", activate: "Ativar conta", activating: "Ativando…", clientError: { activation: "Não foi possível ativar sua conta. Tente novamente.", service: "Não foi possível acessar o serviço de ativação. Tente novamente." },
     },
     home: {
       title: "Escreva para o exame TCF. Receba comentários que ajudam você a alcançar C2.",
