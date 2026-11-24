@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, ensureStarterTopicBankSyncedMock, afterMock } = vi.hoisted(() => {
+const { getCurrentActivatedAppUserMock, AppUserProvisioningErrorMock, findManyMock, essayFindManyMock, ensureStarterTopicBankSyncedMock, afterMock } = vi.hoisted(() => {
   class AppUserProvisioningErrorMock extends Error {}
   return {
     getCurrentActivatedAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
     findManyMock: vi.fn(),
+    essayFindManyMock: vi.fn(),
     ensureStarterTopicBankSyncedMock: vi.fn(),
     afterMock: vi.fn(),
   };
@@ -18,7 +19,7 @@ vi.mock("next/server", async () => {
 
 vi.mock("@/lib/activated-app-user", () => ({ getCurrentActivatedAppUser: getCurrentActivatedAppUserMock }));
 vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: AppUserProvisioningErrorMock }));
-vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findMany: findManyMock } } }));
+vi.mock("@/lib/prisma", () => ({ prisma: { topic: { findMany: findManyMock }, essay: { findMany: essayFindManyMock } } }));
 vi.mock("@/lib/starter-topic-bank-sync", () => ({ ensureStarterTopicBankSynced: ensureStarterTopicBankSyncedMock }));
 
 const { GET } = await import("./route");
@@ -32,15 +33,17 @@ const bank = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const request = (taskType = "TASK_2") => new Request(`http://localhost/api/topics/random?taskType=${taskType}`);
+const request = (taskType = "TASK_2", exclude = "") => new Request(`http://localhost/api/topics/random?taskType=${taskType}${exclude ? `&exclude=${exclude}` : ""}`);
 
 beforeEach(() => {
   getCurrentActivatedAppUserMock.mockReset();
   findManyMock.mockReset();
+  essayFindManyMock.mockReset();
   ensureStarterTopicBankSyncedMock.mockReset();
   afterMock.mockReset();
   getCurrentActivatedAppUserMock.mockResolvedValue({ id: "learner_1" });
   findManyMock.mockResolvedValue([bank("t1"), bank("t2"), bank("t3")]);
+  essayFindManyMock.mockResolvedValue([]);
   ensureStarterTopicBankSyncedMock.mockResolvedValue(undefined);
 });
 
@@ -77,6 +80,26 @@ describe("GET /api/topics/random", () => {
     }
 
     expect(seen).toEqual(new Set(["t1", "t2", "t3"]));
+  });
+
+  it("excludes client-served and essay topics until the cycle resets", async () => {
+    findManyMock.mockResolvedValue([bank("caaaaaaaa"), bank("cbbbbbbbb"), bank("ccccccccc")]);
+    essayFindManyMock.mockResolvedValue([{ topicId: "caaaaaaaa" }]);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    expect((await (await GET(request("TASK_2", "cbbbbbbbb")).json()).topic.id).toBe("ccccccccc");
+  });
+
+  it("resets a completed cycle without immediately repeating the current topic", async () => {
+    findManyMock.mockResolvedValue([bank("caaaaaaaa"), bank("cbbbbbbbb")]);
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const response = await GET(request("TASK_2", "caaaaaaaa,cbbbbbbbb"));
+    expect((await response.json())).toMatchObject({ topic: { id: "caaaaaaaa" }, cycleReset: true });
+  });
+
+  it("ignores malformed or oversized exclude input", async () => {
+    await GET(request("TASK_2", "not-an-id"));
+    await GET(request("TASK_2", Array.from({ length: 41 }, () => "caaaaaaaa").join(",")));
+    expect(findManyMock).toHaveBeenCalledTimes(2);
   });
 
   it("reads only active starter-bank topics for the requested task", async () => {

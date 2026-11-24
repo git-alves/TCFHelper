@@ -8,6 +8,16 @@ import { ensureStarterTopicBankSynced } from "@/lib/starter-topic-bank-sync";
 
 const TASK_TYPES = Object.values(TaskType);
 const NO_STORE_HEADERS = { "Cache-Control": "private, no-store" };
+const MAX_EXCLUDE_IDS = 40;
+const CUID = /^c[a-z0-9]{8,}$/;
+
+function requestedExclusions(request: Request): string[] {
+  const raw = new URL(request.url).searchParams.get("exclude");
+  if (!raw) return [];
+  const ids = raw.split(",");
+  if (ids.length > MAX_EXCLUDE_IDS || ids.some((id) => !CUID.test(id))) return [];
+  return [...new Set(ids)];
+}
 
 /**
  * One random topic for the selected task, drawn only from the app's own
@@ -41,6 +51,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Invalid taskType." }, { status: 400, headers: NO_STORE_HEADERS });
   }
   const taskType = requestedTaskType as TaskType;
+  const excludedIds = requestedExclusions(request);
+  const excluded = new Set(excludedIds);
 
   // after() runs the reconciliation after this response has been sent. The
   // first request is allowed to use the previous active bank rather than wait
@@ -55,6 +67,11 @@ export async function GET(request: Request) {
     select: { id: true, taskType: true, title: true, prompt: true, guideContext: true },
   });
 
+  const written = await prisma.essay.findMany({
+    where: { userId: user.id, topicId: { not: null } },
+    select: { topicId: true },
+  });
+
   if (topics.length === 0) {
     return NextResponse.json(
       { error: "No topics are available for this task yet.", code: "NO_TOPICS_AVAILABLE" },
@@ -62,7 +79,17 @@ export async function GET(request: Request) {
     );
   }
 
-  const topic = topics[Math.floor(Math.random() * topics.length)];
+  const seen = new Set([...excluded, ...written.map((essay) => essay.topicId).filter((id): id is string => id !== null)]);
+  let candidates = topics.filter((topic) => !seen.has(topic.id));
+  const cycleReset = candidates.length === 0;
+  if (cycleReset) {
+    // Keep the currently shown topic out of a fresh cycle when the client
+    // supplied it in exclude, so a reset never immediately repeats it.
+    const currentTopicId = excludedIds.at(-1);
+    candidates = topics.filter((topic) => topic.id !== currentTopicId);
+    if (candidates.length === 0) candidates = topics;
+  }
+  const topic = candidates[Math.floor(Math.random() * candidates.length)];
 
   // An editorial profile on the stored topic wins over the deterministic
   // classifier -- see docs/guided-writing.md's context-source table.
@@ -79,6 +106,7 @@ export async function GET(request: Request) {
         prompt: topic.prompt,
         guideContext,
       },
+      cycleReset,
     },
     { headers: NO_STORE_HEADERS },
   );

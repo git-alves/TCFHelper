@@ -66,6 +66,7 @@ import type { WritingContextClassification } from "@/lib/guided-writing-classifi
 import { WALKTHROUGH_SAMPLE_ESSAY } from "@/lib/walkthrough-sample-essay";
 import { getWalkthroughSampleFeedback } from "@/lib/walkthrough-sample-feedback";
 import { splitTaskThreeDocuments } from "@/lib/task-three-topic";
+import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
 
 // A topic from the app's own database of practice prompts (see
 // src/lib/starter-topics.ts), served at random by /api/topics/random.
@@ -78,6 +79,24 @@ interface BankTopic {
 }
 
 type TopicMode = "recent" | "custom" | null;
+
+function topicCycleKey(userId: string | undefined, taskType: TaskType) {
+  return userId ? `mytcflab:served-topics:${userId}:${taskType}` : null;
+}
+
+function servedTopics(userId: string | undefined, taskType: TaskType): string[] {
+  const key = topicCycleKey(userId, taskType);
+  if (!key) return [];
+  try {
+    const value: unknown = JSON.parse(safeGetLocalItem(key) ?? "[]");
+    return Array.isArray(value) && value.every((id) => typeof id === "string") ? value : [];
+  } catch { return []; }
+}
+
+function saveServedTopic(userId: string | undefined, taskType: TaskType, id: string, reset: boolean) {
+  const key = topicCycleKey(userId, taskType);
+  if (key) safeSetLocalItem(key, JSON.stringify(reset ? [id] : [...new Set([...servedTopics(userId, taskType), id])].slice(-40)));
+}
 
 // How long the draft must sit unchanged before it is written to the device. A
 // pending write is also flushed when the page is hidden or the workspace
@@ -1516,9 +1535,9 @@ export function WritingWorkspace({ userId }: { userId?: string } = {}) {
     setBlockedStep("topic-picker");
 
     try {
-      const res = await fetch(
-        `/api/topics/random?taskType=${encodeURIComponent(currentTaskType)}`,
-      );
+      const served = servedTopics(userId, currentTaskType);
+      const exclude = served.length ? `&exclude=${encodeURIComponent(served.join(","))}` : "";
+      const res = await fetch(`/api/topics/random?taskType=${encodeURIComponent(currentTaskType)}${exclude}`);
 
       if (!res.ok) {
         // An empty bank (no topics seeded for this task) is not a transient
@@ -1548,6 +1567,8 @@ export function WritingWorkspace({ userId }: { userId?: string } = {}) {
         }
         return;
       }
+      const cycleReset = data && typeof data === "object" && "cycleReset" in data && (data as { cycleReset?: unknown }).cycleReset === true;
+      saveServedTopic(userId, currentTaskType, nextTopic.id, cycleReset);
 
       // A newly loaded subject must not expose guidance the learner did not
       // ask to see. The Writing guide remains an explicit, per-subject choice
