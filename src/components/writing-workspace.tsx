@@ -1567,7 +1567,7 @@ export function WritingWorkspace({ userId }: { userId?: string } = {}) {
         }
         return;
       }
-      const cycleReset = data && typeof data === "object" && "cycleReset" in data && (data as { cycleReset?: unknown }).cycleReset === true;
+      const cycleReset = data && typeof data === "object" && "cycleReset" in data ? (data as { cycleReset?: unknown }).cycleReset === true : false;
       saveServedTopic(userId, currentTaskType, nextTopic.id, cycleReset);
 
       // A newly loaded subject must not expose guidance the learner did not
