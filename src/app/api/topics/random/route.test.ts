@@ -86,7 +86,7 @@ describe("GET /api/topics/random", () => {
     findManyMock.mockResolvedValue([bank("caaaaaaaa"), bank("cbbbbbbbb"), bank("ccccccccc")]);
     essayFindManyMock.mockResolvedValue([{ topicId: "caaaaaaaa" }]);
     vi.spyOn(Math, "random").mockReturnValue(0);
-    expect((await (await GET(request("TASK_2", "cbbbbbbbb")).json()).topic.id).toBe("ccccccccc");
+    expect((await (await GET(request("TASK_2", "cbbbbbbbb"))).json()).topic.id).toBe("ccccccccc");
   });
 
   it("resets a completed cycle without immediately repeating the current topic", async () => {
