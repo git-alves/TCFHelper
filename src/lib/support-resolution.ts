@@ -62,6 +62,17 @@ export async function getPendingSupportNotice(userId: string, now = new Date()):
 }
 
 export type ResolveOutcome = { kind: "resolved"; ticketNumber: number } | { kind: "notFound" } | { kind: "alreadyResolved" };
+export type EditResolutionOutcome = { kind: "updated" } | { kind: "notEditable" } | { kind: "notFound" };
+
+export async function editSupportResolutionNote(requestId: string, note: string | null): Promise<EditResolutionOutcome> {
+  const updated = await prisma.supportRequest.updateMany({
+    where: { id: requestId, status: "RESOLVED", noticeSeenAt: null, noticeDismissedAt: null, resolutionFeedback: null },
+    data: { resolutionNote: note },
+  });
+  if (updated.count === 1) return { kind: "updated" };
+  const existing = await prisma.supportRequest.findUnique({ where: { id: requestId }, select: { id: true } });
+  return existing ? { kind: "notEditable" } : { kind: "notFound" };
+}
 
 /**
  * Marks an OPEN request resolved. Resolving a request again after the learner
