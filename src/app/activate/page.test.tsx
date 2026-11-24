@@ -78,6 +78,12 @@ describe("/activate", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
+  it("renders the beta-ended variant when the durable expiry marker is set", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ ...USER, accessExpiredAt: new Date("2026-11-20T00:00:00.000Z") });
+    const page = await ActivatePage();
+    expect(renderToStaticMarkup(page)).toContain("Your beta tester access has ended");
+  });
+
   it("fails closed, without redirecting, when activation state cannot be read", async () => {
     hasRedeemedAccessCodeMock.mockRejectedValue(new Error("database unavailable"));
 

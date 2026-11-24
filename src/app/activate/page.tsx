@@ -59,7 +59,7 @@ export default async function ActivatePage() {
       <p className="text-sm font-medium text-violet-700 dark:text-violet-300">{copy.eyebrow}</p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">{expiredEndDate ? copy.expiredTitle : copy.title}</h1>
       <p className="mt-3 text-zinc-600 dark:text-zinc-400">
-        {expiredEndDate ? copy.expiredDescription({ endDate: expiredEndDate }) : copy.description}
+        {expiredEndDate ? copy.expiredDescription : copy.description}
       </p>
       <AccessCodeActivationForm label={expiredEndDate ? copy.newCodeLabel : undefined} />
     </main>

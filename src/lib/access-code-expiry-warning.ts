@@ -1,5 +1,4 @@
 export const ACCESS_EXPIRY_WARNING_DAYS = 7;
-export const ACCESS_EXPIRY_SUPPORT_HREF = "/support";
 
 function dateParts(date: Date, timeZone: string | null): [number, number, number] {
   try {
@@ -40,4 +39,8 @@ export function accessExpiryDismissalStorageKey(accessCodeId: string) {
 
 export function isAccessExpiryDismissed(storage: Pick<Storage, "getItem">, accessCodeId: string, todayKey: string): boolean {
   return storage.getItem(accessExpiryDismissalStorageKey(accessCodeId)) === todayKey;
+}
+
+export function isLearnerAppPath(pathname: string): boolean {
+  return ["/dashboard", "/tasks", "/practice", "/settings", "/support"].some((path) => pathname === path || pathname.startsWith(`${path}/`));
 }

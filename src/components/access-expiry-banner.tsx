@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAppCopy, useAppLocale } from "@/components/app-locale-provider";
-import { accessExpiryDismissalStorageKey, isAccessExpiryDismissed } from "@/lib/access-code-expiry-warning";
+import { accessExpiryDismissalStorageKey, isAccessExpiryDismissed, isLearnerAppPath } from "@/lib/access-code-expiry-warning";
 import { safeGetLocalItem, safeSetLocalItem } from "@/lib/safe-storage";
 import type { AccessExpiryNotice } from "@/lib/access-expiry-notice";
 
@@ -15,7 +15,7 @@ export function AccessExpiryBanner({ notice }: { notice: AccessExpiryNotice | nu
   useEffect(() => {
     if (notice) setDismissed(isAccessExpiryDismissed({ getItem: safeGetLocalItem }, notice.accessCodeId, notice.todayKey));
   }, [notice]);
-  const inLearnerApp = ["/dashboard", "/tasks", "/practice", "/settings", "/support"].some((path) => pathname === path || pathname.startsWith(`${path}/`));
+  const inLearnerApp = isLearnerAppPath(pathname);
   if (!notice || dismissed || !inLearnerApp) return null;
   const tag = locale === "pt" ? "pt-BR" : locale === "en" ? "en-US" : `${locale}-${locale.toUpperCase()}`;
   const expires = new Date(notice.expiresAt);
