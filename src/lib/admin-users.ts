@@ -198,7 +198,8 @@ export type AdminUserListItem = {
   // needs to know "does this account currently have access" -- e.g. the
   // table's status badge -- must use this field, not activatedAt.
   hasLiveAdmission: boolean;
-  expiresInDays: number | null;
+  // Omitted by older API clients/fixtures; new serializers always provide it.
+  expiresInDays?: number | null;
   usage: AdminUserUsage;
 };
 
