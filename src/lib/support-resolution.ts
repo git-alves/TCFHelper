@@ -108,7 +108,10 @@ export async function resolveSupportRequest(
 }
 
 export type NoticeActionOutcome =
-  | { kind: "ok"; next: SupportResolutionNotice | null }
+  // `notice` is only set by markSupportNoticeSeen: the notice as stored when
+  // the learner opened it, so the modal can show the current reply even if
+  // the admin edited it after the page loaded.
+  | { kind: "ok"; next: SupportResolutionNotice | null; notice?: SupportResolutionNotice }
   // Not the caller's request (or no such request): reported as 404 so a
   // learner cannot probe for other people's ticket ids.
   | { kind: "notFound" }
@@ -121,20 +124,25 @@ async function classifyMissedUpdate(userId: string, requestId: string): Promise<
   return owned ? { kind: "notPending" } : { kind: "notFound" };
 }
 
-/** Records that the learner opened the notice. Idempotent: a repeat is a no-op, not an error. */
+/**
+ * Records that the learner opened the notice. Idempotent: a repeat is a no-op,
+ * not an error. Returns the notice as stored, read after noticeSeenAt is set:
+ * from then on the admin can no longer edit the reply, so this is the text the
+ * learner should be shown.
+ */
 export async function markSupportNoticeSeen(userId: string, requestId: string, now = new Date()): Promise<NoticeActionOutcome> {
-  const updated = await prisma.supportRequest.updateMany({
+  await prisma.supportRequest.updateMany({
     where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId, noticeSeenAt: null },
     data: { noticeSeenAt: now },
   });
-  if (updated.count === 1) return { kind: "ok", next: null };
 
-  // Either already seen (fine) or not pending / not theirs.
+  // Either just marked or already seen (fine), or not pending / not theirs.
   const pending = await prisma.supportRequest.findFirst({
     where: { ...PENDING_NOTICE_WHERE(userId, now), id: requestId },
-    select: { id: true },
+    select: NOTICE_SELECT,
   });
-  if (pending) return { kind: "ok", next: null };
+  const notice = pending ? toNotice(pending) : null;
+  if (notice) return { kind: "ok", next: null, notice };
   return classifyMissedUpdate(userId, requestId);
 }
 

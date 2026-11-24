@@ -130,6 +130,30 @@ describe("NavBar support-resolution notice", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("shows the reply as stored when the notice is opened, not the text the page loaded with", async () => {
+    fetchMock.mockResolvedValue(json({ ok: true, next: null, notice: { ...NOTICE, resolutionNote: "Clear your cache." } }));
+    render(NOTICE);
+
+    await act(async () => {
+      clickSupport();
+    });
+
+    expect(dialog()!.textContent).toContain("Clear your cache.");
+    expect(dialog()!.textContent).not.toContain("We fixed the editor.");
+  });
+
+  it("keeps the loaded reply when telling the server it was seen fails", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    render(NOTICE);
+
+    await act(async () => {
+      clickSupport();
+    });
+
+    expect(postsTo("/api/support/req_7/seen")).toHaveLength(1);
+    expect(dialog()!.textContent).toContain("We fixed the editor.");
+  });
+
   it("clicking the icon opens the notice instead of Support, and tells the server it was seen", () => {
     render(NOTICE);
 

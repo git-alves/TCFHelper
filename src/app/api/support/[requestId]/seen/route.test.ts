@@ -80,4 +80,13 @@ describe("POST /api/support/[requestId]/seen", () => {
     expect(getCurrentAppUserMock).toHaveBeenCalledWith({ skipPresenceTouch: true });
   });
 
+  it("returns the notice as stored so the learner sees the current reply", async () => {
+    const notice = { id: "req_1", ticketNumber: 7, resolutionNote: "Edited reply", resolvedAt: "2026-11-10T10:00:00.000Z" };
+    markSupportNoticeSeenMock.mockResolvedValue({ kind: "ok", next: null, notice });
+
+    const response = await call();
+
+    await expect(response.json()).resolves.toEqual({ ok: true, next: null, notice });
+  });
+
 });

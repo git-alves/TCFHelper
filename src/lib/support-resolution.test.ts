@@ -244,21 +244,41 @@ describe("dismissSupportNotice (\"I don't want to answer\")", () => {
 });
 
 describe("markSupportNoticeSeen", () => {
-  it("records the first view", async () => {
-    updateManyMock.mockResolvedValue({ count: 1 });
+  const STORED = {
+    id: "req_1",
+    ticketNumber: 12,
+    resolutionNote: "Edited reply",
+    resolvedAt: new Date("2026-11-10T10:00:00.000Z"),
+  };
+  const NOTICE_SELECT = { id: true, ticketNumber: true, resolutionNote: true, resolvedAt: true };
 
-    await expect(markSupportNoticeSeen("learner_1", "req_1", NOW)).resolves.toEqual({ kind: "ok", next: null });
+  it("records the first view and returns the notice as stored after it", async () => {
+    updateManyMock.mockResolvedValue({ count: 1 });
+    findFirstMock.mockResolvedValueOnce(STORED);
+
+    await expect(markSupportNoticeSeen("learner_1", "req_1", NOW)).resolves.toEqual({
+      kind: "ok",
+      next: null,
+      notice: { ...STORED, resolvedAt: "2026-11-10T10:00:00.000Z" },
+    });
 
     expect(updateManyMock).toHaveBeenCalledWith({
       where: { ...PENDING_WHERE, id: "req_1", noticeSeenAt: null },
       data: { noticeSeenAt: NOW },
     });
+    expect(findFirstMock).toHaveBeenCalledWith({ where: { ...PENDING_WHERE, id: "req_1" }, select: NOTICE_SELECT });
+    // Read after the seen write, so it is the text the admin can no longer change.
+    expect(updateManyMock.mock.invocationCallOrder[0]).toBeLessThan(findFirstMock.mock.invocationCallOrder[0]);
   });
 
   it("is idempotent for a notice that was already seen, and notFound for someone else's ticket", async () => {
     updateManyMock.mockResolvedValue({ count: 0 });
-    findFirstMock.mockResolvedValueOnce({ id: "req_1" });
-    await expect(markSupportNoticeSeen("learner_1", "req_1", NOW)).resolves.toEqual({ kind: "ok", next: null });
+    findFirstMock.mockResolvedValueOnce(STORED);
+    await expect(markSupportNoticeSeen("learner_1", "req_1", NOW)).resolves.toMatchObject({
+      kind: "ok",
+      next: null,
+      notice: { id: "req_1", resolutionNote: "Edited reply" },
+    });
 
     findFirstMock.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
     await expect(markSupportNoticeSeen("learner_1", "other_users", NOW)).resolves.toEqual({ kind: "notFound" });
