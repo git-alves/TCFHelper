@@ -197,6 +197,9 @@ model User {
   // the learner, after this are "new" for the admin's nav bell; null means
   // every open ticket is new. Only the owner account ever has a value.
   supportInboxSeenAt          DateTime?
+  // Set only by lazy access-code expiry; null also covers never activated and
+  // manual deactivation. A successful replacement redemption clears it.
+  accessExpiredAt             DateTime?
 
   subscriptions           Subscription[]
   essays                  Essay[]

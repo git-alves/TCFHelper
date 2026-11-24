@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const {
   getCurrentAppUserMock,
   AppUserProvisioningErrorMock,
-  hasRedeemedAccessCodeMock,
+  getRedeemedAccessCodeAdmissionMock,
   redirectForUnauthenticatedOrBlockedUserMock,
   redirectMock,
 } = vi.hoisted(() => {
@@ -13,7 +13,7 @@ const {
   return {
     getCurrentAppUserMock: vi.fn(),
     AppUserProvisioningErrorMock,
-    hasRedeemedAccessCodeMock: vi.fn(),
+    getRedeemedAccessCodeAdmissionMock: vi.fn(),
     redirectForUnauthenticatedOrBlockedUserMock: vi.fn(),
     redirectMock: vi.fn(),
   };
@@ -24,11 +24,12 @@ vi.mock("@/lib/app-user", () => ({
   AppUserProvisioningError: AppUserProvisioningErrorMock,
 }));
 vi.mock("@/lib/access-code", () => ({
-  hasRedeemedAccessCode: hasRedeemedAccessCodeMock,
+  getRedeemedAccessCodeAdmission: getRedeemedAccessCodeAdmissionMock,
 }));
 vi.mock("@/lib/blocked-user-redirect", () => ({
   redirectForUnauthenticatedOrBlockedUser: redirectForUnauthenticatedOrBlockedUserMock,
 }));
+vi.mock("@/lib/request-locale", () => ({ getRequestLocale: vi.fn().mockResolvedValue("en") }));
 vi.mock("@/components/access-code-activation-form", () => ({
   AccessCodeActivationForm: () => <div data-testid="access-code-activation-form" />,
 }));
@@ -43,7 +44,7 @@ const USER = { id: "cuid_learner_1", isAdmin: false };
 
 beforeEach(() => {
   getCurrentAppUserMock.mockReset();
-  hasRedeemedAccessCodeMock.mockReset();
+  getRedeemedAccessCodeAdmissionMock.mockReset();
   redirectForUnauthenticatedOrBlockedUserMock.mockReset();
   redirectMock.mockReset();
   redirectMock.mockImplementation(() => {
@@ -51,12 +52,12 @@ beforeEach(() => {
   });
 
   getCurrentAppUserMock.mockResolvedValue(USER);
-  hasRedeemedAccessCodeMock.mockResolvedValue(false);
+  getRedeemedAccessCodeAdmissionMock.mockResolvedValue({ kind: "none" });
 });
 
 describe("/activate", () => {
   it("redirects an already-activated learner instead of rendering the unavailable message", async () => {
-    hasRedeemedAccessCodeMock.mockResolvedValue(true);
+    getRedeemedAccessCodeAdmissionMock.mockResolvedValue({ kind: "active" });
 
     await expect(ActivatePage()).rejects.toThrow("NEXT_REDIRECT");
     expect(redirectMock).toHaveBeenCalledWith("/tasks");
@@ -67,7 +68,7 @@ describe("/activate", () => {
 
     await expect(ActivatePage()).rejects.toThrow("NEXT_REDIRECT");
     expect(redirectMock).toHaveBeenCalledWith("/tasks");
-    expect(hasRedeemedAccessCodeMock).not.toHaveBeenCalled();
+    expect(getRedeemedAccessCodeAdmissionMock).not.toHaveBeenCalled();
   });
 
   it("renders the activation form for a learner who has not redeemed a code", async () => {
@@ -77,8 +78,20 @@ describe("/activate", () => {
     expect(redirectMock).not.toHaveBeenCalled();
   });
 
+  it("renders the beta-ended variant when the durable expiry marker is set", async () => {
+    getCurrentAppUserMock.mockResolvedValue({ ...USER, accessExpiredAt: new Date("2026-11-20T00:00:00.000Z") });
+    const page = await ActivatePage();
+    expect(renderToStaticMarkup(page)).toContain("Your beta tester access has ended");
+  });
+
+  it("renders beta-ended immediately when this visit detaches an expired admission", async () => {
+    getRedeemedAccessCodeAdmissionMock.mockResolvedValue({ kind: "expired", expiresAt: new Date("2026-11-20T00:00:00.000Z") });
+    const page = await ActivatePage();
+    expect(renderToStaticMarkup(page)).toContain("Your beta tester access has ended");
+  });
+
   it("fails closed, without redirecting, when activation state cannot be read", async () => {
-    hasRedeemedAccessCodeMock.mockRejectedValue(new Error("database unavailable"));
+    getRedeemedAccessCodeAdmissionMock.mockRejectedValue(new Error("database unavailable"));
 
     const page = await ActivatePage();
 

@@ -21,6 +21,7 @@ describe("classifyCorrectionFailure", () => {
 
   it("maps an expired session, a busy or failing service, and everything else", () => {
     expect(classifyCorrectionFailure(401, { error: "Unauthorized" })).toEqual({ kind: "sessionExpired" });
+    expect(classifyCorrectionFailure(403, { error: "Access expired", code: "ACCESS_EXPIRED" })).toEqual({ kind: "accessExpired" });
     expect(classifyCorrectionFailure(502, null)).toEqual({ kind: "busy" });
     expect(classifyCorrectionFailure(503, { code: "CORRECTION_SERVICE_UNAVAILABLE" })).toEqual({ kind: "busy" });
     expect(classifyCorrectionFailure(504, null)).toEqual({ kind: "generic" });

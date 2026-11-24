@@ -8,6 +8,7 @@ export type CorrectionErrorState =
   | { kind: "dailyLimit"; resetAt: string | null }
   | { kind: "busy" }
   | { kind: "sessionExpired" }
+  | { kind: "accessExpired" }
   | { kind: "generic" };
 
 function validIsoDate(value: unknown): string | null {
@@ -21,6 +22,7 @@ export function classifyCorrectionFailure(status: number, data: unknown): Correc
     return { kind: "dailyLimit", resetAt: validIsoDate(body.resetAt) };
   }
   if (status === 401) return { kind: "sessionExpired" };
+  if (status === 403 && body.code === "ACCESS_EXPIRED") return { kind: "accessExpired" };
   // The provider failed or is overloaded, or the service is briefly unavailable.
   if (status === 502 || status === 503) return { kind: "busy" };
   return { kind: "generic" };

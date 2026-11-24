@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { EssayStatus, TaskType, TopicSource } from "@prisma/client";
 import { AppUserProvisioningError } from "@/lib/app-user";
-import { getCurrentActivatedAppUser } from "@/lib/activated-app-user";
+import { getCurrentActivatedAppUserAdmission } from "@/lib/activated-app-user";
 import { prisma } from "@/lib/prisma";
 import { getAppConfig, resolveCorrectionProviderId } from "@/lib/app-config";
 import { getCorrectionProvider } from "@/lib/correction-provider-registry";
@@ -191,9 +191,9 @@ async function refundCorrectionReservation(
 }
 
 export async function POST(request: Request) {
-  let user: Awaited<ReturnType<typeof getCurrentActivatedAppUser>>;
+  let admission: Awaited<ReturnType<typeof getCurrentActivatedAppUserAdmission>>;
   try {
-    user = await getCurrentActivatedAppUser();
+    admission = await getCurrentActivatedAppUserAdmission();
   } catch (error) {
     if (error instanceof AppUserProvisioningError) {
       return NextResponse.json(
@@ -208,6 +208,10 @@ export async function POST(request: Request) {
     throw error;
   }
 
+  if (admission.accessExpired) {
+    return NextResponse.json({ error: "Access expired", code: "ACCESS_EXPIRED" }, { status: 403 });
+  }
+  const user = admission.user;
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

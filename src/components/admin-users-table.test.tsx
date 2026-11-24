@@ -70,6 +70,12 @@ describe("AdminUsersTable", () => {
     expect(markup).not.toContain("Access expired");
   });
 
+  it("shows an expiry pill only for a live code within seven days", () => {
+    const markup = renderUsers([user({ activatedAt: "2026-08-05T00:00:00.000Z", hasLiveAdmission: true, expiresInDays: 7 })]);
+    expect(markup).toContain("Expires in 7 days");
+    expect(renderUsers([user({ hasLiveAdmission: true, expiresInDays: null })])).not.toContain("Expires in");
+  });
+
   it("shows a distinct Access expired badge for a redeemed timed code that is no longer live, instead of the green Activated badge", () => {
     // A timed code past its derived expiry (redeemedAt + validityDays)
     // stays attached in the DB until the learner's own next request lazily

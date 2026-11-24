@@ -1,6 +1,6 @@
 import "server-only";
 
-import { hasRedeemedAccessCode } from "@/lib/access-code";
+import { getRedeemedAccessCodeAdmission, hasRedeemedAccessCode } from "@/lib/access-code";
 import { getCurrentAppUser, type AppUser } from "@/lib/app-user";
 
 /**
@@ -19,4 +19,20 @@ export async function getCurrentActivatedAppUser(): Promise<AppUser | null> {
   if (user.isAdmin) return user;
 
   return (await hasRedeemedAccessCode(user.id)) ? user : null;
+}
+
+/** The correction route needs the expiry result from the same lazy-detach read. */
+export async function getCurrentActivatedAppUserAdmission(): Promise<{
+  user: AppUser | null;
+  accessExpired: boolean;
+}> {
+  const user = await getCurrentAppUser();
+  if (!user) return { user: null, accessExpired: false };
+  if (user.isAdmin) return { user, accessExpired: false };
+
+  const admission = await getRedeemedAccessCodeAdmission(user.id);
+  return {
+    user: admission.kind === "active" ? user : null,
+    accessExpired: admission.kind === "expired" || (admission.kind === "none" && user.accessExpiredAt !== null),
+  };
 }

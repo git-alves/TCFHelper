@@ -11,7 +11,7 @@ type RedemptionResponse = {
   error?: string;
 };
 
-export function AccessCodeActivationForm() {
+export function AccessCodeActivationForm({ copy }: { copy: { codeLabel: string; activate: string; activating: string; clientError: { activation: string; service: string } } }) {
   const router = useRouter();
   const errorId = useId();
   const [code, setCode] = useState("");
@@ -38,7 +38,7 @@ export function AccessCodeActivationForm() {
       const payload = (await response.json().catch(() => null)) as RedemptionResponse | null;
 
       if (!response.ok || payload?.activated !== true) {
-        setError(payload?.error ?? "We could not activate your account. Please try again.");
+        setError(payload?.error ?? copy.clientError.activation);
         return;
       }
 
@@ -56,7 +56,7 @@ export function AccessCodeActivationForm() {
         router.refresh();
       }
     } catch {
-      setError("We could not reach the activation service. Please try again.");
+      setError(copy.clientError.service);
     } finally {
       setIsSubmitting(false);
     }
@@ -83,7 +83,7 @@ export function AccessCodeActivationForm() {
     <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4" noValidate>
       <div className="flex flex-col gap-2">
         <label htmlFor="access-code" className="text-sm font-medium">
-          Access code
+          {copy.codeLabel}
         </label>
         <input
           id="access-code"
@@ -114,7 +114,7 @@ export function AccessCodeActivationForm() {
         disabled={!canSubmit}
         className="rounded-full bg-foreground px-5 py-3 text-sm font-medium text-background transition-colors hover:bg-[#383838] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-[#ccc]"
       >
-        {isSubmitting ? "Activating…" : "Activate account"}
+        {isSubmitting ? copy.activating : copy.activate}
       </button>
     </form>
   );

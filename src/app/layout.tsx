@@ -3,6 +3,7 @@ import { Show } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AdminSupportInboxProvider } from "@/components/admin-support-inbox-count";
+import { AccessExpiryBanner } from "@/components/access-expiry-banner";
 import { AppLocaleProvider } from "@/components/app-locale-provider";
 import { AppThemeProvider } from "@/components/app-theme-provider";
 import { ClerkLocaleProvider } from "@/components/clerk-locale-provider";
@@ -15,6 +16,7 @@ import { getAppCopy } from "@/lib/app-copy";
 import { getCurrentAppUser } from "@/lib/app-user";
 import { getRequestLocale } from "@/lib/request-locale";
 import { getNavSupportState } from "@/lib/support-inbox";
+import { getAccessExpiryNotice } from "@/lib/access-expiry-notice";
 import { APP_FAVICON_LINK_ID, THEME_INIT_SCRIPT } from "@/lib/app-theme";
 import { REVEAL_INIT_SCRIPT } from "@/lib/reveal-init-script";
 
@@ -63,7 +65,10 @@ export default async function RootLayout({
   // lookups per full page load, nothing on client-side navigations and no
   // polling. The count query runs for the admin account only. Each fails soft
   // like the lookup above: no dot or badge is better than no page.
-  const { supportNotice, adminSupportCount } = await getNavSupportState(appUser);
+  const [{ supportNotice, adminSupportCount }, accessExpiryNotice] = await Promise.all([
+    getNavSupportState(appUser),
+    appUser ? getAccessExpiryNotice(appUser).catch(() => null) : Promise.resolve(null),
+  ]);
 
   return (
     <html
@@ -100,6 +105,7 @@ export default async function RootLayout({
                   </Show>
                   <AdminSupportInboxProvider initialCount={adminSupportCount}>
                     <NavBar isAdmin={isAdmin} supportNotice={supportNotice} />
+                    <AccessExpiryBanner notice={accessExpiryNotice} />
                     <div className="flex flex-1 flex-col">{children}</div>
                     {settings}
                     {support}

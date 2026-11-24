@@ -64,6 +64,7 @@ export function AdminUserDetail({ user, currentAdminId }: AdminUserDetailProps) 
             ) : (
               <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900 dark:bg-amber-950 dark:text-amber-200">Awaiting access code</span>
             )}
+            {typeof user.expiresInDays === "number" && <span className={`rounded-full px-2.5 py-1 ${user.expiresInDays === 0 ? "bg-rose-100 text-rose-900 dark:bg-rose-950 dark:text-rose-200" : "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"}`}>{user.expiresInDays === 0 ? "Expires today" : user.expiresInDays === 1 ? "Expires tomorrow" : `Expires in ${user.expiresInDays} days`}</span>}
           </div>
         </div>
         <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">Joined {dateTime(user.createdAt, user.timezone)}.</p>

@@ -143,6 +143,10 @@ describe("hasRedeemedAccessCode", () => {
       where: { id: "code_expired", redeemedByUserId: USER_ID, redeemedAt: { not: null } },
       data: { redeemedByUserId: null },
     });
+    expect(userUpdateManyMock).toHaveBeenCalledWith({
+      where: { id: USER_ID },
+      data: { accessExpiredAt: threeDaysAgo },
+    });
   });
 
   it("does not detach a replacement code redeemed between the unlocked read and the lock", async () => {
@@ -205,6 +209,7 @@ describe("redeemAccessCode", () => {
     const expiresAtMs = call.data.expiresAt.getTime();
     expect(expiresAtMs).toBeGreaterThanOrEqual(before + 7 * 24 * 60 * 60 * 1000);
     expect(expiresAtMs).toBeLessThanOrEqual(after + 7 * 24 * 60 * 60 * 1000);
+    expect(userUpdateManyMock).toHaveBeenCalledWith({ where: { id: USER_ID }, data: { accessExpiredAt: null } });
   });
 
   it("does not spend a second code for a learner who is already activated", async () => {
@@ -294,6 +299,7 @@ describe("resetAccessCodeActivation", () => {
       where: { id: USER_ID, activationWelcomeShownAt: null },
       data: { activationWelcomeShownAt: expect.any(Date) },
     });
+    expect(userUpdateManyMock).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ accessExpiredAt: expect.anything() }) }));
     expect(transactionMock).toHaveBeenCalledWith(expect.any(Function), { timeout: 3_000 });
   });
 

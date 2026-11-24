@@ -140,6 +140,10 @@ describe("AUTOMATIC_ADDITIVE_MIGRATIONS", () => {
     expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261119120000_add_recovered_chain_events");
   });
 
+  it("allows the additive User access-expiry outcome marker", () => {
+    expect(AUTOMATIC_ADDITIVE_MIGRATIONS).toContain("20261124120000_add_user_access_expired_at");
+  });
+
   it("widens the AdminEvent constraint without removing existing provider-failure rows", () => {
     const migration = readFileSync(
       fileURLToPath(new URL("../../prisma/migrations/20261119120000_add_recovered_chain_events/migration.sql", import.meta.url)),

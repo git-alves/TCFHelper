@@ -44,7 +44,7 @@ const tx = {
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/app-user", () => ({ AppUserProvisioningError: class extends Error {} }));
-vi.mock("@/lib/activated-app-user", () => ({ getCurrentActivatedAppUser: async () => ({ id: "learner_1" }) }));
+vi.mock("@/lib/activated-app-user", () => ({ getCurrentActivatedAppUserAdmission: async () => ({ user: { id: "learner_1" }, accessExpired: false }) }));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     topic: {
