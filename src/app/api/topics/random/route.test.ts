@@ -60,6 +60,7 @@ describe("GET /api/topics/random", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
     expect(await response.json()).toEqual({
+      cycleReset: false,
       topic: {
         id: "t2",
         taskType: "TASK_2",
