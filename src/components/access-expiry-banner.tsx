@@ -31,9 +31,9 @@ export function AccessExpiryBanner({ notice }: { notice: AccessExpiryNotice | nu
   const message = notice.days === 0 ? copy.bannerToday({ time, date }) : notice.days === 1 ? copy.bannerTomorrow({ date }) : copy.bannerDays({ days: notice.days, date });
 
   return (
-    <aside className="border-b border-violet-200 bg-violet-50 px-4 py-3 text-sm text-violet-950 dark:border-violet-900 dark:bg-violet-950/40 dark:text-violet-100" aria-label={copy.bannerAriaLabel}>
+    <aside className="border-b border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900 dark:border-red-900/60 dark:bg-red-950/45 dark:text-red-100" aria-label={copy.bannerAriaLabel}>
       <div className="mx-auto flex w-full max-w-7xl items-start gap-3 sm:items-center">
-        <span aria-hidden className="mt-0.5 text-violet-700 dark:text-violet-300">◷</span><p className="flex-1">{message}</p>
+        <span aria-hidden className="mt-0.5 text-red-700 dark:text-red-300">◷</span><p className="flex-1">{message}</p>
         <button type="button" className="font-medium underline underline-offset-4" onClick={() => {
           safeSetLocalItem(accessExpiryDismissalStorageKey(notice.accessCodeId), notice.todayKey);
           setDismissed(true);
